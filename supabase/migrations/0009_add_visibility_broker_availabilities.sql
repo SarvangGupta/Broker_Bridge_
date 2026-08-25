@@ -1,0 +1,1 @@
+ALTER TABLE "availabilities" ADD COLUMN "visibility" text DEFAULT 'global' NOT NULL;

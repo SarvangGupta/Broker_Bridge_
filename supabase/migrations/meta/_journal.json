@@ -1,0 +1,97 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785917092614,
+      "tag": "0000_quiet_wendigo",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785918345833,
+      "tag": "0001_init_users_and_companies",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786022320398,
+      "tag": "0002_add_master_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786533639897,
+      "tag": "0004_add_availabilities_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786701607603,
+      "tag": "0005_add_quotations_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786798536939,
+      "tag": "0006_add_deals_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786798608465,
+      "tag": "0007_add_quotation_rejection_counter_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786817672932,
+      "tag": "0009_add_visibility_broker_availabilities",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786887328148,
+      "tag": "0011_add_logistics_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786961423808,
+      "tag": "0013_add_payments_and_disputes",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787127116764,
+      "tag": "0016_add_fulfilled_quantity_to_requirements",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787190000000,
+      "tag": "0017_add_notifications_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787308467475,
+      "tag": "0018_add_master_industries_and_categories",
+      "breakpoints": true
+    }
+  ]
+}
