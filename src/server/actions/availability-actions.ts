@@ -1,9 +1,7 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { db } from "@/src/server/db";
 import { 
-  users, 
   masterCommodities, 
   masterCategories, 
   masterIndustries, 
@@ -16,27 +14,26 @@ import {
 import { availabilitySchema } from "@/src/types/availability-schema";
 import { eq, desc, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { verifySellerSession } from "@/src/server/utils/seller-auth";
 
+/**
+ * Creates a new commodity availability lot for the authenticated Seller organization.
+ * Protected by verifySellerSession({ allowViewer: false }).
+ */
 export async function createAvailabilityAction(data: unknown) {
   try {
+    // 1. Authorize session & verify mutation permissions BEFORE execution
+    const session = await verifySellerSession({ allowViewer: false });
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized" };
+    }
+
+    // 2. Validate payload against schema
     const parsedData = availabilitySchema.parse(data);
 
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: "Unauthorized" };
-    }
-
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id),
-    });
-
-    if (!dbUser || !dbUser.companyId) {
-      return { success: false, error: "User is not linked to a company" };
-    }
-
+    // 3. Insert record bound strictly to authenticated server-side companyId
     const inserted = await db.insert(availabilities).values({
-      companyId: dbUser.companyId,
+      companyId: session.data.companyId,
       commodityId: parsedData.commodity_id,
       gradeId: parsedData.grade_id,
       quantity: parsedData.quantity,
@@ -58,17 +55,16 @@ export async function createAvailabilityAction(data: unknown) {
   }
 }
 
+/**
+ * Fetches listed availabilities belonging strictly to the authenticated Seller organization.
+ * Confidential minimum price is only accessible to the owning Seller organization.
+ */
 export async function getMyAvailabilitiesAction() {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return { success: false, error: "Unauthorized" };
-
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id),
-    });
-
-    if (!dbUser || !dbUser.companyId) return { success: false, error: "Company not found" };
+    const session = await verifySellerSession({ allowViewer: true });
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized" };
+    }
 
     const results = await db
       .select({
@@ -94,7 +90,7 @@ export async function getMyAvailabilitiesAction() {
       .leftJoin(masterUnits, eq(availabilities.unitId, masterUnits.id))
       .leftJoin(masterStates, eq(availabilities.stateId, masterStates.id))
       .leftJoin(masterDistricts, eq(availabilities.districtId, masterDistricts.id))
-      .where(eq(availabilities.companyId, dbUser.companyId))
+      .where(eq(availabilities.companyId, session.data.companyId))
       .orderBy(desc(availabilities.createdAt));
 
     return { success: true, data: results };
@@ -104,16 +100,16 @@ export async function getMyAvailabilitiesAction() {
   }
 }
 
+/**
+ * Cancels an active availability lot. Enforces company tenant boundary and role check.
+ * Protected by verifySellerSession({ allowViewer: false }).
+ */
 export async function cancelAvailabilityAction(id: string) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return { success: false, error: "Unauthorized" };
-
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id),
-    });
-    if (!dbUser || !dbUser.companyId) return { success: false, error: "Company not found" };
+    const session = await verifySellerSession({ allowViewer: false });
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized" };
+    }
 
     const updated = await db
       .update(availabilities)
@@ -121,7 +117,7 @@ export async function cancelAvailabilityAction(id: string) {
       .where(
         and(
           eq(availabilities.id, id),
-          eq(availabilities.companyId, dbUser.companyId),
+          eq(availabilities.companyId, session.data.companyId),
           eq(availabilities.status, 'Open')
         )
       )

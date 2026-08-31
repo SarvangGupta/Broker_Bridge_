@@ -7,6 +7,7 @@ import { Loader2, MapPin, Calendar, PackageOpen, Tag, Ban } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { EmptyState } from "@/src/components/ui/empty-state"
 import { cancelAvailabilityAction } from "@/src/server/actions/availability-actions"
 
 interface AvailabilityRow {
@@ -41,8 +42,8 @@ export function MyAvailabilitiesTable({ availabilities }: MyAvailabilitiesTableP
       } else {
         toast.error(res.error || "Failed to cancel availability")
       }
-    } catch (error) {
-      toast.error("An unexpected error occurred")
+    } catch (error: any) {
+      toast.error(error.message || "An unexpected error occurred")
     } finally {
       setCancellingId(null)
     }
@@ -50,15 +51,12 @@ export function MyAvailabilitiesTable({ availabilities }: MyAvailabilitiesTableP
 
   if (availabilities.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-center bg-white border border-slate-200/80 rounded-2xl shadow-sm">
-        <div className="w-14 h-14 rounded-2xl bg-[#ECFDF5] flex items-center justify-center mb-4 text-[#047857]">
-          <PackageOpen className="w-7 h-7 stroke-[1.75]" />
-        </div>
-        <h3 className="text-lg font-bold text-slate-900 mb-1">No Active Inventory</h3>
-        <p className="text-sm text-slate-500 max-w-sm mb-6">
-          You have not posted any commodity stock yet. Click &ldquo;Post Availability&rdquo; above to publish your inventory to the market.
-        </p>
-      </div>
+      <EmptyState
+        icon={PackageOpen}
+        title="No Active Inventory"
+        description="You have not posted any commodity stock yet. Click &ldquo;Post Availability&rdquo; to publish your inventory to the market."
+        className="bg-white border-slate-200/80 shadow-xs"
+      />
     )
   }
 
@@ -70,7 +68,7 @@ export function MyAvailabilitiesTable({ availabilities }: MyAvailabilitiesTableP
         return (
           <div
             key={item.id}
-            className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between relative group"
+            className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between relative group"
           >
             <div>
               {/* TOP HEADER: Breadcrumb • Commodity • Quality Parameter & Status Badge */}
@@ -100,45 +98,38 @@ export function MyAvailabilitiesTable({ availabilities }: MyAvailabilitiesTableP
                 </Badge>
               </div>
 
-              {/* MIDDLE HERO METRICS: Quantity and Target Price */}
-              <div className="py-4 px-4 bg-slate-50/80 rounded-xl border border-slate-100 flex items-baseline justify-between mb-4">
+              {/* STATS: Quantity & Asking Rate */}
+              <div className="grid grid-cols-2 gap-3 py-3 px-3.5 bg-slate-50/80 rounded-xl border border-slate-100 mb-4">
                 <div>
-                  <div className="text-[11px] font-semibold text-slate-600 tracking-wider uppercase mb-0.5">
-                    Quantity
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                    {item.quantity}{" "}
-                    <span className="text-sm font-semibold text-slate-600">
-                      {item.unitSymbol || "Units"}
-                    </span>
-                  </div>
+                  <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider block">
+                    Available Stock
+                  </span>
+                  <span className="text-base sm:text-lg font-bold text-slate-900">
+                    {item.quantity} {item.unitSymbol || "Units"}
+                  </span>
                 </div>
-                <div className="text-right">
-                  <div className="text-[11px] font-semibold text-slate-600 tracking-wider uppercase mb-0.5">
-                    Target Price
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-[#059669] tracking-tight">
+                <div>
+                  <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider block">
+                    Asking Rate
+                  </span>
+                  <span className="text-base sm:text-lg font-bold text-[#059669]">
                     ₹{item.price}
-                  </div>
+                  </span>
                 </div>
               </div>
 
-              {/* LOCATION & DATES */}
-              <div className="space-y-2 text-xs sm:text-sm text-slate-600">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-slate-500 shrink-0" />
-                  <span className="truncate font-medium">
-                    {item.districtName ? `${item.districtName}, ${item.stateName}` : item.stateName || "Location Not Specified"}
+              {/* LOCATION & VALIDITY METADATA */}
+              <div className="space-y-1.5 text-xs text-slate-500">
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">
+                    {[item.districtName, item.stateName].filter(Boolean).join(", ") || "Location Unspecified"}
                   </span>
                 </div>
-
-                <div className="flex items-center justify-between text-xs text-slate-600 pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                    <span>Posted {format(new Date(item.createdAt), "MMM d, yyyy")}</span>
-                  </div>
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   <span className="font-medium text-slate-600">
-                    Valid till {format(new Date(item.validUntil), "MMM d")}
+                    Valid till {format(new Date(item.validUntil), "MMM d, yyyy")}
                   </span>
                 </div>
               </div>

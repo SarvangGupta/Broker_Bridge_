@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/src/components/ui/empty-state"
 import {
   Dialog,
   DialogContent,
@@ -35,15 +36,12 @@ export function SellerDealsTable({
 
   if (deals.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-center bg-white border border-slate-200/80 rounded-2xl shadow-sm">
-        <div className="w-14 h-14 rounded-2xl bg-[#ECFDF5] flex items-center justify-center mb-4 text-[#047857]">
-          <Handshake className="w-7 h-7 stroke-[1.75]" />
-        </div>
-        <h3 className="text-lg font-bold text-slate-900 mb-1">No Active Deals</h3>
-        <p className="text-sm text-slate-500 max-w-sm">
-          When buyers accept your inventory quotations, booked orders and dispatch trackers will appear here.
-        </p>
-      </div>
+      <EmptyState
+        icon={Handshake}
+        title="No Active Deals"
+        description="When buyers accept your inventory quotations, booked orders and dispatch trackers will appear here."
+        className="bg-white border-slate-200/80 shadow-xs"
+      />
     )
   }
 
@@ -58,7 +56,7 @@ export function SellerDealsTable({
           return (
             <div 
               key={row.deal.id}
-              className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4"
+              className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4"
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -94,27 +92,25 @@ export function SellerDealsTable({
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+              {/* Action Buttons with 48px Touch Targets */}
+              <div className="flex flex-col gap-2.5 pt-2 border-t border-slate-100">
                 {isPendingDispatch && (
                   <Button 
-                    size="lg"
                     onClick={() => setOpenDialogForDeal(row.deal.id)}
-                    className="w-full bg-[#059669] hover:bg-[#047857] text-white min-h-[48px] rounded-xl font-semibold gap-2 shadow-sm cursor-pointer"
+                    className="w-full min-h-[48px] bg-[#059669] hover:bg-[#047857] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                   >
-                    <Truck className="h-4 w-4" />
+                    <Truck className="h-5 w-5" />
                     Dispatch Shipment
                   </Button>
                 )}
                 {canDispute && (
                   <Button 
-                    size="lg"
                     variant="outline"
                     onClick={() => setActiveDisputeDealId(row.deal.id)}
-                    className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-slate-200 hover:border-rose-200 min-h-[48px] rounded-xl font-semibold gap-2 cursor-pointer"
+                    className="w-full min-h-[48px] text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-slate-200 font-semibold rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <AlertTriangle className="h-4 w-4" />
-                    File Dispute
+                    Raise Dispute
                   </Button>
                 )}
               </div>
@@ -124,16 +120,16 @@ export function SellerDealsTable({
       </div>
 
       {/* DESKTOP TABLE VIEW (>= md) */}
-      <div className="hidden md:block rounded-2xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <Table>
-          <TableHeader>
-            <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-b border-slate-200">
-              <TableHead className="font-semibold text-slate-600">Deal ID</TableHead>
-              <TableHead className="font-semibold text-slate-600">Commodity</TableHead>
-              <TableHead className="font-semibold text-slate-600">Quantity</TableHead>
-              <TableHead className="font-semibold text-slate-600">Agreed Price</TableHead>
-              <TableHead className="font-semibold text-slate-600">Status</TableHead>
-              <TableHead className="text-right font-semibold text-slate-600">Actions</TableHead>
+          <TableHeader className="bg-slate-50/60">
+            <TableRow>
+              <TableHead className="font-bold text-slate-700">Deal Ref</TableHead>
+              <TableHead className="font-bold text-slate-700">Commodity & Grade</TableHead>
+              <TableHead className="font-bold text-slate-700">Quantity</TableHead>
+              <TableHead className="font-bold text-slate-700">Agreed Price</TableHead>
+              <TableHead className="font-bold text-slate-700">Status</TableHead>
+              <TableHead className="text-right font-bold text-slate-700">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -174,7 +170,7 @@ export function SellerDealsTable({
                       <Button 
                         size="sm" 
                         onClick={() => setOpenDialogForDeal(row.deal.id)}
-                        className="bg-[#059669] hover:bg-[#047857] text-white gap-1.5 h-9 font-medium shadow-sm cursor-pointer"
+                        className="bg-[#059669] hover:bg-[#047857] text-white gap-1.5 h-9 font-medium shadow-2xs cursor-pointer"
                       >
                         <Truck className="h-4 w-4" />
                         Dispatch
@@ -199,38 +195,34 @@ export function SellerDealsTable({
         </Table>
       </div>
 
-      {/* DISPATCH DIALOG */}
+      {/* DISPATCH MODAL */}
       {openDialogForDeal && (
-        <Dialog 
-          open={!!openDialogForDeal} 
-          onOpenChange={(isOpen) => setOpenDialogForDeal(isOpen ? openDialogForDeal : null)}
-        >
+        <Dialog open={!!openDialogForDeal} onOpenChange={(open) => !open && setOpenDialogForDeal(null)}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-slate-900">Mark Deal as Dispatched</DialogTitle>
-              <DialogDescription className="text-slate-500 text-sm">
-                Enter logistics details and upload the Lorry Receipt (LR) / Invoice.
+              <DialogTitle className="text-xl font-bold text-slate-900">
+                Dispatch Order (Deal #{openDialogForDeal.substring(0, 8).toUpperCase()})
+              </DialogTitle>
+              <DialogDescription>
+                Assign vehicle, driver, and attach invoice/logistics document.
               </DialogDescription>
             </DialogHeader>
             <SellerDispatchForm 
               dealId={openDialogForDeal} 
               vehicleTypes={vehicleTypes} 
-              onSuccess={() => {
-                setOpenDialogForDeal(null)
-                window.location.reload()
-              }}
+              onSuccess={() => setOpenDialogForDeal(null)} 
             />
           </DialogContent>
         </Dialog>
       )}
 
-      {/* DISPUTE DIALOG */}
+      {/* DISPUTE MODAL */}
       {activeDisputeDealId && (
         <FileDisputeDialog
           dealId={activeDisputeDealId}
           open={!!activeDisputeDealId}
           onOpenChange={(open) => !open && setActiveDisputeDealId(null)}
-          onSuccess={() => window.location.reload()}
+          onSuccess={() => setActiveDisputeDealId(null)}
         />
       )}
     </div>

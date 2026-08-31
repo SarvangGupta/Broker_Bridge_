@@ -216,3 +216,22 @@ Serverless CRON jobs configured via Vercel Cron or Inngest\.
 - Offline Data Conflicts: A requirement generated offline might conflict with updated master data or duplicate submissions\. *Strategy: Enforce unique idempotency keys generated on the client device prior to sync\.*
 - Audit Log Scaling: The immutable audit table will grow exponentially\. *Strategy: Plan for table partitioning by date in Phase 2 to maintain query speeds for admin history views\.*
 
+22\. Seller Enterprise Command Center, Authorization & Privacy Architecture (Sprint 13)
+
+- Seller Workspace App Shell & Role-Aware Navigation:
+	- Unified responsive shell (`seller-workspace-shell.tsx`) with sticky header (`seller-header.tsx`) and 8-module sub-navigation (`seller-nav.tsx`).
+	- Supports both desktop underline tab navigation (Forest Jade `#059669`) and mobile drawer navigation (`Sheet`) with 48px+ touch targets.
+	- Real-time KYC status badges (`Verified Entity`, `Pending KYC`, `Action Required`) integrated into the header.
+- Seller Role Authorization (`seller-auth.ts`):
+	- Granular sub-roles: `SELLER_ADMIN` (full permissions), `SELLER_USER` (operational dispatch/availability management), `SELLER_VIEWER` (read-only monitoring).
+	- `verifySellerSession({ allowViewer })` gates all mutations (availabilities, dispatches, invoices) against unauthorized roles and extracts server-authenticated `companyId`.
+- Buyer Privacy & Zero Leakage Enforcement:
+	- Hard Rule: Seller-facing APIs (`deal-actions.ts`) strictly mask buyer names as `"Verified Buyer #B-XXXX"` and never return Buyer PII (phone, email, GST, address, internal notes).
+	- Confidential minimum asking prices are restricted strictly to the owning Seller organization, assigned Broker, or Admin (`availability-actions.ts`).
+- Transaction Document Authorization:
+	- Request-time signed URL generation (`getTransactionDocumentSignedUrlAction` in `logistics-actions.ts`) verifying that caller is an authorized deal participant (Seller company, Buyer company, Broker, Admin) before generating storage access URLs.
+- Shared UX Resilience Baseline:
+	- Skeleton loaders (`dashboard-skeleton.tsx`), empty states (`empty-state.tsx`), and data freshness indicators (`data-freshness.tsx`) for slow/unstable Tier-2 mobile connections.
+	- Strict error recovery preventing false success dialog closures on mutation failures.
+
+

@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { db } from "@/src/server/db"
-import { deals, requirements, availabilities, users } from "@/src/server/db/schema"
+import { deals, requirements, availabilities, users, companies } from "@/src/server/db/schema"
 import { eq, and, ne, notInArray, inArray, sql } from "drizzle-orm"
 
 export type AdminKpis = {
@@ -312,3 +312,251 @@ export async function getSellerKpisAction(): Promise<{ success: boolean; data?: 
     return { success: false, error: error.message || "Failed to fetch Seller KPIs" }
   }
 }
+
+export type ActionRequiredItem = {
+  id: string
+  type: 'DISPATCH_DUE' | 'DISPUTE_FILED' | 'INVENTORY_EXPIRING' | 'KYC_PENDING' | 'DEAL_CONFIRMATION' | 'BROKER_REQUEST'
+  title: string
+  description: string
+  severity: 'critical' | 'warning' | 'info'
+  targetTab: string
+  actionLabel: string
+  entityId?: string
+  badgeText?: string
+}
+
+export type SellerCommandCenterData = {
+  kpis: {
+    activeAvailabilitiesCount: number
+    pendingDispatchesCount: number
+    totalRevenue: number
+  }
+  actionItems: ActionRequiredItem[]
+  inventoryCount: number
+  activeDealsCount: number
+  isKycVerified: boolean
+  isKycPending: boolean
+}
+
+/**
+ * 5. getSellerCommandCenterDataAction
+ * Operational Command Center aggregation:
+ * - Active Inventory & Expiring Inventory
+ * - Pending Dispatches & Disputed Deals
+ * - Revenue aggregates
+ * - Dynamic P0 Action Required alert queue
+ */
+export async function getSellerCommandCenterDataAction(): Promise<{
+  success: boolean
+  data?: SellerCommandCenterData
+  error?: string
+}> {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const userRecords = await db.select().from(users).where(eq(users.id, user.id))
+    const companyId = userRecords[0]?.companyId
+
+    if (!companyId) {
+      return {
+        success: true,
+        data: {
+          kpis: {
+            activeAvailabilitiesCount: 0,
+            pendingDispatchesCount: 0,
+            totalRevenue: 0,
+          },
+          actionItems: [
+            {
+              id: 'missing-kyc-action',
+              type: 'KYC_PENDING',
+              title: 'Complete Company Profile & KYC',
+              description: 'Your organization details are required to list commodity supply and trade.',
+              severity: 'critical',
+              targetTab: 'team',
+              actionLabel: 'Complete Profile',
+              badgeText: 'Action Required',
+            }
+          ],
+          inventoryCount: 0,
+          activeDealsCount: 0,
+          isKycVerified: false,
+          isKycPending: true,
+        },
+      }
+    }
+
+    const [
+      activeAvailsRes, 
+      expiringAvailsRes,
+      pendingDispatchesRes, 
+      disputedDealsRes,
+      allDealsCountRes,
+      revenueRes,
+      companyRes
+    ] = await Promise.all([
+      // 1. Active Availabilities
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(availabilities)
+        .where(
+          and(
+            eq(availabilities.companyId, companyId),
+            eq(availabilities.status, 'Open')
+          )
+        ),
+
+      // 2. Expiring Lots (within 48 hours)
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(availabilities)
+        .where(
+          and(
+            eq(availabilities.companyId, companyId),
+            eq(availabilities.status, 'Open'),
+            sql`${availabilities.validUntil} <= (now() + interval '48 hours')`
+          )
+        ),
+
+      // 3. Pending Dispatches
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.sellerId, companyId),
+            eq(deals.status, 'Dispatch Pending')
+          )
+        ),
+
+      // 4. Disputed Deals
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.sellerId, companyId),
+            eq(deals.status, 'Disputed')
+          )
+        ),
+
+      // 5. Total Active Deals
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.sellerId, companyId),
+            notInArray(deals.status, ['Cancelled'])
+          )
+        ),
+
+      // 6. Cumulative Revenue
+      db
+        .select({
+          totalRevenue: sql<number>`COALESCE(SUM(CAST(${deals.agreedPrice} AS NUMERIC) * ${deals.agreedQuantity}), 0)::float`,
+        })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.sellerId, companyId),
+            ne(deals.status, 'Cancelled')
+          )
+        ),
+
+      // 7. Company Verification Status
+      db.query.companies.findFirst({
+        where: eq(companies.id, companyId),
+      }),
+    ])
+
+    const activeAvailCount = Number(activeAvailsRes[0]?.count ?? 0)
+    const expiringAvailCount = Number(expiringAvailsRes[0]?.count ?? 0)
+    const pendingDispatchCount = Number(pendingDispatchesRes[0]?.count ?? 0)
+    const disputedCount = Number(disputedDealsRes[0]?.count ?? 0)
+    const totalDealsCount = Number(allDealsCountRes[0]?.count ?? 0)
+    const totalRevenue = Number(revenueRes[0]?.totalRevenue ?? 0)
+
+    const isKycVerified = companyRes?.isVerified === true && companyRes?.status === true
+    const isKycPending = companyRes ? companyRes.status === false : true
+
+    // Construct P0 Action Items
+    const actionItems: ActionRequiredItem[] = []
+
+    if (pendingDispatchCount > 0) {
+      actionItems.push({
+        id: 'dispatch-pending-alert',
+        type: 'DISPATCH_DUE',
+        title: `${pendingDispatchCount} Shipment${pendingDispatchCount > 1 ? 's' : ''} Awaiting Logistics Dispatch`,
+        description: 'Booked deals are confirmed and awaiting vehicle & driver details to initiate transport.',
+        severity: 'critical',
+        targetTab: 'orders',
+        actionLabel: 'Dispatch Shipment',
+        badgeText: 'Action Required',
+      })
+    }
+
+    if (disputedCount > 0) {
+      actionItems.push({
+        id: 'dispute-active-alert',
+        type: 'DISPUTE_FILED',
+        title: `${disputedCount} Deal Dispute${disputedCount > 1 ? 's' : ''} Under Resolution`,
+        description: 'Quality or payment exceptions have been flagged for administrator mediation.',
+        severity: 'critical',
+        targetTab: 'deals',
+        actionLabel: 'View Dispute Details',
+        badgeText: 'Urgent Mediation',
+      })
+    }
+
+    if (expiringAvailCount > 0) {
+      actionItems.push({
+        id: 'inventory-expiring-alert',
+        type: 'INVENTORY_EXPIRING',
+        title: `${expiringAvailCount} Inventory Lot${expiringAvailCount > 1 ? 's' : ''} Expiring Soon`,
+        description: 'Your validity window is ending within 48 hours. Extend validity or quick-renew.',
+        severity: 'warning',
+        targetTab: 'inventory',
+        actionLabel: 'Update Validity',
+        badgeText: 'Expiring Soon',
+      })
+    }
+
+    if (isKycPending) {
+      actionItems.push({
+        id: 'kyc-pending-alert',
+        type: 'KYC_PENDING',
+        title: 'Company Verification in Progress',
+        description: 'Your KYC submission is under verification by the BrokerBridge administrator.',
+        severity: 'warning',
+        targetTab: 'team',
+        actionLabel: 'Review Profile',
+        badgeText: 'Pending KYC',
+      })
+    }
+
+    return {
+      success: true,
+      data: {
+        kpis: {
+          activeAvailabilitiesCount: activeAvailCount,
+          pendingDispatchesCount: pendingDispatchCount,
+          totalRevenue,
+        },
+        actionItems,
+        inventoryCount: activeAvailCount,
+        activeDealsCount: totalDealsCount,
+        isKycVerified,
+        isKycPending,
+      },
+    }
+  } catch (error: any) {
+    console.error("getSellerCommandCenterDataAction error:", error)
+    return { success: false, error: error.message || "Failed to fetch Command Center data" }
+  }
+}
+

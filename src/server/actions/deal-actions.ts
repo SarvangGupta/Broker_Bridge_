@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/src/server/db";
 import { quotations, deals, availabilities, users, companies, masterCommodities, requirements } from "@/src/server/db/schema";
-import { eq, and, or, sql, desc, aliasedTable } from "drizzle-orm";
+import { eq, and, or, desc, aliasedTable } from "drizzle-orm";
 import { acceptQuotationSchema, rejectQuotationSchema, counterQuotationSchema } from "@/src/types/deal-schema";
 import { masterGrades } from "@/src/server/db/schema";
 
@@ -195,6 +195,11 @@ export async function counterQuotationAction(data: unknown) {
   }
 }
 
+/**
+ * Fetches deals associated with the authenticated user's company (as Buyer or Seller).
+ * HARD PRIVACY RULE: If the caller is a Seller, Buyer private PII is NEVER exposed.
+ * The buyer name is anonymized as "Verified Buyer #B-XXXX", and only operational fulfillment fields are returned.
+ */
 export async function getDealsByCompanyAction() {
   try {
     const supabase = await createClient();
@@ -214,7 +219,7 @@ export async function getDealsByCompanyAction() {
     const buyerCompanyTable = aliasedTable(companies, 'buyerCompany');
     const sellerCompanyTable = aliasedTable(companies, 'sellerCompany');
 
-    const companyDeals = await db
+    const rawCompanyDeals = await db
       .select({
         deal: deals,
         requirement: requirements,
@@ -241,6 +246,29 @@ export async function getDealsByCompanyAction() {
       .innerJoin(sellerCompanyTable, eq(deals.sellerId, sellerCompanyTable.id))
       .where(or(eq(deals.buyerId, companyId), eq(deals.sellerId, companyId)))
       .orderBy(desc(deals.createdAt));
+
+    // Apply strict privacy transformation for Seller-facing view
+    const companyDeals = rawCompanyDeals.map((row) => {
+      const isSellerViewing = row.deal.sellerId === companyId && row.deal.buyerId !== companyId && dbUser.role !== 'admin';
+
+      return {
+        ...row,
+        buyerCompany: {
+          id: row.buyerCompany.id,
+          name: isSellerViewing
+            ? `Verified Buyer #B-${row.deal.buyerId.slice(0, 4).toUpperCase()}`
+            : row.buyerCompany.name,
+          isVerified: row.buyerCompany.isVerified,
+          trustScore: row.buyerCompany.trustScore,
+        },
+        sellerCompany: {
+          id: row.sellerCompany.id,
+          name: row.sellerCompany.name,
+          isVerified: row.sellerCompany.isVerified,
+          trustScore: row.sellerCompany.trustScore,
+        }
+      };
+    });
 
     return { success: true, data: companyDeals };
   } catch (error: any) {

@@ -29,6 +29,7 @@ brokerbridge-enterprise/
 │   │       └── page.tsx
 │   ├── (seller)/
 │   │   └── seller/
+│   │       ├── layout.tsx
 │   │       └── page.tsx
 │   ├── api/
 │   │   ├── cron/
@@ -58,6 +59,7 @@ brokerbridge-enterprise/
 ├── components/
 │   ├── providers.tsx
 │   └── ui/
+│       ├── alert.tsx
 │       ├── badge.tsx
 │       ├── button.tsx
 │       ├── calendar.tsx
@@ -71,17 +73,20 @@ brokerbridge-enterprise/
 │       ├── popover.tsx
 │       ├── radio-group.tsx
 │       ├── select.tsx
+│       ├── sheet.tsx
 │       ├── skeleton.tsx
 │       ├── sonner.tsx
 │       ├── table.tsx
 │       ├── tabs.tsx
 │       └── textarea.tsx
 ├── components.json
-├── create-requirements-table.ts
 ├── docs/
 │   ├── BrokerBridge_PRD_v4.0.md
+│   ├── BrokerBridge_Seller_PRD_v3.0.md
+│   ├── BrokerBridge_Seller_Sprint_Plan_13-20.md
 │   ├── BrokerBridge_TRD.md
-│   └── Sprints.md
+│   ├── Sprints.md
+│   └── seller-foundation-audit-13.1.md
 ├── drizzle.config.ts
 ├── eslint.config.mjs
 ├── lib/
@@ -93,31 +98,17 @@ brokerbridge-enterprise/
 ├── middleware.ts
 ├── next-env.d.ts
 ├── next.config.ts
-├── package-lock.json
 ├── package.json
 ├── postcss.config.mjs
 ├── PROJECTSTATE.MD
 ├── public/
-│   ├── file.svg
-│   ├── globe.svg
-│   ├── next.svg
-│   ├── vercel.svg
-│   └── window.svg
 ├── README.md
 ├── src/
 │   ├── app/
 │   │   └── api/
-│   │       ├── cron/
-│   │       │   ├── monitor-dispatches/
-│   │       │   │   └── route.ts
-│   │       │   └── process-notifications/
-│   │       │       └── route.ts
-│   │       └── v1/
-│   │           └── requirements/
-│   │               └── sync/
-│   │                   └── route.ts
 │   ├── components/
 │   │   ├── dashboard/
+│   │   │   ├── action-required-banner.tsx
 │   │   │   ├── ai-match-center.tsx
 │   │   │   ├── ai-match-workspace.tsx
 │   │   │   ├── broker-assignments.tsx
@@ -136,20 +127,32 @@ brokerbridge-enterprise/
 │   │   │   ├── quotation-table-actions.tsx
 │   │   │   ├── quotations-deals-tab.tsx
 │   │   │   ├── seller-deals-table.tsx
-│   │   │   └── seller-header-dropdown.tsx
+│   │   │   ├── seller-header.tsx
+│   │   │   ├── seller-header-dropdown.tsx
+│   │   │   ├── seller-nav.tsx
+│   │   │   └── seller-workspace-shell.tsx
+│   │   ├── dialogs/
+│   │   │   └── post-availability-dialog.tsx
 │   │   ├── forms/
 │   │   │   ├── availability-form.tsx
 │   │   │   ├── company-onboarding-form.tsx
 │   │   │   ├── crm-activity-dialog.tsx
+│   │   │   ├── file-dispute-dialog.tsx
 │   │   │   ├── quotation-form.tsx
 │   │   │   ├── requirement-form.tsx
 │   │   │   └── seller-dispatch-form.tsx
 │   │   ├── layout/
 │   │   │   ├── notification-bell.tsx
 │   │   │   └── user-nav.tsx
-│   │   └── realtime-deals-listener.tsx
+│   │   ├── realtime-deals-listener.tsx
+│   │   └── ui/
+│   │       ├── dashboard-skeleton.tsx
+│   │       ├── data-freshness.tsx
+│   │       ├── empty-state.tsx
+│   │       └── sla-badge.tsx
 │   ├── hooks/
 │   │   ├── use-master-data.ts
+│   │   ├── use-media-query.ts
 │   │   └── use-realtime-deals.ts
 │   ├── lib/
 │   │   ├── offline-queue.ts
@@ -188,7 +191,8 @@ brokerbridge-enterprise/
 │   │   ├── services/
 │   │   │   └── whatsapp-service.ts
 │   │   └── utils/
-│   │       └── match-engine.ts
+│   │       ├── match-engine.ts
+│   │       └── seller-auth.ts
 │   └── types/
 │       ├── availability-schema.ts
 │       ├── company-schema.ts
@@ -196,40 +200,12 @@ brokerbridge-enterprise/
 │       ├── deal-schema.ts
 │       ├── logistics-schema.ts
 │       ├── quotation-schema.ts
-│       └── requirement-schema.ts
+│       ├── requirement-schema.ts
+│       └── transaction-schema.ts
 ├── supabase/
 │   └── migrations/
-│       ├── 0001_init_users_and_companies.sql
-│       ├── 0002_add_master_tables.sql
-│       ├── 0003_add_requirements_table.sql
-│       ├── 0004_add_availabilities_table.sql
-│       ├── 0005_add_quotations_table.sql
-│       ├── 0006_add_deals_table.sql
-│       ├── 0007_add_quotation_rejection_counter_fields.sql
-│       ├── 0008_enable_realtime_deals_quotations.sql
-│       ├── 0009_add_visibility_broker_availabilities.sql
-│       ├── 0010_add_visibility_requirements.sql
-│       ├── 0011_add_logistics_tables.sql
-│       ├── 0012_seed_vehicle_types.sql
-│       ├── manual_rls_companies.sql
-│       ├── manual_storage_rls.sql
-│       ├── meta/
-│       │   ├── 0000_snapshot.json
-│       │   ├── 0001_snapshot.json
-│       │   ├── 0002_snapshot.json
-│       │   ├── 0003_snapshot.json
-│       │   ├── 0004_snapshot.json
-│       │   ├── 0005_snapshot.json
-│       │   ├── 0006_snapshot.json
-│       │   ├── 0007_snapshot.json
-│       │   ├── 0008_snapshot.json
-│       │   └── _journal.json
-│       └── seed_states_rajasthan_districts.sql
-├── test-db.ts
-├── tsconfig.json
-├── tsconfig.tsbuildinfo
-└── vercel.json
-`
+└── tsconfig.json
+```
 
 ## Architectural Concepts
 
@@ -302,11 +278,11 @@ The Deal closure engine natively supports Partial Fulfillment workflows:
 To reflect real-world Indian agricultural commodity trading where merchants frequently act as both buyers and sellers:
 - **Dual-Persona Workspace Access**: Users registered with `buyer` or `seller` roles (Tier 2 Traders) are granted access to both `/buyer` and `/seller` workspace portals.
 - **Edge Middleware Fail-Safe**: Next.js Edge Middleware (`middleware.ts` & `lib/supabase/middleware.ts`) identifies trader sessions (`role === 'buyer' || role === 'seller'`) and authorizes routing between both workspaces without requiring role alterations in auth metadata, while strictly preventing cross-tier elevation to `/broker` (Tier 1) or `/admin` (Tier 0).
-- **Universal Profile Toggle UI**: The `<UserNav>` component dynamically renders workspace switching options ("Switch to Seller Workspace" / "Switch to Buyer Workspace") based on active route context.
+- **Universal Profile Toggle UI**: The `<UserNav>` and `<SellerHeaderDropdown>` components dynamically render workspace switching options ("Switch to Seller Workspace" / "Switch to Buyer Workspace") based on active route context.
 
 ### 17. Real-Time Analytics & Safe SQL Aggregation Layer
 The platform provides instant role-partitioned financial and operational intelligence without introducing heavy OLAP dependencies:
-- **Server Action Aggregators**: `analytics-actions.ts` exports dedicated getters (`getAdminKpisAction`, `getBrokerKpisAction`, `getBuyerKpisAction`, `getSellerKpisAction`).
+- **Server Action Aggregators**: `analytics-actions.ts` exports dedicated getters (`getAdminKpisAction`, `getBrokerKpisAction`, `getBuyerKpisAction`, `getSellerKpisAction`, `getSellerCommandCenterDataAction`).
 - **Safe Drizzle ORM Aggregations**: Currency calculations utilize safe PostgreSQL casts and coalesce expressions (`COALESCE(SUM(CAST(agreed_price AS NUMERIC) * agreed_quantity), 0)::float`) to prevent null reference errors or precision loss on empty tables.
 - **Sub-Second RSC Resolution**: Server dashboards execute analytics queries concurrently alongside profile and operational data fetching via `Promise.all`.
 
@@ -318,3 +294,12 @@ To support asynchronous multi-channel alerting without blocking core business tr
 - **Zero-Fallback Route Security**: The `/api/cron/process-notifications` route handler enforces strict Bearer token authentication against `CRON_SECRET`, throwing a 500 error if unconfigured in environment variables and rejecting invalid tokens with 401 Unauthorized.
 - **Live In-App Notification Center**: Client-side `<NotificationBell>` with TanStack Query polling, real-time unread badges, mark-as-read/mark-all-as-read mutations, and role-appropriate deep-linking.
 
+### 19. Enterprise Seller Command Center & Authorization Hardening (Sprint 13)
+The Seller workspace has been engineered into a task-first Operational Command Center governed by strict enterprise tenant isolation:
+- **App Shell & Role-Aware Navigation**: Responsive shell (`seller-workspace-shell.tsx`) with sticky header (`seller-header.tsx`), real-time KYC badges, dual-profile trader switcher, and 8-module sub-navigation (`seller-nav.tsx`) supporting desktop Forest Jade (`#059669`) active underline and mobile slide-out drawer (`Sheet`) with 48px+ touch targets.
+- **Task-First Command Center**: `action-required-banner.tsx` prioritizes P0 actionable items (`DISPATCH_DUE`, `DISPUTE_FILED`, `INVENTORY_EXPIRING`, `KYC_PENDING`) with deep-links to resolving screens above informational KPI cards.
+- **Seller Sub-Role Authorization & Mutation Gating (`seller-auth.ts`)**: Granular sub-roles `SELLER_ADMIN`, `SELLER_USER`, and `SELLER_VIEWER`. Server Action helper `verifySellerSession({ allowViewer })` extracts the authenticated `companyId` and blocks write mutations by `SELLER_VIEWER`.
+- **Zero Buyer PII Leakage**: Seller-facing deal queries in `deal-actions.ts` mask Buyer names as `"Verified Buyer #B-XXXX"` and omit all personal Buyer contact info (phone, email, GST, address).
+- **Confidential Pricing Protection**: Minimum asking prices in `availability-actions.ts` are strictly tenant-isolated to the owning seller company.
+- **Request-Time Signed Document Access**: Storage access URLs are generated via `getTransactionDocumentSignedUrlAction` only after verifying deal participant membership (Seller, Buyer, Broker, Admin).
+- **Shared UX Resilience Baseline**: Pulsing `<DashboardSkeleton>`, `<EmptyState>` with dashed styling, `<DataFreshness>` with live `router.refresh()` triggers, and strict mutation error recovery preventing false success state.

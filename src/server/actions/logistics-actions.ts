@@ -5,24 +5,24 @@ import { db } from "@/src/server/db"
 import { dispatches, invoices, deals, users } from "@/src/server/db/schema"
 import { eq } from "drizzle-orm"
 import { dispatchSchema, invoiceSchema, DispatchData, InvoiceData } from "@/src/types/logistics-schema"
+import { verifySellerSession } from "@/src/server/utils/seller-auth"
 
+/**
+ * Creates a shipment dispatch record for a booked deal.
+ * Gated by verifySellerSession({ allowViewer: false }) and verifies company-level deal ownership.
+ */
 export async function createDispatchAction(data: DispatchData) {
   try {
-    // Validate payload against schema
+    // 1. Authorize session & verify mutation permissions BEFORE execution
+    const session = await verifySellerSession({ allowViewer: false });
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized" };
+    }
+
+    // 2. Validate payload against schema
     const parsedData = dispatchSchema.parse(data);
     
-    // Verify the user session
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return { success: false, error: 'Unauthorized' };
-    }
-    
-    const dbUserResults = await db.select().from(users).where(eq(users.id, user.id));
-    const dbUser = dbUserResults[0];
-    
-    // Verify user is authorized seller for this deal
+    // 3. Verify deal exists and caller's company is the authorized seller for this deal
     const dealResults = await db.select().from(deals).where(eq(deals.id, parsedData.deal_id));
     const deal = dealResults[0];
     
@@ -30,14 +30,18 @@ export async function createDispatchAction(data: DispatchData) {
       return { success: false, error: 'Deal not found.' };
     }
     
-    if (deal.sellerId !== user.id && (!dbUser || deal.sellerId !== dbUser.companyId)) {
-      return { success: false, error: 'Unauthorized: Only the seller can dispatch this deal.' };
+    const isAuthorizedSeller = 
+      deal.sellerId === session.data.companyId || 
+      session.data.user.role === 'admin';
+
+    if (!isAuthorizedSeller) {
+      return { success: false, error: 'Unauthorized: Only the seller company can dispatch this deal.' };
     }
     
-    // Insert the record into the dispatches table
+    // 4. Insert the record into the dispatches table
     const newDispatch = await db.insert(dispatches).values({
       dealId: parsedData.deal_id,
-      sellerId: user.id,
+      sellerId: session.data.user.id,
       vehicleTypeId: parsedData.vehicle_type_id,
       vehicleNumber: parsedData.other_vehicle_type 
         ? `${parsedData.vehicle_number} (${parsedData.other_vehicle_type})` 
@@ -49,7 +53,7 @@ export async function createDispatchAction(data: DispatchData) {
       status: 'Dispatched'
     }).returning();
     
-    // Update the deals table status to 'In Transit'
+    // 5. Update the deals table status to 'In Transit'
     await db.update(deals).set({ status: 'In Transit' }).where(eq(deals.id, parsedData.deal_id));
     
     return { success: true, data: newDispatch[0] };
@@ -59,23 +63,22 @@ export async function createDispatchAction(data: DispatchData) {
   }
 }
 
+/**
+ * Creates an invoice record attached to a booked deal.
+ * Gated by verifySellerSession({ allowViewer: false }) and verifies company-level deal ownership.
+ */
 export async function createInvoiceAction(data: InvoiceData) {
   try {
-    // Validate payload against schema
+    // 1. Authorize session & verify mutation permissions BEFORE execution
+    const session = await verifySellerSession({ allowViewer: false });
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized" };
+    }
+
+    // 2. Validate payload against schema
     const parsedData = invoiceSchema.parse(data);
     
-    // Verify the user session
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return { success: false, error: 'Unauthorized' };
-    }
-    
-    const dbUserResults = await db.select().from(users).where(eq(users.id, user.id));
-    const dbUser = dbUserResults[0];
-    
-    // Verify user is authorized seller for this deal
+    // 3. Verify deal exists and caller's company is the authorized seller for this deal
     const dealResults = await db.select().from(deals).where(eq(deals.id, parsedData.deal_id));
     const deal = dealResults[0];
     
@@ -83,14 +86,18 @@ export async function createInvoiceAction(data: InvoiceData) {
       return { success: false, error: 'Deal not found.' };
     }
     
-    if (deal.sellerId !== user.id && (!dbUser || deal.sellerId !== dbUser.companyId)) {
-      return { success: false, error: 'Unauthorized: Only the seller can upload invoices for this deal.' };
+    const isAuthorizedSeller = 
+      deal.sellerId === session.data.companyId || 
+      session.data.user.role === 'admin';
+
+    if (!isAuthorizedSeller) {
+      return { success: false, error: 'Unauthorized: Only the seller company can upload invoices for this deal.' };
     }
     
-    // Insert the record into the invoices table
+    // 4. Insert the record into the invoices table
     const newInvoice = await db.insert(invoices).values({
       dealId: parsedData.deal_id,
-      sellerId: user.id,
+      sellerId: session.data.user.id,
       invoiceNo: parsedData.invoice_no,
       amount: parsedData.amount.toString(),
       fileUrl: parsedData.file_url,
@@ -101,5 +108,60 @@ export async function createInvoiceAction(data: InvoiceData) {
   } catch (error: any) {
     console.error('createInvoiceAction error:', error);
     return { success: false, error: error.message || 'Failed to create invoice.' };
+  }
+}
+
+/**
+ * Generates a time-limited signed storage URL for transaction documents (Invoices, LRs, COAs).
+ * Strictly requires request-time authorization: caller must be Seller, Buyer, assigned Broker, or Admin.
+ */
+export async function getTransactionDocumentSignedUrlAction(dealId: string, filePath: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Access denied to transaction documents." };
+    }
+
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+
+    if (!dbUser) {
+      return { success: false, error: "Access denied to transaction documents." };
+    }
+
+    const dealResults = await db.select().from(deals).where(eq(deals.id, dealId));
+    const deal = dealResults[0];
+
+    if (!deal) {
+      return { success: false, error: "Access denied to transaction documents." };
+    }
+
+    // Authorize caller based on deal participant relationships
+    const isAuthorized = 
+      dbUser.role === 'admin' ||
+      (deal.brokerId && deal.brokerId === user.id) ||
+      (dbUser.companyId && (deal.sellerId === dbUser.companyId || deal.buyerId === dbUser.companyId));
+
+    if (!isAuthorized) {
+      return { success: false, error: "Access denied to transaction documents." };
+    }
+
+    // Generate signed download URL valid for 1 hour (3600 seconds)
+    const { data, error } = await supabase
+      .storage
+      .from('brokerbridge_documents')
+      .createSignedUrl(filePath, 3600);
+
+    if (error || !data?.signedUrl) {
+      return { success: false, error: error?.message || "Failed to generate document access URL" };
+    }
+
+    return { success: true, data: { signedUrl: data.signedUrl } };
+  } catch (error: any) {
+    console.error('getTransactionDocumentSignedUrlAction error:', error);
+    return { success: false, error: "Access denied to transaction documents." };
   }
 }

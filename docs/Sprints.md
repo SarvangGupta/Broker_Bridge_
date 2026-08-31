@@ -58,9 +58,22 @@ __Phase 4: Logistics, Resolution, and Polish \(Sprints 10–12\)__
 	- __Key Tasks:__ [x] Build dynamic KPI cards \(GMV, Active Deals, Volumes, Revenue\) using safe Drizzle aggregations\. [x] Finalize multi-channel notification architecture \(In-App, WhatsApp, Email\) mapped to the Notification Matrix\. [x] Implement Partial Fulfillment state machine and dual-workspace Trader Profile toggle\. [x] Deploy atomic notification cron dispatcher utilizing PostgreSQL `FOR UPDATE SKIP LOCKED` and exponential backoff retry scheduling\.
 	- __Technical Deliverables:__ `/api/cron/process-notifications` Route Handler, `analytics-actions.ts` aggregation actions, `<NotificationBell>` UI component, and verified TypeScript compiler pass \(`tsc --noEmit`\)\.
 
+__Phase 5: Enterprise Seller Command Center & Core Modules \(Sprints 13–20\)__
+
+- __Sprint 13: Seller Foundation, Command Center & UX Baseline__ (COMPLETED ✅)
+	- __Goal:__ Upgrade the Seller application layout into an Enterprise App Shell, establish task-first Command Center with P0 action alerts, enforce zero Buyer PII leakage, and deploy shared UX resilience baseline.
+	- __Key Tasks:__
+		- [x] __13.1 — Seller Foundation Audit:__ Executed full codebase audit across Seller routes, Server Actions, schemas, and notification triggers. Authored `seller-foundation-audit-13.1.md`.
+		- [x] __13.2 — Seller Workspace Shell & Role-Aware Navigation:__ Built sticky header (`seller-header.tsx`) with real-time KYC badges, `<SellerHeaderDropdown>`, trader switcher, and 8-module sub-navigation (`seller-nav.tsx`) supporting desktop underline tabs and mobile drawer (`Sheet`).
+		- [x] __13.3 — Seller Command Center (Operational Dashboard):__ Built task-first Command Center with Top KPI ribbon, P0 `<ActionRequiredBanner>` with deep-linking action cards (`DISPATCH_DUE`, `DISPUTE_FILED`, `INVENTORY_EXPIRING`, `KYC_PENDING`), operational quick-access workspace cards, and `getSellerCommandCenterDataAction()`.
+		- [x] __13.4 — Seller Authorization & Privacy Hardening:__ Implemented `verifySellerSession()` helper in `seller-auth.ts`, enforced Buyer privacy masking (`"Verified Buyer #B-XXXX"` in `deal-actions.ts`), confidential minimum price protection in `availability-actions.ts`, request-time document signed URL verification (`getTransactionDocumentSignedUrlAction`), and gated write mutations against `SELLER_VIEWER`.
+		- [x] __13.5 — Shared UX / Resilience Baseline:__ Created `<DashboardSkeleton>`, reusable `<EmptyState>`, `<DataFreshness>` with live refresh triggers, and enforced mobile-first 48px touch targets.
+	- __Technical Deliverables:__ `seller-workspace-shell.tsx`, `seller-header.tsx`, `seller-nav.tsx`, `seller-auth.ts`, `action-required-banner.tsx`, `dashboard-skeleton.tsx`, `empty-state.tsx`, `data-freshness.tsx`, and passed `tsc --noEmit` validation.
+
 ---
 
-### 🚀 **Global Platform Status: PRODUCTION READY / DEPLOYMENT PHASE**
-All 12 Sprints across Phases 1–4 are 100% complete and fully verified\. The platform is architecturally hardened for production deployment\.
+### 🚀 **Global Platform Status: SPRINT 13 COMPLETE / READY FOR SPRINT 14**
+Sprints 1–13 are 100% complete and fully verified. Sprint 14 (Inventory & Availability 2.0) is queued for execution.
+
 
 
