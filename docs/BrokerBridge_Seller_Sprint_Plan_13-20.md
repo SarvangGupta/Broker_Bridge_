@@ -143,15 +143,15 @@ Goal: Upgrade the existing Sprint-6 availability foundation into the complete lo
 
 **Implementation:**
 
-- Add or verify lot/batch reference and relationship to availability.
-- Track total, available and reserved quantity.
-- Preserve history for inactive/expired records.
-- Define quantity/version fields needed for stale-data detection.
+- [x] Add or verify lot/batch reference and relationship to availability.
+- [x] Track total, available and reserved quantity.
+- [x] Preserve history for inactive/expired records.
+- [x] Define quantity/version fields needed for stale-data detection.
 **Done when:**
 
-- A lot can be traced through quantity, price, quality and documents.
-- Historical records are preserved.
-- Quantity constraints are represented server-side.
+- [x] A lot can be traced through quantity, price, quality and documents.
+- [x] Historical records are preserved.
+- [x] Quantity constraints are represented server-side.
 
 ### 14.2 — Complete Availability Form
 
@@ -159,17 +159,17 @@ Goal: Upgrade the existing Sprint-6 availability foundation into the complete lo
 
 **Implementation:**
 
-- Commodity and Grade from master data.
-- Lot/Batch, quantity, unit and location using State → District → City → Warehouse.
-- Asking price and confidential minimum price.
-- Price validity, Availability From and Valid Until.
-- Packaging, delivery terms and loading readiness linkage.
-- Quality/COA/Lab linkage.
+- [x] Commodity and Grade from master data.
+- [x] Lot/Batch, quantity, unit and location using State → District → City → Warehouse.
+- [x] Asking price and confidential minimum price.
+- [x] Price validity, Availability From and Valid Until.
+- [x] Packaging, delivery terms and loading readiness linkage.
+- [x] Quality/COA/Lab linkage.
 **Done when:**
 
-- Seller can create an availability containing the required commercial, inventory and operational fields.
-- Structured fields use master data; free text is limited to permitted remarks.
-- Confidential minimum price is not exposed to Buyer-facing paths.
+- [x] Seller can create an availability containing the required commercial, inventory and operational fields.
+- [x] Structured fields use master data; free text is limited to permitted remarks.
+- [x] Confidential minimum price is not exposed to Buyer-facing paths.
 
 ### 14.3 — Availability State Machine & Expiry
 
@@ -177,16 +177,16 @@ Goal: Upgrade the existing Sprint-6 availability foundation into the complete lo
 
 **Implementation:**
 
-- Implement/verify Draft → Pending Approval → Active.
-- Handle Reserved, Sold/Exhausted, Expired, Deactivated as applicable.
-- Server-side Valid Until enforcement.
-- Prevent expired/inactive records from entering new deal matching.
-- Audit status changes.
+- [x] Implement/verify Draft → Pending Approval → Active.
+- [x] Handle Reserved, Sold/Exhausted, Expired, Deactivated as applicable.
+- [x] Server-side Valid Until enforcement.
+- [x] Prevent expired/inactive records from entering new deal matching.
+- [x] Audit status changes.
 **Done when:**
 
-- Expired availability is automatically excluded from new commercial use.
-- Invalid transitions are rejected server-side.
-- Historical availability remains visible where authorized.
+- [x] Expired availability is automatically excluded from new commercial use.
+- [x] Invalid transitions are rejected server-side.
+- [x] Historical availability remains visible where authorized.
 
 ### 14.4 — Quick Renew / Duplicate
 
@@ -194,16 +194,16 @@ Goal: Upgrade the existing Sprint-6 availability foundation into the complete lo
 
 **Implementation:**
 
-- Quick Renew is available only for Expired records.
-- Pre-fill commodity, grade, lot, quantity, price, location, quality and loading settings.
-- Surface price for explicit review; do not silently reuse it.
-- Seller changes fields such as dates/price and creates a new availability record.
-- New record re-enters Draft → Pending Approval → Active.
+- [x] Quick Renew is available only for Expired records.
+- [x] Pre-fill commodity, grade, lot, quantity, price, location, quality and loading settings.
+- [x] Surface price for explicit review; do not silently reuse it.
+- [x] Seller changes fields such as dates/price and creates a new availability record.
+- [x] New record re-enters Draft → Pending Approval → Active.
 **Done when:**
 
-- Renewal does not mutate the expired record.
-- Quick Renew is unavailable on Active or Reserved records.
-- A normal renewal can be completed within the intended under-60-second UX target.
+- [x] Renewal does not mutate the expired record.
+- [x] Quick Renew is unavailable on Active or Reserved records.
+- [x] A normal renewal can be completed within the intended under-60-second UX target.
 
 ### 14.5 — Quantity Concurrency & Inventory Integrity
 
@@ -211,15 +211,15 @@ Goal: Upgrade the existing Sprint-6 availability foundation into the complete lo
 
 **Implementation:**
 
-- Transactional available/reserved quantity updates.
-- Stale version detection on concurrent edits.
-- Reject quantity changes that violate total/reserved/available relationships.
-- Audit material quantity changes.
+- [x] Transactional available/reserved quantity updates.
+- [x] Stale version detection on concurrent edits.
+- [x] Reject quantity changes that violate total/reserved/available relationships.
+- [x] Audit material quantity changes.
 **Done when:**
 
-- Concurrent updates cannot create negative or oversold inventory.
-- Stale Seller updates return a clear recovery path.
-- The final persisted quantity is authoritative.
+- [x] Concurrent updates cannot create negative or oversold inventory.
+- [x] Stale Seller updates return a clear recovery path.
+- [x] The final persisted quantity is authoritative.
 
 # SPRINT 15 — Quality, Lab Testing & Evidence
 

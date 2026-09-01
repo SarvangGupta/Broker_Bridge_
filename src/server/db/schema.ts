@@ -115,16 +115,27 @@ export const availabilities = pgTable('availabilities', {
   companyId: uuid('company_id').references(() => companies.id).notNull(),
   commodityId: uuid('commodity_id').references(() => masterCommodities.id).notNull(),
   gradeId: uuid('grade_id').references(() => masterGrades.id).notNull(),
-  quantity: integer('quantity').notNull(),
+  quantity: integer('quantity').notNull(), // Sprint 6 compatibility
   unitId: uuid('unit_id').references(() => masterUnits.id).notNull(),
-  price: numeric('price').notNull(),
+  price: numeric('price').notNull(), // Sprint 6 compatibility
   stateId: uuid('state_id').references(() => masterStates.id).notNull(),
   districtId: uuid('district_id').references(() => masterDistricts.id).notNull(),
-  validUntil: timestamp('valid_until').notNull(),
   visibility: text('visibility').default('global').notNull(),
   brokerId: uuid('broker_id'),
   status: text('status').default('Open').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  // Lot / Batch Data Model (Sprint 14.1 - PRD v3.0)
+  lotNumber: text('lot_number'),
+  totalQuantity: numeric('total_quantity').notNull(),
+  availableQuantity: numeric('available_quantity').notNull(),
+  reservedQuantity: numeric('reserved_quantity').default('0').notNull(),
+  soldQuantity: numeric('sold_quantity').default('0').notNull(),
+  minimumOrderQuantity: numeric('minimum_order_quantity'),
+  askingPrice: numeric('asking_price').notNull(),
+  confidentialMinimumPrice: numeric('confidential_minimum_price'),
+  availableFrom: timestamp('available_from').defaultNow().notNull(),
+  validUntil: timestamp('valid_until').notNull(),
+  version: integer('version').default(1).notNull(),
 });
 
 export const quotations = pgTable('quotations', {

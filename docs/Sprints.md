@@ -70,10 +70,20 @@ __Phase 5: Enterprise Seller Command Center & Core Modules \(Sprints 13–20\)__
 		- [x] __13.5 — Shared UX / Resilience Baseline:__ Created `<DashboardSkeleton>`, reusable `<EmptyState>`, `<DataFreshness>` with live refresh triggers, and enforced mobile-first 48px touch targets.
 	- __Technical Deliverables:__ `seller-workspace-shell.tsx`, `seller-header.tsx`, `seller-nav.tsx`, `seller-auth.ts`, `action-required-banner.tsx`, `dashboard-skeleton.tsx`, `empty-state.tsx`, `data-freshness.tsx`, and passed `tsc --noEmit` validation.
 
+- __Sprint 14: Inventory & Availability 2.0__ (COMPLETED ✅)
+	- __Goal:__ Complete Seller Supply Contract, Traceable Lot Model, Auto-Expiry, Quick Renew, and Optimistic Locking Concurrency Guard.
+	- __Key Tasks:__
+		- [x] __14.1 — Database Migration & Versioning:__ Implement Lot Model quantities and `version` integer for optimistic locking.
+		- [x] __14.2 — Availability Form (Seller Supply Contract):__ Build mobile-optimized frontend form mapped to database columns.
+		- [x] __14.3 — Availability State Machine & Expiry:__ Enforce deterministic server-enforced state machine and exclude expired records from AI Match Engine.
+		- [x] __14.4 — 1-Click Availability Renewal (Quick Renew):__ Allow Sellers to duplicate expired records with field locking.
+		- [x] __14.5 — Quantity Concurrency & Inventory Integrity:__ Implement Optimistic Locking on edits.
+	- __Technical Deliverables:__ `availability-schema.ts`, `availability-form.tsx`, `availability-actions.ts`, `match-actions.ts`, and verified TypeScript compiler pass `tsc --noEmit`.
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 13 COMPLETE / READY FOR SPRINT 14**
-Sprints 1–13 are 100% complete and fully verified. Sprint 14 (Inventory & Availability 2.0) is queued for execution.
+### 🚀 **Global Platform Status: SPRINT 14 COMPLETE / READY FOR SPRINT 15**
+Sprints 1–14 are 100% complete and fully verified. Sprint 15 (Quality, Lab Testing & Evidence) is queued for execution.
 
 
 

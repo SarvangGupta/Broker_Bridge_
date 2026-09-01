@@ -92,6 +92,13 @@
       "when": 1787308467475,
       "tag": "0018_add_master_industries_and_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788269583004,
+      "tag": "0020_upgrade_availabilities_lot_model",
+      "breakpoints": true
     }
   ]
 }

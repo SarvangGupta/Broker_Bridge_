@@ -57,7 +57,7 @@ export async function runAiMatchAction(requirementId: string) {
       .from(availabilities)
       .where(
         and(
-          eq(availabilities.status, 'Open'),
+          eq(availabilities.status, 'Active'),
           gt(availabilities.validUntil, now),
           or(
             eq(availabilities.visibility, 'global'),

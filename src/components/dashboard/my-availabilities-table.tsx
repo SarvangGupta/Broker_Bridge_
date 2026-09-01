@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { format } from "date-fns"
 import { toast } from "sonner"
-import { Loader2, MapPin, Calendar, PackageOpen, Tag, Ban } from "lucide-react"
+import { Loader2, MapPin, Calendar, PackageOpen, Tag, Ban, RefreshCw, Pencil } from "lucide-react"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -63,7 +64,8 @@ export function MyAvailabilitiesTable({ availabilities }: MyAvailabilitiesTableP
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
       {availabilities.map((item) => {
-        const isOpen = item.status === "Open"
+        const isOpen = item.status === "Active" || item.status === "Open"
+        const isExpired = item.status === "Expired"
 
         return (
           <div
@@ -91,6 +93,8 @@ export function MyAvailabilitiesTable({ availabilities }: MyAvailabilitiesTableP
                   className={
                     isOpen
                       ? "bg-[#ECFDF5] text-[#047857] border-emerald-200/80 font-semibold px-2.5 py-1 text-xs shrink-0 rounded-full"
+                      : isExpired 
+                      ? "bg-amber-50 text-amber-700 border-amber-200/80 font-semibold px-2.5 py-1 text-xs shrink-0 rounded-full"
                       : "bg-slate-100 text-slate-600 border-slate-200 font-semibold px-2.5 py-1 text-xs shrink-0 rounded-full"
                   }
                 >
@@ -137,7 +141,7 @@ export function MyAvailabilitiesTable({ availabilities }: MyAvailabilitiesTableP
 
             {/* ACTION FOOTER */}
             {isOpen && (
-              <div className="pt-4 mt-4 border-t border-slate-100">
+              <div className="pt-4 mt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
                 <Button
                   variant="outline"
                   size="lg"
@@ -150,10 +154,29 @@ export function MyAvailabilitiesTable({ availabilities }: MyAvailabilitiesTableP
                   ) : (
                     <>
                       <Ban className="h-4 w-4" />
-                      Cancel Listing
+                      Cancel
                     </>
                   )}
                 </Button>
+                <Link
+                  href={`?edit=${item.id}`}
+                  className="w-full min-h-[48px] bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl text-sm sm:text-base transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Link>
+              </div>
+            )}
+            
+            {isExpired && (
+              <div className="pt-4 mt-4 border-t border-slate-100">
+                <Link
+                  href={`?renew=${item.id}`}
+                  className="w-full min-h-[48px] bg-[#059669] hover:bg-[#047857] text-white font-semibold rounded-xl text-sm sm:text-base transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Quick Renew
+                </Link>
               </div>
             )}
           </div>
