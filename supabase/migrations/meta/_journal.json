@@ -99,6 +99,27 @@
       "when": 1788269583004,
       "tag": "0020_upgrade_availabilities_lot_model",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788352695089,
+      "tag": "0021_quality_parameter_master_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788354290286,
+      "tag": "0022_add_lab_test_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788355318976,
+      "tag": "0023_add_file_url_to_lab_tests",
+      "breakpoints": true
     }
   ]
 }

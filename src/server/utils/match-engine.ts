@@ -59,7 +59,7 @@ export function calculateMatchScore(
 ): MatchResult | null {
   // 1. Hard Eligibility Filters
   if (req.commodityId !== avail.commodityId) return null;
-  if (!['Open', 'Partially Fulfilled'].includes(req.status) || avail.status !== 'Open') return null;
+  if (!['Open', 'Partially Fulfilled'].includes(req.status) || !['Open', 'Active'].includes(avail.status)) return null;
   if (req.quantity <= 0 || avail.quantity <= 0) return null;
   
   const now = new Date();

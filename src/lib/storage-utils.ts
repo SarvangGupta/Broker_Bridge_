@@ -21,3 +21,27 @@ export async function uploadDocument(file: File, dealId: string): Promise<string
 
   return data.path
 }
+
+import { uploadLabEvidenceAction } from "@/src/server/actions/lab-actions"
+
+/**
+ * Uploads a physical laboratory certificate / COA evidence file to the private 'brokerbridge_lab_evidence' bucket.
+ * Routes through Server Action to guarantee SSR httpOnly cookie authentication and lot ownership.
+ *
+ * @param file The physical PDF/Image file to upload
+ * @param availabilityId The UUID of the supply lot availability
+ * @returns The storage file path (e.g., '123e4567.../1788355_coa.pdf')
+ */
+export async function uploadLabEvidence(file: File, availabilityId: string): Promise<string> {
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("availabilityId", availabilityId)
+
+  const res = await uploadLabEvidenceAction(formData)
+
+  if (!res.success || !res.data?.path) {
+    throw new Error(`Lab evidence upload failed: ${res.error || "Unknown server error"}`)
+  }
+
+  return res.data.path
+}

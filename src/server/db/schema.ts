@@ -93,6 +93,21 @@ export const masterPackagingTypes = pgTable('master_packaging_types', {
   status: boolean('status').default(true).notNull(),
 });
 
+export const masterQualityParameters = pgTable('master_quality_parameters', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  commodityId: uuid('commodity_id').references(() => masterCommodities.id).notNull(),
+  name: text('name').notNull(),
+  type: text('type').notNull(), // 'numeric', 'boolean', 'text'
+  unit: text('unit'), // '%', 'mg/kg'
+  minValue: numeric('min_value'),
+  maxValue: numeric('max_value'),
+  targetValue: numeric('target_value'),
+  isRequired: boolean('is_required').default(false).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const requirements = pgTable('requirements', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id').references(() => companies.id).notNull(),
@@ -136,6 +151,48 @@ export const availabilities = pgTable('availabilities', {
   availableFrom: timestamp('available_from').defaultNow().notNull(),
   validUntil: timestamp('valid_until').notNull(),
   version: integer('version').default(1).notNull(),
+});
+
+export const availabilityQualityValues = pgTable('availability_quality_values', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  availabilityId: uuid('availability_id').references(() => availabilities.id, { onDelete: 'cascade' }).notNull(),
+  parameterId: uuid('parameter_id').references(() => masterQualityParameters.id).notNull(),
+  value: text('value').notNull(),
+  source: text('source').default('Seller Declared').notNull(),
+  verificationStatus: text('verification_status').default('Pending').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const labTests = pgTable('lab_tests', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  availabilityId: uuid('availability_id').references(() => availabilities.id, { onDelete: 'cascade' }).notNull(),
+  companyId: uuid('company_id').references(() => companies.id).notNull(),
+  laboratoryName: text('laboratory_name').notNull(),
+  laboratoryLocation: text('laboratory_location'),
+  sampleId: text('sample_id'),
+  sampleDate: timestamp('sample_date'),
+  testDate: timestamp('test_date').notNull(),
+  reportNumber: text('report_number').notNull(),
+  reportDate: timestamp('report_date').notNull(),
+  validUntil: timestamp('valid_until'),
+  fileUrl: text('file_url'),
+  status: text('status').default('Under Review').notNull(), // 'Sample Pending', 'Testing In Progress', 'Report Uploaded', 'Under Review', 'Verified', 'Correction Required', 'Rejected', 'Expired'
+  verifiedBy: uuid('verified_by').references(() => users.id),
+  verifiedAt: timestamp('verified_at'),
+  verificationNotes: text('verification_notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const labTestResults = pgTable('lab_test_results', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  labTestId: uuid('lab_test_id').references(() => labTests.id, { onDelete: 'cascade' }).notNull(),
+  parameterId: uuid('parameter_id').references(() => masterQualityParameters.id).notNull(),
+  measuredValue: text('measured_value').notNull(),
+  isWithinBounds: boolean('is_within_bounds').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 export const quotations = pgTable('quotations', {

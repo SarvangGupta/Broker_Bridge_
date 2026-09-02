@@ -80,10 +80,20 @@ __Phase 5: Enterprise Seller Command Center & Core Modules \(Sprints 13–20\)__
 		- [x] __14.5 — Quantity Concurrency & Inventory Integrity:__ Implement Optimistic Locking on edits.
 	- __Technical Deliverables:__ `availability-schema.ts`, `availability-form.tsx`, `availability-actions.ts`, `match-actions.ts`, and verified TypeScript compiler pass `tsc --noEmit`.
 
+- __Sprint 15: Quality, Lab Testing & Evidence__ (COMPLETED ✅)
+	- __Goal:__ Make quality a structured, commodity-specific, lot-scoped system with dynamic EAV parameters, structured lab records, private storage vault, and mathematical expiry guards.
+	- __Key Tasks:__
+		- [x] __15.1 — Quality Parameter Master Integration:__ Created dynamic EAV schema tables `master_quality_parameters` and `availability_quality_values` with `getQualityTemplateByCommodityAction`.
+		- [x] __15.2 — Seller Quality Entry & Lot-Scoped Validation:__ Built dynamic quality UI (`dynamic-quality-fields.tsx`) and runtime boundary validator (`validateQualityEntries`) checking min, max, target, and required rules.
+		- [x] __15.3 — Structured Lab Test Record & Quality Freshness Engine:__ Built `lab_tests` and `lab_test_results` tables, `<LabTestForm />` with 4-card responsive workflow, and `computeLabFreshness` engine (`Valid`, `Expiring Soon`, `Expired`).
+		- [x] __15.4 — Secure Lab Documents & Evidence Vault:__ Configured private Supabase Storage bucket `brokerbridge_lab_evidence` with RLS policies, `<LabDocumentUpload />` component, Server Action upload bridge (`uploadLabEvidenceAction`), and 60-minute signed URL generator (`getLabEvidenceSignedUrlAction`).
+		- [x] __15.5 — Quality Readiness, Broker Verification & Supply Badges:__ Built `quality-verification-actions.ts` with `reviewLabTestAction` (role-gated to Broker/Admin), `<QualityStatusBadge />` with mathematical expiry override, `<LabReviewDialog />` broker audit modal, and AI match engine readiness indicators.
+	- __Technical Deliverables:__ `quality-schema.ts`, `lab-schema.ts`, `lab-actions.ts`, `quality-verification-actions.ts`, `lab-test-form.tsx`, `dynamic-quality-fields.tsx`, `quality-status-badge.tsx`, `manual_lab_storage_rls.sql`, and verified `tsc --noEmit` compiler pass.
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 14 COMPLETE / READY FOR SPRINT 15**
-Sprints 1–14 are 100% complete and fully verified. Sprint 15 (Quality, Lab Testing & Evidence) is queued for execution.
+### 🚀 **Global Platform Status: SPRINT 15 COMPLETE / READY FOR SPRINT 16**
+Sprints 1–15 are 100% complete and fully verified. Ready for **Sprint 16: Loading Readiness & Broker Request Inbox**.
 
 
 

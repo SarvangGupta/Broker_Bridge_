@@ -4,12 +4,13 @@ import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { useSearchParams, useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Loader2, Check, ChevronsUpDown, CalendarIcon, Lock, Info } from "lucide-react"
+import { Loader2, Check, ChevronsUpDown, CalendarIcon, Lock, Info, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 
 import { Button, buttonVariants } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   Form,
   FormControl,
@@ -30,10 +31,18 @@ import { availabilitySchema, AvailabilitySchema } from "@/src/types/availability
 import { createAvailabilityAction, getAvailabilityForRenewalAction, updateAvailabilityAction, getAvailabilityForEditAction } from "@/src/server/actions/availability-actions"
 import { getActiveBrokersAction } from "@/src/server/actions/admin-actions"
 import {
+  saveAvailabilityQualityValuesAction,
+  getAvailabilityQualityValuesAction,
+} from "@/src/server/actions/quality-actions"
+import {
+  validateQualityEntries,
+  QualityTemplateParameter,
+} from "@/src/types/quality-schema"
+import { DynamicQualityFields } from "@/src/components/forms/dynamic-quality-fields"
+import {
   useIndustries,
   useCategories,
   useCommodities,
-  useGrades,
   useUnits,
   useStates,
   useDistricts
@@ -45,8 +54,13 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
   const [selectedIndustryId, setSelectedIndustryId] = useState<string>("")
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("")
 
+  // Dynamic Quality Parameter States
+  const [qualityValues, setQualityValues] = useState<Record<string, string>>({})
+  const [qualityErrors, setQualityErrors] = useState<Record<string, string>>({})
+  const [qualityTemplate, setQualityTemplate] = useState<QualityTemplateParameter[]>([])
+  const [isQualitySectionOpen, setIsQualitySectionOpen] = useState(true)
+
   const [openCommodity, setOpenCommodity] = useState(false)
-  const [openGrade, setOpenGrade] = useState(false)
   const [openUnit, setOpenUnit] = useState(false)
   const [openState, setOpenState] = useState(false)
   const [openDistrict, setOpenDistrict] = useState(false)
@@ -54,7 +68,6 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
   const { data: industries = [], isLoading: loadingIndustries } = useIndustries()
   const { data: categories = [], isLoading: loadingCategories } = useCategories()
   const { data: commodities = [], isLoading: loadingCommodities } = useCommodities(selectedCategoryId || undefined)
-  const { data: grades = [], isLoading: loadingGrades } = useGrades()
   const { data: units = [], isLoading: loadingUnits } = useUnits()
   const { data: states = [], isLoading: loadingStates } = useStates()
   const { data: districts = [], isLoading: loadingDistricts } = useDistricts()
@@ -90,7 +103,7 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
       city_id: "",
       warehouse_name: "",
       available_from: new Date(),
-      valid_until: undefined,
+      valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       visibility: "global",
       broker_id: "",
       version: 1,
@@ -137,6 +150,18 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
           toast.error(res.error || "Failed to load renew data")
           router.replace('/seller')
         }
+
+        // Fetch existing lot quality values for renewal pre-fill
+        const qRes = await getAvailabilityQualityValuesAction(renewId)
+        if (qRes.success && qRes.data) {
+          const qMap: Record<string, string> = {}
+          qRes.data.forEach((item: any) => {
+            if (item.parameterId && item.value) {
+              qMap[item.parameterId] = item.value
+            }
+          })
+          setQualityValues(qMap)
+        }
       } else if (editId) {
         const res = await getAvailabilityForEditAction(editId)
         if (res.success && res.data) {
@@ -167,6 +192,18 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
           toast.error(res.error || "Failed to load edit data")
           router.replace('/seller')
         }
+
+        // Fetch existing lot quality values for edit
+        const qRes = await getAvailabilityQualityValuesAction(editId)
+        if (qRes.success && qRes.data) {
+          const qMap: Record<string, string> = {}
+          qRes.data.forEach((item: any) => {
+            if (item.parameterId && item.value) {
+              qMap[item.parameterId] = item.value
+            }
+          })
+          setQualityValues(qMap)
+        }
       }
       setIsRenewing(false)
     }
@@ -178,6 +215,11 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
   const visibility = form.watch("visibility")
   const selectedStateId = form.watch("state_id")
 
+  // Reset quality errors when commodity changes
+  useEffect(() => {
+    setQualityErrors({})
+  }, [selectedCommodityId])
+
   const filteredCategories = selectedIndustryId
     ? categories.filter((c: any) => c.industryId === selectedIndustryId)
     : []
@@ -186,18 +228,63 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
     ? commodities.filter((c: any) => c.categoryId === selectedCategoryId)
     : []
 
-  const filteredGrades = grades.filter((g: any) => g.commodityId === selectedCommodityId)
   const filteredDistricts = districts.filter((d: any) => d.stateId === selectedStateId)
 
   async function onSubmit(data: AvailabilitySchema) {
+    // 1. Pre-validate quality parameters if template parameters exist
+    if (qualityTemplate.length > 0) {
+      const validation = validateQualityEntries(qualityValues, qualityTemplate)
+      if (!validation.isValid) {
+        setQualityErrors(validation.errors)
+        setIsQualitySectionOpen(true)
+        const firstError = Object.values(validation.errors)[0] || "Please check required quality parameters."
+        toast.error(firstError)
+        return
+      }
+      setQualityErrors({})
+    }
+
     setIsSubmitting(true)
     try {
-      const result = data.id
-        ? await updateAvailabilityAction(data)
-        : await createAvailabilityAction(data)
+      const payload = {
+        ...data,
+        id: editId || data.id,
+        version: data.version ?? 1,
+      }
 
-      if (result.success) {
-        toast.success(data.id ? "Availability updated successfully!" : "Availability posted successfully!")
+      const result = payload.id
+        ? await updateAvailabilityAction(payload)
+        : await createAvailabilityAction(payload)
+
+      if (result.success && result.data?.id) {
+        const availabilityId = result.data.id
+
+        // 2. Persist lot-scoped quality values
+        const formattedQualityValues = Object.entries(qualityValues)
+          .filter(([_, val]) => val !== undefined && val !== null && String(val).trim() !== '')
+          .map(([parameter_id, value]) => ({
+            parameter_id,
+            value: String(value).trim(),
+          }))
+
+        if (formattedQualityValues.length > 0 || qualityTemplate.length > 0) {
+          const qSaveRes = await saveAvailabilityQualityValuesAction({
+            availability_id: availabilityId,
+            values: formattedQualityValues,
+          })
+
+          if (!qSaveRes.success) {
+            if (qSaveRes.validationErrors) {
+              setQualityErrors(qSaveRes.validationErrors)
+              setIsQualitySectionOpen(true)
+            }
+            toast.error(qSaveRes.error || "Availability saved, but quality parameters could not be updated.")
+            setIsSubmitting(false)
+            return
+          }
+        }
+
+        toast.success(data.id ? "Availability and quality specifications updated!" : "Availability and quality specifications posted successfully!")
         form.reset({
           commodity_id: "",
           grade_id: "",
@@ -217,6 +304,8 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
           broker_id: "",
           version: 1,
         })
+        setQualityValues({})
+        setQualityErrors({})
         setSelectedIndustryId("")
         setSelectedCategoryId("")
         onSuccess?.()
@@ -239,12 +328,28 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
     }
   }
 
+  function onInvalid(errors: any) {
+    console.error("AvailabilityForm validation errors:", errors)
+    const currentValues = form.getValues()
+    const parseResult = availabilitySchema.safeParse(currentValues)
+    if (!parseResult.success && parseResult.error.issues.length > 0) {
+      toast.error(parseResult.error.issues[0].message)
+      return
+    }
+
+    const errorEntries = Object.entries(errors)
+    if (errorEntries.length > 0) {
+      const [firstField, firstErr] = errorEntries[0] as [string, any]
+      const msg = firstErr?.message || `Please check the ${firstField} field.`
+      toast.error(msg)
+    } else {
+      toast.error("Please fill in all required fields before posting.")
+    }
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <input type="hidden" {...form.register("version", { valueAsNumber: true })} />
-        <input type="hidden" {...form.register("id")} />
-
+      <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         {/* SECTION 1: Product Details */}
         <Card>
           <CardHeader>
@@ -358,8 +463,7 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
                                   key={commodity.id}
                                   value={commodity.name}
                                   onSelect={() => {
-                                    form.setValue("commodity_id", commodity.id)
-                                    form.setValue("grade_id", "")
+                                    form.setValue("commodity_id", commodity.id, { shouldValidate: true })
                                     setOpenCommodity(false)
                                   }}
                                   className="min-h-[48px]"
@@ -385,89 +489,88 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
 
               <FormField
                 control={form.control}
-                name="grade_id"
+                name="lot_number"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Quality Parameter</FormLabel>
-                    <Popover open={openGrade} onOpenChange={setOpenGrade}>
-                      <FormControl>
-                        <PopoverTrigger
-                          disabled={isQuickRenew || !selectedCommodityId || loadingGrades}
-                          className={cn(
-                            buttonVariants({ variant: "outline" }),
-                            "w-full min-h-[48px] justify-between font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value
-                            ? filteredGrades.find((g: any) => g.id === field.value)?.gradeName
-                            : !selectedCommodityId
-                              ? "Select commodity first"
-                              : "Select quality parameter"}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </PopoverTrigger>
-                      </FormControl>
-                      <PopoverContent className="w-[300px] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Search quality parameter..." className="min-h-[48px]" />
-                          <CommandList>
-                            <CommandEmpty>No quality parameter found.</CommandEmpty>
-                            <CommandGroup>
-                              {filteredGrades.map((grade: any) => (
-                                <CommandItem
-                                  key={grade.id}
-                                  value={grade.gradeName}
-                                  onSelect={() => {
-                                    form.setValue("grade_id", grade.id)
-                                    setOpenGrade(false)
-                                  }}
-                                  className="min-h-[48px]"
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      grade.id === field.value ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  {grade.gradeName}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                  <FormItem>
+                    <FormLabel>Lot / Batch Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g. BATCH-2024-001"
+                        className="min-h-[48px]"
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="lot_number"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Lot / Batch Number (Optional)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="e.g. BATCH-2024-001"
-                      className="min-h-[48px]"
-                      {...field}
-                      value={field.value || ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </CardContent>
         </Card>
 
-        {/* SECTION 2: Quantity & Location */}
+        {/* SECTION 2: Quality Parameters & Specifications */}
+        <Card className="overflow-hidden border-slate-200">
+          <CardHeader
+            className="cursor-pointer hover:bg-slate-50/80 transition-colors select-none flex flex-row items-center justify-between space-y-0 py-4"
+            onClick={() => setIsQualitySectionOpen(!isQualitySectionOpen)}
+          >
+            <div className="space-y-1">
+              <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
+                <span>2. Quality Parameters & Specifications</span>
+                {Object.keys(qualityErrors).length > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {Object.keys(qualityErrors).length} Error(s)
+                  </Badge>
+                )}
+              </CardTitle>
+              <p className="text-xs text-slate-500">
+                Dynamic commodity-specific laboratory & QC measurement specifications.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsQualitySectionOpen(!isQualitySectionOpen)
+              }}
+            >
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform duration-200",
+                  isQualitySectionOpen && "rotate-180"
+                )}
+              />
+            </Button>
+          </CardHeader>
+          {isQualitySectionOpen && (
+            <CardContent className="pt-2 pb-6 border-t bg-slate-50/25">
+              <DynamicQualityFields
+                commodityId={selectedCommodityId}
+                values={qualityValues}
+                onChange={(newValues) => {
+                  setQualityValues(newValues)
+                  setQualityErrors((prev) => {
+                    const next = { ...prev }
+                    Object.keys(newValues).forEach((k) => delete next[k])
+                    return next
+                  })
+                }}
+                errors={qualityErrors}
+                disabled={isSubmitting}
+                onTemplateLoaded={(t) => setQualityTemplate(t)}
+              />
+            </CardContent>
+          )}
+        </Card>
+
+        {/* SECTION 3: Quantity & Location */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-slate-800">2. Quantity & Location</CardTitle>
+            <CardTitle className="text-lg text-slate-800">3. Quantity & Location</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -731,10 +834,10 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
           </CardContent>
         </Card>
 
-        {/* SECTION 3: Commercial Terms */}
+        {/* SECTION 4: Commercial Terms & Validity */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-slate-800">3. Commercial Terms</CardTitle>
+            <CardTitle className="text-lg text-slate-800">4. Commercial Terms & Validity</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

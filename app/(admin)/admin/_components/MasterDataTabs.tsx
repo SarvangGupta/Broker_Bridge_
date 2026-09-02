@@ -56,16 +56,16 @@ import {
   getUnitsAction,
   addUnitAction,
   updateUnitAction,
-  getGradesAction,
-  addGradeAction,
-  updateGradeAction,
-  deleteGradeAction,
-  deleteUnitAction
+  deleteUnitAction,
+  getQualityParametersAction,
+  deleteQualityParameterAction
 } from "@/src/server/actions/master-data-actions"
 import { CompanyApprovalQueue } from "./company-approval-queue"
 import { DealDeskQueue } from "./deal-desk-queue"
 import { AdminDisputeQueue } from "./admin-dispute-queue"
 import { AdminHelpDeskQueue } from "./admin-help-desk-queue"
+import { QualityParameterDialog } from "./quality-parameter-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export function MasterDataTabs() {
@@ -77,7 +77,7 @@ export function MasterDataTabs() {
   const [states, setStates] = useState<any[]>([])
   const [districts, setDistricts] = useState<any[]>([])
   const [units, setUnits] = useState<any[]>([])
-  const [grades, setGrades] = useState<any[]>([])
+  const [qualityParameters, setQualityParameters] = useState<any[]>([])
   const [adminKpis, setAdminKpis] = useState<AdminKpis | null>(null)
   
   const [loading, setLoading] = useState(false)
@@ -89,14 +89,14 @@ export function MasterDataTabs() {
   const [addStateOpen, setAddStateOpen] = useState(false)
   const [addDistrictOpen, setAddDistrictOpen] = useState(false)
   const [addUnitOpen, setAddUnitOpen] = useState(false)
-  const [addGradeOpen, setAddGradeOpen] = useState(false)
+  const [qualityParamDialogOpen, setQualityParamDialogOpen] = useState(false)
 
   // Edit states
   const [editIndustryId, setEditIndustryId] = useState<string | null>(null)
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null)
   const [editCommodityId, setEditCommodityId] = useState<string | null>(null)
-  const [editGradeId, setEditGradeId] = useState<string | null>(null)
   const [editUnitId, setEditUnitId] = useState<string | null>(null)
+  const [editingQualityParam, setEditingQualityParam] = useState<any | null>(null)
 
   // Forms state
   const [industryName, setIndustryName] = useState("")
@@ -110,19 +110,17 @@ export function MasterDataTabs() {
   const [districtStateId, setDistrictStateId] = useState("")
   const [unitName, setUnitName] = useState("")
   const [unitSymbol, setUnitSymbol] = useState("")
-  const [gradeName, setGradeName] = useState("")
-  const [gradeCommodityId, setGradeCommodityId] = useState("")
 
   const loadData = async () => {
     setLoading(true)
-    const [indRes, catRes, commRes, stateRes, distRes, unitsRes, gradesRes, kpisRes] = await Promise.all([
+    const [indRes, catRes, commRes, stateRes, distRes, unitsRes, qualityRes, kpisRes] = await Promise.all([
       getIndustriesAction(),
       getCategoriesAction(),
       getCommoditiesAction(),
       getStatesAction(),
       getDistrictsAction(),
       getUnitsAction(),
-      getGradesAction(),
+      getQualityParametersAction(),
       getAdminKpisAction(),
     ])
     
@@ -132,7 +130,7 @@ export function MasterDataTabs() {
     if (stateRes.success) setStates(stateRes.data || [])
     if (distRes.success) setDistricts(distRes.data || [])
     if (unitsRes.success) setUnits(unitsRes.data || [])
-    if (gradesRes.success) setGrades(gradesRes.data || [])
+    if (qualityRes.success) setQualityParameters(qualityRes.data || [])
     if (kpisRes.success && kpisRes.data) setAdminKpis(kpisRes.data)
     
     setLoading(false)
@@ -326,36 +324,19 @@ export function MasterDataTabs() {
     }
   }
 
-  // Quality Parameter (formerly Grade) handlers
-  const handleGradeModalChange = (open: boolean) => {
-    setAddGradeOpen(open)
-    if (!open) { setEditGradeId(null); setGradeName(""); setGradeCommodityId(""); }
+  // Quality Parameter handlers
+  const handleOpenAddQualityParam = () => {
+    setEditingQualityParam(null)
+    setQualityParamDialogOpen(true)
   }
 
-  const openEditGrade = (g: any) => {
-    setEditGradeId(g.id)
-    setGradeName(g.gradeName)
-    setGradeCommodityId(g.commodityId || "")
-    setAddGradeOpen(true)
+  const handleOpenEditQualityParam = (param: any) => {
+    setEditingQualityParam(param)
+    setQualityParamDialogOpen(true)
   }
 
-  const handleAddGrade = async () => {
-    if (!gradeName.trim() || !gradeCommodityId) return
-    const res = editGradeId ? await updateGradeAction(editGradeId, gradeCommodityId, gradeName.trim()) : await addGradeAction(gradeCommodityId, gradeName.trim())
-    if (res.success) {
-      toast.success(editGradeId ? "Quality parameter updated" : "Quality parameter added")
-      setAddGradeOpen(false)
-      setGradeName("")
-      setGradeCommodityId("")
-      setEditGradeId(null)
-      loadData()
-    } else {
-      toast.error(res.error || "Failed to save quality parameter")
-    }
-  }
-
-  const handleDeleteGrade = async (id: string) => {
-    const res = await deleteGradeAction(id)
+  const handleDeleteQualityParam = async (id: string) => {
+    const res = await deleteQualityParameterAction(id)
     if (res.success) {
       toast.success("Quality parameter deleted successfully")
       loadData()
@@ -778,50 +759,21 @@ export function MasterDataTabs() {
               </div>
             </TabsContent>
 
-            {/* QUALITY PARAMETERS (FORMERLY GRADES) TAB */}
+            {/* QUALITY PARAMETERS TAB */}
             <TabsContent value="grades" className="m-0 outline-none">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold tracking-tight text-[#334155]">Quality Parameters</h2>
-                  <p className="text-sm text-slate-500 mt-1">Manage commodity quality parameters (e.g., Moisture %, Thread Count, Purity).</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Manage commodity quality parameters, mathematical tolerances, and lab specifications.
+                  </p>
                 </div>
-                <Dialog open={addGradeOpen} onOpenChange={handleGradeModalChange}>
-                  <DialogTrigger render={<Button className="bg-[#334155] hover:bg-[#1e293b] text-white shadow-sm" />}>
-                    Add Quality Parameter
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{editGradeId ? "Edit Quality Parameter" : "Add New Quality Parameter"}</DialogTitle>
-                      <DialogDescription>Link a quality parameter specification to a commodity.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="gradeCommodityId" className="text-right">Commodity</Label>
-                        <div className="col-span-3">
-                          <Select onValueChange={(val) => setGradeCommodityId(val || "")} value={gradeCommodityId}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a commodity">
-                                {gradeCommodityId ? commodities.find(c => c.id === gradeCommodityId)?.name : null}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {commodities.map((c) => (
-                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="gradeName" className="text-right">Parameter Name</Label>
-                        <Input id="gradeName" value={gradeName} onChange={(e) => setGradeName(e.target.value)} placeholder="e.g. Moisture < 10%, Grade A, Count 30s" className="col-span-3" />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button onClick={handleAddGrade}>Save</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  onClick={handleOpenAddQualityParam}
+                  className="bg-[#334155] hover:bg-[#1e293b] text-white shadow-sm"
+                >
+                  Add Quality Parameter
+                </Button>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -833,30 +785,104 @@ export function MasterDataTabs() {
                       <TableRow>
                         <TableHead className="text-slate-600 font-semibold">ID</TableHead>
                         <TableHead className="text-slate-600 font-semibold">Commodity</TableHead>
-                        <TableHead className="text-slate-600 font-semibold">Quality Parameter</TableHead>
+                        <TableHead className="text-slate-600 font-semibold">Parameter Name</TableHead>
+                        <TableHead className="text-slate-600 font-semibold">Data Type</TableHead>
+                        <TableHead className="text-slate-600 font-semibold">Unit</TableHead>
+                        <TableHead className="text-slate-600 font-semibold">Tolerances & Targets</TableHead>
+                        <TableHead className="text-slate-600 font-semibold">Requirement</TableHead>
                         <TableHead className="text-right text-slate-600 font-semibold">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {grades.map((g) => (
-                        <TableRow key={g.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                          <TableCell className="font-mono text-xs text-slate-500">{g.id.substring(0, 8)}...</TableCell>
-                          <TableCell className="font-medium text-slate-700">{commodities.find(c => c.id === g.commodityId)?.name || "-"}</TableCell>
-                          <TableCell className="font-medium text-[#334155]">{g.gradeName}</TableCell>
+                      {qualityParameters.map((p) => (
+                        <TableRow key={p.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                          <TableCell className="font-mono text-xs text-slate-500">{p.id.substring(0, 8)}...</TableCell>
+                          <TableCell className="font-medium text-slate-700">
+                            {p.commodityName || commodities.find((c) => c.id === p.commodityId)?.name || "-"}
+                          </TableCell>
+                          <TableCell className="font-semibold text-[#334155]">{p.name}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                p.type === "numeric"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200 capitalize font-medium text-xs"
+                                  : p.type === "boolean"
+                                  ? "bg-purple-50 text-purple-700 border-purple-200 capitalize font-medium text-xs"
+                                  : "bg-slate-100 text-slate-700 border-slate-200 capitalize font-medium text-xs"
+                              }
+                            >
+                              {p.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {p.unit ? (
+                              <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
+                                {p.unit}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-xs">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {p.type === "numeric" ? (
+                              <div className="text-xs flex flex-wrap items-center gap-2 text-slate-600">
+                                {p.minValue !== null && p.minValue !== undefined && (
+                                  <span>Min: <strong className="font-medium text-slate-800">{p.minValue}</strong></span>
+                                )}
+                                {p.maxValue !== null && p.maxValue !== undefined && (
+                                  <span>Max: <strong className="font-medium text-slate-800">{p.maxValue}</strong></span>
+                                )}
+                                {p.targetValue !== null && p.targetValue !== undefined && (
+                                  <span className="text-emerald-700">Target: <strong className="font-medium">{p.targetValue}</strong></span>
+                                )}
+                                {p.minValue === null && p.maxValue === null && p.targetValue === null && (
+                                  <span className="text-slate-400">No bounds</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400">N/A</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {p.isRequired ? (
+                              <Badge variant="destructive" className="text-[11px] font-medium">
+                                Mandatory
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[11px] font-normal text-slate-500 bg-slate-100">
+                                Optional
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button variant="ghost" size="icon" onClick={() => openEditGrade(g)} className="text-slate-400 hover:text-blue-600">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenEditQualityParam(p)}
+                                className="text-slate-400 hover:text-blue-600"
+                              >
                                 <Edit className="w-4 h-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteGrade(g.id)} className="text-slate-400 hover:text-red-600">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteQualityParam(p.id)}
+                                className="text-slate-400 hover:text-red-600"
+                              >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </TableCell>
                         </TableRow>
                       ))}
-                      {grades.length === 0 && (
-                        <TableRow><TableCell colSpan={4} className="text-center text-slate-500 py-12">No quality parameters found.</TableCell></TableRow>
+                      {qualityParameters.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-slate-500 py-12">
+                            No quality parameters found. Click &quot;Add Quality Parameter&quot; to configure one.
+                          </TableCell>
+                        </TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1093,6 +1119,14 @@ export function MasterDataTabs() {
         </main>
       </div>
       
+      <QualityParameterDialog
+        open={qualityParamDialogOpen}
+        onOpenChange={setQualityParamDialogOpen}
+        commodities={commodities}
+        editingParameter={editingQualityParam}
+        onSuccess={loadData}
+      />
+
       <AdminProfileDialog open={isProfileOpen} onOpenChange={setIsProfileOpen} />
     </Tabs>
   )

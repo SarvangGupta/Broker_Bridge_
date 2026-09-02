@@ -7,10 +7,12 @@ import {
   companies, 
   masterCommodities, 
   masterCategories, 
-  masterIndustries 
+  masterIndustries,
+  labTests,
 } from "@/src/server/db/schema"
 import { eq, inArray } from "drizzle-orm"
 import { MatchResult } from "@/src/server/utils/match-engine"
+import { computeLabFreshness } from "@/src/types/lab-schema"
 
 export type EnrichedMatchResult = MatchResult & {
   companyName: string;
@@ -19,6 +21,10 @@ export type EnrichedMatchResult = MatchResult & {
   commodityName?: string | null;
   categoryName?: string | null;
   industryName?: string | null;
+  labTestId?: string | null;
+  qualityStatus?: string;
+  isQualityVerified?: boolean;
+  labTestValidUntil?: Date | null;
 };
 
 export async function runAiMatchWithDetailsAction(requirementId: string) {
@@ -33,7 +39,7 @@ export async function runAiMatchWithDetailsAction(requirementId: string) {
     const matchData = result.data as MatchResult[];
     const availabilityIds = matchData.map(m => m.availabilityId);
 
-    // 2. Fetch the company names, trust credentials, and sector hierarchy for these availabilities
+    // 2. Fetch the company names, trust credentials, sector hierarchy, and lab tests for these availabilities
     const availabilityDetails = await db
       .select({
          id: availabilities.id,
@@ -43,17 +49,36 @@ export async function runAiMatchWithDetailsAction(requirementId: string) {
          commodityName: masterCommodities.name,
          categoryName: masterCategories.name,
          industryName: masterIndustries.name,
+         labTestId: labTests.id,
+         labTestStatus: labTests.status,
+         labTestValidUntil: labTests.validUntil,
+         labTestTestDate: labTests.testDate,
       })
       .from(availabilities)
       .leftJoin(companies, eq(availabilities.companyId, companies.id))
       .leftJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))
       .leftJoin(masterCategories, eq(masterCategories.id, masterCommodities.categoryId))
       .leftJoin(masterIndustries, eq(masterIndustries.id, masterCategories.industryId))
+      .leftJoin(labTests, eq(availabilities.id, labTests.availabilityId))
       .where(inArray(availabilities.id, availabilityIds));
 
-    // 3. Map the company names, trust credentials, and sector hierarchy back into the results
+    // 3. Map the company names, trust credentials, and quality verification status back into results
     const enrichedMatches: EnrichedMatchResult[] = matchData.map(match => {
        const detail = availabilityDetails.find(d => d.id === match.availabilityId);
+       
+       // Calculate mathematical freshness and effective quality status
+       let effectiveQualityStatus = detail?.labTestStatus || 'Seller Declared';
+       if (detail?.labTestTestDate) {
+         const freshness = computeLabFreshness(detail.labTestTestDate, detail.labTestValidUntil);
+         if (freshness === 'Expired') {
+           effectiveQualityStatus = 'Expired';
+         }
+       } else if (detail?.labTestValidUntil && new Date(detail.labTestValidUntil).getTime() < Date.now()) {
+         effectiveQualityStatus = 'Expired';
+       }
+
+       const isQualityVerified = effectiveQualityStatus === 'Verified';
+
        return {
          ...match,
          companyName: detail?.companyName || 'Unknown Company',
@@ -62,6 +87,10 @@ export async function runAiMatchWithDetailsAction(requirementId: string) {
          commodityName: detail?.commodityName || null,
          categoryName: detail?.categoryName || null,
          industryName: detail?.industryName || null,
+         labTestId: detail?.labTestId || null,
+         qualityStatus: effectiveQualityStatus,
+         isQualityVerified,
+         labTestValidUntil: detail?.labTestValidUntil || null,
        }
     });
 

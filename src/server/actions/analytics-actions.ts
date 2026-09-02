@@ -270,7 +270,7 @@ export async function getSellerKpisAction(): Promise<{ success: boolean; data?: 
         .where(
           and(
             eq(availabilities.companyId, companyId),
-            eq(availabilities.status, 'Open')
+            inArray(availabilities.status, ['Active', 'Open'])
           )
         ),
 
@@ -406,7 +406,7 @@ export async function getSellerCommandCenterDataAction(): Promise<{
         .where(
           and(
             eq(availabilities.companyId, companyId),
-            eq(availabilities.status, 'Open')
+            inArray(availabilities.status, ['Active', 'Open'])
           )
         ),
 
@@ -417,7 +417,7 @@ export async function getSellerCommandCenterDataAction(): Promise<{
         .where(
           and(
             eq(availabilities.companyId, companyId),
-            eq(availabilities.status, 'Open'),
+            inArray(availabilities.status, ['Active', 'Open']),
             sql`${availabilities.validUntil} <= (now() + interval '48 hours')`
           )
         ),

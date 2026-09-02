@@ -8,6 +8,7 @@ import {
   masterStates, 
   masterDistricts, 
   masterGrades, 
+  masterQualityParameters,
   masterUnits, 
   masterVehicleTypes,
   masterIndustries,
@@ -15,7 +16,8 @@ import {
   requirements,
   availabilities
 } from '../db/schema';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, and } from 'drizzle-orm';
+import { masterQualityParameterFormSchema } from '@/src/types/quality-schema';
 
 async function verifyAdminSession(): Promise<{ authorized: boolean; error?: string }> {
   try {
@@ -344,6 +346,115 @@ export async function deleteGradeAction(id: string) {
         error: 'Cannot delete this Quality Parameter because it is referenced in trading records.' 
       };
     }
+    return { success: false, error: error.message || 'Failed to delete quality parameter' };
+  }
+}
+
+export async function getQualityParametersAction(commodityId?: string) {
+  try {
+    const baseQuery = db
+      .select({
+        id: masterQualityParameters.id,
+        commodityId: masterQualityParameters.commodityId,
+        name: masterQualityParameters.name,
+        type: masterQualityParameters.type,
+        unit: masterQualityParameters.unit,
+        minValue: masterQualityParameters.minValue,
+        maxValue: masterQualityParameters.maxValue,
+        targetValue: masterQualityParameters.targetValue,
+        isRequired: masterQualityParameters.isRequired,
+        isActive: masterQualityParameters.isActive,
+        commodityName: masterCommodities.name,
+      })
+      .from(masterQualityParameters)
+      .leftJoin(masterCommodities, eq(masterQualityParameters.commodityId, masterCommodities.id))
+      .where(
+        commodityId
+          ? and(
+              eq(masterQualityParameters.commodityId, commodityId),
+              eq(masterQualityParameters.isActive, true)
+            )
+          : eq(masterQualityParameters.isActive, true)
+      )
+      .orderBy(asc(masterCommodities.name), asc(masterQualityParameters.name));
+
+    const parameters = await baseQuery;
+    return { success: true, data: parameters };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to fetch quality parameters' };
+  }
+}
+
+export async function addQualityParameterAction(payload: unknown) {
+  try {
+    const auth = await verifyAdminSession();
+    if (!auth.authorized) return { success: false, error: auth.error };
+
+    const data = masterQualityParameterFormSchema.parse(payload);
+
+    const inserted = await db
+      .insert(masterQualityParameters)
+      .values({
+        commodityId: data.commodity_id,
+        name: data.name,
+        type: data.type,
+        unit: data.unit || null,
+        minValue: data.min_value !== undefined && data.min_value !== null ? data.min_value.toString() : null,
+        maxValue: data.max_value !== undefined && data.max_value !== null ? data.max_value.toString() : null,
+        targetValue: data.target_value !== undefined && data.target_value !== null ? data.target_value.toString() : null,
+        isRequired: data.is_required,
+        isActive: true,
+      })
+      .returning();
+
+    return { success: true, data: inserted[0] };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to add quality parameter' };
+  }
+}
+
+export async function updateQualityParameterAction(id: string, payload: unknown) {
+  try {
+    const auth = await verifyAdminSession();
+    if (!auth.authorized) return { success: false, error: auth.error };
+
+    const data = masterQualityParameterFormSchema.parse(payload);
+
+    const updated = await db
+      .update(masterQualityParameters)
+      .set({
+        commodityId: data.commodity_id,
+        name: data.name,
+        type: data.type,
+        unit: data.unit || null,
+        minValue: data.min_value !== undefined && data.min_value !== null ? data.min_value.toString() : null,
+        maxValue: data.max_value !== undefined && data.max_value !== null ? data.max_value.toString() : null,
+        targetValue: data.target_value !== undefined && data.target_value !== null ? data.target_value.toString() : null,
+        isRequired: data.is_required,
+        updatedAt: new Date(),
+      })
+      .where(eq(masterQualityParameters.id, id))
+      .returning();
+
+    return { success: true, data: updated[0] };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to update quality parameter' };
+  }
+}
+
+export async function deleteQualityParameterAction(id: string) {
+  try {
+    const auth = await verifyAdminSession();
+    if (!auth.authorized) return { success: false, error: auth.error };
+
+    const updated = await db
+      .update(masterQualityParameters)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(masterQualityParameters.id, id))
+      .returning();
+
+    return { success: true, data: updated[0] };
+  } catch (error: any) {
     return { success: false, error: error.message || 'Failed to delete quality parameter' };
   }
 }

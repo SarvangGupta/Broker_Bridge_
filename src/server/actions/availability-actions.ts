@@ -9,10 +9,11 @@ import {
   masterUnits,
   masterStates,
   masterDistricts,
-  availabilities
+  availabilities,
+  labTests,
 } from "@/src/server/db/schema";
 import { availabilitySchema, AvailabilityStatus, VALID_STATUS_TRANSITIONS } from "@/src/types/availability-schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { verifySellerSession } from "@/src/server/utils/seller-auth";
 
@@ -31,11 +32,33 @@ export async function createAvailabilityAction(data: unknown) {
     // 2. Validate payload against schema
     const parsedData = availabilitySchema.parse(data);
 
+    // Auto-resolve grade if omitted (DB foreign key constraint)
+    let effectiveGradeId = parsedData.grade_id;
+    if (!effectiveGradeId) {
+      const gradeRecord = await db
+        .select({ id: masterGrades.id })
+        .from(masterGrades)
+        .where(eq(masterGrades.commodityId, parsedData.commodity_id))
+        .limit(1);
+      if (gradeRecord.length > 0) {
+        effectiveGradeId = gradeRecord[0].id;
+      } else {
+        const anyGrade = await db.select({ id: masterGrades.id }).from(masterGrades).limit(1);
+        if (anyGrade.length > 0) {
+          effectiveGradeId = anyGrade[0].id;
+        }
+      }
+    }
+
+    if (!effectiveGradeId) {
+      throw new Error("No valid commodity grade configuration found.");
+    }
+
     // 3. Insert record bound strictly to authenticated server-side companyId
     const inserted = await db.insert(availabilities).values({
       companyId: session.data.companyId,
       commodityId: parsedData.commodity_id,
-      gradeId: parsedData.grade_id,
+      gradeId: effectiveGradeId,
       quantity: parsedData.total_quantity, // Sprint 6 compatibility
       unitId: parsedData.unit_id,
       price: parsedData.asking_price.toString(), // Sprint 6 compatibility
@@ -43,7 +66,7 @@ export async function createAvailabilityAction(data: unknown) {
       districtId: parsedData.district_id,
       visibility: parsedData.visibility,
       status: "Active",
-      brokerId: parsedData.broker_id || null,
+      brokerId: (parsedData.broker_id && parsedData.broker_id !== 'none') ? parsedData.broker_id : null,
 
       // New Lot-Level Fields (Sprint 14.1)
       lotNumber: parsedData.lot_number || null,
@@ -81,11 +104,14 @@ export async function getMyAvailabilitiesAction() {
     const results = await db
       .select({
         id: availabilities.id,
+        commodityId: availabilities.commodityId,
         quantity: availabilities.quantity,
         price: availabilities.price,
         status: availabilities.status,
         createdAt: availabilities.createdAt,
         validUntil: availabilities.validUntil,
+        lotNumber: availabilities.lotNumber,
+        totalQuantity: availabilities.totalQuantity,
         commodityName: masterCommodities.name,
         categoryName: masterCategories.name,
         industryName: masterIndustries.name,
@@ -93,6 +119,10 @@ export async function getMyAvailabilitiesAction() {
         unitSymbol: masterUnits.symbol,
         stateName: masterStates.name,
         districtName: masterDistricts.name,
+        labTestId: labTests.id,
+        labTestStatus: labTests.status,
+        labTestValidUntil: labTests.validUntil,
+        labTestTestDate: labTests.testDate,
       })
       .from(availabilities)
       .leftJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))
@@ -102,6 +132,7 @@ export async function getMyAvailabilitiesAction() {
       .leftJoin(masterUnits, eq(availabilities.unitId, masterUnits.id))
       .leftJoin(masterStates, eq(availabilities.stateId, masterStates.id))
       .leftJoin(masterDistricts, eq(availabilities.districtId, masterDistricts.id))
+      .leftJoin(labTests, eq(availabilities.id, labTests.availabilityId))
       .where(eq(availabilities.companyId, session.data.companyId))
       .orderBy(desc(availabilities.createdAt));
 
@@ -113,7 +144,8 @@ export async function getMyAvailabilitiesAction() {
 }
 
 /**
- * Cancels an active availability lot. Enforces company tenant boundary and role check.
+ * Cancels an active/open availability lot. Enforces company tenant boundary and role check.
+ * Allows cancelling lots in 'Open', 'Active', 'Draft', or 'Pending Approval' states.
  * Protected by verifySellerSession({ allowViewer: false }).
  */
 export async function cancelAvailabilityAction(id: string) {
@@ -125,12 +157,12 @@ export async function cancelAvailabilityAction(id: string) {
 
     const updated = await db
       .update(availabilities)
-      .set({ status: 'Deactivated' })
+      .set({ status: 'Cancelled' })
       .where(
         and(
           eq(availabilities.id, id),
           eq(availabilities.companyId, session.data.companyId),
-          eq(availabilities.status, 'Active')
+          inArray(availabilities.status, ['Open', 'Active', 'Draft', 'Pending Approval'])
         )
       )
       .returning();
@@ -142,7 +174,7 @@ export async function cancelAvailabilityAction(id: string) {
     revalidatePath("/seller");
     return { success: true, data: updated[0] };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: false, error: error.message || "Failed to cancel availability" };
   }
 }
 
@@ -306,17 +338,29 @@ export async function updateAvailabilityAction(payload: any) {
     const id = payload.id;
     const version = payload.version;
     
+    let effectiveGradeId = parsedData.grade_id;
+    if (!effectiveGradeId) {
+      const gradeRecord = await db
+        .select({ id: masterGrades.id })
+        .from(masterGrades)
+        .where(eq(masterGrades.commodityId, parsedData.commodity_id))
+        .limit(1);
+      if (gradeRecord.length > 0) {
+        effectiveGradeId = gradeRecord[0].id;
+      }
+    }
+
     // Explicitly increment the version using SQL and map form fields to DB columns
-    const dataToUpdate = {
+    const dataToUpdate: any = {
       commodityId: parsedData.commodity_id,
-      gradeId: parsedData.grade_id,
+      ...(effectiveGradeId ? { gradeId: effectiveGradeId } : {}),
       quantity: parsedData.total_quantity, // Sprint 6 compatibility
       unitId: parsedData.unit_id,
       price: parsedData.asking_price.toString(), // Sprint 6 compatibility
       stateId: parsedData.state_id,
       districtId: parsedData.district_id,
       visibility: parsedData.visibility,
-      brokerId: parsedData.broker_id || null,
+      brokerId: (parsedData.broker_id && parsedData.broker_id !== 'none') ? parsedData.broker_id : null,
 
       lotNumber: parsedData.lot_number || null,
       totalQuantity: parsedData.total_quantity.toString(),

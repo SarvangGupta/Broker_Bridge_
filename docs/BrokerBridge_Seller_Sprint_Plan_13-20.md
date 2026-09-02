@@ -221,88 +221,88 @@ Goal: Upgrade the existing Sprint-6 availability foundation into the complete lo
 - [x] Stale Seller updates return a clear recovery path.
 - [x] The final persisted quantity is authoritative.
 
-# SPRINT 15 — Quality, Lab Testing & Evidence
+# SPRINT 15 — Quality, Lab Testing & Evidence (COMPLETED ✅)
 
 Goal: Make quality a structured, commodity-specific, lot-scoped system rather than a collection of static fields and files.
 
-### 15.1 — Quality Parameter Master Integration
+### 15.1 — Quality Parameter Master Integration (COMPLETED ✅)
 
 **Objective:** Connect Seller quality forms to the configured commodity template.
 
 **Implementation:**
 
-- Load the authoritative quality template for the selected commodity.
-- Support parameter name, unit, min, max, target/guaranteed value and required flag as configured.
-- Use commodity-specific examples such as Moisture, Protein, Broken %, Foreign Matter, Damage %, Aflatoxin and Test Weight where configured.
+- [x] Load the authoritative quality template for the selected commodity.
+- [x] Support parameter name, unit, min, max, target/guaranteed value and required flag as configured.
+- [x] Use commodity-specific examples such as Moisture, Protein, Broken %, Foreign Matter, Damage %, Aflatoxin and Test Weight where configured.
 **Done when:**
 
-- Changing commodity changes the quality parameter set dynamically.
-- No hard-coded commodity-specific form is required for normal configuration.
-- Required parameters are enforced.
+- [x] Changing commodity changes the quality parameter set dynamically.
+- [x] No hard-coded commodity-specific form is required for normal configuration.
+- [x] Required parameters are enforced.
 
-### 15.2 — Seller Quality Entry & Validation
+### 15.2 — Seller Quality Entry & Validation (COMPLETED ✅)
 
 **Objective:** Capture and validate actual Seller quality values.
 
 **Implementation:**
 
-- Render dynamic input controls based on parameter type.
-- Validate numeric ranges and required values.
-- Show human-readable field errors.
-- Store the submitted quality snapshot against the exact lot.
+- [x] Render dynamic input controls based on parameter type.
+- [x] Validate numeric ranges and required values.
+- [x] Show human-readable field errors.
+- [x] Store the submitted quality snapshot against the exact lot.
 **Done when:**
 
-- Invalid values cannot be persisted.
-- The Seller can see exactly which quality field needs correction.
-- Persisted values can be reproduced later in a deal snapshot.
+- [x] Invalid values cannot be persisted.
+- [x] The Seller can see exactly which quality field needs correction.
+- [x] Persisted values can be reproduced later in a deal snapshot.
 
-### 15.3 — Lab Test Record
+### 15.3 — Lab Test Record (COMPLETED ✅)
 
 **Objective:** Create structured lab testing data independent of the document file itself.
 
 **Implementation:**
 
-- Lab/Test ID, lot reference, test date, source/lab, results and status.
-- Validity/freshness and expiry.
-- Link test results to the exact lot.
-- Track requested/uploaded/reviewed/verified/expired states as applicable.
+- [x] Lab/Test ID, lot reference, test date, source/lab, results and status.
+- [x] Validity/freshness and expiry.
+- [x] Link test results to the exact lot.
+- [x] Track requested/uploaded/reviewed/verified/expired states as applicable.
 **Done when:**
 
-- Lab information is queryable without parsing a PDF.
-- A lab record cannot point to the wrong lot.
-- Expired evidence is excluded from verified evidence display.
+- [x] Lab information is queryable without parsing a PDF.
+- [x] A lab record cannot point to the wrong lot.
+- [x] Expired evidence is excluded from verified evidence display.
 
-### 15.4 — COA / Lab / Quality Documents
+### 15.4 — COA / Lab / Quality Documents (COMPLETED ✅)
 
 **Objective:** Securely attach evidence to the exact lot.
 
 **Implementation:**
 
-- COA, laboratory report, quality certificate, batch report and specification sheet.
-- Private storage with authorization at download time.
-- File type/size validation.
-- Document verification and expiry status.
-- Replace/update flow that preserves audit history.
+- [x] COA, laboratory report, quality certificate, batch report and specification sheet.
+- [x] Private storage with authorization at download time.
+- [x] File type/size validation.
+- [x] Document verification and expiry status.
+- [x] Replace/update flow that preserves audit history.
 **Done when:**
 
-- A Seller can upload and later retrieve only authorized documents.
-- Expired/rejected documents are clearly marked.
-- No direct URL access bypasses authorization.
+- [x] A Seller can upload and later retrieve only authorized documents.
+- [x] Expired/rejected documents are clearly marked.
+- [x] No direct URL access bypasses authorization.
 
-### 15.5 — Quality Readiness & Broker Visibility
+### 15.5 — Quality Readiness & Broker Visibility (COMPLETED ✅)
 
 **Objective:** Make quality state operationally useful to the Broker without exposing Seller-private data.
 
 **Implementation:**
 
-- Show verified/pending/correction-required status on Seller dashboard.
-- Expose only authorized quality evidence through Broker-facing workflow.
-- Prevent invalid/expired quality evidence from being treated as verified.
-- Audit quality and document state changes.
+- [x] Show verified/pending/correction-required status on Seller dashboard.
+- [x] Expose only authorized quality evidence through Broker-facing workflow.
+- [x] Prevent invalid/expired quality evidence from being treated as verified.
+- [x] Audit quality and document state changes.
 **Done when:**
 
-- Broker-facing match/request workflows receive correct quality state.
-- Seller can immediately see missing or expiring quality actions.
+- [x] Broker-facing match/request workflows receive correct quality state.
+- [x] Seller can immediately see missing or expiring quality actions.
 
 # SPRINT 16 — Loading Readiness & Broker Request Inbox
 

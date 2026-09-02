@@ -1,12 +1,19 @@
+"use client";
+
+import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { EnrichedMatchResult } from "@/src/server/actions/ui-match-actions"
-import { CheckCircle2, AlertTriangle, Percent, Activity } from "lucide-react"
+import { CheckCircle2, AlertTriangle, Percent, Activity, FlaskConical } from "lucide-react"
 
 import { VerificationBadge, TrustScore } from "@/src/components/ui/trust-badge"
+import { QualityStatusBadge } from "@/src/components/dashboard/quality-status-badge"
+import { LabReviewDialog } from "@/src/components/broker/lab-review-dialog"
 
 export function MatchResultCard({ match }: { match: EnrichedMatchResult }) {
+  const [labReviewOpen, setLabReviewOpen] = useState(false);
+
   const getBadgeColor = (classification: string) => {
     switch (classification) {
       case 'Strong Match': return 'bg-green-500 hover:bg-green-600 text-white'
@@ -35,6 +42,12 @@ export function MatchResultCard({ match }: { match: EnrichedMatchResult }) {
             <h3 className="font-semibold text-lg line-clamp-1">{match.companyName}</h3>
             {match.isVerified && <VerificationBadge compact />}
             <TrustScore score={match.trustScore} compact />
+            {match.qualityStatus && (
+              <QualityStatusBadge
+                status={match.qualityStatus}
+                validUntil={match.labTestValidUntil}
+              />
+            )}
           </div>
           <p className="text-xs text-muted-foreground text-ellipsis overflow-hidden">
             {match.recommendedAction}
@@ -95,10 +108,36 @@ export function MatchResultCard({ match }: { match: EnrichedMatchResult }) {
         </div>
       </CardContent>
 
-      <CardFooter className="pt-4 border-t flex gap-3">
-        <Button className="w-full" size="sm">Create Quote</Button>
-        <Button variant="outline" className="w-full" size="sm">View Details</Button>
+      <CardFooter className="pt-4 border-t flex flex-col sm:flex-row gap-2.5">
+        <Button className="w-full min-h-[48px] h-12 text-sm font-semibold" size="sm">
+          Create Quote
+        </Button>
+        {match.labTestId ? (
+          <Button
+            variant="outline"
+            onClick={() => setLabReviewOpen(true)}
+            className="w-full min-h-[48px] h-12 text-sm font-semibold text-slate-700 hover:text-slate-900 border-slate-300 flex items-center justify-center gap-1.5"
+            size="sm"
+          >
+            <FlaskConical className="w-4 h-4 text-primary" />
+            Audit Lab Test
+          </Button>
+        ) : (
+          <Button variant="outline" className="w-full min-h-[48px] h-12 text-sm font-semibold" size="sm">
+            View Details
+          </Button>
+        )}
       </CardFooter>
+
+      {/* Broker Lab Review Modal */}
+      {match.labTestId && (
+        <LabReviewDialog
+          labTestId={match.labTestId}
+          availabilityId={match.availabilityId}
+          open={labReviewOpen}
+          onOpenChange={setLabReviewOpen}
+        />
+      )}
     </Card>
   )
 }
