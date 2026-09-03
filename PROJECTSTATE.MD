@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 5: Multi-Sector Architecture & Platform Scaling (Sprint 13+)**  
-Global Platform Status: **PRODUCTION READY / SPRINT 15 VERIFIED** 🚀  
-Status: **Sprint 15 Completed** ✅ (Sprints 1–15 Complete & Fully Verified; Ready for Sprint 16)
+Global Platform Status: **PRODUCTION READY / SPRINT 16 VERIFIED** 🚀  
+Status: **Sprint 16 Completed** ✅ (Sprints 1–16 Complete & Fully Verified; Ready for Sprint 17)
 
 
 ---
@@ -177,4 +177,35 @@ Status: **Sprint 15 Completed** ✅ (Sprints 1–15 Complete & Fully Verified; R
   - Integrated "Upload Lab Report" / "Manage Lab Report" trigger button and modal into `<InventoryCard />`.
   - Enhanced AI Match Engine (`ui-match-actions.ts` & `match-result-card.tsx`) with quality readiness badges and broker audit triggers.
 - **Verification:** Passed `npx tsc --noEmit` with 0 errors. Dynamic Quality Engine, Structured Lab Records, Private Evidence Storage Vault, and Mathematical Expiry Guard are 100% operational.
+
+### 🟢 Sprint 16: Loading Readiness & Broker Request Inbox
+- **Status:** `COMPLETED` ✅
+- **Goal:** Connect Seller supply loading readiness to Broker-originated commercial proposals, deploy privacy-safe Broker Request Inbox with Accept/Reject/Counter response triad, integrate notification deep-linking, and enforce AI Recommendation Decision Gate.
+- **Micro-Sprint 16.1 (Loading Readiness Model & Drizzle Schema):** `COMPLETED` ✅
+  - Upgraded `availabilities` table with loading readiness columns: `loadingStatus`, `loadingDuration`, `loadingStartDate`, `loadingCapacity`, `loadingRemarks`, `loadingUpdatedAt`.
+  - Generated Drizzle migration `0024_add_loading_readiness_to_availabilities.sql` and synchronized journal.
+  - Built `loading-schema.ts` with strict Zod refinements for delayed/blocked statuses.
+  - Implemented `updateLoadingReadinessAction` and `getLoadingReadinessAction` in `loading-actions.ts` with tenant ownership verification.
+- **Micro-Sprint 16.2 (Loading Readiness UI & Inventory Card Updates):** `COMPLETED` ✅
+  - Built mobile-first `<LoadingReadinessForm />` with 48px touch targets, date pickers, numeric inputs, and dynamic remarks validation.
+  - Built responsive `<LoadingStatusModal />` (Dialog for desktop / bottom Sheet for mobile viewports).
+  - Created color-coded `<LoadingStatusBadge />` and embedded operational strip + update triggers on `<InventoryCard />`.
+- **Micro-Sprint 16.3 (Broker Request Inbox & Response Workflow):** `COMPLETED` ✅
+  - Built `getSellerBrokerRequestsAction` with hard zero-Buyer-PII scrubbing (zero phone, email, WhatsApp, GST).
+  - Built `respondToBrokerRequestAction` supporting the complete response triad: Accept (`Seller Accepted`), Reject (`Seller Rejected` with mandatory $\ge 5$ char reason), and Counter (`Seller Countered` with custom rate, quantity, dispatch date, and notes).
+  - Built `<BrokerRequestInbox />` with status filter tabs, countdown expiration badges, commercial summary grid, Accept confirmation modal, Counter modal, and Reject modal with quick-chips.
+  - Created dedicated route `/seller/requests` and integrated inbox into the Command Center Deals tab.
+- **Micro-Sprint 16.4 (Request Notifications & Deep Links):** `COMPLETED` ✅
+  - Upgraded `notifications` schema with `action_url` column and generated migration `0025_add_notification_action_url.sql`.
+  - Updated notification bell dropdown to support deep link routing and background optimistic read-marking.
+  - Upgraded `<BrokerRequestInbox />` to detect `?requestId=` query parameter, auto-switch active tabs, smooth scroll, and highlight linked cards.
+  - Integrated notification dispatch and instant TanStack Query cache invalidation in dev seeder.
+- **Micro-Sprint 16.5 (AI Recommendation Decision Gate & Broker Provenance):** `COMPLETED` ✅
+  - Enforced server-side human broker session validation (`role === 'broker' || role === 'admin'`), rejecting autonomous bot executions with `"AI autonomous action prohibited. Only an authorized Broker can initiate commercial proposals."`.
+  - Locked down direct AI-to-deal conversions, requiring verified quotation state machine confirmations.
+  - Added verified "Broker-Mediated Request" attribution pill with `<ShieldCheck>` on request cards (*"Originated by Broker: [Broker Name] • [Broker Agency]"*).
+  - Implemented structured non-autonomous audit logging in `audit-actions.ts` (`logDecisionGateAuditEventAction`).
+  - Implemented dev hardening verification utility in `test-gate-action.ts` (`verifyDecisionGateIntegrityAction`).
+- **Verification:** Passed `npx tsc --noEmit` with 0 errors. Loading Readiness State Machine, Privacy-Safe Broker Inbox, Response Triad (Accept/Reject/Counter), Notification Deep Links, and AI Decision Gate are 100% operational.
+
 

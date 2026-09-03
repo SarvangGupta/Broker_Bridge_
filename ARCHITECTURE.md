@@ -321,3 +321,26 @@ The platform establishes quality as a dynamic, lot-scoped, and audit-grade domai
 - **Server Action Upload Bridge**: Document uploads utilize `uploadLabEvidenceAction` to guarantee SSR `httpOnly` cookie authentication and tenant lot validation without exposing client tokens.
 - **Broker Quality Verification Pipeline**: `quality-verification-actions.ts` allows verified Tier-1 Brokers and Admins to audit structured parameters against certificates via `<LabReviewDialog />`, executing atomic status transitions across `lab_tests` and `availability_quality_values`.
 
+### 22. Loading Readiness Operational Model & Lot State Machine (Sprint 16)
+Loading readiness is modeled as a pre-deal operational attribute linked directly to supply inventory lots:
+- **Operational Lot Attributes**: The `availabilities` table includes `loadingStatus` (`'Not Ready'`, `'Ready'`, `'Scheduled'`, `'Loading'`, `'Loaded'`, `'Delayed'`, `'Blocked'`), `loadingDuration` (integer days for AI matching), `loadingStartDate` (timestamp), `loadingCapacity` (daily dispatch rate in MT), `loadingRemarks` (mandatory operational feedback on delayed/blocked states), and `loadingUpdatedAt`.
+- **Pre-Deal Dispatch Feasibility**: Loading readiness allows brokers and algorithms to verify physical warehouse throughput before issuing commercial proposals, preventing deal locks on logistically blocked stock.
+- **Mobile-First Mutation Surface**: `<LoadingReadinessForm />` and `<LoadingStatusModal />` provide 48px touch targets for rapid single-handed field updates by warehouse operators.
+- **Visual Status Badges**: `<LoadingStatusBadge />` provides color-coded indicators (Emerald for Ready/Loaded, Sky for Scheduled/Loading, Amber for Delayed, Rose for Blocked, Slate for Not Ready) embedded directly on inventory cards.
+
+### 23. Privacy-Isolated Broker Request Inbox & AI Decision Gate (Sprint 16)
+The Seller commercial negotiation interface operates under strict broker-mediated and non-autonomous governance:
+- **Zero-Buyer Discovery & Hard Privacy Shield**: The Seller Request Inbox query (`getSellerBrokerRequestsAction`) joins quotations with requirements and lots while strictly scrubbing all Buyer personal and organizational contact data (phone numbers, emails, WhatsApp handles, company legal names, and GST numbers). Sellers evaluate trade terms purely on commercial merits (quantity, offered rate, loading timeline, settlement mechanism).
+- **Commercial Response Triad**: The `<BrokerRequestInbox />` component allows Sellers to respond to incoming proposals deterministically:
+  - **Accept (`'Seller Accepted'`)**: Locks the Seller's consent and notifies the Broker Desk to draft the formal Deal Booking.
+  - **Reject (`'Seller Rejected'`)**: Requires a documented operational or pricing rationale ($\ge 5$ characters) using interactive quick-chips.
+  - **Counter (`'Seller Countered'`)**: Permits structured adjustments to price, quantity, earliest dispatch date, and commercial notes without overwriting previous proposal states.
+- **AI Recommendation Decision Gate & Non-Autonomous Guardrails**:
+  - The AI Match Engine remains strictly recommendation-only. Under no circumstances can automated background crons, algorithms, or bot routines initiate proposals, accept terms, or generate Bookings.
+  - Proposal initiation actions (`createQuotationAction`, `initiateBrokerRequestFromAiMatchAction`) enforce authenticated human broker verification (`role === 'broker' || role === 'admin'`). Autonomous calls are explicitly rejected with `"AI autonomous action prohibited. Only an authorized Broker can initiate commercial proposals."`.
+  - Booking creation (`acceptQuotationAction`, `createDealAction`) is locked behind explicit human quotation state machine transitions and authorized party confirmations.
+- **Broker Provenance Attribution**: Each proposal card in `<BrokerRequestInbox />` displays a verified **Broker-Mediated Request** banner (`brokerName`, `brokerCompany`, `isBrokerVerified`), assuring the Seller of licensed human curation.
+- **Non-Autonomous Audit Trail**: Critical decision milestones dispatch structured audit events (`logDecisionGateAuditEventAction`) recording actor provenance, match scores, and human review flags for compliance auditing.
+- **Notification Deep-Linking Engine**: In-app notifications contain deep-link URLs (`action_url: '/seller/requests?requestId=...'`). The inbox utilizes Next.js `useSearchParams()` to detect deep links, automatically switch status tabs, smooth-scroll to the card, and highlight it with an emerald focus ring.
+
+

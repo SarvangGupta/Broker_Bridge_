@@ -151,6 +151,13 @@ export const availabilities = pgTable('availabilities', {
   availableFrom: timestamp('available_from').defaultNow().notNull(),
   validUntil: timestamp('valid_until').notNull(),
   version: integer('version').default(1).notNull(),
+  // Loading Readiness Model (Sprint 16.1 - PRD v3.0)
+  loadingStatus: text('loading_status').default('Not Ready').notNull(),
+  loadingDuration: integer('loading_duration'),
+  loadingStartDate: timestamp('loading_start_date'),
+  loadingCapacity: numeric('loading_capacity'),
+  loadingRemarks: text('loading_remarks'),
+  loadingUpdatedAt: timestamp('loading_updated_at'),
 });
 
 export const availabilityQualityValues = pgTable('availability_quality_values', {
@@ -294,6 +301,7 @@ export const notifications = pgTable('notifications', {
   eventType: text('event_type').notNull(), // 'MATCH_CREATED', 'MATCH_UPDATED', 'NEGOTIATION_RECEIVED', 'NEGOTIATION_ACCEPTED', 'DEAL_CREATED', 'DEAL_UPDATED', 'SYSTEM'
   title: text('title').notNull(),
   message: text('message').notNull(),
+  actionUrl: text('action_url'),
   payload: jsonb('payload'),
   deliveryStatus: text('delivery_status').default('Pending').notNull(), // 'Pending', 'Processing', 'Sent', 'Failed'
   readAt: timestamp('read_at'),

@@ -13,6 +13,7 @@ export interface QueueNotificationInput {
   eventType: NotificationEventType
   title: string
   message: string
+  actionUrl?: string | null
   payload?: NotificationPayload | null
 }
 
@@ -55,6 +56,7 @@ export async function queueNotificationAction(input: QueueNotificationInput) {
         eventType: input.eventType,
         title: input.title,
         message: input.message,
+        actionUrl: input.actionUrl || null,
         payload: input.payload || null,
         deliveryStatus: isChannelInApp ? 'Sent' : 'Pending',
         sentAt: isChannelInApp ? new Date() : null,

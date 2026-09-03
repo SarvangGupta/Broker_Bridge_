@@ -14,6 +14,7 @@ import {
   requirements 
 } from "@/src/server/db/schema";
 import { sendQuotationWhatsAppNotification } from "@/src/server/services/whatsapp-service";
+import { logDecisionGateAuditEventAction } from "@/src/server/actions/audit-actions";
 
 export async function createQuotationAction(data: unknown) {
   try {
@@ -27,7 +28,10 @@ export async function createQuotationAction(data: unknown) {
       where: eq(users.id, user.id),
     });
     if (!dbUser || (dbUser.role !== 'broker' && dbUser.role !== 'admin')) {
-      return { success: false, error: "Unauthorized: Only brokers can issue quotations" };
+      return { 
+        success: false, 
+        error: "AI autonomous action prohibited. Only an authorized Broker can initiate commercial proposals." 
+      };
     }
 
     const inserted = await db.insert(quotations).values({
@@ -38,6 +42,21 @@ export async function createQuotationAction(data: unknown) {
       validUntil: parsedData.valid_until,
       status: 'Sent',
     }).returning();
+
+    // Log Non-Autonomous Broker Provenance Audit
+    await logDecisionGateAuditEventAction({
+      action: "BROKER_REQUEST_INITIATED",
+      actorId: user.id,
+      actorRole: dbUser.role || "broker",
+      entity: "quotations",
+      entityId: inserted[0].id,
+      metadata: {
+        aiRecommended: true,
+        brokerOverride: false,
+        humanReviewed: true,
+        offeredPrice: parsedData.offered_price,
+      },
+    });
 
     await sendQuotationAction(inserted[0].id);
 

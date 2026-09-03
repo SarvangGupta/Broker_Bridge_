@@ -304,87 +304,87 @@ Goal: Make quality a structured, commodity-specific, lot-scoped system rather th
 - [x] Broker-facing match/request workflows receive correct quality state.
 - [x] Seller can immediately see missing or expiring quality actions.
 
-# SPRINT 16 — Loading Readiness & Broker Request Inbox
+# SPRINT 16 — Loading Readiness & Broker Request Inbox (COMPLETED ✅)
 
 Goal: Connect Seller supply readiness to Broker-originated commercial requests without creating a direct Buyer communication channel.
 
-### 16.1 — Loading Readiness Model
+### 16.1 — Loading Readiness Model (COMPLETED ✅)
 
 **Objective:** Make loading readiness a pre-deal operational attribute.
 
 **Implementation:**
 
-- Statuses: Ready, Scheduled, Loading, Delayed, Blocked as applicable.
-- Loading duration, readiness date/time and remarks.
-- Associate readiness with the relevant lot/availability.
+- [x] Statuses: Ready, Scheduled, Loading, Delayed, Blocked as applicable.
+- [x] Loading duration, readiness date/time and remarks.
+- [x] Associate readiness with the relevant lot/availability.
 **Done when:**
 
-- Seller can state whether stock is operationally ready.
-- Status is queryable and auditable.
-- Loading readiness is available before Booking.
+- [x] Seller can state whether stock is operationally ready.
+- [x] Status is queryable and auditable.
+- [x] Loading readiness is available before Booking.
 
-### 16.2 — Loading Readiness UI & Updates
+### 16.2 — Loading Readiness UI & Updates (COMPLETED ✅)
 
 **Objective:** Give Seller a fast workflow to update readiness.
 
 **Implementation:**
 
-- Update state from inventory/lot context.
-- Show current readiness prominently on lot cards.
-- Validate permitted transitions.
-- Provide clear failure/retry states.
+- [x] Update state from inventory/lot context.
+- [x] Show current readiness prominently on lot cards.
+- [x] Validate permitted transitions.
+- [x] Provide clear failure/retry states.
 **Done when:**
 
-- Seller can update readiness from mobile with minimal steps.
-- Invalid transitions are rejected.
-- Dashboard reflects the latest persisted state.
+- [x] Seller can update readiness from mobile with minimal steps.
+- [x] Invalid transitions are rejected.
+- [x] Dashboard reflects the latest persisted state.
 
-### 16.3 — Broker Request Inbox
+### 16.3 — Broker Request Inbox (COMPLETED ✅)
 
 **Objective:** Present broker-originated commercial requests as Seller actions.
 
 **Implementation:**
 
-- Request ID, commodity, grade, requested quantity, quality requirements, delivery and response deadline.
-- Broker message/context where permitted.
-- Accept / Reject / Counter actions.
-- Never expose Buyer phone/email/WhatsApp or direct contact.
+- [x] Request ID, commodity, grade, requested quantity, quality requirements, delivery and response deadline.
+- [x] Broker message/context where permitted.
+- [x] Accept / Reject / Counter actions.
+- [x] Never expose Buyer phone/email/WhatsApp or direct contact.
 **Done when:**
 
-- Seller receives requests only through Broker-controlled workflows.
-- The request contains enough information to make a commercial decision.
-- No direct Buyer discovery mechanism exists.
+- [x] Seller receives requests only through Broker-controlled workflows.
+- [x] The request contains enough information to make a commercial decision.
+- [x] No direct Buyer discovery mechanism exists.
 
-### 16.4 — Request Notifications & Deep Links
+### 16.4 — Request Notifications & Deep Links (COMPLETED ✅)
 
 **Objective:** Connect request events to the Seller Action Center.
 
 **Implementation:**
 
-- New Broker request notification.
-- Deadline/reminder notification where configured.
-- Deep link directly to request detail.
-- Notification payload contains no prohibited Buyer information.
+- [x] New Broker request notification.
+- [x] Deadline/reminder notification where configured.
+- [x] Deep link directly to request detail.
+- [x] Notification payload contains no prohibited Buyer information.
 **Done when:**
 
-- Notification opens the exact action screen.
-- Retry does not duplicate notifications.
-- Notification delivery failure is visible to operations.
+- [x] Notification opens the exact action screen.
+- [x] Retry does not duplicate notifications.
+- [x] Notification delivery failure is visible to operations.
 
-### 16.5 — AI Recommendation Decision Gate
+### 16.5 — AI Recommendation Decision Gate (COMPLETED ✅)
 
 **Objective:** Ensure AI remains recommendation-only while Seller request flow is deterministic.
 
 **Implementation:**
 
-- Verify AI ranks/recommends availability but cannot independently select, negotiate, finalize or book.
-- Broker remains the explicit decision-maker.
-- Audit manual Broker overrides where applicable.
-- Ensure Seller sees only the Broker-originated commercial request, not an AI autonomous action.
+- [x] Verify AI ranks/recommends availability but cannot independently select, negotiate, finalize or book.
+- [x] Broker remains the explicit decision-maker.
+- [x] Audit manual Broker overrides where applicable.
+- [x] Ensure Seller sees only the Broker-originated commercial request, not an AI autonomous action.
 **Done when:**
 
-- No AI path can create a Booking.
-- No AI path can bypass Broker decision-making.
+- [x] No AI path can create a Booking.
+- [x] No AI path can bypass Broker decision-making.
 
 # SPRINT 17 — Negotiation & Immutable Deal Versioning
 

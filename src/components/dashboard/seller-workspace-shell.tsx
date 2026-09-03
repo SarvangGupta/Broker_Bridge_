@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, Suspense } from 'react'
 import { SellerHeader } from '@/src/components/dashboard/seller-header'
 import { SellerNav } from '@/src/components/dashboard/seller-nav'
 import { MyAvailabilitiesTable } from '@/src/components/dashboard/my-availabilities-table'
@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SellerCommandCenterData } from '@/src/server/actions/analytics-actions'
+import { BrokerRequestInbox } from '@/src/components/dashboard/broker-request-inbox'
 
 interface SellerWorkspaceShellProps {
   profile: any
@@ -36,6 +37,7 @@ interface SellerWorkspaceShellProps {
   userRole?: string
   availabilities: any[]
   deals: any[]
+  brokerRequests?: any[]
   vehicleTypes: any[]
   commandCenterData?: SellerCommandCenterData
 }
@@ -46,6 +48,7 @@ export function SellerWorkspaceShell({
   userRole = "SELLER_ADMIN",
   availabilities,
   deals,
+  brokerRequests = [],
   vehicleTypes,
   commandCenterData,
 }: SellerWorkspaceShellProps) {
@@ -318,20 +321,34 @@ export function SellerWorkspaceShell({
         {/* TAB 4: REQUESTS & DEALS                                                    */}
         {/* ========================================================================= */}
         {activeTab === 'deals' && (
-          <div className="space-y-6 animate-in fade-in-50 duration-200">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                  Broker Requests & Deals
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Track broker commercial proposals, negotiations, and locked transaction bookings.
-                </p>
+          <div className="space-y-8 animate-in fade-in-50 duration-200">
+            {/* Broker Commercial Requests Inbox (Sprint 16.3 & 16.4) */}
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12 bg-white rounded-2xl border border-slate-200">
+                <span className="text-xs text-slate-500 font-semibold">Loading Broker Inbox...</span>
               </div>
-              <DataFreshness />
-            </div>
+            }>
+              <BrokerRequestInbox initialRequests={brokerRequests} />
+            </Suspense>
 
-            <SellerDealsTable deals={deals} vehicleTypes={vehicleTypes} />
+            {/* Confirmed / Booked Deals Table */}
+            <div className="space-y-4 pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+                    Booked Deals & Executions
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Finalized transactions ready for logistics dispatch and invoice generation.
+                  </p>
+                </div>
+                <Badge variant="outline" className="bg-slate-100 text-slate-700 font-semibold text-xs">
+                  {deals.length} Booked
+                </Badge>
+              </div>
+
+              <SellerDealsTable deals={deals} vehicleTypes={vehicleTypes} />
+            </div>
           </div>
         )}
 

@@ -123,6 +123,12 @@ export async function getMyAvailabilitiesAction() {
         labTestStatus: labTests.status,
         labTestValidUntil: labTests.validUntil,
         labTestTestDate: labTests.testDate,
+        loadingStatus: availabilities.loadingStatus,
+        loadingDuration: availabilities.loadingDuration,
+        loadingStartDate: availabilities.loadingStartDate,
+        loadingCapacity: availabilities.loadingCapacity,
+        loadingRemarks: availabilities.loadingRemarks,
+        loadingUpdatedAt: availabilities.loadingUpdatedAt,
       })
       .from(availabilities)
       .leftJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))

@@ -61,3 +61,17 @@ This document tracks UI/UX anomalies, architectural logic bugs, and their eventu
   2. Applied the `INSERT` RLS policy on `storage.objects` for `authenticated` users uploading with path format `{availability_id}/{filename}`.
   3. Applied the `SELECT` policy restricting download/view access exclusively to Admin/Broker roles and the lot-owning Seller company.
 
+---
+
+## Sprint 16.4 - Notification Action URL Schema & Instant Dev Refresh
+- **Issue:** 
+  1. Terminal logged `PostgresError: column "action_url" does not exist` during notification queries (`getInAppNotificationsAction`).
+  2. Clicking "Generate Test Broker Request" did not update the header notification bell unread counter instantly.
+- **Root Causes:**
+  1. The Drizzle schema was updated with `actionUrl: text('action_url')`, but the generated migration file `0025_add_notification_action_url.sql` had not yet been executed on the live Supabase PostgreSQL database.
+  2. The frontend Notification Bell was polling on a 15-second interval and did not receive immediate cache invalidation upon mock request generation.
+- **Resolution:**
+  1. Applied `ALTER TABLE "notifications" ADD COLUMN IF NOT EXISTS "action_url" text;` directly to PostgreSQL.
+  2. Updated `createMockBrokerRequestAction` in `src/server/actions/broker-request-actions.ts` to explicitly queue the notification with `action_url` and invoke `revalidatePath('/', 'layout')`.
+  3. Injected `queryClient.invalidateQueries({ queryKey: ['in-app-notifications'] })` into `handleGenerateMock` in `src/components/dashboard/broker-request-inbox.tsx` to instantly re-fetch and increment the unread badge in the header.
+

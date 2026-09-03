@@ -10,6 +10,7 @@ import { getMyAvailabilitiesAction } from "@/src/server/actions/availability-act
 import { getDealsByCompanyAction } from "@/src/server/actions/deal-actions"
 import { getMasterVehicleTypesAction } from "@/src/server/actions/master-data-actions"
 import { getSellerCommandCenterDataAction, SellerCommandCenterData } from "@/src/server/actions/analytics-actions"
+import { getSellerBrokerRequestsAction } from "@/src/server/actions/broker-request-actions"
 import { SellerWorkspaceShell } from "@/src/components/dashboard/seller-workspace-shell"
 
 export default async function SellerDashboard() {
@@ -21,15 +22,17 @@ export default async function SellerDashboard() {
 
   let availabilities: any[] = []
   let deals: any[] = []
+  let brokerRequests: any[] = []
   let vehicleTypes: any[] = []
   let fullProfileData: any = null
   let commandCenterData: SellerCommandCenterData | undefined = undefined
   let userRole = "SELLER_ADMIN"
 
   if (hasCompany) {
-    const [availabilitiesRes, dealsRes, vehicleTypesRes, fullProfileRes, commandCenterRes] = await Promise.all([
+    const [availabilitiesRes, dealsRes, brokerRequestsRes, vehicleTypesRes, fullProfileRes, commandCenterRes] = await Promise.all([
       getMyAvailabilitiesAction(),
       getDealsByCompanyAction(),
+      getSellerBrokerRequestsAction(),
       getMasterVehicleTypesAction(),
       getFullBuyerProfileDetailsAction(),
       getSellerCommandCenterDataAction(),
@@ -40,6 +43,9 @@ export default async function SellerDashboard() {
     }
     if (dealsRes.success && dealsRes.data) {
       deals = dealsRes.data
+    }
+    if (brokerRequestsRes.success && brokerRequestsRes.data) {
+      brokerRequests = brokerRequestsRes.data
     }
     if (vehicleTypesRes.success && vehicleTypesRes.data) {
       vehicleTypes = vehicleTypesRes.data
@@ -94,6 +100,7 @@ export default async function SellerDashboard() {
           userRole={userRole}
           availabilities={availabilities}
           deals={deals}
+          brokerRequests={brokerRequests}
           vehicleTypes={vehicleTypes}
           commandCenterData={commandCenterData}
         />

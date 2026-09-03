@@ -24,6 +24,12 @@ interface AvailabilityRow {
   labTestValidUntil?: Date | string | null
   labTestTestDate?: Date | string | null
   labTestId?: string | null
+  loadingStatus?: string | null
+  loadingDuration?: number | null
+  loadingStartDate?: Date | string | null
+  loadingCapacity?: string | number | null
+  loadingRemarks?: string | null
+  loadingUpdatedAt?: Date | string | null
 }
 
 interface MyAvailabilitiesTableProps {

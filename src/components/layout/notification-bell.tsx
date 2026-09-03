@@ -135,12 +135,16 @@ export function NotificationBell({ className }: { className?: string }) {
       markReadMutation.mutate(item.id)
     }
 
-    if (item.payload?.url) {
-      setIsOpen(false)
-      router.push(item.payload.url)
-    } else if (item.payload?.dealId) {
-      setIsOpen(false)
-      router.push('/deals')
+    setIsOpen(false)
+    const targetUrl =
+      item.actionUrl ||
+      item.payload?.action_url ||
+      item.payload?.url ||
+      (item.payload?.requestId ? `/seller/requests?requestId=${item.payload.requestId}` : null) ||
+      (item.payload?.dealId ? '/deals' : null)
+
+    if (targetUrl) {
+      router.push(targetUrl)
     }
   }
 

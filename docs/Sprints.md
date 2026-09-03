@@ -90,10 +90,20 @@ __Phase 5: Enterprise Seller Command Center & Core Modules \(Sprints 13–20\)__
 		- [x] __15.5 — Quality Readiness, Broker Verification & Supply Badges:__ Built `quality-verification-actions.ts` with `reviewLabTestAction` (role-gated to Broker/Admin), `<QualityStatusBadge />` with mathematical expiry override, `<LabReviewDialog />` broker audit modal, and AI match engine readiness indicators.
 	- __Technical Deliverables:__ `quality-schema.ts`, `lab-schema.ts`, `lab-actions.ts`, `quality-verification-actions.ts`, `lab-test-form.tsx`, `dynamic-quality-fields.tsx`, `quality-status-badge.tsx`, `manual_lab_storage_rls.sql`, and verified `tsc --noEmit` compiler pass.
 
+- __Sprint 16: Loading Readiness & Broker Request Inbox__ (COMPLETED ✅)
+	- __Goal:__ Make loading readiness a pre-deal operational attribute of inventory lots, deploy privacy-safe Broker Request Inbox with Accept/Reject/Counter response triad, integrate notification deep-linking, and enforce AI Recommendation Decision Gate.
+	- __Key Tasks:__
+		- [x] __16.1 — Loading Readiness Model & Schema:__ Added `loading_status`, `loading_duration`, `loading_start_date`, `loading_capacity`, `loading_remarks`, and `loading_updated_at` to `availabilities` table with Drizzle migration `0024_add_loading_readiness_to_availabilities.sql`. Built `loading-schema.ts` and `loading-actions.ts`.
+		- [x] __16.2 — Loading Readiness UI & Inventory Card Updates:__ Built mobile-optimized `<LoadingReadinessForm />` with 48px touch targets, responsive `<LoadingStatusModal />` (Dialog for desktop / bottom Sheet for mobile), and color-coded `<LoadingStatusBadge />` on `<InventoryCard />`.
+		- [x] __16.3 — Broker Request Inbox & Response Workflow:__ Built `/src/server/actions/broker-request-actions.ts` with strict zero-Buyer-PII scrubbing, `broker-request-schema.ts`, and `<BrokerRequestInbox />` supporting status tabs, expiration countdown badges, commercial summaries, Accept modal, Counter modal, and Reject modal with quick-chips. Created `/seller/requests` route and embedded inbox in Command Center.
+		- [x] __16.4 — Request Notifications & Deep Links:__ Added `action_url` column to `notifications` schema (migration `0025_add_notification_action_url.sql`). Updated notification bell to handle deep-link routing and optimistic mark-as-read. Enhanced `<BrokerRequestInbox />` with `useSearchParams()` deep-link auto-tabbing, smooth scrolling, and visual highlight.
+		- [x] __16.5 — AI Recommendation Decision Gate & Broker Provenance:__ Enforced server-side human broker session validation (`role === 'broker' || role === 'admin'`) rejecting autonomous bot executions. Added verified "Broker-Mediated Request" pill with `<ShieldCheck>` on request cards, structured audit logging (`logDecisionGateAuditEventAction`), and dev hardening verification utility (`verifyDecisionGateIntegrityAction`).
+	- __Technical Deliverables:__ `loading-schema.ts`, `loading-actions.ts`, `loading-readiness-form.tsx`, `loading-status-badge.tsx`, `loading-status-modal.tsx`, `broker-request-schema.ts`, `broker-request-actions.ts`, `broker-request-inbox.tsx`, `/seller/requests/page.tsx`, `audit-actions.ts`, `test-gate-action.ts`, and passed `tsc --noEmit` validation.
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 15 COMPLETE / READY FOR SPRINT 16**
-Sprints 1–15 are 100% complete and fully verified. Ready for **Sprint 16: Loading Readiness & Broker Request Inbox**.
+### 🚀 **Global Platform Status: SPRINT 16 COMPLETE / READY FOR SPRINT 17**
+Sprints 1–16 are 100% complete and fully verified. Ready for **Sprint 17: Negotiation & Immutable Deal Versioning**.
 
 
 

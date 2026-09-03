@@ -120,6 +120,20 @@
       "when": 1788355318976,
       "tag": "0023_add_file_url_to_lab_tests",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788438097602,
+      "tag": "0024_add_loading_readiness_to_availabilities",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788439828735,
+      "tag": "0025_add_notification_action_url",
+      "breakpoints": true
     }
   ]
 }
