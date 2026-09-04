@@ -386,85 +386,87 @@ Goal: Connect Seller supply readiness to Broker-originated commercial requests w
 - [x] No AI path can create a Booking.
 - [x] No AI path can bypass Broker decision-making.
 
-# SPRINT 17 — Negotiation & Immutable Deal Versioning
+> **SELLER-SIDE READY:** The Seller's Broker Request Inbox and response actions are fully production-ready. When building the Broker Dashboard in the future, developers only need to connect the Broker's outbound request trigger to the existing `broker_requests` database table.
+
+# SPRINT 17 — Negotiation & Immutable Deal Versioning (COMPLETED ✅)
 
 Goal: Replace overwrite-style commercial updates with controlled, immutable Deal Versions.
 
-### 17.1 — Negotiation Action Model
+### 17.1 — Negotiation Action Model (COMPLETED ✅)
 
 **Objective:** Implement Seller-side Accept / Reject / Counter within permitted fields.
 
 **Implementation:**
 
-- Accept a Broker request/proposal.
-- Reject with a reason where required.
-- Counter only permitted commercial fields such as price, quantity, delivery, payment or quality terms.
-- Keep the negotiation Broker-mediated; no shared Buyer-Seller chat.
+- [x] Accept a Broker request/proposal.
+- [x] Reject with a reason where required.
+- [x] Counter only permitted commercial fields such as price, quantity, delivery, payment or quality terms.
+- [x] Keep the negotiation Broker-mediated; no shared Buyer-Seller chat.
 **Done when:**
 
-- Every Seller commercial response is authorized server-side.
-- Rejected/countered states are explicit.
-- Seller cannot communicate directly with Buyer through the product.
+- [x] Every Seller commercial response is authorized server-side.
+- [x] Rejected/countered states are explicit.
+- [x] Seller cannot communicate directly with Buyer through the product.
 
-### 17.2 — Deal Version Entity & Snapshot
+### 17.2 — Deal Version Entity & Snapshot (COMPLETED ✅)
 
 **Objective:** Persist every material commercial revision as an immutable snapshot.
 
 **Implementation:**
 
-- Version number, deal reference, actor, timestamp and supersession relationship.
-- Snapshot commodity, grade, lot/batch, quantity, rate, quality, delivery, payment, packaging, freight/transport, taxes/charges and special conditions as applicable.
-- Store version status and confirmation references.
+- [x] Version number, deal reference, actor, timestamp and supersession relationship.
+- [x] Snapshot commodity, grade, lot/batch, quantity, rate, quality, delivery, payment, packaging, freight/transport, taxes/charges and special conditions as applicable.
+- [x] Store version status and confirmation references.
 **Done when:**
 
-- Version 1, 2, 3... remain independently readable.
-- Historical versions cannot be edited.
-- Current version is explicitly identifiable.
+- [x] Version 1, 2, 3... remain independently readable.
+- [x] Historical versions cannot be edited.
+- [x] Current version is explicitly identifiable.
 
-### 17.3 — Version Creation Rules
+### 17.3 — Version Creation Rules (COMPLETED ✅)
 
 **Objective:** Guarantee that material commercial changes create a new version.
 
 **Implementation:**
 
-- Detect material field changes.
-- Create a new version instead of mutating the previous snapshot.
-- Preserve the previous version as historical.
-- Audit the actor, old version, new version and reason where required.
+- [x] Detect material field changes.
+- [x] Create a new version instead of mutating the previous snapshot.
+- [x] Preserve the previous version as historical.
+- [x] Audit the actor, old version, new version and reason where required.
 **Done when:**
 
-- No material change overwrites a prior version.
-- Version numbering is deterministic and concurrency-safe.
+- [x] No material change overwrites a prior version.
+- [x] Version numbering is deterministic and concurrency-safe.
 
-### 17.4 — Stale-Version Protection
+### 17.4 — Stale-Version Protection (COMPLETED ✅)
 
 **Objective:** Prevent Seller actions against an outdated deal version.
 
 **Implementation:**
 
-- Compare the Seller's version reference with the current version.
-- Reject stale confirmation/counter actions.
-- Show a clear stale-version warning and the latest version.
-- Do not silently merge stale edits.
+- [x] Compare the Seller's version reference with the current version.
+- [x] Reject stale confirmation/counter actions.
+- [x] Show a clear stale-version warning and the latest version.
+- [x] Do not silently merge stale edits.
 **Done when:**
 
-- A Seller cannot confirm an outdated version.
-- The recovery path opens the current version.
+- [x] A Seller cannot confirm an outdated version.
+- [x] The recovery path opens the current version.
 
-### 17.5 — Negotiation Timeline & Audit
+### 17.5 — Negotiation Timeline & Audit (COMPLETED ✅)
 
 **Objective:** Make commercial history reviewable without exposing private data.
 
 **Implementation:**
 
-- Chronological negotiation/version timeline.
-- Actor and timestamp for each event.
-- Read-only historical snapshots.
-- Audit events for material changes and decisions.
+- [x] Chronological negotiation/version timeline.
+- [x] Actor and timestamp for each event.
+- [x] Read-only historical snapshots.
+- [x] Audit events for material changes and decisions.
 **Done when:**
 
-- Seller can understand how the current terms were reached.
-- History cannot be rewritten from Seller UI/API.
+- [x] Seller can understand how the current terms were reached.
+- [x] History cannot be rewritten from Seller UI/API.
 
 # SPRINT 18 — Final Deal Confirmation, Finalization & Booking
 

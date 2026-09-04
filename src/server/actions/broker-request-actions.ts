@@ -14,12 +14,17 @@ import {
   masterDistricts,
   users,
   companies,
+  negotiationEvents,
+  dealVersions,
 } from "@/src/server/db/schema";
 import {
   brokerResponseSchema,
   BrokerResponsePayload,
   SellerBrokerRequestItem,
 } from "@/src/types/broker-request-schema";
+import { createDealVersionInTransaction } from "@/src/server/actions/version-actions";
+import { DealVersionSnapshot } from "@/src/types/deal-version-schema";
+import { verifyLatestVersion } from "@/src/server/utils/version-engine";
 import { eq, and, desc, inArray, sql, aliasedTable } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { verifySellerSession } from "@/src/server/utils/seller-auth";
@@ -98,6 +103,27 @@ export async function getSellerBrokerRequestsAction(
 
     const rows = await query;
 
+    // Fetch latest deal version for these quotations to support optimistic locking
+    const requestIds = rows.map((r) => r.id);
+    const versionMap = new Map<string, number>();
+
+    if (requestIds.length > 0) {
+      const allVersions = await db
+        .select({
+          requestId: dealVersions.requestId,
+          versionNumber: dealVersions.versionNumber,
+        })
+        .from(dealVersions)
+        .where(inArray(dealVersions.requestId, requestIds))
+        .orderBy(desc(dealVersions.versionNumber));
+
+      for (const v of allVersions) {
+        if (!versionMap.has(v.requestId)) {
+          versionMap.set(v.requestId, v.versionNumber);
+        }
+      }
+    }
+
     // Normalize & sanitize into strict Seller-Safe items
     const now = new Date();
     const items: SellerBrokerRequestItem[] = rows.map((r) => {
@@ -130,6 +156,7 @@ export async function getSellerBrokerRequestsAction(
         counterPrice: r.counterPrice ? Number(r.counterPrice) : null,
         counterNotes: r.counterNotes || null,
         rejectionReason: r.rejectionReason || null,
+        latestVersionNumber: versionMap.get(r.id) ?? 1,
       };
     });
 
@@ -164,7 +191,7 @@ export async function getSellerBrokerRequestsAction(
 
 /**
  * Responds to a broker-originated commercial proposal (Accept / Reject / Counter).
- * Enforces company boundary and permission checks.
+ * Enforces company boundary, role permission checks, stale version guards, and logs immutable negotiation events.
  */
 export async function respondToBrokerRequestAction(
   data: unknown
@@ -184,35 +211,194 @@ export async function respondToBrokerRequestAction(
 
     const payload = validation.data;
 
-    // Verify ownership of the target request/quotation
-    const quotation = await db.query.quotations.findFirst({
-      where: eq(quotations.id, payload.requestId),
+    // Additional validation checks
+    if (payload.action === 'reject') {
+      if (!payload.rejectionReason || payload.rejectionReason.trim().length < 5) {
+        return { success: false, error: "Please provide a valid rejection reason (at least 5 characters)." };
+      }
+    }
+
+    if (payload.action === 'counter') {
+      const hasPrice = payload.counterPrice !== undefined && payload.counterPrice !== null && payload.counterPrice > 0;
+      const hasQuantity = payload.counterQuantity !== undefined && payload.counterQuantity !== null && payload.counterQuantity > 0;
+      const hasRemarks = payload.counterRemarks !== undefined && payload.counterRemarks !== null && payload.counterRemarks.trim().length > 0;
+      const hasDate = payload.counterDeliveryDate !== undefined && payload.counterDeliveryDate !== null && payload.counterDeliveryDate.trim().length > 0;
+
+      if (!hasPrice && !hasQuantity && !hasRemarks && !hasDate) {
+        return { success: false, error: "At least one counter proposal field (price, quantity, delivery date, or remarks) must be specified." };
+      }
+    }
+
+    const actionType = payload.action === 'accept' ? 'ACCEPT' : payload.action === 'reject' ? 'REJECT' : 'COUNTER';
+
+    // Execute atomic transaction for negotiation event logging and parent state update
+    await db.transaction(async (tx) => {
+      // Concurrency Stale-Version Guard (Unconditionally Enforced)
+      const expectedVer = payload.expectedVersionNumber ?? (payload as any).expected_version_number;
+      await verifyLatestVersion(tx, payload.requestId, expectedVer);
+
+      // Verify existence of target broker request / quotation
+      const quotation = await tx.query.quotations.findFirst({
+        where: eq(quotations.id, payload.requestId),
+      });
+
+      if (!quotation) {
+        throw new Error("Broker request not found.");
+      }
+
+      // Check if the availability lot belongs to this seller's company (Tenant Isolation)
+      const linkedLot = await tx.query.availabilities.findFirst({
+        where: eq(availabilities.id, quotation.sellerAvailabilityId),
+      });
+
+      if (!linkedLot || linkedLot.companyId !== session.data.companyId) {
+        throw new Error("Unauthorized: You do not have permission to respond to this request.");
+      }
+
+      // Check if quotation is expired
+      if (new Date(quotation.validUntil) < new Date()) {
+        throw new Error("This broker proposal has expired and can no longer be modified.");
+      }
+
+      // Check if already finalized or closed
+      if (quotation.status === 'Seller Accepted' || quotation.status === 'Accepted') {
+        throw new Error("This request has already been accepted.");
+      }
+
+      // Construct immutable event payload
+      const eventPayload: Record<string, any> = {
+        action: actionType,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (actionType === 'REJECT') {
+        eventPayload.rejectionReason = payload.rejectionReason;
+      } else if (actionType === 'COUNTER') {
+        eventPayload.counterPrice = payload.counterPrice ?? null;
+        eventPayload.counterQuantity = payload.counterQuantity ?? null;
+        eventPayload.counterDeliveryDate = payload.counterDeliveryDate ?? null;
+        eventPayload.counterRemarks = payload.counterRemarks ?? null;
+        eventPayload.originalOfferedPrice = quotation.offeredPrice;
+      } else if (actionType === 'ACCEPT') {
+        eventPayload.agreedPrice = quotation.offeredPrice;
+      }
+
+      // Step B: Insert immutable record into negotiation_events
+      await tx.insert(negotiationEvents).values({
+        requestId: payload.requestId,
+        companyId: session.data.companyId,
+        actorId: session.data.user.id,
+        actionType: actionType,
+        payload: eventPayload,
+      });
+
+      // Step C: Update status of parent broker request / quotation and create Deal Version
+      if (actionType === 'ACCEPT') {
+        await tx
+          .update(quotations)
+          .set({
+            status: 'Seller Accepted',
+          })
+          .where(eq(quotations.id, payload.requestId));
+
+        // Update active Deal Version status to 'Seller Confirmed' if it exists
+        const latestVersion = await tx.query.dealVersions.findFirst({
+          where: eq(dealVersions.requestId, payload.requestId),
+          orderBy: desc(dealVersions.versionNumber),
+        });
+
+        if (latestVersion && latestVersion.status !== 'Superseded') {
+          await tx
+            .update(dealVersions)
+            .set({ status: 'Seller Confirmed' })
+            .where(eq(dealVersions.id, latestVersion.id));
+        }
+      } else if (actionType === 'REJECT') {
+        await tx
+          .update(quotations)
+          .set({
+            status: 'Seller Rejected',
+            rejectionReason: payload.rejectionReason,
+          })
+          .where(eq(quotations.id, payload.requestId));
+      } else if (actionType === 'COUNTER') {
+        const notesParts = [];
+        if (payload.counterRemarks) notesParts.push(payload.counterRemarks);
+        if (payload.counterQuantity) notesParts.push(`Requested Qty: ${payload.counterQuantity}`);
+        if (payload.counterDeliveryDate) notesParts.push(`Expected Date: ${payload.counterDeliveryDate}`);
+
+        await tx
+          .update(quotations)
+          .set({
+            status: 'Seller Countered',
+            counterPrice: payload.counterPrice ? payload.counterPrice.toString() : quotation.offeredPrice,
+            counterNotes: notesParts.join(" | ") || "Seller submitted counter-terms",
+          })
+          .where(eq(quotations.id, payload.requestId));
+
+        // Fetch requirement and master records to construct accurate commercial snapshot
+        const requirement = await tx.query.requirements.findFirst({
+          where: eq(requirements.id, quotation.requirementId),
+        });
+        const commodity = await tx.query.masterCommodities.findFirst({
+          where: eq(masterCommodities.id, linkedLot.commodityId),
+        });
+        const unit = await tx.query.masterUnits.findFirst({
+          where: eq(masterUnits.id, linkedLot.unitId),
+        });
+        const grade = linkedLot.gradeId
+          ? await tx.query.masterGrades.findFirst({
+              where: eq(masterGrades.id, linkedLot.gradeId),
+            })
+          : null;
+
+        const existingVersion = await tx.query.dealVersions.findFirst({
+          where: eq(dealVersions.requestId, payload.requestId),
+          orderBy: desc(dealVersions.versionNumber),
+        });
+
+        const baseSnapshot: any = existingVersion?.snapshotPayload || {};
+        const counterSnapshot: DealVersionSnapshot = {
+          commodityId: linkedLot.commodityId,
+          commodityName: commodity?.name || baseSnapshot.commodityName || "Commodity",
+          gradeId: linkedLot.gradeId || baseSnapshot.gradeId || null,
+          gradeName: grade?.gradeName || baseSnapshot.gradeName || null,
+          lotId: linkedLot.id,
+          lotNumber: linkedLot.lotNumber || baseSnapshot.lotNumber || null,
+          quantity: payload.counterQuantity
+            ? Number(payload.counterQuantity)
+            : (Number(baseSnapshot.quantity) || Number(requirement?.quantity) || Number(linkedLot.totalQuantity)),
+          unitId: linkedLot.unitId || baseSnapshot.unitId || null,
+          unitSymbol: unit?.symbol || baseSnapshot.unitSymbol || "MT",
+          rate: payload.counterPrice
+            ? Number(payload.counterPrice)
+            : (Number(baseSnapshot.rate) || Number(quotation.offeredPrice)),
+          deliveryState: baseSnapshot.deliveryState || null,
+          deliveryDistrict: baseSnapshot.deliveryDistrict || null,
+          deliveryLocation: baseSnapshot.deliveryLocation || null,
+          deliveryTerms: requirement?.deliveryTermsId || baseSnapshot.deliveryTerms || "Ex-Warehouse",
+          deliveryDate: payload.counterDeliveryDate || (requirement?.targetDate ? new Date(requirement.targetDate).toISOString().split("T")[0] : baseSnapshot.deliveryDate) || null,
+          paymentTerms: baseSnapshot.paymentTerms || "Standard Commercial Terms",
+          packagingType: baseSnapshot.packagingType || null,
+          qualityNotes: baseSnapshot.qualityNotes || null,
+          qualityParameters: baseSnapshot.qualityParameters || null,
+          remarks: payload.counterRemarks || baseSnapshot.remarks || "Seller counter-offer submitted.",
+          originatorRole: "seller",
+          timestamp: new Date().toISOString(),
+        };
+
+        // Create new Deal Version with status 'Countered' (supersedes previous version)
+        await createDealVersionInTransaction(tx, {
+          requestId: payload.requestId,
+          newSnapshot: counterSnapshot,
+          actorId: session.data.user.id,
+          status: "Countered",
+          expectedVersionNumber: expectedVer,
+        });
+      }
     });
 
-    if (!quotation) {
-      return { success: false, error: "Broker request not found." };
-    }
-
-    // Check if the availability lot belongs to this seller's company
-    const linkedLot = await db.query.availabilities.findFirst({
-      where: eq(availabilities.id, quotation.sellerAvailabilityId),
-    });
-
-    if (!linkedLot || linkedLot.companyId !== session.data.companyId) {
-      return { success: false, error: "Unauthorized: You do not have permission to respond to this request." };
-    }
-
-    // Check if quotation is expired
-    if (new Date(quotation.validUntil) < new Date()) {
-      return { success: false, error: "This broker proposal has expired and can no longer be modified." };
-    }
-
-    // Check if already finalized or closed
-    if (quotation.status === 'Seller Accepted' || quotation.status === 'Accepted') {
-      return { success: false, error: "This request has already been accepted." };
-    }
-
-    // Log Decision Gate Audit Event
+    // Log Decision Gate Audit Event for compliance and audit trail
     await logDecisionGateAuditEventAction({
       action: "SELLER_PROPOSAL_ACTION",
       actorId: session.data.user.id,
@@ -221,76 +407,24 @@ export async function respondToBrokerRequestAction(
       entityId: payload.requestId,
       metadata: {
         action: payload.action,
+        actionType,
         sellerCompanyId: session.data.companyId,
         counterPrice: payload.counterPrice,
+        counterQuantity: payload.counterQuantity,
+        counterDeliveryDate: payload.counterDeliveryDate,
         rejectionReason: payload.rejectionReason,
         humanReviewed: true,
       },
     });
 
-    if (payload.action === 'accept') {
-      await db
-        .update(quotations)
-        .set({
-          status: 'Seller Accepted',
-        })
-        .where(eq(quotations.id, payload.requestId));
+    revalidatePath('/seller');
+    revalidatePath('/seller/requests');
+    revalidatePath('/', 'layout');
 
-      revalidatePath('/seller');
-      revalidatePath('/seller/requests');
-      revalidatePath('/', 'layout');
-
-      return {
-        success: true,
-        message: "Broker proposal accepted. The Broker has been notified to proceed with deal finalization.",
-      };
-    }
-
-    if (payload.action === 'reject') {
-      await db
-        .update(quotations)
-        .set({
-          status: 'Seller Rejected',
-          rejectionReason: payload.rejectionReason,
-        })
-        .where(eq(quotations.id, payload.requestId));
-
-      revalidatePath('/seller');
-      revalidatePath('/seller/requests');
-      revalidatePath('/', 'layout');
-
-      return {
-        success: true,
-        message: "Broker proposal rejected with documented reason.",
-      };
-    }
-
-    if (payload.action === 'counter') {
-      const notesParts = [];
-      if (payload.counterRemarks) notesParts.push(payload.counterRemarks);
-      if (payload.counterQuantity) notesParts.push(`Requested Qty: ${payload.counterQuantity}`);
-      if (payload.counterDeliveryDate) notesParts.push(`Expected Date: ${payload.counterDeliveryDate}`);
-
-      await db
-        .update(quotations)
-        .set({
-          status: 'Seller Countered',
-          counterPrice: payload.counterPrice ? payload.counterPrice.toString() : quotation.offeredPrice,
-          counterNotes: notesParts.join(" | ") || "Seller submitted counter-terms",
-        })
-        .where(eq(quotations.id, payload.requestId));
-
-      revalidatePath('/seller');
-      revalidatePath('/seller/requests');
-      revalidatePath('/', 'layout');
-
-      return {
-        success: true,
-        message: "Counter-proposal submitted to Broker for negotiation review.",
-      };
-    }
-
-    return { success: false, error: "Invalid action." };
+    return {
+      success: true,
+      message: "Response submitted successfully to your Broker.",
+    };
   } catch (error: any) {
     console.error("Failed to respond to broker request:", error);
     return { success: false, error: error.message || "Failed to process response" };
@@ -345,6 +479,62 @@ export async function initiateBrokerRequestFromAiMatchAction(params: {
       status: 'Sent',
       counterNotes: params.brokerNotes || "Broker curated proposal based on AI recommendation parameters.",
     }).returning();
+
+    // Insert Version 1 into deal_versions (Immutable Snapshot Engine)
+    const targetLot = await db.query.availabilities.findFirst({
+      where: eq(availabilities.id, params.sellerAvailabilityId),
+    });
+    const targetReq = await db.query.requirements.findFirst({
+      where: eq(requirements.id, params.requirementId),
+    });
+    if (targetLot && targetReq) {
+      const comm = await db.query.masterCommodities.findFirst({
+        where: eq(masterCommodities.id, targetLot.commodityId),
+      });
+      const grd = targetLot.gradeId
+        ? await db.query.masterGrades.findFirst({
+            where: eq(masterGrades.id, targetLot.gradeId),
+          })
+        : null;
+      const unt = targetLot.unitId
+        ? await db.query.masterUnits.findFirst({
+            where: eq(masterUnits.id, targetLot.unitId),
+          })
+        : null;
+
+      const initialAiSnapshot: DealVersionSnapshot = {
+        commodityId: targetLot.commodityId,
+        commodityName: comm?.name || "Commodity",
+        gradeId: targetLot.gradeId || null,
+        gradeName: grd?.gradeName || "Standard Grade",
+        lotId: targetLot.id,
+        lotNumber: targetLot.lotNumber || null,
+        quantity: Number(targetReq.quantity || 50),
+        unitId: targetLot.unitId || null,
+        unitSymbol: unt?.symbol || "MT",
+        rate: Number(params.offeredPrice),
+        deliveryState: null,
+        deliveryDistrict: null,
+        deliveryLocation: null,
+        deliveryTerms: targetReq.deliveryTermsId || "Ex-Warehouse",
+        deliveryDate: targetReq.targetDate ? new Date(targetReq.targetDate).toISOString().split("T")[0] : null,
+        paymentTerms: "Standard Escrow Settlement via Broker Desk",
+        packagingType: "Standard Packaging",
+        qualityNotes: null,
+        qualityParameters: null,
+        remarks: params.brokerNotes || "Broker curated proposal based on AI recommendation parameters.",
+        originatorRole: "broker",
+        timestamp: new Date().toISOString(),
+      };
+
+      await db.insert(dealVersions).values({
+        requestId: inserted[0].id,
+        versionNumber: 1,
+        actorId: user.id,
+        status: "Proposed",
+        snapshotPayload: initialAiSnapshot,
+      });
+    }
 
     // Log Non-Autonomous Audit Event
     await logDecisionGateAuditEventAction({
@@ -519,13 +709,57 @@ export async function createMockBrokerRequestAction(): Promise<BrokerActionRespo
       counterNotes: "Broker proposal: Verified buyer with immediate dispatch and 100% letter of credit settlement.",
     }).returning();
 
-    // 5. Trigger In-App Notification with Deep Link (Sprint 16.4)
-    // CRITICAL PRIVACY: Zero Buyer identifiers in title/message/payload
+    // 4b. Insert Version 1 into deal_versions (Deal Versioning Engine)
     const commodityRecord = await db.query.masterCommodities.findFirst({
       where: eq(masterCommodities.id, lot.commodityId),
     });
     const commodityName = commodityRecord?.name || 'Commodity';
+    const gradeRecord = lot.gradeId
+      ? await db.query.masterGrades.findFirst({
+          where: eq(masterGrades.id, lot.gradeId),
+        })
+      : null;
+    const unitRecord = lot.unitId
+      ? await db.query.masterUnits.findFirst({
+          where: eq(masterUnits.id, lot.unitId),
+        })
+      : null;
 
+    const initialSnapshot: DealVersionSnapshot = {
+      commodityId: lot.commodityId,
+      commodityName: commodityName,
+      gradeId: lot.gradeId || null,
+      gradeName: gradeRecord?.gradeName || "Standard Grade",
+      lotId: lot.id,
+      lotNumber: lot.lotNumber || null,
+      quantity: Number(requirement.quantity || 50),
+      unitId: lot.unitId || null,
+      unitSymbol: unitRecord?.symbol || "MT",
+      rate: proposedRate,
+      deliveryState: null,
+      deliveryDistrict: null,
+      deliveryLocation: null,
+      deliveryTerms: requirement.deliveryTermsId || "Ex-Warehouse (Immediate Loading)",
+      deliveryDate: requirement.targetDate ? new Date(requirement.targetDate).toISOString().split("T")[0] : null,
+      paymentTerms: "Standard Escrow Settlement via Broker Desk",
+      packagingType: "Standard Packaging",
+      qualityNotes: null,
+      qualityParameters: null,
+      remarks: "Broker proposal: Verified buyer with immediate dispatch and 100% letter of credit settlement.",
+      originatorRole: "broker",
+      timestamp: new Date().toISOString(),
+    };
+
+    await db.insert(dealVersions).values({
+      requestId: insertedQuotation[0].id,
+      versionNumber: 1,
+      actorId: broker.id,
+      status: "Proposed",
+      snapshotPayload: initialSnapshot,
+    });
+
+    // 5. Trigger In-App Notification with Deep Link (Sprint 16.4)
+    // CRITICAL PRIVACY: Zero Buyer identifiers in title/message/payload
     await queueNotificationAction({
       userId: session.data.user.id,
       companyId: sellerCompanyId,

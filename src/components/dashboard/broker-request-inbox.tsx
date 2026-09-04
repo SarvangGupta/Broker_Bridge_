@@ -24,11 +24,13 @@ import {
   Send,
   HelpCircle,
   MapPin,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn, formatIndianCurrency } from "@/lib/utils";
+import { useMediaQuery } from "@/src/hooks/use-media-query";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,9 +44,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { NegotiationTimeline } from "@/src/components/dashboard/negotiation-timeline";
 
 import {
   SellerBrokerRequestItem,
@@ -77,6 +87,10 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
   const [requests, setRequests] = useState<SellerBrokerRequestItem[]>(initialRequests);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [isGeneratingMock, setIsGeneratingMock] = useState(false);
+
+  // Timeline Sheet State (Micro-Sprint 17.5)
+  const [timelineRequest, setTimelineRequest] = useState<SellerBrokerRequestItem | null>(null);
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   // Response Modals State
   const [selectedRequest, setSelectedRequest] = useState<SellerBrokerRequestItem | null>(null);
@@ -180,16 +194,49 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
       const res = await respondToBrokerRequestAction({
         requestId: selectedRequest.id,
         action: "accept",
+        expectedVersionNumber: selectedRequest.latestVersionNumber ?? 1,
       });
       if (res.success) {
         toast.success(res.message || "Proposal accepted successfully!");
         handleCloseModals();
         router.refresh();
       } else {
-        toast.error(res.error || "Failed to accept proposal");
+        if (res.error?.includes("STALE_VERSION_DETECTED")) {
+          toast.error("Stale terms detected.", {
+            description: "The Broker updated this proposal while you were viewing it. Refreshing terms...",
+            action: {
+              label: "Refresh Deal",
+              onClick: () => {
+                queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+                router.refresh();
+              },
+            },
+          });
+          handleCloseModals();
+          queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+          router.refresh();
+        } else {
+          toast.error(res.error || "Failed to accept proposal");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "An unexpected error occurred");
+      if (error.message?.includes("STALE_VERSION_DETECTED")) {
+        toast.error("Stale terms detected.", {
+          description: "The Broker updated this proposal while you were viewing it. Refreshing terms...",
+          action: {
+            label: "Refresh Deal",
+            onClick: () => {
+              queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+              router.refresh();
+            },
+          },
+        });
+        handleCloseModals();
+        queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+        router.refresh();
+      } else {
+        toast.error(error.message || "An unexpected error occurred");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -209,16 +256,49 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
         requestId: selectedRequest.id,
         action: "reject",
         rejectionReason: rejectionReason.trim(),
+        expectedVersionNumber: selectedRequest.latestVersionNumber ?? 1,
       });
       if (res.success) {
         toast.success(res.message || "Proposal rejected with notes.");
         handleCloseModals();
         router.refresh();
       } else {
-        toast.error(res.error || "Failed to reject proposal");
+        if (res.error?.includes("STALE_VERSION_DETECTED")) {
+          toast.error("Stale terms detected.", {
+            description: "The Broker updated this proposal while you were viewing it. Refreshing terms...",
+            action: {
+              label: "Refresh Deal",
+              onClick: () => {
+                queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+                router.refresh();
+              },
+            },
+          });
+          handleCloseModals();
+          queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+          router.refresh();
+        } else {
+          toast.error(res.error || "Failed to reject proposal");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "An unexpected error occurred");
+      if (error.message?.includes("STALE_VERSION_DETECTED")) {
+        toast.error("Stale terms detected.", {
+          description: "The Broker updated this proposal while you were viewing it. Refreshing terms...",
+          action: {
+            label: "Refresh Deal",
+            onClick: () => {
+              queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+              router.refresh();
+            },
+          },
+        });
+        handleCloseModals();
+        queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+        router.refresh();
+      } else {
+        toast.error(error.message || "An unexpected error occurred");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -236,16 +316,49 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
         counterQuantity,
         counterDeliveryDate: counterDeliveryDate || undefined,
         counterRemarks: counterRemarks.trim() || undefined,
+        expectedVersionNumber: selectedRequest.latestVersionNumber ?? 1,
       });
       if (res.success) {
         toast.success(res.message || "Counter-proposal submitted to Broker!");
         handleCloseModals();
         router.refresh();
       } else {
-        toast.error(res.error || "Failed to submit counter-proposal");
+        if (res.error?.includes("STALE_VERSION_DETECTED")) {
+          toast.error("Stale terms detected.", {
+            description: "The Broker updated this proposal while you were viewing it. Refreshing terms...",
+            action: {
+              label: "Refresh Deal",
+              onClick: () => {
+                queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+                router.refresh();
+              },
+            },
+          });
+          handleCloseModals();
+          queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+          router.refresh();
+        } else {
+          toast.error(res.error || "Failed to submit counter-proposal");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "An unexpected error occurred");
+      if (error.message?.includes("STALE_VERSION_DETECTED")) {
+        toast.error("Stale terms detected.", {
+          description: "The Broker updated this proposal while you were viewing it. Refreshing terms...",
+          action: {
+            label: "Refresh Deal",
+            onClick: () => {
+              queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+              router.refresh();
+            },
+          },
+        });
+        handleCloseModals();
+        queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+        router.refresh();
+      } else {
+        toast.error(error.message || "An unexpected error occurred");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -415,6 +528,15 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
                         <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                           #REQ-{req.id.slice(0, 6).toUpperCase()}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => setTimelineRequest(req)}
+                          className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded border border-slate-200 transition-colors cursor-pointer"
+                          title="Click to view full negotiation timeline"
+                        >
+                          <History className="h-3 w-3 text-slate-500" />
+                          <span>v{req.latestVersionNumber || 1}</span>
+                        </button>
                         {req.lotNumber && (
                           <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                             Lot #{req.lotNumber}
@@ -566,8 +688,8 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
                 </div>
 
                 {/* 4. ACTIONS FOOTER (FOR PENDING PROPOSALS) */}
-                {isPending && (
-                  <div className="pt-4 mt-2 border-t border-slate-100 space-y-2.5">
+                {isPending ? (
+                  <div className="pt-4 mt-2 border-t border-slate-100 space-y-2">
                     <div className="grid grid-cols-2 gap-2.5">
                       <Button
                         type="button"
@@ -591,15 +713,41 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
                       </Button>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenReject(req)}
+                        className="w-full min-h-[38px] h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-xs font-semibold rounded-xl cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" />
+                        <span>Decline</span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setTimelineRequest(req)}
+                        className="w-full min-h-[38px] h-9 text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 text-xs font-semibold rounded-xl cursor-pointer gap-1.5"
+                      >
+                        <History className="h-3.5 w-3.5 text-slate-500" />
+                        <span>View History</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-3 mt-2 border-t border-slate-100">
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      onClick={() => handleOpenReject(req)}
-                      className="w-full min-h-[40px] h-10 text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-xs font-semibold rounded-xl cursor-pointer"
+                      onClick={() => setTimelineRequest(req)}
+                      className="w-full min-h-[40px] h-10 border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 text-xs font-semibold rounded-xl gap-2 cursor-pointer transition-colors shadow-2xs"
                     >
-                      <X className="h-3.5 w-3.5 mr-1.5" />
-                      <span>Decline / Reject Proposal</span>
+                      <History className="h-4 w-4 text-emerald-600" />
+                      <span>View Negotiation Timeline & Versions</span>
                     </Button>
                   </div>
                 )}
@@ -898,6 +1046,48 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ========================================================================= */}
+      {/* 8. NEGOTIATION TIMELINE & AUDIT SHEET (MICRO-SPRINT 17.5)                */}
+      {/* ========================================================================= */}
+      <Sheet open={!!timelineRequest} onOpenChange={(open) => !open && setTimelineRequest(null)}>
+        <SheetContent
+          side={isDesktop ? "right" : "bottom"}
+          className={cn(
+            "bg-white overflow-y-auto z-50",
+            isDesktop ? "w-full sm:max-w-xl p-6" : "h-[90vh] p-4 rounded-t-2xl"
+          )}
+        >
+          <SheetHeader className="p-0 pb-4 border-b border-slate-100 text-left">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-100 text-[#047857] flex items-center justify-center shrink-0">
+                <History className="h-5 w-5 stroke-[2.2]" />
+              </div>
+              <div>
+                <SheetTitle className="text-lg font-bold text-slate-900">
+                  Negotiation Timeline & Audit
+                </SheetTitle>
+                <SheetDescription className="text-xs text-slate-500 mt-0.5">
+                  {timelineRequest
+                    ? `#REQ-${timelineRequest.id.slice(0, 6).toUpperCase()} • ${timelineRequest.commodityName} (${timelineRequest.gradeName})`
+                    : "Commercial negotiation history"}
+                </SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+
+          <div className="py-4">
+            {timelineRequest && (
+              <NegotiationTimeline
+                requestId={timelineRequest.id}
+                onRefresh={() => {
+                  queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+                }}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
     </div>
   );

@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 5: Multi-Sector Architecture & Platform Scaling (Sprint 13+)**  
-Global Platform Status: **PRODUCTION READY / SPRINT 16 VERIFIED** 🚀  
-Status: **Sprint 16 Completed** ✅ (Sprints 1–16 Complete & Fully Verified; Ready for Sprint 17)
+Global Platform Status: **PRODUCTION READY / SPRINT 17 VERIFIED** 🚀  
+Status: **Sprint 17 Completed** ✅ (Sprints 1–17 Complete & Fully Verified; Ready for Sprint 18: Final Confirmation + Finalization + Booking)
 
 
 ---
@@ -206,6 +206,33 @@ Status: **Sprint 16 Completed** ✅ (Sprints 1–16 Complete & Fully Verified; R
   - Added verified "Broker-Mediated Request" attribution pill with `<ShieldCheck>` on request cards (*"Originated by Broker: [Broker Name] • [Broker Agency]"*).
   - Implemented structured non-autonomous audit logging in `audit-actions.ts` (`logDecisionGateAuditEventAction`).
   - Implemented dev hardening verification utility in `test-gate-action.ts` (`verifyDecisionGateIntegrityAction`).
-- **Verification:** Passed `npx tsc --noEmit` with 0 errors. Loading Readiness State Machine, Privacy-Safe Broker Inbox, Response Triad (Accept/Reject/Counter), Notification Deep Links, and AI Decision Gate are 100% operational.
+- **Verification:** Passed `npx tsc --noEmit` with 0 errors. Pre-Deal Loading Readiness state machine, Privacy-Safe Broker Inbox, Response Triad (Accept/Reject/Counter), Notification Deep Links, and AI Decision Gate are 100% operational on the Seller side.
+- **Developer Handover Note:** We implemented a Dev Seeder (`createMockBrokerRequestAction` / 'Generate Test Broker Request' button) to QA the Seller inbox. This proves the Seller UI perfectly handles incoming deals. The future Broker PRD/Dashboard simply needs to replace this Dev Seeder with the real Broker AI Match/Quotation UI.
+
+### 🟢 Sprint 17: Negotiation & Immutable Deal Versioning
+- **Status:** `COMPLETED` ✅
+- **Goal:** Replace overwrite-style mutations with an immutable Deal Versioning system, enforce append-only audit trail for back-and-forth negotiation events, implement material change detection and automatic supersession, deploy optimistic locking concurrency protection, and build a privacy-safe read-only audit timeline UI.
+- **Micro-Sprint 17.1 (Negotiation Action Model - Backend & Events):** `COMPLETED` ✅
+  - Created `negotiation_events` table in Drizzle schema with indexed `request_id` and `company_id` foreign keys.
+  - Generated continuous migration file `0026_add_negotiation_events.sql` and synchronized Drizzle journal.
+  - Hardened `respondToBrokerRequestAction` in `broker-request-actions.ts` to execute atomic Drizzle transactions logging immutable negotiation actions (`ACCEPT`, `REJECT`, `COUNTER`) with structured payloads.
+- **Micro-Sprint 17.2 (Deal Version Entity & Snapshot):** `COMPLETED` ✅
+  - Created `deal_versions` table in Drizzle schema with `version_number`, `status` (`'Proposed'`, `'Countered'`, `'Seller Confirmed'`, `'Buyer Confirmed'`, `'Broker Finalized'`, `'Superseded'`), and `snapshot_payload` (JSONB).
+  - Generated continuous migration file `0027_add_deal_versions_snapshot.sql` and synchronized Drizzle journal.
+  - Built Zod validation schemas (`deal-version-schema.ts`) and Server Actions (`createDealVersionSnapshotAction`, `getDealVersionsAction`, `getLatestDealVersionAction`).
+- **Micro-Sprint 17.3 (Version Creation & Supersession Rules):** `COMPLETED` ✅
+  - Built Material Change Detection Engine (`detectMaterialChanges` and `getMaterialDiffList`) in `version-engine.ts` checking price, quantity, delivery date, terms, packaging, and quality specifications.
+  - Implemented `createNewDealVersionAction` and `createDealVersionInTransaction` in `version-actions.ts`, ensuring that material commercial changes or counter-proposals atomically mark previous active versions as `'Superseded'` and append a new incremental version (`v1 -> v2 -> v3`) without mutating historical snapshots.
+  - Integrated dynamic version snapshotting into `respondToBrokerRequestAction` on Seller Counter and Accept.
+- **Micro-Sprint 17.4 (Stale-Version Protection - Optimistic Concurrency):** `COMPLETED` ✅
+  - Implemented `verifyLatestVersion()` in `version-engine.ts` to validate client version expectations against the database.
+  - Injected `expectedVersionNumber` into `brokerResponseSchema`, `respondToBrokerRequestAction`, and `createDealVersionInTransaction`, immediately rejecting stale submissions with an explicit `"STALE_VERSION_DETECTED"` error.
+  - Added "Refresh Deal" toast recovery handler and interactive card version badges `v{latestVersionNumber}` in `<BrokerRequestInbox />`.
+- **Micro-Sprint 17.5 (Negotiation Timeline & Audit UI):** `COMPLETED` ✅
+  - Built `getNegotiationTimelineAction` in `version-actions.ts` merging deal versions and negotiation events chronologically with strict zero-Buyer-PII scrubbing (masking actors as `"You (Seller)"` and `"Broker Desk"`).
+  - Built `<NegotiationTimeline />` read-only component in `negotiation-timeline.tsx` with left-bordered vertical rail, status badge nodes (`v1`, `v2`, `CheckCircle2`, `XCircle`, `ArrowUpDown`), and formatted audit timestamps.
+  - Integrated timeline drawer into `<BrokerRequestInbox />` via a responsive `<Sheet>` (right slide-out on desktop, bottom sheet on mobile), preserving uncluttered 48px touch targets for primary P0 action buttons.
+- **Verification:** Passed `npx tsc --noEmit` with 0 errors. Overwrite mutations have been 100% replaced with the Immutable Deal Versioning Engine, and the Seller's Response Triad and Stale-Data Concurrency Guards are fully operational.
+
 
 

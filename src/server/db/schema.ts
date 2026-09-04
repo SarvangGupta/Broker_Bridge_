@@ -349,4 +349,31 @@ export const crmTasks = pgTable('crm_tasks', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const negotiationEvents = pgTable('negotiation_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requestId: uuid('request_id').notNull(),
+  companyId: uuid('company_id').references(() => companies.id).notNull(),
+  actorId: uuid('actor_id').references(() => users.id).notNull(),
+  actionType: text('action_type').notNull(), // 'ACCEPT', 'REJECT', 'COUNTER'
+  payload: jsonb('payload'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('negotiation_events_request_idx').on(table.requestId, table.createdAt),
+  index('negotiation_events_company_idx').on(table.companyId, table.createdAt),
+]);
+
+export const dealVersions = pgTable('deal_versions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requestId: uuid('request_id').notNull(),
+  versionNumber: integer('version_number').notNull(),
+  actorId: uuid('actor_id').references(() => users.id).notNull(),
+  status: text('status').default('Proposed').notNull(), // 'Draft', 'Proposed', 'Countered', 'Seller Confirmed', 'Buyer Confirmed', 'Broker Finalized', 'Superseded'
+  snapshotPayload: jsonb('snapshot_payload').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('deal_versions_request_idx').on(table.requestId, table.versionNumber),
+]);
+
+
+
 

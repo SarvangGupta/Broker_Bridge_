@@ -99,11 +99,22 @@ __Phase 5: Enterprise Seller Command Center & Core Modules \(Sprints 13–20\)__
 		- [x] __16.4 — Request Notifications & Deep Links:__ Added `action_url` column to `notifications` schema (migration `0025_add_notification_action_url.sql`). Updated notification bell to handle deep-link routing and optimistic mark-as-read. Enhanced `<BrokerRequestInbox />` with `useSearchParams()` deep-link auto-tabbing, smooth scrolling, and visual highlight.
 		- [x] __16.5 — AI Recommendation Decision Gate & Broker Provenance:__ Enforced server-side human broker session validation (`role === 'broker' || role === 'admin'`) rejecting autonomous bot executions. Added verified "Broker-Mediated Request" pill with `<ShieldCheck>` on request cards, structured audit logging (`logDecisionGateAuditEventAction`), and dev hardening verification utility (`verifyDecisionGateIntegrityAction`).
 	- __Technical Deliverables:__ `loading-schema.ts`, `loading-actions.ts`, `loading-readiness-form.tsx`, `loading-status-badge.tsx`, `loading-status-modal.tsx`, `broker-request-schema.ts`, `broker-request-actions.ts`, `broker-request-inbox.tsx`, `/seller/requests/page.tsx`, `audit-actions.ts`, `test-gate-action.ts`, and passed `tsc --noEmit` validation.
+	- __Broker Handover Note (SELLER-SIDE READY):__ The Seller's Broker Request Inbox and response actions are fully production-ready. When building the Broker Dashboard in the future, developers only need to connect the Broker's outbound request trigger to the existing `broker_requests` database table.
+
+- __Sprint 17: Negotiation + Deal Versioning__ (COMPLETED ✅)
+	- __Goal:__ Replace overwrite-style mutations with an immutable Deal Versioning system, enforce append-only audit trail for back-and-forth negotiation events, implement material change detection and automatic supersession, deploy optimistic locking concurrency protection, and build a privacy-safe read-only audit timeline UI.
+	- __Key Tasks:__
+		- [x] __17.1 — Negotiation Action Model (Backend & Events):__ Added `negotiation_events` table to Drizzle schema (migration `0026_add_negotiation_events.sql`). Hardened `respondToBrokerRequestAction` with atomic Drizzle transactions logging immutable negotiation records (`ACCEPT`, `REJECT`, `COUNTER`).
+		- [x] __17.2 — Deal Version Entity & Snapshot:__ Added `deal_versions` table to Drizzle schema (migration `0027_add_deal_versions_snapshot.sql`). Created Zod validation schemas in `deal-version-schema.ts`, `createDealVersionSnapshotAction`, `getDealVersionsAction`, and `getLatestDealVersionAction`.
+		- [x] __17.3 — Version Creation & Supersession Rules:__ Built `detectMaterialChanges` and `getMaterialDiffList` in `version-engine.ts`. Implemented `createNewDealVersionAction` and `createDealVersionInTransaction` ensuring material commercial changes atomically supersede previous versions (`status: 'Superseded'`) without mutating historical snapshots.
+		- [x] __17.4 — Stale-Version Protection (Optimistic Concurrency):__ Implemented `verifyLatestVersion()` in `version-engine.ts`. Injected `expectedVersionNumber` into Zod schemas, `respondToBrokerRequestAction`, and `createDealVersionInTransaction`, rejecting stale client edits with `"STALE_VERSION_DETECTED"`. Added "Refresh Deal" toast recovery and version badge `v{latestVersionNumber}` on request cards.
+		- [x] __17.5 — Negotiation Timeline & Audit UI:__ Built `getNegotiationTimelineAction` in `version-actions.ts` with strict zero-Buyer-PII scrubbing and tenant isolation. Created read-only `<NegotiationTimeline />` vertical timeline component. Integrated into `<BrokerRequestInbox />` via interactive version badges and a responsive slide-out `<Sheet>` drawer.
+	- __Technical Deliverables:__ `negotiation_events` and `deal_versions` schema tables, `0026_add_negotiation_events.sql`, `0027_add_deal_versions_snapshot.sql`, `deal-version-schema.ts`, `version-engine.ts`, `version-actions.ts`, `negotiation-timeline.tsx`, `<BrokerRequestInbox />` Sheet integration, and passed `tsc --noEmit` validation.
 
 ---
 
-### 🚀 **Global Platform Status: SPRINT 16 COMPLETE / READY FOR SPRINT 17**
-Sprints 1–16 are 100% complete and fully verified. Ready for **Sprint 17: Negotiation & Immutable Deal Versioning**.
+### 🚀 **Global Platform Status: SPRINT 17 COMPLETE / READY FOR SPRINT 18**
+Sprints 1–17 are 100% complete and fully verified. Ready for **Sprint 18: Final Confirmation + Finalization + Booking**.
 
 
 

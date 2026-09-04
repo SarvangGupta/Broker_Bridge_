@@ -113,6 +113,7 @@ brokerbridge-enterprise/
 │   │   │   ├── ai-match-workspace.tsx
 │   │   │   ├── broker-assignments.tsx
 │   │   │   ├── broker-header-dropdown.tsx
+│   │   │   ├── broker-request-inbox.tsx
 │   │   │   ├── buyer-deals-table.tsx
 │   │   │   ├── buyer-header-dropdown.tsx
 │   │   │   ├── buyer-quotation-card.tsx
@@ -124,6 +125,7 @@ brokerbridge-enterprise/
 │   │   │   ├── match-result-card.tsx
 │   │   │   ├── my-availabilities-table.tsx
 │   │   │   ├── my-requirements-table.tsx
+│   │   │   ├── negotiation-timeline.tsx
 │   │   │   ├── quotation-table-actions.tsx
 │   │   │   ├── quotations-deals-tab.tsx
 │   │   │   ├── seller-deals-table.tsx
@@ -137,7 +139,10 @@ brokerbridge-enterprise/
 │   │   │   ├── availability-form.tsx
 │   │   │   ├── company-onboarding-form.tsx
 │   │   │   ├── crm-activity-dialog.tsx
+│   │   │   ├── dynamic-quality-fields.tsx
 │   │   │   ├── file-dispute-dialog.tsx
+│   │   │   ├── lab-test-form.tsx
+│   │   │   ├── loading-readiness-form.tsx
 │   │   │   ├── quotation-form.tsx
 │   │   │   ├── requirement-form.tsx
 │   │   │   └── seller-dispatch-form.tsx
@@ -149,6 +154,8 @@ brokerbridge-enterprise/
 │   │       ├── dashboard-skeleton.tsx
 │   │       ├── data-freshness.tsx
 │   │       ├── empty-state.tsx
+│   │       ├── loading-status-badge.tsx
+│   │       ├── quality-status-badge.tsx
 │   │       └── sla-badge.tsx
 │   ├── hooks/
 │   │   ├── use-master-data.ts
@@ -163,22 +170,29 @@ brokerbridge-enterprise/
 │   │   │   ├── admin-actions.ts
 │   │   │   ├── admin-profile-actions.ts
 │   │   │   ├── analytics-actions.ts
+│   │   │   ├── audit-actions.ts
 │   │   │   ├── auth-actions.ts
 │   │   │   ├── availability-actions.ts
 │   │   │   ├── broker-actions.ts
+│   │   │   ├── broker-request-actions.ts
 │   │   │   ├── company-actions.ts
 │   │   │   ├── crm-actions.ts
 │   │   │   ├── deal-actions.ts
+│   │   │   ├── lab-actions.ts
+│   │   │   ├── loading-actions.ts
 │   │   │   ├── logistics-actions.ts
 │   │   │   ├── master-data-actions.ts
 │   │   │   ├── match-actions.ts
 │   │   │   ├── notification-actions.ts
+│   │   │   ├── quality-verification-actions.ts
 │   │   │   ├── quotation-actions.ts
 │   │   │   ├── requirement-actions.ts
 │   │   │   ├── support-actions.ts
+│   │   │   ├── test-gate-action.ts
 │   │   │   ├── transaction-actions.ts
 │   │   │   ├── ui-match-actions.ts
-│   │   │   └── user-profile-actions.ts
+│   │   │   ├── user-profile-actions.ts
+│   │   │   └── version-actions.ts
 │   │   ├── db/
 │   │   │   ├── index.ts
 │   │   │   └── schema.ts
@@ -192,13 +206,19 @@ brokerbridge-enterprise/
 │   │   │   └── whatsapp-service.ts
 │   │   └── utils/
 │   │       ├── match-engine.ts
-│   │       └── seller-auth.ts
+│   │       ├── seller-auth.ts
+│   │       └── version-engine.ts
 │   └── types/
 │       ├── availability-schema.ts
+│       ├── broker-request-schema.ts
 │       ├── company-schema.ts
 │       ├── crm-schema.ts
 │       ├── deal-schema.ts
+│       ├── deal-version-schema.ts
+│       ├── lab-schema.ts
+│       ├── loading-schema.ts
 │       ├── logistics-schema.ts
+│       ├── quality-schema.ts
 │       ├── quotation-schema.ts
 │       ├── requirement-schema.ts
 │       └── transaction-schema.ts
@@ -330,17 +350,41 @@ Loading readiness is modeled as a pre-deal operational attribute linked directly
 
 ### 23. Privacy-Isolated Broker Request Inbox & AI Decision Gate (Sprint 16)
 The Seller commercial negotiation interface operates under strict broker-mediated and non-autonomous governance:
+- **Decoupled Deal Engine Architecture**: The Deal Engine enforces complete architectural decoupling between the Buyer's identity and the Seller's commercial visibility. The Seller interacts solely with broker-mediated proposal objects (`broker_requests` / `quotations`) and never interfaces with Buyer systems or direct communications. Commercial terms (quantity, rate, payment terms, delivery parameters) are negotiated purely on market merits while Buyer identity remains fully abstracted behind the Broker Desk.
 - **Zero-Buyer Discovery & Hard Privacy Shield**: The Seller Request Inbox query (`getSellerBrokerRequestsAction`) joins quotations with requirements and lots while strictly scrubbing all Buyer personal and organizational contact data (phone numbers, emails, WhatsApp handles, company legal names, and GST numbers). Sellers evaluate trade terms purely on commercial merits (quantity, offered rate, loading timeline, settlement mechanism).
 - **Commercial Response Triad**: The `<BrokerRequestInbox />` component allows Sellers to respond to incoming proposals deterministically:
   - **Accept (`'Seller Accepted'`)**: Locks the Seller's consent and notifies the Broker Desk to draft the formal Deal Booking.
   - **Reject (`'Seller Rejected'`)**: Requires a documented operational or pricing rationale ($\ge 5$ characters) using interactive quick-chips.
   - **Counter (`'Seller Countered'`)**: Permits structured adjustments to price, quantity, earliest dispatch date, and commercial notes without overwriting previous proposal states.
-- **AI Recommendation Decision Gate & Non-Autonomous Guardrails**:
+- **Active AI Decision Gate Rule**:
   - The AI Match Engine remains strictly recommendation-only. Under no circumstances can automated background crons, algorithms, or bot routines initiate proposals, accept terms, or generate Bookings.
   - Proposal initiation actions (`createQuotationAction`, `initiateBrokerRequestFromAiMatchAction`) enforce authenticated human broker verification (`role === 'broker' || role === 'admin'`). Autonomous calls are explicitly rejected with `"AI autonomous action prohibited. Only an authorized Broker can initiate commercial proposals."`.
   - Booking creation (`acceptQuotationAction`, `createDealAction`) is locked behind explicit human quotation state machine transitions and authorized party confirmations.
-- **Broker Provenance Attribution**: Each proposal card in `<BrokerRequestInbox />` displays a verified **Broker-Mediated Request** banner (`brokerName`, `brokerCompany`, `isBrokerVerified`), assuring the Seller of licensed human curation.
+- **Enforced Broker Provenance Attribution**: All requests reaching the Seller Inbox enforce Broker Provenance. Each proposal card in `<BrokerRequestInbox />` displays a verified **"Originated by Broker: [Broker Name] • [Broker Agency]"** badge with `<ShieldCheck>`, assuring the Seller of licensed human curation and regulatory accountability.
 - **Non-Autonomous Audit Trail**: Critical decision milestones dispatch structured audit events (`logDecisionGateAuditEventAction`) recording actor provenance, match scores, and human review flags for compliance auditing.
 - **Notification Deep-Linking Engine**: In-app notifications contain deep-link URLs (`action_url: '/seller/requests?requestId=...'`). The inbox utilizes Next.js `useSearchParams()` to detect deep links, automatically switch status tabs, smooth-scroll to the card, and highlight it with an emerald focus ring.
+
+### 24. Immutable Deal Versioning Engine & Append-Only Negotiation Ledger (Sprint 17)
+To ensure absolute regulatory auditability and eliminate destructive data overwrites during commercial trade negotiations:
+- **Append-Only Immutability Invariant**: Standard overwrite mutations on proposals (`UPDATE quotations SET offered_price = ...`) have been completely replaced with an immutable Deal Versioning architecture.
+  - Commercial state changes are recorded as frozen snapshots in the `deal_versions` table (`version_number`, `status`, `snapshot_payload`).
+  - Back-and-forth counter-offers, rejections, and acceptances are permanently logged in the `negotiation_events` table (`action_type`, `payload`, `actor_id`, `company_id`).
+  - Historical version rows and snapshot payloads are strictly write-once and mathematically immutable.
+- **Material Change Detection & Atomic Supersession (`version-engine.ts`)**:
+  - The `detectMaterialChanges` utility normalizes and compares JSONB snapshots across key commercial fields: `rate`, `quantity`, `deliveryDate`, `deliveryTerms`, `deliveryLocation`, `paymentTerms`, `commodityId`, `gradeId`, `lotNumber`, `packagingType`, `unitSymbol`, and `qualityParameters`.
+  - When material changes or counter-proposals are submitted, the backend (`createDealVersionInTransaction` in `version-actions.ts`) executes an atomic transaction that:
+    1. Updates the previous active version's status strictly to `'Superseded'`.
+    2. Inserts a brand new snapshot row with incremented version number (`version_number: previous + 1`).
+    3. Leaves previous historical records completely intact for visual diffing and dispute resolution.
+- **Optimistic Locking & Stale-Version Concurrency Protection**:
+  - To prevent race conditions where a Seller responds to or counters an outdated proposal while a Broker is concurrently modifying terms, the system enforces Optimistic Concurrency Control.
+  - Mutating actions (`respondToBrokerRequestAction`, `createNewDealVersionAction`) strictly require an `expectedVersionNumber` from the client.
+  - The `verifyLatestVersion()` guard queries the database for the highest active version number. If `highest_version > expectedVersionNumber`, the mutation is immediately aborted with a `STALE_VERSION_DETECTED` exception.
+  - The UI captures this error, presents a non-destructive `"Stale terms detected"` toast alert, and provides a 1-click `"Refresh Deal"` recovery action that updates TanStack Query caches and re-syncs the active proposal state.
+- **Privacy-Enforced Chronological Audit Timeline (`getNegotiationTimelineAction`)**:
+  - The timeline fetcher merges `deal_versions` and `negotiation_events` into a single chronological timeline sorted by `created_at ASC`.
+  - **Zero-Buyer PII Exposure**: All Buyer private contact data (phone numbers, emails, WhatsApp identifiers) is completely stripped at the server layer. Actor roles and names are strictly normalized to `"You (Seller)"` and `"Broker Desk"` / `"Broker"`.
+  - The `<NegotiationTimeline />` component renders a clean vertical rail with distinct version badges (`v1`, `v2`), status icons (`ACCEPT`, `REJECT`, `COUNTER`), and diff summaries inside a responsive `<Sheet>` drawer.
+
 
 

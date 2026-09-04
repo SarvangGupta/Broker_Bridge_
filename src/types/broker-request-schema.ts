@@ -37,6 +37,19 @@ export const brokerResponseSchema = z
       (val) => (val === "" || val === null || val === undefined ? undefined : String(val).trim()),
       z.string().max(500, "Remarks cannot exceed 500 characters").optional()
     ),
+    expectedVersionNumber: z.preprocess(
+      (val) => (val === "" || val === null || val === undefined || isNaN(Number(val)) ? undefined : Number(val)),
+      z.number({
+        required_error: "Expected version number is required for concurrency validation",
+        invalid_type_error: "Expected version number must be a valid number",
+      })
+        .int("Expected version number must be an integer")
+        .positive("Expected version number is required for concurrency validation")
+    ),
+    expected_version_number: z.preprocess(
+      (val) => (val === "" || val === null || val === undefined || isNaN(Number(val)) ? undefined : Number(val)),
+      z.number().int().positive().optional()
+    ),
   })
   .superRefine((data, ctx) => {
     // Refinement 1: If rejecting, a clear reason is mandatory
@@ -112,4 +125,5 @@ export interface SellerBrokerRequestItem {
   counterPrice?: number | null;
   counterNotes?: string | null;
   rejectionReason?: string | null;
+  latestVersionNumber?: number | null;
 }

@@ -75,3 +75,19 @@ This document tracks UI/UX anomalies, architectural logic bugs, and their eventu
   2. Updated `createMockBrokerRequestAction` in `src/server/actions/broker-request-actions.ts` to explicitly queue the notification with `action_url` and invoke `revalidatePath('/', 'layout')`.
   3. Injected `queryClient.invalidateQueries({ queryKey: ['in-app-notifications'] })` into `handleGenerateMock` in `src/components/dashboard/broker-request-inbox.tsx` to instantly re-fetch and increment the unread badge in the header.
 
+---
+
+## Sprint 17.5 - Deal Version Supersession Engine & Initial Snapshot Seeder
+
+- **Issue:** When a Seller submitted a counter-offer via the Broker Request Inbox, the system failed to create a new incremental row (`Version 2`) in `deal_versions` and failed to mark `Version 1` as `'Superseded'`. The negotiation timeline consequently displayed only a single version or failed to reflect the back-and-forth immutable audit trail.
+- **Root Causes:**
+  1. **Dev Seeder Snapshot Omission:** `createMockBrokerRequestAction` in `src/server/actions/broker-request-actions.ts` inserted rows into the parent `quotations` table but omitted inserting the initial baseline `Version 1` snapshot (`status: 'Proposed'`) into `deal_versions`.
+  2. **Zero-Row Version Lookup:** When countering a request that had no prior `deal_versions` record, `existingVersions` returned empty (`[]`), causing `highestVersion` to evaluate to `null` and defaulting `nextVersionNumber` to `1` without marking any record as `Superseded`.
+  3. **Strict Material Diff vs. Counter Action:** `createDealVersionInTransaction` evaluated `detectMaterialChanges` strictly against numeric and date fields. If a counter-offer maintained identical price/quantity terms but provided commercial counter remarks or changed originator roles (`broker` -> `seller`), the version engine concluded that no material changes occurred and exited early without incrementing the version.
+- **Resolution:**
+  1. **Fixed Dev & AI Match Seeders:** Updated `createMockBrokerRequestAction` and `initiateBrokerRequestFromAiMatchAction` in `src/server/actions/broker-request-actions.ts` to immediately insert the initial `Version 1` record (`status: 'Proposed'`) with frozen commodity, lot, quantity, rate, and delivery terms snapshots into `deal_versions`.
+  2. **Legacy / Unversioned Request Fallback:** Enhanced `createDealVersionInTransaction` in `src/server/actions/version-actions.ts` to automatically query the parent `quotation` and synthesize `Version 1` (`status: 'Superseded'`) on the fly if an unversioned proposal is countered.
+  3. **Counter & State Transition Handling:** Enhanced the change detection condition in `createDealVersionInTransaction` so that whenever `status === 'Countered'`, or an originator role change (`broker` to `seller`) or status change occurs, a new immutable row with `version_number: previous + 1` and `status: 'Countered'` is guaranteed to be created, and the previous version is atomically updated to `'Superseded'`.
+  4. **Optimistic Stale-Version Protection:** Passed `expectedVersionNumber` through `respondToBrokerRequestAction` into `createDealVersionInTransaction` to enforce concurrency protection against stale proposals.
+
+
