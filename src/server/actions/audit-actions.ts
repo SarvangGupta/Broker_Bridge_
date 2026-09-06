@@ -3,6 +3,7 @@
 export type AuditActionType =
   | "BROKER_REQUEST_INITIATED"
   | "BOOKING_MANUALLY_CONFIRMED"
+  | "BOOKING_CREATED"
   | "AI_MATCH_REVIEWED"
   | "AUTONOMOUS_BYPASS_ATTEMPT_BLOCKED"
   | "SELLER_PROPOSAL_ACTION";
@@ -11,7 +12,7 @@ export interface DecisionGateAuditEvent {
   action: AuditActionType;
   actorId: string;
   actorRole?: string;
-  entity: "broker_requests" | "deals" | "quotations" | "ai_match" | "system";
+  entity: "broker_requests" | "deals" | "quotations" | "ai_match" | "system" | "bookings";
   entityId?: string;
   metadata?: {
     matchScore?: number;

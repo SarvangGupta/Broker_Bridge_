@@ -22,9 +22,8 @@ import {
   BrokerResponsePayload,
   SellerBrokerRequestItem,
 } from "@/src/types/broker-request-schema";
-import { createDealVersionInTransaction } from "@/src/server/actions/version-actions";
 import { DealVersionSnapshot } from "@/src/types/deal-version-schema";
-import { verifyLatestVersion } from "@/src/server/utils/version-engine";
+import { createDealVersionInTransaction, verifyLatestVersion } from "@/src/server/utils/version-engine";
 import { eq, and, desc, inArray, sql, aliasedTable } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { verifySellerSession } from "@/src/server/utils/seller-auth";

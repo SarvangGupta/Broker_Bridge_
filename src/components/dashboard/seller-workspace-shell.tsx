@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, Suspense } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { SellerHeader } from '@/src/components/dashboard/seller-header'
 import { SellerNav } from '@/src/components/dashboard/seller-nav'
 import { MyAvailabilitiesTable } from '@/src/components/dashboard/my-availabilities-table'
@@ -52,9 +53,29 @@ export function SellerWorkspaceShell({
   vehicleTypes,
   commandCenterData,
 }: SellerWorkspaceShellProps) {
-  // Default to Command Center dashboard tab
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const searchParams = useSearchParams()
+  const tabFromUrl = searchParams.get('tab')
+
+  // Default to URL tab or Command Center dashboard tab
+  const [activeTab, setActiveTab] = useState(tabFromUrl || 'dashboard')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  // Sync tab state when URL searchParams change (e.g. on browser back/forward)
+  useEffect(() => {
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl)
+    } else if (!tabFromUrl && activeTab !== 'dashboard') {
+      setActiveTab('dashboard')
+    }
+  }, [tabFromUrl])
+
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab)
+    if (typeof window !== 'undefined') {
+      const url = newTab === 'dashboard' ? '/seller' : `/seller?tab=${newTab}`
+      window.history.replaceState(null, '', url)
+    }
+  }
 
   const companyName = fullProfile?.company?.name || profile?.name || "Seller Trading Workspace"
   const kpis = commandCenterData?.kpis || {
@@ -78,7 +99,7 @@ export function SellerWorkspaceShell({
       {/* 2. RESPONSIVE MODULE SUB-NAV */}
       <SellerNav 
         activeTab={activeTab} 
-        onTabChange={setActiveTab} 
+        onTabChange={handleTabChange} 
         userRole={userRole}
         mobileOpen={mobileNavOpen}
         onMobileOpenChange={setMobileNavOpen}
@@ -149,7 +170,7 @@ export function SellerWorkspaceShell({
             {/* Task 3: P0 Action Required Section (Critical Task Alerts) */}
             <ActionRequiredBanner 
               actionItems={actionItems} 
-              onNavigateTab={setActiveTab} 
+              onNavigateTab={handleTabChange} 
             />
 
             {/* Task 4: Operational Quick Access Cards (Bottom Row - 2 Columns) */}
@@ -187,7 +208,7 @@ export function SellerWorkspaceShell({
                     </p>
                   </div>
                   <Button 
-                    onClick={() => setActiveTab('inventory')}
+                    onClick={() => handleTabChange('inventory')}
                     className="w-full min-h-[48px] bg-[#059669] hover:bg-[#047857] text-white font-bold rounded-xl cursor-pointer shadow-xs gap-2"
                   >
                     <span>Manage All Inventory</span>
@@ -219,7 +240,7 @@ export function SellerWorkspaceShell({
                     </p>
                   </div>
                   <Button 
-                    onClick={() => setActiveTab('deals')}
+                    onClick={() => handleTabChange('deals')}
                     variant="outline"
                     className="w-full min-h-[48px] border-slate-300 text-slate-800 hover:bg-slate-50 font-bold rounded-xl cursor-pointer shadow-2xs gap-2"
                   >

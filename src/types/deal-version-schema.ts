@@ -141,3 +141,19 @@ export interface NegotiationTimelineItem {
   createdAt: string;
 }
 
+export interface DealVersionSnapshotDetailRecord extends DealVersionRecord {
+  totalVersions: number;
+  previousSnapshotPayload?: DealVersionSnapshot | null;
+  diffData: any;
+}
+
+export type VersionActionResult<T = any> = {
+  success: boolean;
+  version_id?: string;
+  version_number?: number;
+  data?: T;
+  error?: string;
+  message?: string;
+};
+
+

@@ -213,3 +213,114 @@ export async function verifyLatestVersion(
   };
 }
 
+/**
+ * Internal Transaction-Safe Helper:
+ * Evaluates material changes against existing versions, supersedes older records,
+ * and inserts a new immutable Deal Version within an existing transaction context.
+ */
+export async function createDealVersionInTransaction(
+  tx: any,
+  params: {
+    requestId: string;
+    newSnapshot: DealVersionSnapshot;
+    actorId: string;
+    status?: any;
+    expectedVersionNumber?: number | null;
+  }
+): Promise<{ version: any; created: boolean }> {
+  // Stale Version Protection Guard
+  if (params.expectedVersionNumber !== undefined && params.expectedVersionNumber !== null) {
+    await verifyLatestVersion(tx, params.requestId, params.expectedVersionNumber);
+  }
+
+  // Step A: Find highest existing version for this request_id
+  const existingVersions = await tx
+    .select({
+      id: dealVersions.id,
+      versionNumber: dealVersions.versionNumber,
+      status: dealVersions.status,
+      snapshotPayload: dealVersions.snapshotPayload,
+    })
+    .from(dealVersions)
+    .where(eq(dealVersions.requestId, params.requestId))
+    .orderBy(desc(dealVersions.versionNumber));
+
+  let highestVersion = existingVersions.length > 0 ? existingVersions[0] : null;
+
+  // If no deal_versions record exists yet, synthesize Version 1 first
+  if (!highestVersion) {
+    const parentQuotation = await tx.query.quotations?.findFirst({
+      where: eq(dealVersions.requestId, params.requestId),
+    });
+
+    if (parentQuotation) {
+      const initialV1Snapshot: DealVersionSnapshot = {
+        ...params.newSnapshot,
+        rate: Number(parentQuotation.offeredPrice || params.newSnapshot.rate),
+        originatorRole: "broker",
+        timestamp: new Date(parentQuotation.createdAt || Date.now()).toISOString(),
+      };
+
+      const [v1] = await tx
+        .insert(dealVersions)
+        .values({
+          requestId: params.requestId,
+          versionNumber: 1,
+          actorId: parentQuotation.brokerId || params.actorId,
+          status: parentQuotation.status === "Sent" ? "Proposed" : (parentQuotation.status as any) || "Proposed",
+          snapshotPayload: initialV1Snapshot,
+        })
+        .returning();
+
+      highestVersion = v1;
+    }
+  }
+
+  // Step B: Check if material terms changed
+  if (highestVersion) {
+    const isDifferent = detectMaterialChanges(
+      highestVersion.snapshotPayload as Record<string, any>,
+      params.newSnapshot as Record<string, any>
+    );
+
+    if (!isDifferent) {
+      if (params.status && params.status !== highestVersion.status) {
+        const [updated] = await tx
+          .update(dealVersions)
+          .set({ status: params.status })
+          .where(eq(dealVersions.id, highestVersion.id))
+          .returning();
+        return { version: updated, created: false };
+      }
+      return { version: highestVersion, created: false };
+    }
+
+    // Step C: Atomically supersede previous active versions
+    await tx
+      .update(dealVersions)
+      .set({ status: "Superseded" })
+      .where(eq(dealVersions.requestId, params.requestId));
+  }
+
+  // Step D: Insert new incremental deal version
+  const newVersionNumber = highestVersion ? highestVersion.versionNumber + 1 : 1;
+  const targetStatus = params.status || "Proposed";
+
+  const [newVer] = await tx
+    .insert(dealVersions)
+    .values({
+      requestId: params.requestId,
+      versionNumber: newVersionNumber,
+      actorId: params.actorId,
+      status: targetStatus,
+      snapshotPayload: {
+        ...params.newSnapshot,
+        timestamp: new Date().toISOString(),
+      },
+    })
+    .returning();
+
+  return { version: newVer, created: true };
+}
+
+

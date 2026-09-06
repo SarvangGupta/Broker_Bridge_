@@ -173,11 +173,14 @@ brokerbridge-enterprise/
 │   │   │   ├── audit-actions.ts
 │   │   │   ├── auth-actions.ts
 │   │   │   ├── availability-actions.ts
+│   │   │   ├── booking-actions.ts
 │   │   │   ├── broker-actions.ts
 │   │   │   ├── broker-request-actions.ts
 │   │   │   ├── company-actions.ts
+│   │   │   ├── confirmation-actions.ts
 │   │   │   ├── crm-actions.ts
 │   │   │   ├── deal-actions.ts
+│   │   │   ├── finalization-actions.ts
 │   │   │   ├── lab-actions.ts
 │   │   │   ├── loading-actions.ts
 │   │   │   ├── logistics-actions.ts
@@ -188,6 +191,7 @@ brokerbridge-enterprise/
 │   │   │   ├── quotation-actions.ts
 │   │   │   ├── requirement-actions.ts
 │   │   │   ├── support-actions.ts
+│   │   │   ├── test-booking-action.ts
 │   │   │   ├── test-gate-action.ts
 │   │   │   ├── transaction-actions.ts
 │   │   │   ├── ui-match-actions.ts
@@ -205,6 +209,8 @@ brokerbridge-enterprise/
 │   │   ├── services/
 │   │   │   └── whatsapp-service.ts
 │   │   └── utils/
+│   │       ├── diff-engine.ts
+│   │       ├── finalization-gate.ts
 │   │       ├── match-engine.ts
 │   │       ├── seller-auth.ts
 │   │       └── version-engine.ts
@@ -380,11 +386,46 @@ To ensure absolute regulatory auditability and eliminate destructive data overwr
   - To prevent race conditions where a Seller responds to or counters an outdated proposal while a Broker is concurrently modifying terms, the system enforces Optimistic Concurrency Control.
   - Mutating actions (`respondToBrokerRequestAction`, `createNewDealVersionAction`) strictly require an `expectedVersionNumber` from the client.
   - The `verifyLatestVersion()` guard queries the database for the highest active version number. If `highest_version > expectedVersionNumber`, the mutation is immediately aborted with a `STALE_VERSION_DETECTED` exception.
-  - The UI captures this error, presents a non-destructive `"Stale terms detected"` toast alert, and provides a 1-click `"Refresh Deal"` recovery action that updates TanStack Query caches and re-syncs the active proposal state.
 - **Privacy-Enforced Chronological Audit Timeline (`getNegotiationTimelineAction`)**:
   - The timeline fetcher merges `deal_versions` and `negotiation_events` into a single chronological timeline sorted by `created_at ASC`.
   - **Zero-Buyer PII Exposure**: All Buyer private contact data (phone numbers, emails, WhatsApp identifiers) is completely stripped at the server layer. Actor roles and names are strictly normalized to `"You (Seller)"` and `"Broker Desk"` / `"Broker"`.
   - The `<NegotiationTimeline />` component renders a clean vertical rail with distinct version badges (`v1`, `v2`), status icons (`ACCEPT`, `REJECT`, `COUNTER`), and diff summaries inside a responsive `<Sheet>` drawer.
+
+### 25. Commercial Boundaries, Broker Finalization Gate & Idempotent Booking Engine (Sprint 18)
+The transition from commercial negotiation to operational fulfillment enforces strict enterprise boundaries and mathematical concurrency invariants:
+- **Strict Separation of Concerns**:
+  - **Seller Confirmation $\neq$ Booking**:
+    - The Seller Final Confirmation action (`confirmFinalDealTermsAction` in `confirmation-actions.ts`) establishes an explicit, binding Seller commitment to the exact agreed Deal Version (`status: 'Seller Confirmed'`).
+    - It does **not** create a Booking, generate operational tracking identifiers, or authorize physical dispatch.
+    - It writes an immutable audit record to `negotiation_events` and locks the terms against stale broker edits via Optimistic Concurrency Control (`STALE_VERSION_DETECTED`).
+  - **Broker Finalization $\neq$ Booking**:
+    - The Broker Finalization Gate (`finalizeDealAction` in `finalization-actions.ts`) represents the formal administrative verification and multi-counterparty authorization step.
+    - It evaluates three mandatory pre-flight conditions via `validateFinalizationPreconditions` (`finalization-gate.ts`): (1) Deal Version currency check, (2) Mandatory Seller Confirmation check (`MISSING_SELLER_CONFIRMATION` error on unconfirmed proposals), and (3) Buyer Mandate verification.
+    - It transitions the deal version, quotation, and deal records to `'Broker Finalized'`. However, it strictly **refrains** from issuing Booking references or altering physical inventory balances.
+  - **System Booking Engine (`createIdempotentBookingAction` in `booking-actions.ts`)**:
+    - Booking creation is the sole authoritative gateway from commercial agreement into operational fulfillment.
+    - Fulfillment modules (Sprint 19 Dispatch, Logistics, Invoicing, Settlement) can only execute against an existing, locked `bookings` record.
+- **Server-Computed Visual Diff Engine (`diff-engine.ts`)**:
+  - The `computeVersionDiff` engine executes entirely on the server, comparing the current immutable snapshot JSONB against the preceding version snapshot across 15 commercial dimensions (rate, quantity, delivery terms, payment conditions, lab specifications, packaging).
+  - Deterministically maps fields to delta states: `unchanged`, `increased` (favorable emerald highlight), `decreased` (reduced rose strikethrough), `added`, `removed`, or `changed`.
+  - The `<VisualDiffSnapshot />` and `<FinalDealSnapshot />` components are strictly read-only, prohibiting client-side field edits and preventing visual spoofing.
+- **Idempotent Transactional Booking Engine & Inventory Locking**:
+  - **Database-Level Unique Guard**: The `bookings` PostgreSQL table enforces a strict `UNIQUE(deal_id)` constraint alongside a globally unique `booking_reference` (`BKG-YYYY-XXXX`).
+  - **Atomic Transaction & Inventory Lock (`db.transaction`)**:
+    - Checks for an existing booking linked to the deal ID. If present, it immediately returns the existing record without side effects.
+    - Verifies the `'Broker Finalized'` status gate.
+    - Executes an atomic, conditional SQL inventory reservation on `availabilities`:
+      ```sql
+      UPDATE availabilities 
+      SET available_quantity = available_quantity - :dealQuantity,
+          reserved_quantity = reserved_quantity + :dealQuantity,
+          version = version + 1
+      WHERE id = :lotId AND available_quantity >= :dealQuantity;
+      ```
+    - Aborts the entire transaction with `INVENTORY_LOCK_FAILED` if stock is insufficient or concurrently locked.
+    - Inserts the locked booking row linked to `deal_versions.id` (`lockedVersionId`), updates parent deal status to `'Dispatch Pending'`, records an audit entry in `negotiation_events`, logs decision gate provenance, and queues in-app notifications.
+  - **Network Replay & Idempotency Guarantee**:
+    - Distributed network retries, browser refreshes, or concurrent double-clicks safely resolve to the existing `bookings` row without duplicate allocations, double-locking inventory, or generating redundant operational orders.
 
 
 

@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 5: Multi-Sector Architecture & Platform Scaling (Sprint 13+)**  
-Global Platform Status: **PRODUCTION READY / SPRINT 17 VERIFIED** 🚀  
-Status: **Sprint 17 Completed** ✅ (Sprints 1–17 Complete & Fully Verified; Ready for Sprint 18: Final Confirmation + Finalization + Booking)
+Global Platform Status: **SPRINT 18 IN PROGRESS (18.1 Complete)** 🚀  
+Status: **Sprint 18 In Progress** ⏳ (Micro-Sprint 18.1 Final Deal Snapshot Completed ✅; Ready for 18.2 Visual Diff)
 
 
 ---
@@ -233,6 +233,49 @@ Status: **Sprint 17 Completed** ✅ (Sprints 1–17 Complete & Fully Verified; R
   - Built `<NegotiationTimeline />` read-only component in `negotiation-timeline.tsx` with left-bordered vertical rail, status badge nodes (`v1`, `v2`, `CheckCircle2`, `XCircle`, `ArrowUpDown`), and formatted audit timestamps.
   - Integrated timeline drawer into `<BrokerRequestInbox />` via a responsive `<Sheet>` (right slide-out on desktop, bottom sheet on mobile), preserving uncluttered 48px touch targets for primary P0 action buttons.
 - **Verification:** Passed `npx tsc --noEmit` with 0 errors. Overwrite mutations have been 100% replaced with the Immutable Deal Versioning Engine, and the Seller's Response Triad and Stale-Data Concurrency Guards are fully operational.
+
+### 🟢 Sprint 18: Final Deal Confirmation, Finalization & Booking (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Implement the critical commercial boundary: Seller Confirmation ≠ Booking; Broker Finalization → System Booking.
+- **Micro-Sprint 18.1 (Final Deal Snapshot - Read-Only):** `COMPLETED` ✅
+  - Built `getDealVersionSnapshotAction(versionId)` in `version-actions.ts` with strict `@supabase/ssr` authenticated session checks, tenant isolation, and zero-Buyer-PII scrubbing.
+  - Built mobile-first read-only `<FinalDealSnapshot />` component in `final-deal-snapshot.tsx` rendering frozen `snapshot_payload` JSONB with 5 comprehensive term groups: Core Product & Commercial Terms, Quality & Lab Specifications, Logistics & Delivery Schedule, Financials & Payment Terms, and Special Conditions / Remarks.
+  - Created Next.js route `/seller/deals/[id]/confirm/page.tsx` integrating server-side pre-fetching and `<FinalDealSnapshot />`.
+  - Integrated "Review Terms Snapshot" deep-links on `<BrokerRequestInbox />` request cards.
+- **Micro-Sprint 18.2 (Visual Diff Confirmation Screen):** `COMPLETED` ✅
+  - Built Server-Side Diff Engine (`computeVersionDiff` and `getChangedFieldLabels` in `diff-engine.ts`) comparing rate, quantity, delivery date, terms, packaging, and quality specifications to produce delta states (`unchanged`, `increased` [emerald], `decreased` [rose strikethrough], `changed`).
+  - Built `<VisualDiffSnapshot />` in `visual-diff-snapshot.tsx` with "What Changed" summary banner, "Version X of Y" indicators, and delta highlighting.
+- **Micro-Sprint 18.3 (Seller Final Confirmation):** `COMPLETED` ✅
+  - Built `confirmFinalDealTermsAction` and `requestBrokerCorrectionAction` in `confirmation-actions.ts` with atomic Drizzle transactions, optimistic concurrency protection (`STALE_VERSION_DETECTED`), immutable `negotiation_events` auditing, and broker in-app notifications.
+  - Built `<FinalConfirmationActions />` action bar with React 19 `useTransition`, modal confirmation dialog, and broker correction input modal.
+- **Micro-Sprint 18.4 (Broker Finalization Gate):** `COMPLETED` ✅
+  - Built `validateFinalizationPreconditions` in `finalization-gate.ts` enforcing three mandatory pre-conditions: Version Concurrency match, Seller Confirmed status, and Buyer Mandate confirmation.
+  - Built `finalizeDealAction` in `finalization-actions.ts` transitioning versions and parent deals to `'Broker Finalized'` with tamper-evident decision gate auditing.
+  - Built `<DevFinalizationGateTester />` in `dev-finalization-gate-tester.tsx` enabling interactive verification of negative and positive gate checks.
+- **Micro-Sprint 18.5 (Idempotent Booking Creation):** `COMPLETED` ✅
+  - Added `bookings` table to Drizzle schema with database-level `UNIQUE` constraint on `deal_id`, unique `booking_reference`, foreign key to `deal_versions.id`, and generated migration `0028_add_bookings_table.sql`.
+  - Implemented `createIdempotentBookingAction(dealId)` in `booking-actions.ts` featuring:
+    - Step A: Idempotency check returning existing booking immediately without re-processing.
+    - Step B: Gate check strictly requiring `'Broker Finalized'` status.
+    - Step C: Transaction-safe inventory reservation on `availabilities` table.
+    - Step D: Unique `booking_reference` generation (`BKG-2026-XXXX`) and insertion.
+    - Step E: Audit logging (`action: 'BOOKING_CREATED'`) and seller in-app notifications.
+  - Built comprehensive Seller Deal View at `/seller/deals/[id]/page.tsx` with `<SellerDealDetailView />` rendering the high-visibility locked Booking ID banner and unlocking "Proceed to Dispatch" (Sprint 19) only when the Booking ID exists.
+  - Updated `<SellerDealsTable />` to link rows directly to `/seller/deals/[id]`.
+- **Verification:** Passed `npx tsc --noEmit` with 0 errors. Visual Diff Confirmation, Broker Finalization Gate, and Idempotent Transactional Booking Engine are 100% operational. Commercial state machine boundaries and idempotent booking guarantees fully verified.
+
+---
+
+### 🟡 Sprint 19: Dispatch, Documents & Seller Settlement (UP NEXT 🔜)
+- **Status:** `UP NEXT` 🔜
+- **Goal:** Harden fulfillment so operations begin only from a valid Booking and quantity/payment data remain trustworthy.
+- **Micro-Sprint 19.1:** Booked Order / Dispatch Entry Gate
+- **Micro-Sprint 19.2:** Dispatch Creation & Document Upload
+- **Micro-Sprint 19.3:** Vehicle & Driver Assignment
+- **Micro-Sprint 19.4:** Weight Discrepancy & Dispute Guard
+- **Micro-Sprint 19.5:** Settlement & Payment Release Gate
+
+
 
 
 

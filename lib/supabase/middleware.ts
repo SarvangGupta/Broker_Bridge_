@@ -104,6 +104,7 @@ export async function updateSession(request: NextRequest) {
     if (path === '/' && targetWorkspace !== '/') {
       const url = request.nextUrl.clone()
       url.pathname = targetWorkspace
+      url.searchParams.delete('error')
       return createRedirectResponse(url)
     }
 
@@ -112,6 +113,7 @@ export async function updateSession(request: NextRequest) {
       if (targetWorkspace !== '/login' && targetWorkspace !== path) {
         const url = request.nextUrl.clone()
         url.pathname = targetWorkspace
+        url.searchParams.delete('error')
         return createRedirectResponse(url)
       }
     }

@@ -468,94 +468,108 @@ Goal: Replace overwrite-style commercial updates with controlled, immutable Deal
 - [x] Seller can understand how the current terms were reached.
 - [x] History cannot be rewritten from Seller UI/API.
 
-# SPRINT 18 — Final Deal Confirmation, Finalization & Booking
+# SPRINT 18 — Final Deal Confirmation, Finalization & Booking (COMPLETED ✅)
 
 Goal: Implement the critical new commercial boundary: Seller Confirmation ≠ Booking; Broker Finalization → System Booking.
 
-### 18.1 — Final Deal Snapshot
+### 18.1 — Final Deal Snapshot (COMPLETED ✅)
 
 **Objective:** Create the exact final commercial snapshot that the Seller must review.
 
 **Implementation:**
 
-- Show exact Deal Version.
-- Commodity, grade, lot/batch, final quantity/unit, final rate.
-- Quality specification snapshot and authorized evidence status.
-- Delivery location/date/window, payment terms, packaging, freight/transport, taxes/charges and special conditions.
-- Confirmation status and timestamps.
+- [x] Show exact Deal Version (`<FinalDealSnapshot />`).
+- [x] Commodity, grade, lot/batch, final quantity/unit, final rate.
+- [x] Quality specification snapshot and authorized evidence status.
+- [x] Delivery location/date/window, payment terms, packaging, freight/transport, taxes/charges and special conditions.
+- [x] Confirmation status and timestamps.
+- [x] Zero-Buyer-PII scrubbing and tenant isolation in `getDealVersionSnapshotAction`.
+- [x] Route integration at `/seller/deals/[id]/confirm`.
+
 **Done when:**
 
-- Seller can see exactly what is being confirmed.
-- The displayed snapshot is generated from the immutable version, not editable fields.
+- [x] Seller can see exactly what is being confirmed.
+- [x] The displayed snapshot is generated from the immutable version, not editable fields.
 
-### 18.2 — Visual Diff Confirmation Screen
+
+### 18.2 — Visual Diff Confirmation Screen (COMPLETED ✅)
 
 **Objective:** Implement the v3.0 Visual Diff enhancement.
 
 **Implementation:**
 
-- Show Version X of Y.
-- Server-compute changes from the previous immutable version.
-- Changed fields: favorable/new in green; reduced/removed in red.
-- Unchanged fields have no change indicator.
-- Version 1 shows First Version instead of a diff.
-- Actions only: Confirm Final Terms or Request Broker Correction.
+- [x] Show Version X of Y (`"Version X of Y"` indicator and badge).
+- [x] Server-compute changes from the previous immutable version (`computeVersionDiff` in `diff-engine.ts`).
+- [x] Changed fields: favorable/new in green; reduced/removed in red strikethrough.
+- [x] Unchanged fields have no change indicator.
+- [x] Version 1 shows First Version instead of a diff.
+- [x] Actions only: Confirm Final Terms or Request Broker Correction.
+- [x] Built `<VisualDiffSnapshot />` with "What Changed" summary banner and delta annotations.
+
 **Done when:**
 
-- Seller can identify changed terms at a glance.
-- Seller cannot edit commercial terms from the confirmation screen.
-- Diff cannot be manipulated by the client.
+- [x] Seller can identify changed terms at a glance.
+- [x] Seller cannot edit commercial terms from the confirmation screen.
+- [x] Diff cannot be manipulated by the client.
 
-### 18.3 — Seller Final Confirmation
+### 18.3 — Seller Final Confirmation (COMPLETED ✅)
 
 **Objective:** Record an explicit Seller confirmation against the exact version.
 
 **Implementation:**
 
-- Confirm Final Terms action.
-- Request Broker Correction action creates/requires a new version.
-- Store Seller actor, timestamp and Deal Version reference.
-- Create immutable audit event.
-- Block Broker finalization if Seller confirmation is missing.
+- [x] Confirm Final Terms action (`confirmFinalDealTermsAction`).
+- [x] Request Broker Correction action (`requestBrokerCorrectionAction`) requiring a new incremental version.
+- [x] Store Seller actor, timestamp and Deal Version reference.
+- [x] Create immutable audit events in `negotiation_events` table and structured log drain.
+- [x] Block Broker finalization if Seller confirmation is missing.
+- [x] Built `<FinalConfirmationActions />` action bar with confirmation modal and correction dialog.
+
 **Done when:**
 
-- Only the exact confirmed version is eligible for finalization.
-- Seller confirmation is distinct from Booking.
-- A correction request never silently edits the current version.
+- [x] Only the exact confirmed version is eligible for finalization.
+- [x] Seller confirmation is distinct from Booking.
+- [x] A correction request never silently edits the current version.
 
-### 18.4 — Broker Finalization Gate
+### 18.4 — Broker Finalization Gate (COMPLETED ✅)
 
 **Objective:** Create the explicit system gate before Booking.
 
 **Implementation:**
 
-- Validate required Seller confirmation.
-- Validate required Buyer-side confirmation through the Broker-controlled workflow.
-- Validate current version validity.
-- Reject finalization when any required condition is missing.
-- Audit the Broker finalization action.
+- [x] Validate required Seller confirmation (`validateFinalizationPreconditions` in `finalization-gate.ts`).
+- [x] Validate required Buyer-side confirmation through the Broker-controlled workflow.
+- [x] Validate current version validity (optimistic version concurrency guard).
+- [x] Reject finalization when any required condition is missing (`MISSING_SELLER_CONFIRMATION`, `MISSING_BUYER_CONFIRMATION`, `STALE_VERSION_DETECTED`).
+- [x] Audit the Broker finalization action (`finalizeDealAction`).
+- [x] Built `<DevFinalizationGateTester />` test harness to simulate negative & positive broker finalization flows.
+
 **Done when:**
 
-- Broker cannot finalize an unconfirmed version.
-- Finalization is a separate state/action from Booking creation.
+- [x] Broker cannot finalize an unconfirmed version.
+- [x] Finalization is a separate state/action from Booking creation.
 
-### 18.5 — Idempotent Booking Creation
+### 18.5 — Idempotent Booking Creation (COMPLETED ✅)
 
 **Objective:** Make Booking a single transactional system outcome.
 
 **Implementation:**
 
-- On successful Broker Finalization, create unique Booking ID.
-- Lock the final commercial snapshot.
-- Reserve/lock applicable inventory quantities transactionally.
-- Prevent repeated finalization requests from creating duplicate bookings.
-- Return the existing Booking ID for a repeated idempotent request.
+- [x] On successful Broker Finalization, create unique Booking ID (`BKG-YYYY-XXXX`).
+- [x] Added `bookings` table with database-level UNIQUE constraint on `deal_id` and foreign key to `deal_versions.id`.
+- [x] Lock the final commercial snapshot against the locked version ID.
+- [x] Reserve/lock applicable inventory quantities transactionally (`availabilities` table atomic lock).
+- [x] Prevent repeated finalization/booking requests from creating duplicate bookings (`createIdempotentBookingAction`).
+- [x] Return the existing Booking ID for a repeated idempotent request.
+- [x] Built `/seller/deals/[id]` view (`<SellerDealDetailView />`) with high-visibility locked Booking badge.
+- [x] Unlocked "Proceed to Dispatch" (Sprint 19) call-to-action only if Booking ID is present.
+
 **Done when:**
 
-- One finalized transaction produces one Booking ID.
-- Historical Deal Versions remain immutable.
-- Booking is the locked operational transaction record.
-- Seller can proceed to Dispatch only after Booking exists.
+- [x] One finalized transaction produces one Booking ID.
+- [x] Historical Deal Versions remain immutable.
+- [x] Booking is the locked operational transaction record.
+- [x] Seller can proceed to Dispatch only after Booking exists.
 
 # SPRINT 19 — Dispatch, Documents & Seller Settlement
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { SlaCountdown } from "@/src/components/ui/sla-badge"
 import {
   Table,
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { FileDisputeDialog } from "@/src/components/forms/file-dispute-dialog"
 import { SellerDispatchForm } from "@/src/components/forms/seller-dispatch-form"
-import { AlertTriangle, Truck, Handshake } from "lucide-react"
+import { AlertTriangle, Truck, Handshake, Eye } from "lucide-react"
 
 export function SellerDealsTable({ 
   deals, 
@@ -94,6 +95,13 @@ export function SellerDealsTable({
 
               {/* Action Buttons with 48px Touch Targets */}
               <div className="flex flex-col gap-2.5 pt-2 border-t border-slate-100">
+                <Link
+                  href={`/seller/deals/${row.deal.id}`}
+                  className="w-full min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl flex items-center justify-center gap-2 shadow-2xs transition-colors"
+                >
+                  <Eye className="h-4 w-4 text-slate-700" />
+                  View Deal & Booking ID
+                </Link>
                 {isPendingDispatch && (
                   <Button 
                     onClick={() => setOpenDialogForDeal(row.deal.id)}
@@ -139,7 +147,12 @@ export function SellerDealsTable({
               return (
                 <TableRow key={row.deal.id} className="hover:bg-slate-50/50 transition-colors">
                   <TableCell className="font-mono text-xs font-semibold text-slate-500">
-                    {row.deal.id.substring(0, 8).toUpperCase()}
+                    <Link
+                      href={`/seller/deals/${row.deal.id}`}
+                      className="text-emerald-700 hover:underline font-bold"
+                    >
+                      {row.deal.id.substring(0, 8).toUpperCase()}
+                    </Link>
                   </TableCell>
                   <TableCell>
                     <div className="font-bold text-slate-900">{row.commodity.name}</div>
@@ -166,6 +179,13 @@ export function SellerDealsTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-right space-x-2">
+                    <Link
+                      href={`/seller/deals/${row.deal.id}`}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg transition-colors"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>Details</span>
+                    </Link>
                     {row.deal.status === 'Dispatch Pending' && (
                       <Button 
                         size="sm" 

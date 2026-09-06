@@ -111,10 +111,20 @@ __Phase 5: Enterprise Seller Command Center & Core Modules \(Sprints 13–20\)__
 		- [x] __17.5 — Negotiation Timeline & Audit UI:__ Built `getNegotiationTimelineAction` in `version-actions.ts` with strict zero-Buyer-PII scrubbing and tenant isolation. Created read-only `<NegotiationTimeline />` vertical timeline component. Integrated into `<BrokerRequestInbox />` via interactive version badges and a responsive slide-out `<Sheet>` drawer.
 	- __Technical Deliverables:__ `negotiation_events` and `deal_versions` schema tables, `0026_add_negotiation_events.sql`, `0027_add_deal_versions_snapshot.sql`, `deal-version-schema.ts`, `version-engine.ts`, `version-actions.ts`, `negotiation-timeline.tsx`, `<BrokerRequestInbox />` Sheet integration, and passed `tsc --noEmit` validation.
 
+- __Sprint 18: Final Confirmation + Finalization + Booking__ (COMPLETED ✅)
+	- __Goal:__ Implement the critical commercial boundary: Seller Confirmation ≠ Booking; Broker Finalization → System Booking.
+	- __Key Tasks:__
+		- [x] __18.1 — Final Deal Snapshot (Read-Only):__ Built `getDealVersionSnapshotAction(versionId)` in `version-actions.ts` with strict session verification, tenant isolation, and zero Buyer PII exposure. Built mobile-first read-only `<FinalDealSnapshot />` rendering frozen `snapshot_payload` JSONB with 5 comprehensive term groups. Created `/seller/deals/[id]/confirm/page.tsx` route with server-side pre-fetching.
+		- [x] __18.2 — Visual Diff Confirmation Screen:__ Built Server-Side Diff Engine (`computeVersionDiff` in `diff-engine.ts`) comparing commercial fields to produce deterministic delta states (`unchanged`, `increased` [emerald], `decreased` [rose strikethrough], `changed`). Built `<VisualDiffSnapshot />` with "What Changed" summary banner and delta annotations.
+		- [x] __18.3 — Seller Final Confirmation:__ Built `confirmFinalDealTermsAction` and `requestBrokerCorrectionAction` in `confirmation-actions.ts` with atomic transactions, optimistic locking (`STALE_VERSION_DETECTED`), immutable `negotiation_events` auditing, and broker in-app notifications. Built `<FinalConfirmationActions />` action bar.
+		- [x] __18.4 — Broker Finalization Gate:__ Built `validateFinalizationPreconditions` in `finalization-gate.ts` enforcing 3 mandatory pre-flight checks: Version Concurrency match, Seller Confirmed status, and Buyer Mandate confirmation. Built `finalizeDealAction` in `finalization-actions.ts` and interactive `<DevFinalizationGateTester />`.
+		- [x] __18.5 — Idempotent Booking Creation:__ Added `bookings` table with database-level `UNIQUE` constraint on `deal_id` (migration `0028_add_bookings_table.sql`). Built `createIdempotentBookingAction` in `booking-actions.ts` with transaction-safe inventory reservation on `availabilities` table, unique reference generation (`BKG-YYYY-XXXX`), and replay-safe idempotency. Built Seller Deal View at `/seller/deals/[id]/page.tsx` with `<SellerDealDetailView />`.
+	- __Technical Deliverables:__ `bookings` table schema, `0028_add_bookings_table.sql`, `diff-engine.ts`, `finalization-gate.ts`, `confirmation-actions.ts`, `finalization-actions.ts`, `booking-actions.ts`, `final-deal-snapshot.tsx`, `visual-diff-snapshot.tsx`, `final-confirmation-actions.tsx`, `dev-finalization-gate-tester.tsx`, `seller-deal-detail-view.tsx`, `/seller/deals/[id]/confirm/page.tsx`, and passed `tsc --noEmit` validation.
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 17 COMPLETE / READY FOR SPRINT 18**
-Sprints 1–17 are 100% complete and fully verified. Ready for **Sprint 18: Final Confirmation + Finalization + Booking**.
+### 🚀 **Global Platform Status: SPRINT 18 COMPLETE / READY FOR SPRINT 19**
+Sprints 1–18 are 100% complete and fully verified. Ready for **Sprint 19: Dispatch + Documents + Settlement**.
 
 
 

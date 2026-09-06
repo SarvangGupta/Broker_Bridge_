@@ -374,6 +374,14 @@ export const dealVersions = pgTable('deal_versions', {
   index('deal_versions_request_idx').on(table.requestId, table.versionNumber),
 ]);
 
-
-
-
+export const bookings = pgTable('bookings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  bookingReference: text('booking_reference').notNull().unique(),
+  dealId: uuid('deal_id').notNull().unique(),
+  lockedVersionId: uuid('locked_version_id').references(() => dealVersions.id).notNull(),
+  status: text('status').default('Confirmed').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('bookings_deal_idx').on(table.dealId),
+  index('bookings_reference_idx').on(table.bookingReference),
+]);

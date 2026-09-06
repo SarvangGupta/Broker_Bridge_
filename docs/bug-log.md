@@ -90,4 +90,15 @@ This document tracks UI/UX anomalies, architectural logic bugs, and their eventu
   3. **Counter & State Transition Handling:** Enhanced the change detection condition in `createDealVersionInTransaction` so that whenever `status === 'Countered'`, or an originator role change (`broker` to `seller`) or status change occurs, a new immutable row with `version_number: previous + 1` and `status: 'Countered'` is guaranteed to be created, and the previous version is atomically updated to `'Superseded'`.
   4. **Optimistic Stale-Version Protection:** Passed `expectedVersionNumber` through `respondToBrokerRequestAction` into `createDealVersionInTransaction` to enforce concurrency protection against stale proposals.
 
+---
+
+## Sprint 18.1/18.5 - Smart Back Navigation & Hierarchical Route Resolution
+
+- **Issue:** Navigating back from the Deal Confirmation Snapshot (`/seller/deals/[id]/confirm`) or Deal Detail View (`/seller/deals/[id]`) using static `<Link href="/seller/deals">` caused user disorientation or routing loops when users arrived via deep links from the Command Center (`/seller`), Broker Request Inbox (`/seller/requests`), or Notification Bell links.
+- **Root Cause:** Hardcoded static parent paths ignored previous navigation context and broke browser history continuity, forcing users into the general Deals table rather than returning them to their origin workflow (e.g. Inbox tab or Notification deep-link source).
+- **Resolution:**
+  1. Implemented "Smart Back Navigation" using Next.js `useRouter()` and `router.back()` with fallback routing to preserve context.
+  2. Preserved deep-link query parameters (`?requestId=...`) and active tab states across navigation boundaries.
+  3. Ensured breadcrumbs and header back buttons dynamically honor the referrer context, eliminating routing loops between the Dashboard, Requests Inbox, and Confirmation views.
+
 

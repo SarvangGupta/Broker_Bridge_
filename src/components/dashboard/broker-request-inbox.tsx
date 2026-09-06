@@ -25,7 +25,9 @@ import {
   HelpCircle,
   MapPin,
   History,
+  FileCheck2,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -738,17 +740,24 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
                     </div>
                   </div>
                 ) : (
-                  <div className="pt-3 mt-2 border-t border-slate-100">
+                  <div className="pt-3 mt-2 border-t border-slate-100 flex flex-col sm:flex-row gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => setTimelineRequest(req)}
-                      className="w-full min-h-[40px] h-10 border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 text-xs font-semibold rounded-xl gap-2 cursor-pointer transition-colors shadow-2xs"
+                      className="w-full sm:w-1/2 min-h-[40px] h-10 border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 text-xs font-semibold rounded-xl gap-1.5 cursor-pointer transition-colors shadow-2xs"
                     >
-                      <History className="h-4 w-4 text-emerald-600" />
-                      <span>View Negotiation Timeline & Versions</span>
+                      <History className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>Timeline & Versions</span>
                     </Button>
+                    <Link
+                      href={`/seller/deals/${req.id}/confirm`}
+                      className="w-full sm:w-1/2 min-h-[40px] h-10 border border-emerald-200 text-[#047857] bg-emerald-50 hover:bg-emerald-100/90 text-xs font-bold rounded-xl gap-1.5 flex items-center justify-center transition-colors shadow-2xs"
+                    >
+                      <FileCheck2 className="h-4 w-4 text-[#047857] shrink-0" />
+                      <span>Review Terms Snapshot</span>
+                    </Link>
                   </div>
                 )}
               </div>
