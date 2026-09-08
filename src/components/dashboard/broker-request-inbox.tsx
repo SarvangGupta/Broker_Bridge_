@@ -71,6 +71,25 @@ interface BrokerRequestInboxProps {
   initialRequests: SellerBrokerRequestItem[];
 }
 
+export const ACCEPTED_PROPOSAL_STATES = [
+  "Seller Confirmed",
+  "Buyer Confirmed",
+  "Broker Finalized",
+  "Booked",
+  "Confirmed",
+  "Dispatch Pending",
+  "Seller Accepted",
+  "Accepted",
+];
+
+export const PENDING_PROPOSAL_STATES = [
+  "Open",
+  "Proposed",
+  "Countered",
+  "Pending",
+  "Sent",
+];
+
 const QUICK_REJECTION_REASONS = [
   "Price is below minimum profitable margin",
   "Insufficient available inventory for requested quantity",
@@ -105,7 +124,7 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
       const target = requests.find((r) => r.id === deepLinkedRequestId);
       if (target) {
         // Adjust active tab to ensure the target card is rendered
-        if (target.status === "Seller Accepted" || target.status === "Accepted") {
+        if (ACCEPTED_PROPOSAL_STATES.includes(target.status)) {
           setActiveTab("accepted");
         } else if (target.status === "Seller Countered" || target.status === "Countered") {
           setActiveTab("countered");
@@ -118,14 +137,12 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
         }
 
         // Smooth scroll to card
-        const timer = setTimeout(() => {
+        setTimeout(() => {
           const el = document.getElementById(`request-card-${deepLinkedRequestId}`);
           if (el) {
             el.scrollIntoView({ behavior: "smooth", block: "center" });
           }
-        }, 250);
-
-        return () => clearTimeout(timer);
+        }, 150);
       }
     }
   }, [deepLinkedRequestId, requests]);
@@ -142,10 +159,10 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
   // Filter requests based on tab
   const filteredRequests = requests.filter((item) => {
     if (activeTab === "pending") {
-      return item.status === "Pending" || item.status === "Sent";
+      return PENDING_PROPOSAL_STATES.includes(item.status);
     }
     if (activeTab === "accepted") {
-      return item.status === "Seller Accepted" || item.status === "Accepted";
+      return ACCEPTED_PROPOSAL_STATES.includes(item.status);
     }
     if (activeTab === "countered") {
       return item.status === "Seller Countered" || item.status === "Countered";
@@ -462,10 +479,10 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
             All Requests ({requests.length})
           </TabsTrigger>
           <TabsTrigger value="pending" className="rounded-lg py-2 px-3.5 text-xs sm:text-sm font-semibold cursor-pointer">
-            Pending Action ({requests.filter(r => r.status === 'Pending' || r.status === 'Sent').length})
+            Pending Action ({requests.filter(r => PENDING_PROPOSAL_STATES.includes(r.status)).length})
           </TabsTrigger>
           <TabsTrigger value="accepted" className="rounded-lg py-2 px-3.5 text-xs sm:text-sm font-semibold cursor-pointer">
-            Accepted ({requests.filter(r => r.status === 'Seller Accepted' || r.status === 'Accepted').length})
+            Accepted ({requests.filter(r => ACCEPTED_PROPOSAL_STATES.includes(r.status)).length})
           </TabsTrigger>
           <TabsTrigger value="countered" className="rounded-lg py-2 px-3.5 text-xs sm:text-sm font-semibold cursor-pointer">
             Countered ({requests.filter(r => r.status === 'Seller Countered' || r.status === 'Countered').length})
@@ -501,8 +518,8 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {filteredRequests.map((req) => {
-            const isPending = req.status === "Pending" || req.status === "Sent";
-            const isAccepted = req.status === "Seller Accepted" || req.status === "Accepted";
+            const isPending = PENDING_PROPOSAL_STATES.includes(req.status);
+            const isAccepted = ACCEPTED_PROPOSAL_STATES.includes(req.status);
             const isCountered = req.status === "Seller Countered" || req.status === "Countered";
             const isRejected = req.status === "Seller Rejected" || req.status === "Rejected";
             const isExpired = req.status === "Expired";

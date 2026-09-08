@@ -101,4 +101,59 @@ This document tracks UI/UX anomalies, architectural logic bugs, and their eventu
   2. Preserved deep-link query parameters (`?requestId=...`) and active tab states across navigation boundaries.
   3. Ensured breadcrumbs and header back buttons dynamically honor the referrer context, eliminating routing loops between the Dashboard, Requests Inbox, and Confirmation views.
 
+---
+
+## Sprint 19 - Dispatch, Documents & Settlement Bug Resolutions
+
+### 1. PostgreSQL UUID vs. Booking Reference Polymorphic Lookup Bug (Sprint 19.1/19.5)
+- **Issue:** Navigating to `/seller/dispatch/[bookingId]` or querying dispatch/booking details using human-readable booking references (e.g. `BKG-2026-XHNG`) threw `PostgresError: invalid input syntax for type uuid: "BKG-2026-XHNG"`.
+- **Root Cause:** Drizzle queries directly executed `eq(bookings.id, rawBookingId)` on strings without validating whether the input string was a standard UUID or a formatted reference code (`"BKG-2026-XXXX"`).
+- **Resolution:**
+  1. Implemented polymorphic lookup utilities using `isUuid` regex (`/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`).
+  2. Queries first check `bookings.bookingReference = rawBookingId.toUpperCase()`, falling back to `bookings.id` or `bookings.dealId` lookups only if the input matches UUID formatting.
+
+---
+
+### 2. "Zombie" Dispatch Button on Fully Dispatched Bookings (Sprint 19.1/19.2)
+- **Issue:** When a booking was 100% fulfilled (`remaining_quantity <= 0`), the "Initiate Dispatch" button remained clickable on the Booked Orders table, permitting sellers to attempt dispatching zero or negative quantities.
+- **Root Cause:** UI action render conditions evaluated parent deal status rather than dynamic `remainingQuantity <= 0` balance.
+- **Resolution:**
+  1. Gated `<BookedOrdersTable />` to render a neutral "View Shipments & Documents" action when `remainingQuantity <= 0 || isFullyDispatched || bookingStatus === 'Fully Dispatched'`.
+  2. Added an authoritative green completion banner on `/seller/dispatch/[bookingId]` ("This Booking Has Been Fully Dispatched") and hid the dispatch submission form once 100% fulfilled.
+
+---
+
+### 3. `ALLOWED_DOCUMENT_TYPES.map is not a function` Runtime Crash (Sprint 19.3)
+- **Issue:** Mounting the `<FulfillmentDocumentUpload />` component triggered an unhandled React TypeError: `ALLOWED_DOCUMENT_TYPES.map is not a function`.
+- **Root Cause:** `ALLOWED_DOCUMENT_TYPES` had been exported as an object mapping (`{ LR: '...', INVOICE: '...' }`) rather than an iterable array in `src/types/dispatch-schema.ts`.
+- **Resolution:** Standardized `ALLOWED_DOCUMENT_TYPES` as a typed array `["LR", "Invoice", "E-Way Bill", "Weighment Slip", "Loading Photo"]` with defensive array fallbacks.
+
+---
+
+### 4. Supabase Storage RLS Violation on Document Upload (Sprint 19.3/19.5)
+- **Issue:** Uploading a PDF or image of a Lorry Receipt (LR) or Weighbridge Slip failed with `Fulfillment document upload failed after 3 attempts: new row violates row-level security policy`.
+- **Root Cause:** The browser-side `createClient()` Supabase client attempted direct uploads to the `brokerbridge_documents` storage bucket. However, auth tokens are stored in `httpOnly` secure cookies by `@supabase/ssr` to prevent XSS theft, so browser requests lacked ambient JWT auth headers, violating PostgreSQL RLS policies for `authenticated` users.
+- **Resolution:**
+  1. Created `uploadFulfillmentDocumentAction` as a Next.js Server Action (`'use server'`) in `src/server/actions/document-actions.ts`.
+  2. The action authenticates the seller session server-side via `verifySellerSession()`, parses the file buffer, streams it to Supabase Storage via the server client with active session credentials, and inserts the document metadata into `dispatch_documents` atomically.
+
+---
+
+### 5. Disjointed Dispatch-to-Document Workflow (Sprint 19.2/19.3 UX)
+- **Issue:** After creating a dispatch record via `<SellerDispatchForm>`, the modal immediately closed, requiring the seller to manually locate the order in a nested table to attach Lorry Receipts (LR/Bilty).
+- **Root Cause:** `<SellerDispatchForm>` lacked a post-submission step state.
+- **Resolution:**
+  1. Added `createdDispatchId` local state in `seller-dispatch-form.tsx`.
+  2. Upon successful creation, the form dynamically transitions in-place to the "Upload Fulfillment Documents" step with vehicle registration highlights, allowing immediate LR/Invoice upload or 1-click "Skip & Upload Later".
+
+---
+
+### 6. Multi-Shipment Quantity Ambiguity in Partial Fulfillment Views (Sprint 19.2/19.5)
+- **Issue:** When a booking was fulfilled across multiple partial shipments (e.g. 50 MT total split into Truck 1: 36 MT and Truck 2: 14 MT), the page rendered duplicate telemetry cards and two identical upload vaults without indicating which truck/quantity each vault was for.
+- **Root Cause:** `getDispatchTrackingAction` defaulted each shipment card to `totalBookedQuantity` (50 MT) without querying the `negotiation_events` ledger for specific truck payloads.
+- **Resolution:**
+  1. Enhanced `getDispatchTrackingAction` to pull `DISPATCH_SUBMITTED` events from `negotiation_events`, computing `shipmentNumber`, `totalShipments`, `isPartial`, and exact `dispatchQuantity`.
+  2. Upgraded `<LogisticsTracker />` and the dispatch page to display "Shipment X of Y (36 MT Partial Load vs 14 MT Final Load)" badges and truck-scoped document upload vaults.
+
+
 

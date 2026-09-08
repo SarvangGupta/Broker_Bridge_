@@ -14,6 +14,8 @@ import {
   Loader2,
   Sparkles,
   ArrowRight,
+  Truck,
+  Lock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,7 @@ import {
   finalizeDealAction,
   devResetDealVersionStatusAction,
 } from "@/src/server/actions/finalization-actions";
+import { createIdempotentBookingAction } from "@/src/server/actions/booking-actions";
 import { SnapshotDetailsWithDiff } from "@/src/components/dashboard/visual-diff-snapshot";
 
 interface DevFinalizationGateTesterProps {
@@ -41,7 +44,7 @@ export function DevFinalizationGateTester({
   const isSellerConfirmed = record.status === "Seller Confirmed";
   const isFinalized = record.status === "Broker Finalized";
 
-  // Handle Simulate Broker Finalization
+  // Handle Simulate Broker Finalization (Sprint 18.4)
   const handleSimulateFinalize = () => {
     startTransition(async () => {
       try {
@@ -63,6 +66,32 @@ export function DevFinalizationGateTester({
       } catch (err: any) {
         toast.error("Broker Finalization Gate Blocked 🛑", {
           description: err.message || "Pre-flight validation failed.",
+        });
+      }
+    });
+  };
+
+  // Handle Simulate System Booking (Sprint 18.5)
+  const handleSimulateSystemBooking = () => {
+    startTransition(async () => {
+      try {
+        const res = await createIdempotentBookingAction(record.requestId);
+
+        if (res.success && res.bookingId) {
+          toast.success("System Booking Created! 🚀", {
+            description: `Unique Booking ID ${res.bookingId} issued and locked. Deal is now ready for dispatch!`,
+          });
+          queryClient.invalidateQueries({ queryKey: ["seller-broker-requests"] });
+          queryClient.invalidateQueries({ queryKey: ["in-app-notifications"] });
+          router.refresh();
+        } else {
+          toast.error("Booking Creation Failed 🛑", {
+            description: res.error || "Failed to create booking.",
+          });
+        }
+      } catch (err: any) {
+        toast.error("Booking Creation Failed 🛑", {
+          description: err.message || "Failed to create booking.",
         });
       }
     });
@@ -98,13 +127,13 @@ export function DevFinalizationGateTester({
             </div>
             <div>
               <CardTitle className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                <span>Broker Finalization Gate Simulator</span>
+                <span>Broker Finalization & Booking Simulator</span>
                 <Badge variant="outline" className="bg-white border-indigo-200 text-indigo-700 font-bold text-[10px]">
-                  Sprint 18.4 QA
+                  Dev Mode
                 </Badge>
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Test dual-confirmation system gates (Seller Confirmation ≠ Booking; Broker Finalization → System Booking)
+                Test dual-confirmation system gates (Seller Confirmation ≠ Booking; Broker Finalization → System Booking ID)
               </CardDescription>
             </div>
           </div>
@@ -174,12 +203,12 @@ export function DevFinalizationGateTester({
 
         {/* Action Controls */}
         <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
-          {/* Simulate Broker Finalize Button */}
+          {/* Simulate Broker Finalize Button (Sprint 18.4) */}
           <Button
             type="button"
             onClick={handleSimulateFinalize}
             disabled={isPending || isFinalized}
-            className="w-full sm:flex-1 min-h-[44px] h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer shadow-xs gap-2"
+            className="w-full sm:flex-1 min-h-[48px] h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer shadow-xs gap-2"
           >
             {isPending ? (
               <>
@@ -191,7 +220,7 @@ export function DevFinalizationGateTester({
                 <Award className="w-4 h-4" />
                 <span>
                   {isFinalized
-                    ? "Deal Already Broker Finalized"
+                    ? "Broker Finalization Passed"
                     : isSellerConfirmed
                     ? "Simulate Broker Finalization (Expect SUCCESS)"
                     : "Simulate Broker Finalization (Expect GATE BLOCK)"}
@@ -207,10 +236,10 @@ export function DevFinalizationGateTester({
               variant="outline"
               onClick={() => handleReset("Proposed")}
               disabled={isPending}
-              className="flex-1 sm:flex-none border-slate-300 text-slate-700 text-xs font-semibold rounded-xl min-h-[44px] h-11 px-3 gap-1.5"
+              className="flex-1 sm:flex-none border-slate-300 text-slate-700 text-xs font-semibold rounded-xl min-h-[48px] h-12 px-3.5 gap-1.5"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset to 'Proposed'</span>
+              <span>Reset 'Proposed'</span>
             </Button>
 
             <Button
@@ -218,13 +247,48 @@ export function DevFinalizationGateTester({
               variant="outline"
               onClick={() => handleReset("Seller Confirmed")}
               disabled={isPending}
-              className="flex-1 sm:flex-none border-emerald-300 text-[#047857] bg-emerald-50/50 hover:bg-emerald-50 text-xs font-semibold rounded-xl min-h-[44px] h-11 px-3 gap-1.5"
+              className="flex-1 sm:flex-none border-emerald-300 text-[#047857] bg-emerald-50/50 hover:bg-emerald-50 text-xs font-semibold rounded-xl min-h-[48px] h-12 px-3.5 gap-1.5"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Set 'Confirmed'</span>
             </Button>
           </div>
         </div>
+
+        {/* SIMULATE SYSTEM BOOKING BUTTON (Sprint 18.5) */}
+        {isFinalized && (
+          <div className="pt-3 border-t border-indigo-200/80 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Next Gate: System Booking Creation (Sprint 18.5)</span>
+              </span>
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] font-bold">
+                Ready to Lock & Book
+              </Badge>
+            </div>
+
+            <Button
+              type="button"
+              onClick={handleSimulateSystemBooking}
+              disabled={isPending}
+              className="w-full min-h-[48px] h-12 bg-[#059669] hover:bg-[#047857] text-white font-black text-xs sm:text-sm rounded-xl cursor-pointer shadow-md gap-2 transition-all hover:scale-[1.005] active:scale-[0.995]"
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Issuing Unique Booking ID (Sprint 18.5)...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-emerald-200" />
+                  <span>Simulate System Booking (Sprint 18.5)</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

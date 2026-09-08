@@ -200,13 +200,23 @@ export function SellerDealDetailView({
 
             {/* ACTION BUTTON (SPRINT 19 UNLOCKED) */}
             <div className="flex flex-col sm:flex-row md:flex-col gap-3 min-w-[220px]">
-              <Button
-                onClick={() => setIsDispatchModalOpen(true)}
-                className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-2xl flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-950/40 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Truck className="w-5 h-5 text-slate-950" />
-                <span>Proceed to Dispatch</span>
-              </Button>
+              {booking.status === "Fully Dispatched" ? (
+                <Link
+                  href={`/seller/dispatch/${booking.bookingReference}`}
+                  className="w-full h-12 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl flex items-center justify-center gap-2.5 shadow-md cursor-pointer transition-all"
+                >
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  <span>View Shipments & Documents</span>
+                </Link>
+              ) : (
+                <Link
+                  href={`/seller/dispatch/${booking.bookingReference}`}
+                  className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-2xl flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-950/40 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Truck className="w-5 h-5 text-slate-950" />
+                  <span>Proceed to Dispatch</span>
+                </Link>
+              )}
 
               <Link
                 href={`/seller/deals/${deal.id || quotation?.id}/confirm`}
@@ -420,6 +430,11 @@ export function SellerDealDetailView({
             </DialogHeader>
             <SellerDispatchForm
               dealId={deal.id}
+              bookingId={booking?.id}
+              bookingReference={booking?.bookingReference}
+              bookedQuantity={Number(deal.agreedQuantity || latestVersion?.snapshotPayload?.quantity || 0)}
+              remainingQuantity={Number(deal.agreedQuantity || latestVersion?.snapshotPayload?.quantity || 0)}
+              unitSymbol={latestVersion?.snapshotPayload?.unitSymbol || ""}
               vehicleTypes={vehicleTypes}
               onSuccess={() => {
                 setIsDispatchModalOpen(false);

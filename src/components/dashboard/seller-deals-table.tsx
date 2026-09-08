@@ -216,25 +216,35 @@ export function SellerDealsTable({
       </div>
 
       {/* DISPATCH MODAL */}
-      {openDialogForDeal && (
-        <Dialog open={!!openDialogForDeal} onOpenChange={(open) => !open && setOpenDialogForDeal(null)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-slate-900">
-                Dispatch Order (Deal #{openDialogForDeal.substring(0, 8).toUpperCase()})
-              </DialogTitle>
-              <DialogDescription>
-                Assign vehicle, driver, and attach invoice/logistics document.
-              </DialogDescription>
-            </DialogHeader>
-            <SellerDispatchForm 
-              dealId={openDialogForDeal} 
-              vehicleTypes={vehicleTypes} 
-              onSuccess={() => setOpenDialogForDeal(null)} 
-            />
-          </DialogContent>
-        </Dialog>
-      )}
+      {openDialogForDeal && (() => {
+        const selectedDealRow = deals.find((d) => d.deal.id === openDialogForDeal);
+        const bookedQty = Number(selectedDealRow?.deal.agreedQuantity || 0);
+        const unitSym = selectedDealRow?.unit?.symbol || selectedDealRow?.requirement?.unit || "";
+
+        return (
+          <Dialog open={!!openDialogForDeal} onOpenChange={(open) => !open && setOpenDialogForDeal(null)}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 sm:p-8">
+              <DialogHeader className="pb-4">
+                <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-emerald-600" />
+                  <span>Dispatch Order (Deal #{openDialogForDeal.substring(0, 8).toUpperCase()})</span>
+                </DialogTitle>
+                <DialogDescription>
+                  Assign vehicle, driver, and specify shipment dispatch volume.
+                </DialogDescription>
+              </DialogHeader>
+              <SellerDispatchForm
+                dealId={openDialogForDeal}
+                vehicleTypes={vehicleTypes}
+                bookedQuantity={bookedQty}
+                remainingQuantity={bookedQty}
+                unitSymbol={unitSym}
+                onSuccess={() => setOpenDialogForDeal(null)}
+              />
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       {/* DISPUTE MODAL */}
       {activeDisputeDealId && (

@@ -11,11 +11,15 @@ import {
   negotiationEvents,
   users,
   requirements,
+  dispatches,
+  masterVehicleTypes,
 } from "@/src/server/db/schema";
-import { eq, or, and, sql, desc } from "drizzle-orm";
+import { eq, or, and, sql, desc, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logDecisionGateAuditEventAction } from "@/src/server/actions/audit-actions";
 import { queueNotificationAction } from "@/src/server/actions/notification-actions";
+import { verifySellerSession } from "@/src/server/utils/seller-auth";
+import { DealVersionSnapshot } from "@/src/types/deal-version-schema";
 
 export type BookingActionResult<T = any> = {
   success: boolean;
@@ -438,3 +442,473 @@ export async function getBookingByDealIdAction(
     };
   }
 }
+
+export interface BookedOrderSummary {
+  id: string; // Booking UUID
+  bookingReference: string; // 'BKG-2026-XXXX'
+  dealId: string;
+  quotationId?: string;
+  lockedVersionId: string;
+  versionNumber: number;
+  commodityName: string;
+  gradeName: string;
+  lotNumber: string;
+  bookedQuantity: number;
+  alreadyDispatchedQuantity: number;
+  remainingQuantity: number;
+  unitSymbol: string;
+  lockedRate: number;
+  totalValuation: number;
+  deliveryLocation: string;
+  deliveryState?: string;
+  deliveryDistrict?: string;
+  deliveryTerms: string;
+  expectedDeliveryDate?: string | null;
+  paymentTerms: string;
+  dealStatus: string;
+  bookingStatus: string;
+  bookingCreatedAt: string;
+  dispatchesCount: number;
+  hasDispatched: boolean;
+  isFullyDispatched: boolean;
+}
+
+/**
+ * Server Action: Fetches all booked orders for the authenticated Seller (Micro-Sprint 19.1).
+ *
+ * STRICT PRIVACY & ISOLATION RULES:
+ * 1. Enforces tenant isolation: Returns only bookings owned by the authenticated seller's company.
+ * 2. Zero Buyer PII: Strips all buyer personal/contact data at the query boundary.
+ * 3. Read-Only Snapshot: Reads from immutable locked version snapshots.
+ */
+export async function getSellerBookedOrdersAction(): Promise<{
+  success: boolean;
+  data?: BookedOrderSummary[];
+  error?: string;
+}> {
+  try {
+    const session = await verifySellerSession({ allowViewer: true });
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized: Valid seller session required." };
+    }
+
+    const sellerCompanyId = session.data.companyId;
+    const isPlatformAdmin =
+      session.data.user.role === "admin" ||
+      session.data.user.role === "ADMIN";
+
+    // 1. Fetch all bookings
+    const allBookings = await db
+      .select({
+        id: bookings.id,
+        bookingReference: bookings.bookingReference,
+        dealId: bookings.dealId,
+        lockedVersionId: bookings.lockedVersionId,
+        status: bookings.status,
+        createdAt: bookings.createdAt,
+      })
+      .from(bookings)
+      .orderBy(desc(bookings.createdAt));
+
+    if (!allBookings.length) {
+      return { success: true, data: [] };
+    }
+
+    // 2. Fetch associated deals, quotations, versions, and lots
+    const bookedOrders: BookedOrderSummary[] = [];
+
+    for (const b of allBookings) {
+      // Find deal record
+      let dealRecord = await db.query.deals.findFirst({
+        where: or(eq(deals.id, b.dealId), eq(deals.quotationId, b.dealId)),
+      });
+
+      // Find quotation
+      const quotationId = dealRecord ? dealRecord.quotationId : b.dealId;
+      const quotationRecord = await db.query.quotations.findFirst({
+        where: eq(quotations.id, quotationId),
+      });
+
+      // Find availability/lot
+      const lotRecord = quotationRecord?.sellerAvailabilityId
+        ? await db.query.availabilities.findFirst({
+            where: eq(availabilities.id, quotationRecord.sellerAvailabilityId),
+          })
+        : null;
+
+      // Ownership Verification: Must match sellerCompanyId unless admin
+      const dealSellerId = dealRecord?.sellerId;
+      const lotCompanyId = lotRecord?.companyId;
+
+      const isOwnedBySeller =
+        isPlatformAdmin ||
+        dealSellerId === sellerCompanyId ||
+        dealSellerId === session.data.user.id ||
+        lotCompanyId === sellerCompanyId;
+
+      if (!isOwnedBySeller) {
+        continue;
+      }
+
+      // Fetch locked version snapshot
+      let versionRecord = await db.query.dealVersions.findFirst({
+        where: eq(dealVersions.id, b.lockedVersionId),
+      });
+
+      if (!versionRecord && quotationId) {
+        versionRecord = await db.query.dealVersions.findFirst({
+          where: eq(dealVersions.requestId, quotationId),
+          orderBy: desc(dealVersions.versionNumber),
+        });
+      }
+
+      const snap = (versionRecord?.snapshotPayload || {}) as DealVersionSnapshot;
+
+      // Fetch dispatches and negotiation dispatch events for partial fulfillment tracking
+      const dealIdToQuery = dealRecord ? dealRecord.id : b.dealId;
+      const [existingDispatches, dispatchEvents] = await Promise.all([
+        db.query.dispatches.findMany({
+          where: eq(dispatches.dealId, dealIdToQuery),
+        }),
+        quotationId
+          ? db
+              .select()
+              .from(negotiationEvents)
+              .where(
+                and(
+                  eq(negotiationEvents.requestId, quotationId),
+                  eq(negotiationEvents.actionType, "DISPATCH_SUBMITTED")
+                )
+              )
+          : [],
+      ]);
+
+      const bookedQty = Number(dealRecord?.agreedQuantity || snap.quantity || 0);
+      const lockedRate = Number(dealRecord?.agreedPrice || snap.rate || 0);
+      const totalVal = bookedQty * lockedRate;
+
+      const alreadyDispatched = dispatchEvents.reduce(
+        (sum, ev) => sum + Number((ev.payload as any)?.dispatchQuantity || 0),
+        0
+      );
+      const remainingQty = Math.max(0, Number((bookedQty - alreadyDispatched).toFixed(4)));
+
+      const destParts = [snap.deliveryLocation, snap.deliveryDistrict, snap.deliveryState].filter(Boolean);
+      const destString = destParts.length > 0 ? destParts.join(", ") : "Ex-Warehouse";
+
+      const orderSummary: BookedOrderSummary = {
+        id: b.id,
+        bookingReference: b.bookingReference,
+        dealId: dealRecord ? dealRecord.id : b.dealId,
+        quotationId: quotationRecord?.id,
+        lockedVersionId: b.lockedVersionId,
+        versionNumber: versionRecord?.versionNumber || 1,
+        commodityName: snap.commodityName || "Agricultural Commodity",
+        gradeName: snap.gradeName || "Standard Grade",
+        lotNumber: snap.lotNumber || lotRecord?.lotNumber || "N/A",
+        bookedQuantity: bookedQty,
+        alreadyDispatchedQuantity: alreadyDispatched,
+        remainingQuantity: remainingQty,
+        unitSymbol: snap.unitSymbol || "MT",
+        lockedRate: lockedRate,
+        totalValuation: totalVal,
+        deliveryLocation: destString,
+        deliveryState: snap.deliveryState || undefined,
+        deliveryDistrict: snap.deliveryDistrict || undefined,
+        deliveryTerms: snap.deliveryTerms || "Ex-Warehouse",
+        expectedDeliveryDate: snap.deliveryDate || null,
+        paymentTerms: snap.paymentTerms || "Broker Escrow Settlement",
+        dealStatus: dealRecord?.status || "Dispatch Pending",
+        bookingStatus: b.status || "Confirmed",
+        bookingCreatedAt: b.createdAt.toISOString(),
+        dispatchesCount: existingDispatches.length,
+        hasDispatched:
+          existingDispatches.length > 0 ||
+          alreadyDispatched > 0 ||
+          dealRecord?.status === "In Transit" ||
+          dealRecord?.status === "Dispatched" ||
+          dealRecord?.status === "Partially Dispatched",
+        isFullyDispatched: remainingQty === 0 && bookedQty > 0,
+      };
+
+      bookedOrders.push(orderSummary);
+    }
+
+    return {
+      success: true,
+      data: bookedOrders,
+    };
+  } catch (error: any) {
+    console.error("Get seller booked orders error:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to load booked orders.",
+    };
+  }
+}
+
+export interface BookingForDispatchDetails {
+  booking: {
+    id: string;
+    bookingReference: string;
+    status: string;
+    createdAt: string;
+    lockedVersionId: string;
+  };
+  deal: {
+    id: string;
+    requirementId?: string;
+    quotationId?: string;
+    agreedQuantity: number;
+    agreedPrice: number | string;
+    status: string;
+    createdAt: string;
+    expectedDeliveryDate?: string | null;
+  };
+  quotation: {
+    id: string;
+    status: string;
+  } | null;
+  lockedVersion: {
+    id: string;
+    versionNumber: number;
+    status: string;
+    snapshotPayload: DealVersionSnapshot;
+    createdAt: string;
+  };
+  commercials: {
+    commodityName: string;
+    gradeName: string;
+    lotNumber: string;
+    bookedQuantity: number;
+    alreadyDispatchedQuantity: number;
+    remainingQuantity: number;
+    unitSymbol: string;
+    lockedRate: number;
+    totalValuation: number;
+    deliveryLocation: string;
+    deliveryTerms: string;
+    expectedDeliveryDate: string | null;
+    paymentTerms: string;
+  };
+  vehicleTypes: Array<{ id: string; name: string }>;
+  existingDispatches: Array<any>;
+}
+
+/**
+ * Server Action: Fetches specific Booking details for the Gated Dispatch Entry point (Micro-Sprint 19.1).
+ *
+ * GATE ENFORCEMENT:
+ * 1. Checks if booking exists. If not, returns explicit error to block unbooked dispatches.
+ * 2. Verifies Seller tenant ownership.
+ * 3. Provides read-only locked commercial terms for pre-filling and boundary validation.
+ */
+export async function getBookingForDispatchAction(
+  bookingIdOrReference: string
+): Promise<{
+  success: boolean;
+  data?: BookingForDispatchDetails;
+  error?: string;
+}> {
+  try {
+    const session = await verifySellerSession({ allowViewer: true });
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized: Valid seller session required." };
+    }
+
+    if (!bookingIdOrReference) {
+      return { success: false, error: "Booking ID or Reference is required." };
+    }
+
+    const sellerCompanyId = session.data.companyId;
+    const isPlatformAdmin =
+      session.data.user.role === "admin" ||
+      session.data.user.role === "ADMIN";
+
+    // 1. Find Booking record (supports both human-readable booking_reference and UUID)
+    const rawInput = (bookingIdOrReference || "").trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawInput);
+
+    let bookingRecord = await db.query.bookings.findFirst({
+      where: eq(bookings.bookingReference, rawInput.toUpperCase()),
+    });
+
+    if (!bookingRecord && isUuid) {
+      bookingRecord = await db.query.bookings.findFirst({
+        where: or(
+          eq(bookings.id, rawInput),
+          eq(bookings.dealId, rawInput)
+        ),
+      });
+    }
+
+    if (!bookingRecord) {
+      return {
+        success: false,
+        error: "DISPATCH_GATE_REJECTED: Booking reference not found. Physical dispatches can only be initiated for booked transactions.",
+      };
+    }
+
+    // 2. Resolve Deal
+    let dealRecord = await db.query.deals.findFirst({
+      where: or(
+        eq(deals.id, bookingRecord.dealId),
+        eq(deals.quotationId, bookingRecord.dealId)
+      ),
+    });
+
+    // 3. Resolve Quotation
+    const targetQuotationId = dealRecord
+      ? dealRecord.quotationId
+      : bookingRecord.dealId;
+
+    const quotationRecord = await db.query.quotations.findFirst({
+      where: eq(quotations.id, targetQuotationId),
+    });
+
+    // 4. Resolve Availability Lot
+    const lotRecord = quotationRecord?.sellerAvailabilityId
+      ? await db.query.availabilities.findFirst({
+          where: eq(availabilities.id, quotationRecord.sellerAvailabilityId),
+        })
+      : null;
+
+    // 5. Tenant Authorization Check
+    const dealSellerId = dealRecord?.sellerId;
+    const lotCompanyId = lotRecord?.companyId;
+
+    const isAuthorized =
+      isPlatformAdmin ||
+      dealSellerId === sellerCompanyId ||
+      dealSellerId === session.data.user.id ||
+      lotCompanyId === sellerCompanyId;
+
+    if (!isAuthorized) {
+      return {
+        success: false,
+        error: "Unauthorized: You do not own the inventory or deal linked to this booking.",
+      };
+    }
+
+    // 6. Fetch Locked Deal Version Snapshot
+    let versionRecord = await db.query.dealVersions.findFirst({
+      where: eq(dealVersions.id, bookingRecord.lockedVersionId),
+    });
+
+    if (!versionRecord && targetQuotationId) {
+      versionRecord = await db.query.dealVersions.findFirst({
+        where: eq(dealVersions.requestId, targetQuotationId),
+        orderBy: desc(dealVersions.versionNumber),
+      });
+    }
+
+    if (!versionRecord) {
+      return {
+        success: false,
+        error: "Locked deal version snapshot not found for this booking.",
+      };
+    }
+
+    const snap = versionRecord.snapshotPayload as DealVersionSnapshot;
+
+    // 7. Fetch active Master Vehicle Types, Existing Dispatches & Negotiation Events
+    const [vehicleTypesList, existingDispatchesList, dispatchEventsList] = await Promise.all([
+      db
+        .select({
+          id: masterVehicleTypes.id,
+          name: masterVehicleTypes.name,
+        })
+        .from(masterVehicleTypes)
+        .where(eq(masterVehicleTypes.status, true)),
+      dealRecord
+        ? db.query.dispatches.findMany({
+            where: eq(dispatches.dealId, dealRecord.id),
+          })
+        : [],
+      targetQuotationId
+        ? db
+            .select()
+            .from(negotiationEvents)
+            .where(
+              and(
+                eq(negotiationEvents.requestId, targetQuotationId),
+                eq(negotiationEvents.actionType, "DISPATCH_SUBMITTED")
+              )
+            )
+        : [],
+    ]);
+
+    const bookedQty = Number(dealRecord?.agreedQuantity || snap.quantity || 0);
+    const lockedRate = Number(dealRecord?.agreedPrice || snap.rate || 0);
+    const totalVal = bookedQty * lockedRate;
+
+    const alreadyDispatched = dispatchEventsList.reduce(
+      (sum, ev) => sum + Number((ev.payload as any)?.dispatchQuantity || 0),
+      0
+    );
+    const remainingQty = Math.max(0, Number((bookedQty - alreadyDispatched).toFixed(4)));
+
+    const destParts = [snap.deliveryLocation, snap.deliveryDistrict, snap.deliveryState].filter(Boolean);
+    const destString = destParts.length > 0 ? destParts.join(", ") : "Ex-Warehouse";
+
+    return {
+      success: true,
+      data: {
+        booking: {
+          id: bookingRecord.id,
+          bookingReference: bookingRecord.bookingReference,
+          status: bookingRecord.status,
+          createdAt: bookingRecord.createdAt.toISOString(),
+          lockedVersionId: bookingRecord.lockedVersionId,
+        },
+        deal: {
+          id: dealRecord ? dealRecord.id : bookingRecord.dealId,
+          requirementId: dealRecord?.requirementId || quotationRecord?.requirementId,
+          quotationId: targetQuotationId,
+          agreedQuantity: bookedQty,
+          agreedPrice: lockedRate,
+          status: dealRecord?.status || "Dispatch Pending",
+          createdAt: dealRecord?.createdAt?.toISOString() || bookingRecord.createdAt.toISOString(),
+          expectedDeliveryDate: snap.deliveryDate || null,
+        },
+        quotation: quotationRecord
+          ? {
+              id: quotationRecord.id,
+              status: quotationRecord.status,
+            }
+          : null,
+        lockedVersion: {
+          id: versionRecord.id,
+          versionNumber: versionRecord.versionNumber,
+          status: versionRecord.status,
+          snapshotPayload: snap,
+          createdAt: versionRecord.createdAt.toISOString(),
+        },
+        commercials: {
+          commodityName: snap.commodityName || "Agricultural Commodity",
+          gradeName: snap.gradeName || "Standard Grade",
+          lotNumber: snap.lotNumber || lotRecord?.lotNumber || "N/A",
+          bookedQuantity: bookedQty,
+          alreadyDispatchedQuantity: alreadyDispatched,
+          remainingQuantity: remainingQty,
+          unitSymbol: snap.unitSymbol || "MT",
+          lockedRate: lockedRate,
+          totalValuation: totalVal,
+          deliveryLocation: destString,
+          deliveryTerms: snap.deliveryTerms || "Ex-Warehouse",
+          expectedDeliveryDate: snap.deliveryDate || null,
+          paymentTerms: snap.paymentTerms || "Broker Escrow Settlement",
+        },
+        vehicleTypes: vehicleTypesList,
+        existingDispatches: existingDispatchesList,
+      },
+    };
+  } catch (error: any) {
+    console.error("Get booking for dispatch error:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to load booking details for dispatch.",
+    };
+  }
+}
+

@@ -1,7 +1,19 @@
 'use client'
 
 import React from 'react'
-import { AlertCircle, Clock, Truck, ShieldAlert, ArrowRight, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import {
+  AlertCircle,
+  Clock,
+  Truck,
+  ShieldAlert,
+  ArrowRight,
+  CheckCircle2,
+  AlertTriangle,
+  Wallet,
+  Building2,
+  FileCheck2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ActionRequiredItem } from '@/src/server/actions/analytics-actions'
@@ -11,7 +23,12 @@ interface ActionRequiredBannerProps {
   onNavigateTab: (tabId: string) => void
 }
 
-export function ActionRequiredBanner({ actionItems, onNavigateTab }: ActionRequiredBannerProps) {
+export function ActionRequiredBanner({
+  actionItems,
+  onNavigateTab,
+}: ActionRequiredBannerProps) {
+  const router = useRouter()
+
   if (!actionItems || actionItems.length === 0) {
     return (
       <div className="w-full p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between gap-4">
@@ -24,11 +41,14 @@ export function ActionRequiredBanner({ actionItems, onNavigateTab }: ActionRequi
               All Tasks Cleared
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              No urgent actions pending. Inventory and dispatches are up to date.
+              No urgent actions pending. Inventory, dispatches, and settlements are up to date.
             </div>
           </div>
         </div>
-        <Badge variant="outline" className="hidden sm:inline-flex bg-emerald-50 text-[#047857] border-emerald-200 font-bold text-xs">
+        <Badge
+          variant="outline"
+          className="hidden sm:inline-flex bg-emerald-50 text-[#047857] border-emerald-200 font-bold text-xs"
+        >
           Operational Normal
         </Badge>
       </div>
@@ -37,14 +57,18 @@ export function ActionRequiredBanner({ actionItems, onNavigateTab }: ActionRequi
 
   const getAlertIcon = (type: ActionRequiredItem['type']) => {
     switch (type) {
-      case 'DISPATCH_DUE':
-        return <Truck className="w-5 h-5 text-amber-600 shrink-0 stroke-[2]" />
+      case 'PAYMENT_OVERDUE':
+        return <Wallet className="w-5 h-5 text-rose-600 shrink-0 stroke-[2]" />
       case 'DISPUTE_FILED':
         return <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 stroke-[2]" />
+      case 'DISPATCH_DELAYED':
+        return <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 stroke-[2]" />
+      case 'DISPATCH_DUE':
+        return <Truck className="w-5 h-5 text-amber-600 shrink-0 stroke-[2]" />
       case 'INVENTORY_EXPIRING':
         return <Clock className="w-5 h-5 text-amber-600 shrink-0 stroke-[2]" />
       case 'KYC_PENDING':
-        return <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 stroke-[2]" />
+        return <Building2 className="w-5 h-5 text-amber-600 shrink-0 stroke-[2]" />
       default:
         return <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 stroke-[2]" />
     }
@@ -71,6 +95,14 @@ export function ActionRequiredBanner({ actionItems, onNavigateTab }: ActionRequi
     return 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
   }
 
+  const handleActionClick = (item: ActionRequiredItem) => {
+    if (item.targetUrl) {
+      router.push(item.targetUrl)
+    } else {
+      onNavigateTab(item.targetTab)
+    }
+  }
+
   return (
     <section aria-label="Action Required Tasks" className="space-y-3">
       <div className="flex items-center justify-between px-1">
@@ -80,7 +112,9 @@ export function ActionRequiredBanner({ actionItems, onNavigateTab }: ActionRequi
             Priority Action Required ({actionItems.length})
           </h2>
         </div>
-        <span className="text-xs text-slate-400 font-medium">Time-Sensitive Operational Tasks</span>
+        <span className="text-xs text-slate-400 font-medium">
+          Time-Sensitive Operational Tasks
+        </span>
       </div>
 
       <div className="grid grid-cols-1 gap-3">
@@ -117,9 +151,9 @@ export function ActionRequiredBanner({ actionItems, onNavigateTab }: ActionRequi
             </div>
 
             <Button
-              onClick={() => onNavigateTab(item.targetTab)}
+              onClick={() => handleActionClick(item)}
               size="sm"
-              className={`w-full sm:w-auto shrink-0 font-semibold rounded-xl min-h-[40px] px-4 cursor-pointer gap-1.5 ${getButtonStyle(
+              className={`w-full sm:w-auto shrink-0 font-bold rounded-xl min-h-[48px] px-5 cursor-pointer gap-1.5 ${getButtonStyle(
                 item.severity
               )}`}
             >

@@ -114,6 +114,7 @@ export async function createInvoiceAction(data: InvoiceData) {
 /**
  * Generates a time-limited signed storage URL for transaction documents (Invoices, LRs, COAs).
  * Strictly requires request-time authorization: caller must be Seller, Buyer, assigned Broker, or Admin.
+ * Enforces strict path traversal defenses and deal-scoped storage key validation.
  */
 export async function getTransactionDocumentSignedUrlAction(dealId: string, filePath: string) {
   try {
@@ -122,6 +123,15 @@ export async function getTransactionDocumentSignedUrlAction(dealId: string, file
 
     if (authError || !user) {
       return { success: false, error: "Access denied to transaction documents." };
+    }
+
+    if (!dealId || !filePath || typeof filePath !== "string") {
+      return { success: false, error: "Deal ID and file path are required." };
+    }
+
+    // Path Traversal Defense: Reject directory traversal sequences
+    if (filePath.includes('..') || filePath.includes('\\') || filePath.includes('\0')) {
+      return { success: false, error: "Access denied to transaction documents: Invalid path format." };
     }
 
     const dbUser = await db.query.users.findFirst({

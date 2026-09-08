@@ -31,6 +31,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { SellerCommandCenterData } from '@/src/server/actions/analytics-actions'
 import { BrokerRequestInbox } from '@/src/components/dashboard/broker-request-inbox'
+import { BookedOrdersTable } from '@/src/components/dashboard/booked-orders-table'
+import { SettlementWorkspaceView } from '@/src/components/dashboard/settlement-workspace-view'
 
 interface SellerWorkspaceShellProps {
   profile: any
@@ -374,23 +376,37 @@ export function SellerWorkspaceShell({
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 5: ORDERS & DISPATCH                                                   */}
+        {/* TAB 5: ORDERS & DISPATCH (Sprint 19)                                      */}
         {/* ========================================================================= */}
         {activeTab === 'orders' && (
-          <div className="space-y-6 animate-in fade-in-50 duration-200">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                  Orders, Logistics & Dispatch
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Manage vehicle details, driver assignments, and live transit ETAs for booked deals.
-                </p>
+          <div className="space-y-8 animate-in fade-in-50 duration-200">
+            {/* Booked Orders & Dispatch Entry Gate */}
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12 bg-white rounded-2xl border border-slate-200">
+                <span className="text-xs text-slate-500 font-semibold">Loading Booked Orders...</span>
               </div>
-              <DataFreshness />
-            </div>
+            }>
+              <BookedOrdersTable />
+            </Suspense>
 
-            <SellerDealsTable deals={deals} vehicleTypes={vehicleTypes} />
+            {/* Historical Deals & Shipments View */}
+            <div className="space-y-4 pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+                    All Fulfilment & Deal Records
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Historical shipment executions, driver records, and live status tracking.
+                  </p>
+                </div>
+                <Badge variant="outline" className="bg-slate-100 text-slate-700 font-semibold text-xs">
+                  {deals.length} Total Deals
+                </Badge>
+              </div>
+
+              <SellerDealsTable deals={deals} vehicleTypes={vehicleTypes} />
+            </div>
           </div>
         )}
 
@@ -398,7 +414,7 @@ export function SellerWorkspaceShell({
         {/* TAB 6: PAYMENTS & SETTLEMENT                                               */}
         {/* ========================================================================= */}
         {activeTab === 'payments' && (
-          <div className="space-y-6 animate-in fade-in-50 duration-200">
+          <div className="space-y-8 animate-in fade-in-50 duration-200">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
@@ -411,47 +427,15 @@ export function SellerWorkspaceShell({
               <DataFreshness />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <KpiCard 
-                title="TOTAL SETTLEMENT" 
-                value={formatIndianCurrency(kpis.totalRevenue)}
-                icon={Wallet}
-                badgeColor="emerald"
-                description="Cumulative completed trade settlements"
-              />
-              <KpiCard 
-                title="IN TRANSIT VOLUME" 
-                value={deals.filter(d => d.deal.status === 'In Transit').length}
-                icon={Truck}
-                badgeColor="amber"
-                description="Deals currently moving on trucks"
-              />
-              <KpiCard 
-                title="DISPUTE EXCEPTIONS" 
-                value={deals.filter(d => d.deal.status === 'Disputed').length}
-                icon={AlertCircle}
-                badgeColor="amber"
-                description="Deals undergoing mediation"
-              />
-            </div>
-
-            <Card className="rounded-2xl border-slate-200 shadow-xs bg-white">
-              <CardHeader>
-                <CardTitle className="text-lg font-bold text-slate-900">Settlement Ledger</CardTitle>
-                <CardDescription className="text-sm text-slate-500">
-                  Transactions are settled following delivery confirmation and invoice reconciliation.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  <Wallet className="w-10 h-10 text-slate-400 mx-auto mb-2 stroke-[1.5]" />
-                  <h3 className="font-bold text-slate-800 text-sm">Settlement View Linked to Bookings</h3>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                    Direct payment records and invoice reconciliation breakdowns update as dispatches are confirmed.
-                  </p>
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center py-16 bg-white rounded-2xl border border-slate-200">
+                  <span className="text-xs text-slate-500 font-semibold">Loading Settlement Ledger...</span>
                 </div>
-              </CardContent>
-            </Card>
+              }
+            >
+              <SettlementWorkspaceView />
+            </Suspense>
           </div>
         )}
 

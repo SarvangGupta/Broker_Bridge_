@@ -427,5 +427,36 @@ The transition from commercial negotiation to operational fulfillment enforces s
   - **Network Replay & Idempotency Guarantee**:
     - Distributed network retries, browser refreshes, or concurrent double-clicks safely resolve to the existing `bookings` row without duplicate allocations, double-locking inventory, or generating redundant operational orders.
 
+### 26. Dispatch Entry Gate, Partial Fulfillment Math & Scoped Document Vault (Sprint 19)
+Fulfillment operations are strictly gated behind authoritative Bookings, maintaining mathematical balance integrity and isolation at the individual shipment level:
+- **Authoritative Booking Entry Gate**:
+  - The dispatch lifecycle cannot be initiated on open availabilities, negotiations, or unfinalized proposals (`getBookingForDispatchAction` in `booking-actions.ts`).
+  - Polymorphic lookup routines resolve bookings safely by both human-readable `booking_reference` (`BKG-YYYY-XXXX`) and PostgreSQL UUID without throwing type-casting syntax errors.
+  - Zombie dispatch actions are eliminated: when `remaining_quantity <= 0`, UI mutations are hidden and replaced with an authoritative completion state.
+- **Partial Fulfillment Math & Concurrency Engine (`dispatch-actions.ts`)**:
+  - Executes strictly inside `db.transaction()` to prevent race conditions during concurrent dispatches across multiple logistics terminals.
+  - Queries historical `DISPATCH_SUBMITTED` negotiation events to compute the exact `alreadyDispatchedQuantity` and `remainingQuantity`.
+  - Rejects over-dispatch attempts (`dispatch_quantity > remaining_quantity`) with `DISPATCH_QUANTITY_EXCEEDED`.
+  - Transitions booking states dynamically between `'Partially Dispatched'` and `'Fully Dispatched'`.
+- **Truck-Scoped Document Vault Separation of Concerns**:
+  - **Shipment-Level Scoping**: Unlike pre-deal lab evidence (scoped to `availability_id`), fulfillment documents (`dispatch_documents`) are explicitly foreign-keyed to a specific `dispatch_id` (truck/shipment level) rather than the generic global deal or booking. In multi-truck partial fulfillments (e.g., Truck 1 with 36 MT and Truck 2 with 14 MT), each transport vehicle maintains its own isolated document vault for Lorry Receipts (LR), Tax Invoices, e-Way Bills, Weighment Slips, and Loading Photos.
+  - **Server Action Upload Bridge (`uploadFulfillmentDocumentAction`)**:
+    - Direct browser client uploads to private Supabase Storage buckets fail when authentication cookies are set to `httpOnly`.
+    - Uploads are routed through a Next.js Server Action bridge (`'use server'`) in `document-actions.ts`, authenticating via `verifySellerSession()`, validating 5MB file limits and MIME types, and streaming buffers directly via the authenticated server-side Supabase client.
+  - **Short-Lived Signed URL Generation**: Document views utilize 15-minute expiring signed URLs (`getDispatchDocumentsAction`), ensuring fulfillment records cannot be permanently hotlinked or accessed by unauthorized tenants.
+
+### 27. Read-Only Server-Side Financial Settlement Ledger (Sprint 19)
+The Seller Financial Settlement module provides high-integrity visibility into gross values, commissions, payments, and receivables without client-side financial calculations:
+- **Server-Side Math Engine (`getSellerSettlementOverviewAction`)**:
+  - Gross sales values (`agreedQuantity * agreedPrice`), broker commissions (custom rule or default ₹25/MT), other charges, net receivables (`grossValue - brokerCommission - otherCharges`), and outstanding balances are calculated exclusively on the server.
+  - Reads confirmed payment records (`payments` table) and open disputes (`disputes` table) in a read-only manner.
+  - Enforces strict tenant isolation: Sellers can only query financial settlements for deals tied to their authenticated `companyId`.
+- **Hard Zero-Buyer PII Shield**:
+  - All Buyer banking details, PAN, GST, phone numbers, and corporate email addresses are scrubbed at the query boundary.
+  - Counterparty identities are presented under clean pseudonyms (e.g., `"Verified Buyer #B-XXXX"`).
+- **Proactive Operational Financial Alerts**:
+  - The settlement engine identifies overdue receivables (exceeding payment due dates) and active trade disputes, bubbling them up into P0 `<ActionRequiredBanner>` notifications on the Seller Command Center.
+
+
 
 

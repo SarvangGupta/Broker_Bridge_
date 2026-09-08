@@ -250,6 +250,18 @@ export const dispatches = pgTable('dispatches', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const dispatchDocuments = pgTable('dispatch_documents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  dispatchId: uuid('dispatch_id').references(() => dispatches.id, { onDelete: 'cascade' }).notNull(),
+  documentType: text('document_type').notNull(), // 'LR', 'Invoice', 'E-Way Bill', 'Weighment Slip', 'Loading Photo'
+  fileUrl: text('file_url').notNull(),
+  uploadedBy: uuid('uploaded_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('dispatch_documents_dispatch_idx').on(table.dispatchId),
+  index('dispatch_documents_type_idx').on(table.dispatchId, table.documentType),
+]);
+
 export const invoices = pgTable('invoices', {
   id: uuid('id').defaultRandom().primaryKey(),
   dealId: uuid('deal_id').references(() => deals.id).notNull(),

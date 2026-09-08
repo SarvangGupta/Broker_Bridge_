@@ -2,8 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { db } from "@/src/server/db"
-import { deals, requirements, availabilities, users, companies } from "@/src/server/db/schema"
+import { deals, requirements, availabilities, users, companies, dispatches, disputes, bookings } from "@/src/server/db/schema"
 import { eq, and, ne, notInArray, inArray, sql } from "drizzle-orm"
+import { getSellerSettlementOverviewAction } from "@/src/server/actions/settlement-actions"
 
 export type AdminKpis = {
   totalGmv: number
@@ -315,11 +316,20 @@ export async function getSellerKpisAction(): Promise<{ success: boolean; data?: 
 
 export type ActionRequiredItem = {
   id: string
-  type: 'DISPATCH_DUE' | 'DISPUTE_FILED' | 'INVENTORY_EXPIRING' | 'KYC_PENDING' | 'DEAL_CONFIRMATION' | 'BROKER_REQUEST'
+  type:
+    | 'DISPATCH_DUE'
+    | 'DISPATCH_DELAYED'
+    | 'DISPUTE_FILED'
+    | 'PAYMENT_OVERDUE'
+    | 'INVENTORY_EXPIRING'
+    | 'KYC_PENDING'
+    | 'DEAL_CONFIRMATION'
+    | 'BROKER_REQUEST'
   title: string
   description: string
   severity: 'critical' | 'warning' | 'info'
   targetTab: string
+  targetUrl?: string
   actionLabel: string
   entityId?: string
   badgeText?: string
@@ -397,7 +407,9 @@ export async function getSellerCommandCenterDataAction(): Promise<{
       disputedDealsRes,
       allDealsCountRes,
       revenueRes,
-      companyRes
+      companyRes,
+      delayedDispatchesRes,
+      settlementOverviewRes
     ] = await Promise.all([
       // 1. Active Availabilities
       db
@@ -472,6 +484,21 @@ export async function getSellerCommandCenterDataAction(): Promise<{
       db.query.companies.findFirst({
         where: eq(companies.id, companyId),
       }),
+
+      // 8. Delayed Dispatches
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(dispatches)
+        .innerJoin(deals, eq(dispatches.dealId, deals.id))
+        .where(
+          and(
+            eq(deals.sellerId, companyId),
+            eq(dispatches.status, 'Delayed')
+          )
+        ),
+
+      // 9. Settlement Overview
+      getSellerSettlementOverviewAction(),
     ])
 
     const activeAvailCount = Number(activeAvailsRes[0]?.count ?? 0)
@@ -480,6 +507,8 @@ export async function getSellerCommandCenterDataAction(): Promise<{
     const disputedCount = Number(disputedDealsRes[0]?.count ?? 0)
     const totalDealsCount = Number(allDealsCountRes[0]?.count ?? 0)
     const totalRevenue = Number(revenueRes[0]?.totalRevenue ?? 0)
+    const delayedDispatchCount = Number(delayedDispatchesRes[0]?.count ?? 0)
+    const settlementSummary = settlementOverviewRes?.success && settlementOverviewRes.data ? settlementOverviewRes.data.summary : null
 
     const isKycVerified = companyRes?.isVerified === true && companyRes?.status === true
     const isKycPending = companyRes ? companyRes.status === false : true
@@ -487,6 +516,53 @@ export async function getSellerCommandCenterDataAction(): Promise<{
     // Construct P0 Action Items
     const actionItems: ActionRequiredItem[] = []
 
+    // 1. Overdue Payments Alert (P0 Critical)
+    if (settlementSummary && settlementSummary.overdueCount > 0) {
+      actionItems.push({
+        id: 'payment-overdue-alert',
+        type: 'PAYMENT_OVERDUE',
+        title: `₹${settlementSummary.totalOverdue.toLocaleString('en-IN')} Overdue across ${settlementSummary.overdueCount} Payment${settlementSummary.overdueCount > 1 ? 's' : ''}`,
+        description: 'Past-due settlement invoices awaiting payment reconciliation or broker escalation.',
+        severity: 'critical',
+        targetTab: 'payments',
+        targetUrl: '/seller/payments',
+        actionLabel: 'View Overdue Ledger',
+        badgeText: 'Payment Overdue',
+      })
+    }
+
+    // 2. Active Disputes Alert (P0 Critical)
+    const totalDisputed = Math.max(disputedCount, settlementSummary?.disputedCount || 0)
+    if (totalDisputed > 0) {
+      actionItems.push({
+        id: 'dispute-active-alert',
+        type: 'DISPUTE_FILED',
+        title: `${totalDisputed} Deal Dispute${totalDisputed > 1 ? 's' : ''} Under Broker Mediation`,
+        description: 'Quality or delivery exceptions have been flagged for administrator mediation.',
+        severity: 'critical',
+        targetTab: 'payments',
+        targetUrl: '/seller/payments',
+        actionLabel: 'View Dispute Details',
+        badgeText: 'Urgent Mediation',
+      })
+    }
+
+    // 3. Delayed Dispatches Alert (P0 Warning/Action)
+    if (delayedDispatchCount > 0) {
+      actionItems.push({
+        id: 'dispatch-delayed-alert',
+        type: 'DISPATCH_DELAYED',
+        title: `${delayedDispatchCount} Transport Dispatch${delayedDispatchCount > 1 ? 'es' : ''} Reported Delayed`,
+        description: 'Transit checkpoint or carrier delays reported on live dispatches.',
+        severity: 'warning',
+        targetTab: 'orders',
+        targetUrl: '/seller/dispatch',
+        actionLabel: 'Track Shipments',
+        badgeText: 'Transit Delayed',
+      })
+    }
+
+    // 4. Pending Logistics Dispatches
     if (pendingDispatchCount > 0) {
       actionItems.push({
         id: 'dispatch-pending-alert',
@@ -495,24 +571,13 @@ export async function getSellerCommandCenterDataAction(): Promise<{
         description: 'Booked deals are confirmed and awaiting vehicle & driver details to initiate transport.',
         severity: 'critical',
         targetTab: 'orders',
+        targetUrl: '/seller/dispatch',
         actionLabel: 'Dispatch Shipment',
         badgeText: 'Action Required',
       })
     }
 
-    if (disputedCount > 0) {
-      actionItems.push({
-        id: 'dispute-active-alert',
-        type: 'DISPUTE_FILED',
-        title: `${disputedCount} Deal Dispute${disputedCount > 1 ? 's' : ''} Under Resolution`,
-        description: 'Quality or payment exceptions have been flagged for administrator mediation.',
-        severity: 'critical',
-        targetTab: 'deals',
-        actionLabel: 'View Dispute Details',
-        badgeText: 'Urgent Mediation',
-      })
-    }
-
+    // 5. Expiring Inventory
     if (expiringAvailCount > 0) {
       actionItems.push({
         id: 'inventory-expiring-alert',
@@ -526,6 +591,7 @@ export async function getSellerCommandCenterDataAction(): Promise<{
       })
     }
 
+    // 6. Pending KYC
     if (isKycPending) {
       actionItems.push({
         id: 'kyc-pending-alert',

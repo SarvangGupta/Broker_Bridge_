@@ -351,6 +351,7 @@ export async function uploadLabEvidenceAction(
 
 /**
  * Generates an authorized, time-limited signed URL for viewing or downloading private lab evidence.
+ * Strictly enforces lot tenant ownership and path traversal sanitization.
  */
 export async function getLabEvidenceSignedUrlAction(
   filePath: string
@@ -366,13 +367,19 @@ export async function getLabEvidenceSignedUrlAction(
       return { success: false, error: 'Unauthorized: Authentication required.' };
     }
 
-    if (!filePath) {
+    if (!filePath || typeof filePath !== 'string') {
       return { success: false, error: 'File path is required.' };
     }
 
+    // Path Traversal Guard: Reject directory traversal sequences
+    if (filePath.includes('..') || filePath.includes('\\') || filePath.includes('\0')) {
+      return { success: false, error: 'Invalid file path format: Directory traversal prohibited.' };
+    }
+
     // Extract availabilityId from path: {availability_id}/{filename}
-    const availabilityId = filePath.split('/')[0];
-    if (!availabilityId) {
+    const pathParts = filePath.split('/');
+    const availabilityId = pathParts[0];
+    if (!availabilityId || pathParts.length < 2) {
       return { success: false, error: 'Invalid evidence file path format.' };
     }
 
@@ -424,6 +431,7 @@ export async function getLabEvidenceSignedUrlAction(
 
 /**
  * Fetches structured lab test record for an availability lot with computed freshness.
+ * Strictly verifies tenant organization ownership or Broker/Admin role.
  */
 export async function getLabTestByAvailabilityAction(
   availabilityId: string
@@ -467,12 +475,31 @@ export async function getLabTestByAvailabilityAction(
       return { success: false, error: 'Availability ID is required.' };
     }
 
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+
+    if (!dbUser) {
+      return { success: false, error: 'User profile not found.' };
+    }
+
     const labTest = await db.query.labTests.findFirst({
       where: eq(labTests.availabilityId, availabilityId),
     });
 
     if (!labTest) {
       return { success: true, data: null };
+    }
+
+    // Tenant Ownership Check: Must be Admin, Broker, or Owner of the lot
+    const isOwner = dbUser.companyId && dbUser.companyId === labTest.companyId;
+    const isBrokerOrAdmin = dbUser.role === 'admin' || dbUser.role === 'broker';
+
+    if (!isOwner && !isBrokerOrAdmin) {
+      return {
+        success: false,
+        error: 'Unauthorized: You do not have permission to view this lab test record.',
+      };
     }
 
     const results = await db
