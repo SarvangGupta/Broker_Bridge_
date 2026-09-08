@@ -97,7 +97,7 @@ export function SellerDealsTable({
               <div className="flex flex-col gap-2.5 pt-2 border-t border-slate-100">
                 <Link
                   href={`/seller/deals/${row.deal.id}`}
-                  className="w-full min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl flex items-center justify-center gap-2 shadow-2xs transition-colors"
+                  className="w-full min-h-[48px] h-12 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl flex items-center justify-center gap-2 shadow-2xs transition-colors"
                 >
                   <Eye className="h-4 w-4 text-slate-700" />
                   View Deal & Booking ID
@@ -105,7 +105,7 @@ export function SellerDealsTable({
                 {isPendingDispatch && (
                   <Button 
                     onClick={() => setOpenDialogForDeal(row.deal.id)}
-                    className="w-full min-h-[48px] bg-[#059669] hover:bg-[#047857] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                    className="w-full min-h-[48px] h-12 bg-[#059669] hover:bg-[#047857] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                   >
                     <Truck className="h-5 w-5" />
                     Dispatch Shipment
@@ -115,7 +115,7 @@ export function SellerDealsTable({
                   <Button 
                     variant="outline"
                     onClick={() => setActiveDisputeDealId(row.deal.id)}
-                    className="w-full min-h-[48px] text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-slate-200 font-semibold rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full min-h-[48px] h-12 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-slate-200 font-semibold rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <AlertTriangle className="h-4 w-4" />
                     Raise Dispute
@@ -129,17 +129,18 @@ export function SellerDealsTable({
 
       {/* DESKTOP TABLE VIEW (>= md) */}
       <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50/60">
-            <TableRow>
-              <TableHead className="font-bold text-slate-700">Deal Ref</TableHead>
-              <TableHead className="font-bold text-slate-700">Commodity & Grade</TableHead>
-              <TableHead className="font-bold text-slate-700">Quantity</TableHead>
-              <TableHead className="font-bold text-slate-700">Agreed Price</TableHead>
-              <TableHead className="font-bold text-slate-700">Status</TableHead>
-              <TableHead className="text-right font-bold text-slate-700">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-50/60">
+              <TableRow>
+                <TableHead className="font-bold text-slate-700">Deal Ref</TableHead>
+                <TableHead className="font-bold text-slate-700">Commodity & Grade</TableHead>
+                <TableHead className="font-bold text-slate-700">Quantity</TableHead>
+                <TableHead className="font-bold text-slate-700">Agreed Price</TableHead>
+                <TableHead className="font-bold text-slate-700">Status</TableHead>
+                <TableHead className="text-right font-bold text-slate-700">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {deals.map((row) => {
               const canDispute = row.deal.status !== 'Closed' && row.deal.status !== 'Disputed' && row.deal.status !== 'Cancelled'
@@ -213,6 +214,7 @@ export function SellerDealsTable({
             })}
           </TableBody>
         </Table>
+        </div>
       </div>
 
       {/* DISPATCH MODAL */}

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, timestamp, jsonb, integer, numeric, doublePrecision, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, boolean, timestamp, jsonb, integer, numeric, doublePrecision, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const companies = pgTable('companies', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -309,13 +309,17 @@ export const notifications = pgTable('notifications', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   companyId: uuid('company_id').references(() => companies.id, { onDelete: 'cascade' }),
-  channel: text('channel').notNull(), // 'IN_APP', 'WHATSAPP', 'EMAIL'
-  eventType: text('event_type').notNull(), // 'MATCH_CREATED', 'MATCH_UPDATED', 'NEGOTIATION_RECEIVED', 'NEGOTIATION_ACCEPTED', 'DEAL_CREATED', 'DEAL_UPDATED', 'SYSTEM'
+  channel: text('channel').default('IN_APP').notNull(), // 'IN_APP', 'WHATSAPP', 'EMAIL'
+  eventType: text('event_type').notNull(), // 'KYC_STATUS', 'AVAILABILITY_APPROVED', 'AVAILABILITY_REJECTED', 'AVAILABILITY_EXPIRING', 'AVAILABILITY_EXPIRED', 'QUALITY_REVIEW', 'LAB_UPDATE', 'NEW_BROKER_REQUEST', 'BROKER_COUNTER', 'DEAL_VERSION_UPDATE', 'FINAL_CONFIRMATION_REQUIRED', 'CONFIRMATION_OUTCOME', 'BOOKING_CREATED', 'LOADING_REMINDER', 'DISPATCH_REMINDER', 'DOCUMENT_ISSUE', 'DELIVERY_UPDATE', 'PAYMENT_UPDATE', 'SYSTEM'
   title: text('title').notNull(),
-  message: text('message').notNull(),
-  actionUrl: text('action_url'),
+  message: text('message').default('').notNull(),
+  contextReason: text('context_reason').default('').notNull(),
+  actionLabel: text('action_label').default('View Details').notNull(),
+  actionUrl: text('action_url').default('/seller').notNull(),
+  idempotencyKey: text('idempotency_key'),
   payload: jsonb('payload'),
   deliveryStatus: text('delivery_status').default('Pending').notNull(), // 'Pending', 'Processing', 'Sent', 'Failed'
+  isRead: boolean('is_read').default(false).notNull(),
   readAt: timestamp('read_at'),
   attemptCount: integer('attempt_count').default(0).notNull(),
   maxAttempts: integer('max_attempts').default(3).notNull(),
@@ -327,8 +331,10 @@ export const notifications = pgTable('notifications', {
   failedAt: timestamp('failed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
+  uniqueIndex('notifications_idempotency_key_idx').on(table.idempotencyKey),
   index('notifications_user_created_idx').on(table.userId, table.createdAt),
   index('notifications_tenant_idx').on(table.companyId, table.createdAt),
+  index('notifications_user_is_read_idx').on(table.userId, table.isRead, table.createdAt),
   index('notifications_queue_idx').on(table.deliveryStatus, table.channel, table.nextRetryAt, table.createdAt),
 ]);
 

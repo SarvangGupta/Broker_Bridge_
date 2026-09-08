@@ -440,7 +440,56 @@ export function SellerWorkspaceShell({
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 7: DOCUMENTS VAULT                                                     */}
+        {/* TAB 7: REPORTS & VISIBILITY                                               */}
+        {/* ========================================================================= */}
+        {activeTab === 'reports' && (
+          <div className="space-y-6 animate-in fade-in-50 duration-200">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                  Reports & Visibility
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                  Financial math, inventory turnover state, daily sales volume & audit-ready CSV exports.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/seller/reports"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>Open Full Reports Engine</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+
+            <Card className="rounded-2xl border-slate-200 shadow-xs bg-white p-6">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="space-y-2 max-w-xl">
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-200 font-bold text-xs">
+                    Zero-Buyer PII Server-Side Aggregation
+                  </Badge>
+                  <h3 className="text-lg font-bold text-slate-900">Interactive Analytics & Export Center</h3>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    View time-series sales trends (7d / 30d / All Time), real-time inventory distribution (Available, Reserved, Sold), complete logistics pipeline status, and download one-click audit CSV reports.
+                  </p>
+                </div>
+                <a
+                  href="/seller/reports"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#047857] hover:bg-[#065f46] text-white font-bold text-sm shadow-sm transition-all text-center shrink-0 cursor-pointer inline-flex items-center justify-center gap-2"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Launch Analytics Dashboard</span>
+                </a>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 8: DOCUMENTS VAULT                                                     */}
         {/* ========================================================================= */}
         {activeTab === 'documents' && (
           <div className="space-y-6 animate-in fade-in-50 duration-200">

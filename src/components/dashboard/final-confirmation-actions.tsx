@@ -319,7 +319,7 @@ export function FinalConfirmationActions({
               variant="outline"
               onClick={() => setModalType(null)}
               disabled={isPending}
-              className="w-full sm:w-auto font-semibold rounded-xl min-h-[44px]"
+              className="w-full sm:w-auto font-semibold rounded-xl min-h-[48px] h-12"
             >
               Cancel
             </Button>
@@ -327,7 +327,7 @@ export function FinalConfirmationActions({
               type="button"
               onClick={handleConfirmTerms}
               disabled={isPending}
-              className="w-full sm:w-auto bg-[#059669] hover:bg-[#047857] text-white font-bold rounded-xl min-h-[44px] gap-2 cursor-pointer shadow-xs"
+              className="w-full sm:w-auto bg-[#059669] hover:bg-[#047857] text-white font-bold rounded-xl min-h-[48px] h-12 gap-2 cursor-pointer shadow-xs"
             >
               {isPending ? (
                 <>
@@ -368,25 +368,29 @@ export function FinalConfirmationActions({
 
           <div className="p-6 space-y-4 text-xs">
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600 leading-relaxed">
-              <strong>Broker-Mediated Policy:</strong> Sellers do not edit commercial fields directly on confirmation. Please describe what terms need adjustment.
+              <span>
+                Please specify the exact parameters requiring adjustment. Your remarks will be transmitted directly to the Broker Desk.
+              </span>
             </div>
 
-            {/* Quick Chips */}
+            {/* Quick selection chips */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                Quick Remarks:
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Quick Reason Select
               </span>
               <div className="flex flex-wrap gap-1.5">
-                {CORRECTION_QUICK_CHIPS.map((chip, idx) => (
+                {CORRECTION_QUICK_CHIPS.map((chip) => (
                   <button
-                    key={idx}
+                    key={chip}
                     type="button"
-                    onClick={() =>
-                      setCorrectionRemarks((prev) =>
-                        prev ? `${prev} • ${chip}` : chip
-                      )
-                    }
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                    onClick={() => {
+                      if (!correctionRemarks.includes(chip)) {
+                        setCorrectionRemarks((prev) =>
+                          prev ? `${prev}, ${chip}` : chip
+                        );
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs bg-slate-100 hover:bg-amber-50 hover:text-amber-800 text-slate-700 transition-colors border border-slate-200 cursor-pointer"
                   >
                     + {chip}
                   </button>
@@ -394,19 +398,21 @@ export function FinalConfirmationActions({
               </div>
             </div>
 
-            {/* Structured Correction Textarea */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-800 block">
-                Correction Details for Broker Desk <span className="text-rose-500">*</span>
+            {/* Custom remarks textarea */}
+            <div className="space-y-1.5 pt-1">
+              <label className="text-xs font-bold text-slate-700 block">
+                Detailed Correction Notes <span className="text-rose-500">*</span>
               </label>
               <Textarea
+                placeholder="E.g., We cannot fulfill at ₹4,100/MT due to rising transport costs. Please counter at ₹4,180/MT or adjust quantity to 100 MT."
                 value={correctionRemarks}
                 onChange={(e) => setCorrectionRemarks(e.target.value)}
-                placeholder="Specify the exact revisions needed (e.g., Price needs to be ₹2,100/MT due to transport rates; extend dispatch date by 3 days)..."
                 rows={4}
-                className="resize-none rounded-xl text-xs"
+                className="w-full text-xs rounded-xl border-slate-200 focus:border-amber-500 focus:ring-amber-500"
               />
-              <span className="text-[10px] text-slate-400 block">Minimum 5 characters required.</span>
+              <span className="text-[11px] text-slate-400">
+                Minimum 5 characters required ({correctionRemarks.trim().length}/5).
+              </span>
             </div>
           </div>
 
@@ -416,7 +422,7 @@ export function FinalConfirmationActions({
               variant="outline"
               onClick={() => setModalType(null)}
               disabled={isPending}
-              className="w-full sm:w-auto font-semibold rounded-xl min-h-[44px]"
+              className="w-full sm:w-auto font-semibold rounded-xl min-h-[48px] h-12"
             >
               Cancel
             </Button>
@@ -424,7 +430,7 @@ export function FinalConfirmationActions({
               type="button"
               onClick={handleRequestCorrection}
               disabled={isPending || correctionRemarks.trim().length < 5}
-              className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl min-h-[44px] gap-2 cursor-pointer shadow-xs"
+              className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl min-h-[48px] h-12 gap-2 cursor-pointer shadow-xs"
             >
               {isPending ? (
                 <>

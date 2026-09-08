@@ -22,6 +22,7 @@ import { getDealVersionSnapshotAction, getNegotiationTimelineAction } from "./ve
 import { getSellerSettlementOverviewAction } from "./settlement-actions";
 import { updateLoadingReadinessAction } from "./loading-actions";
 import { confirmFinalDealTermsAction } from "./confirmation-actions";
+import { sanitizeNotificationText } from "../utils/privacy-scrubber";
 import { resolveSellerRole } from "../utils/seller-auth";
 
 export type SecurityTestResult = {
@@ -231,15 +232,15 @@ export async function runSecurityRegressionAudit(): Promise<{
       "VALID_STATUS_TRANSITIONS and authoritative server actions reject arbitrary status skips."
     );
 
-    // -------------------------------------------------------------
-    // TEST P: Buyer PII request -> NEVER RETURNED
-    // -------------------------------------------------------------
+    const testPiiString = "Buyer contact: +919876543210, email: buyer@test.com, GST: 27ABCDE1234F1Z5, wa.me/9876543210";
+    const scrubbed = sanitizeNotificationText(testPiiString);
+    const piiScrubbed = !scrubbed.includes("+919876543210") && !scrubbed.includes("buyer@test.com") && !scrubbed.includes("27ABCDE1234F1Z5") && !scrubbed.includes("wa.me");
     recordResult(
       "P",
       "Hard Zero-Buyer-PII Isolation Shield",
       "Information Leakage",
-      true,
-      "All seller-facing deal queries, version snapshots, and timelines strip phone, email, WhatsApp, and GST."
+      piiScrubbed,
+      `All seller-facing queries, version snapshots, and notification text strip phone, email, WhatsApp, and GST. Scrub result: ${scrubbed}`
     );
 
     // -------------------------------------------------------------

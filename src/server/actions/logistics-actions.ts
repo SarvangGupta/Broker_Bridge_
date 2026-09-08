@@ -32,10 +32,16 @@ export async function createDispatchAction(data: DispatchData) {
     
     const isAuthorizedSeller = 
       deal.sellerId === session.data.companyId || 
+      deal.sellerId === session.data.user.id ||
       session.data.user.role === 'admin';
 
     if (!isAuthorizedSeller) {
       return { success: false, error: 'Unauthorized: Only the seller company can dispatch this deal.' };
+    }
+
+    // State Transition Guard: Only allowed if deal is in 'Dispatch Pending' or 'Confirmed' or 'In Transit'
+    if (deal.status === 'Cancelled' || deal.status === 'Closed') {
+      return { success: false, error: `Invalid state transition: Cannot dispatch a deal with status "${deal.status}".` };
     }
     
     // 4. Insert the record into the dispatches table

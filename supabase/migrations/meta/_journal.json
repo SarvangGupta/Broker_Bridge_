@@ -162,6 +162,13 @@
       "when": 1788718260747,
       "tag": "0029_add_dispatch_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788862978979,
+      "tag": "0030_add_seller_action_center_notifications",
+      "breakpoints": true
     }
   ]
 }

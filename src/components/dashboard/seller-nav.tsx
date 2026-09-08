@@ -11,7 +11,8 @@ import {
   FolderLock, 
   Users,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  TrendingUp
 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
@@ -69,6 +70,13 @@ export const SELLER_NAV_ITEMS: NavItem[] = [
     shortLabel: 'Payments',
     icon: Wallet,
     description: 'Receivables, advances & payment status',
+  },
+  {
+    id: 'reports',
+    label: 'Reports & Visibility',
+    shortLabel: 'Reports',
+    icon: TrendingUp,
+    description: 'Financial math, sales trends & inventory state',
   },
   {
     id: 'documents',
