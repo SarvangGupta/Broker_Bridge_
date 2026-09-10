@@ -13,6 +13,7 @@ import {
   masterVehicleTypes,
   masterIndustries,
   masterCategories,
+  masterLaboratories,
   requirements,
   availabilities
 } from '../db/schema';
@@ -34,6 +35,36 @@ async function verifyAdminSession(): Promise<{ authorized: boolean; error?: stri
     return { authorized: true };
   } catch (err: any) {
     return { authorized: false, error: err.message || 'Authentication check failed' };
+  }
+}
+
+export async function getMasterLaboratoriesAction() {
+  try {
+    const labs = await db
+      .select()
+      .from(masterLaboratories)
+      .where(eq(masterLaboratories.isActive, true))
+      .orderBy(asc(masterLaboratories.name));
+
+    if (!labs || labs.length === 0) {
+      const fallbackLabs = [
+        { id: '11111111-1111-1111-1111-111111111101', name: 'SGS India', location: 'Gurugram, Haryana', isActive: true },
+        { id: '11111111-1111-1111-1111-111111111102', name: 'Farelabs', location: 'Gurugram, Haryana', isActive: true },
+        { id: '11111111-1111-1111-1111-111111111103', name: 'NCML (National Commodities Management)', location: 'Jaipur, Rajasthan', isActive: true },
+        { id: '11111111-1111-1111-1111-111111111104', name: 'National Collateral Management Services (NCMSL)', location: 'Bhopal, MP', isActive: true },
+        { id: '11111111-1111-1111-1111-111111111105', name: 'Dr. Amin Controllers', location: 'Mumbai, Maharashtra', isActive: true },
+        { id: '11111111-1111-1111-1111-111111111106', name: 'ITC Agri Business Quality Lab', location: 'Hyderabad, Telangana', isActive: true },
+        { id: '11111111-1111-1111-1111-111111111107', name: 'Vimta Labs', location: 'Hyderabad, Telangana', isActive: true },
+        { id: '11111111-1111-1111-1111-111111111108', name: 'Eurofins Analytical Services', location: 'Bengaluru, Karnataka', isActive: true },
+        { id: '11111111-1111-1111-1111-111111111109', name: 'TUV India', location: 'Pune, Maharashtra', isActive: true },
+        { id: '11111111-1111-1111-1111-111111111110', name: 'Intertek India', location: 'New Delhi, Delhi', isActive: true },
+      ];
+      return { success: true, data: fallbackLabs };
+    }
+
+    return { success: true, data: labs };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to fetch master laboratories' };
   }
 }
 

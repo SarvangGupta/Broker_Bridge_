@@ -20,6 +20,10 @@ interface AvailabilityRow {
   stateName: string | null
   districtName: string | null
   lotNumber?: string | null
+  lab_status?: string | null
+  lab_valid_until?: Date | string | null
+  labStatus?: string | null
+  labValidUntil?: Date | string | null
   labTestStatus?: string | null
   labTestValidUntil?: Date | string | null
   labTestTestDate?: Date | string | null

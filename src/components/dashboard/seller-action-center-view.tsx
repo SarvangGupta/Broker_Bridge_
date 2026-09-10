@@ -341,7 +341,7 @@ export function SellerActionCenterView({
               variant="outline"
               className="mt-2 h-11 px-5 rounded-xl border-slate-200 text-slate-800 font-bold text-xs"
             >
-              Return to Command Center
+              Return to Dashboard
             </Button>
           </Link>
         </div>

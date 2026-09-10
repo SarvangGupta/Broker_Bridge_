@@ -77,7 +77,7 @@ export default async function SellerReportsPage() {
                 className="border-slate-300 font-bold text-xs rounded-xl h-9 gap-1.5 cursor-pointer"
               >
                 <LayoutDashboard className="w-3.5 h-3.5 text-slate-600" />
-                <span>Command Center</span>
+                <span>Dashboard</span>
               </Button>
             </Link>
           </div>

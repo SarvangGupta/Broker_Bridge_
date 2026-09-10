@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { SellerHeader } from '@/src/components/dashboard/seller-header'
-import { SellerNav } from '@/src/components/dashboard/seller-nav'
 import { MyAvailabilitiesTable } from '@/src/components/dashboard/my-availabilities-table'
 import { SellerDealsTable } from '@/src/components/dashboard/seller-deals-table'
 import { PostAvailabilityDialog } from '@/src/components/dialogs/post-availability-dialog'
@@ -33,6 +31,8 @@ import { SellerCommandCenterData } from '@/src/server/actions/analytics-actions'
 import { BrokerRequestInbox } from '@/src/components/dashboard/broker-request-inbox'
 import { BookedOrdersTable } from '@/src/components/dashboard/booked-orders-table'
 import { SettlementWorkspaceView } from '@/src/components/dashboard/settlement-workspace-view'
+import { SellerQualityVaultView } from '@/src/components/dashboard/seller-quality-vault-view'
+import { SellerGlobalLabReportItem } from '@/src/server/actions/lab-actions'
 
 interface SellerWorkspaceShellProps {
   profile: any
@@ -42,6 +42,7 @@ interface SellerWorkspaceShellProps {
   deals: any[]
   brokerRequests?: any[]
   vehicleTypes: any[]
+  labReports?: SellerGlobalLabReportItem[]
   commandCenterData?: SellerCommandCenterData
 }
 
@@ -53,14 +54,14 @@ export function SellerWorkspaceShell({
   deals,
   brokerRequests = [],
   vehicleTypes,
+  labReports = [],
   commandCenterData,
 }: SellerWorkspaceShellProps) {
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get('tab')
 
-  // Default to URL tab or Command Center dashboard tab
+  // Default to URL tab or Dashboard tab
   const [activeTab, setActiveTab] = useState(tabFromUrl || 'dashboard')
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   // Sync tab state when URL searchParams change (e.g. on browser back/forward)
   useEffect(() => {
@@ -88,31 +89,10 @@ export function SellerWorkspaceShell({
   const actionItems = commandCenterData?.actionItems || []
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-[#F8FAFC] font-sans antialiased overflow-x-hidden">
-      
-      {/* 1. TOP STICKY HEADER */}
-      <SellerHeader 
-        profile={profile} 
-        fullProfile={fullProfile} 
-        userRole={userRole} 
-        onMobileMenuToggle={() => setMobileNavOpen(true)}
-      />
-
-      {/* 2. RESPONSIVE MODULE SUB-NAV */}
-      <SellerNav 
-        activeTab={activeTab} 
-        onTabChange={handleTabChange} 
-        userRole={userRole}
-        mobileOpen={mobileNavOpen}
-        onMobileOpenChange={setMobileNavOpen}
-        companyName={companyName}
-      />
-
-      {/* 3. MAIN WORKSPACE CANVAS */}
-      <main className="flex-1 w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 font-sans antialiased">
         
         {/* ========================================================================= */}
-        {/* TAB 1: SELLER COMMAND CENTER (OPERATIONAL DASHBOARD)                       */}
+        {/* TAB 1: SELLER DASHBOARD (OPERATIONAL DASHBOARD)                            */}
         {/* ========================================================================= */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in-50 duration-200">
@@ -122,7 +102,7 @@ export function SellerWorkspaceShell({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                    Seller Command Center
+                    Seller Dashboard
                   </h1>
                   <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-[#047857] border border-emerald-200">
                     Live Operational
@@ -286,58 +266,10 @@ export function SellerWorkspaceShell({
         {/* TAB 3: QUALITY & LAB TESTING                                               */}
         {/* ========================================================================= */}
         {activeTab === 'quality' && (
-          <div className="space-y-6 animate-in fade-in-50 duration-200">
-            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                Quality & Laboratory Testing
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Dynamic quality parameter templates, lab certificates & COA verification records.
-              </p>
-            </div>
-
-            <Card className="rounded-2xl border-slate-200 shadow-xs bg-white">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-2xl bg-emerald-50 text-[#047857]">
-                    <FlaskConical className="w-6 h-6 stroke-[2]" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg font-bold text-slate-900">Lot Quality Engine</CardTitle>
-                    <CardDescription className="text-sm text-slate-500">
-                      Quality parameters are dynamically generated per commodity master template.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  <div className="text-xs sm:text-sm text-slate-600">
-                    <span className="font-semibold text-slate-900">Lot Traceability Rule:</span> Every active lot is verified against commodity standards (Moisture, Admixture, Protein, Oil content). Full lab record creation and certificate uploads activate in Sprint 15.
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                  <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-1">
-                    <div className="text-xs text-slate-400 font-semibold uppercase">Dynamic Templates</div>
-                    <div className="text-base font-bold text-slate-900">Commodity-Driven</div>
-                    <div className="text-xs text-slate-500">Moisture, foreign matter, grain size</div>
-                  </div>
-                  <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-1">
-                    <div className="text-xs text-slate-400 font-semibold uppercase">Lab Records</div>
-                    <div className="text-base font-bold text-slate-900">NABL & Private Labs</div>
-                    <div className="text-xs text-slate-500">Certificate No, Test Date, COA PDF</div>
-                  </div>
-                  <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-1">
-                    <div className="text-xs text-slate-400 font-semibold uppercase">Quality Freshness</div>
-                    <div className="text-base font-bold text-[#059669]">Validity Tracking</div>
-                    <div className="text-xs text-slate-500">Auto-flags stale or expired tests</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <SellerQualityVaultView
+            initialReports={labReports}
+            onNavigateToInventory={() => handleTabChange('inventory')}
+          />
         )}
 
         {/* ========================================================================= */}
@@ -595,7 +527,6 @@ export function SellerWorkspaceShell({
           </div>
         )}
 
-      </main>
     </div>
   )
 }

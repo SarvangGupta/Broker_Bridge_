@@ -101,6 +101,20 @@ export async function getMyAvailabilitiesAction() {
       return { success: false, error: session.error || "Unauthorized" };
     }
 
+    // Subquery: Select the MOST RECENT lab test per availability lot
+    const latestLabTests = db
+      .selectDistinctOn([labTests.availabilityId], {
+        id: labTests.id,
+        availabilityId: labTests.availabilityId,
+        status: labTests.status,
+        validUntil: labTests.validUntil,
+        testDate: labTests.testDate,
+        createdAt: labTests.createdAt,
+      })
+      .from(labTests)
+      .orderBy(labTests.availabilityId, desc(labTests.createdAt))
+      .as("latest_lab_tests");
+
     const results = await db
       .select({
         id: availabilities.id,
@@ -119,10 +133,14 @@ export async function getMyAvailabilitiesAction() {
         unitSymbol: masterUnits.symbol,
         stateName: masterStates.name,
         districtName: masterDistricts.name,
-        labTestId: labTests.id,
-        labTestStatus: labTests.status,
-        labTestValidUntil: labTests.validUntil,
-        labTestTestDate: labTests.testDate,
+        labTestId: latestLabTests.id,
+        labTestStatus: latestLabTests.status,
+        labTestValidUntil: latestLabTests.validUntil,
+        labTestTestDate: latestLabTests.testDate,
+        lab_status: latestLabTests.status,
+        lab_valid_until: latestLabTests.validUntil,
+        labStatus: latestLabTests.status,
+        labValidUntil: latestLabTests.validUntil,
         loadingStatus: availabilities.loadingStatus,
         loadingDuration: availabilities.loadingDuration,
         loadingStartDate: availabilities.loadingStartDate,
@@ -138,7 +156,7 @@ export async function getMyAvailabilitiesAction() {
       .leftJoin(masterUnits, eq(availabilities.unitId, masterUnits.id))
       .leftJoin(masterStates, eq(availabilities.stateId, masterStates.id))
       .leftJoin(masterDistricts, eq(availabilities.districtId, masterDistricts.id))
-      .leftJoin(labTests, eq(availabilities.id, labTests.availabilityId))
+      .leftJoin(latestLabTests, eq(availabilities.id, latestLabTests.availabilityId))
       .where(eq(availabilities.companyId, session.data.companyId))
       .orderBy(desc(availabilities.createdAt));
 

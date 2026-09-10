@@ -7,10 +7,12 @@ import {
   labTestResults,
   availabilities,
   masterQualityParameters,
+  masterCommodities,
   users,
 } from '@/src/server/db/schema';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, desc } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { verifySellerSession } from '@/src/server/utils/seller-auth';
 import {
   labTestFormSchema,
   checkIsWithinBounds,
@@ -98,18 +100,67 @@ export async function saveLabTestRecordAction(
         where: eq(labTests.availabilityId, payload.availability_id),
       });
 
+      // Handle explicit "Not Required" state
+      if (payload.is_lab_required === false) {
+        if (existingLabTest) {
+          labTestId = existingLabTest.id;
+          await tx
+            .update(labTests)
+            .set({
+              laboratoryName: 'Not Required',
+              laboratoryLocation: null,
+              sampleId: null,
+              sampleDate: null,
+              testDate: new Date(),
+              reportNumber: 'NOT-REQUIRED',
+              reportDate: new Date(),
+              validUntil: null,
+              fileUrl: null,
+              status: 'Not Required',
+              updatedAt: new Date(),
+            })
+            .where(eq(labTests.id, labTestId));
+        } else {
+          const inserted = await tx
+            .insert(labTests)
+            .values({
+              availabilityId: payload.availability_id,
+              companyId: availability.companyId,
+              laboratoryName: 'Not Required',
+              laboratoryLocation: null,
+              sampleId: null,
+              sampleDate: null,
+              testDate: new Date(),
+              reportNumber: 'NOT-REQUIRED',
+              reportDate: new Date(),
+              validUntil: null,
+              fileUrl: null,
+              status: 'Not Required',
+            })
+            .returning({ id: labTests.id });
+
+          labTestId = inserted[0].id;
+        }
+
+        // Delete any existing lab test results
+        await tx.delete(labTestResults).where(eq(labTestResults.labTestId, labTestId));
+        resultsCount = 0;
+        return;
+      }
+
+      // Normal "Lab Required" Flow
       if (existingLabTest) {
         labTestId = existingLabTest.id;
         await tx
           .update(labTests)
           .set({
-            laboratoryName: payload.laboratory_name,
+            laboratoryName: payload.laboratory_name || 'Lab Test',
             laboratoryLocation: payload.laboratory_location || null,
             sampleId: payload.sample_id || null,
             sampleDate: payload.sample_date ? new Date(payload.sample_date) : null,
-            testDate: new Date(payload.test_date),
-            reportNumber: payload.report_number,
-            reportDate: new Date(payload.report_date),
+            testDate: payload.test_date ? new Date(payload.test_date) : new Date(),
+            reportNumber: payload.report_number || 'REPORT',
+            reportDate: payload.report_date ? new Date(payload.report_date) : new Date(),
             validUntil: payload.valid_until ? new Date(payload.valid_until) : null,
             fileUrl: payload.file_url ?? existingLabTest.fileUrl,
             status: existingLabTest.status === 'Verified' ? 'Verified' : 'Under Review',
@@ -122,13 +173,13 @@ export async function saveLabTestRecordAction(
           .values({
             availabilityId: payload.availability_id,
             companyId: availability.companyId,
-            laboratoryName: payload.laboratory_name,
+            laboratoryName: payload.laboratory_name || 'Lab Test',
             laboratoryLocation: payload.laboratory_location || null,
             sampleId: payload.sample_id || null,
             sampleDate: payload.sample_date ? new Date(payload.sample_date) : null,
-            testDate: new Date(payload.test_date),
-            reportNumber: payload.report_number,
-            reportDate: new Date(payload.report_date),
+            testDate: payload.test_date ? new Date(payload.test_date) : new Date(),
+            reportNumber: payload.report_number || 'REPORT',
+            reportDate: payload.report_date ? new Date(payload.report_date) : new Date(),
             validUntil: payload.valid_until ? new Date(payload.valid_until) : null,
             fileUrl: payload.file_url || null,
             status: 'Under Review',
@@ -141,7 +192,7 @@ export async function saveLabTestRecordAction(
       // Delete existing results and bulk-insert new ones
       await tx.delete(labTestResults).where(eq(labTestResults.labTestId, labTestId));
 
-      const toInsert = payload.results
+      const toInsert = (payload.results || [])
         .filter(
           (r) => r.measured_value !== undefined && r.measured_value !== null && String(r.measured_value).trim() !== ''
         )
@@ -371,13 +422,18 @@ export async function getLabEvidenceSignedUrlAction(
       return { success: false, error: 'File path is required.' };
     }
 
+    let cleanPath = filePath.trim();
+    if (cleanPath.includes('/brokerbridge_lab_evidence/')) {
+      cleanPath = cleanPath.split('/brokerbridge_lab_evidence/')[1].split('?')[0];
+    }
+
     // Path Traversal Guard: Reject directory traversal sequences
-    if (filePath.includes('..') || filePath.includes('\\') || filePath.includes('\0')) {
+    if (cleanPath.includes('..') || cleanPath.includes('\\') || cleanPath.includes('\0')) {
       return { success: false, error: 'Invalid file path format: Directory traversal prohibited.' };
     }
 
     // Extract availabilityId from path: {availability_id}/{filename}
-    const pathParts = filePath.split('/');
+    const pathParts = cleanPath.split('/');
     const availabilityId = pathParts[0];
     if (!availabilityId || pathParts.length < 2) {
       return { success: false, error: 'Invalid evidence file path format.' };
@@ -410,7 +466,7 @@ export async function getLabEvidenceSignedUrlAction(
     // Generate signed URL valid for 60 minutes
     const { data, error } = await supabase.storage
       .from('brokerbridge_lab_evidence')
-      .createSignedUrl(filePath, 3600);
+      .createSignedUrl(cleanPath, 3600);
 
     if (error || !data?.signedUrl) {
       return { success: false, error: error?.message || 'Failed to generate signed download link.' };
@@ -425,6 +481,122 @@ export async function getLabEvidenceSignedUrlAction(
     return {
       success: false,
       error: error.message || 'Failed to retrieve evidence file link.',
+    };
+  }
+}
+
+/**
+ * Alias helper for getLabEvidenceSignedUrlAction.
+ */
+export async function getSignedLabDocumentUrlAction(
+  filePath: string
+): Promise<LabActionResponse<{ signedUrl: string }>> {
+  return getLabEvidenceSignedUrlAction(filePath);
+}
+
+export type SellerGlobalLabReportItem = {
+  id: string;
+  availabilityId: string;
+  companyId: string;
+  laboratoryName: string;
+  laboratoryLocation: string | null;
+  sampleId: string | null;
+  sampleDate: string | null;
+  testDate: string;
+  reportNumber: string;
+  reportDate: string;
+  validUntil: string | null;
+  fileUrl: string | null;
+  status: string;
+  createdAt: string;
+  lotNumber: string | null;
+  commodityId: string | null;
+  commodityName: string | null;
+  freshness: LabFreshnessStatus;
+  effectiveStatus: string;
+};
+
+/**
+ * Global Fetch Action: getSellerGlobalLabReportsAction
+ * Fetches all lab reports belonging to the current authenticated seller's company.
+ * LEFT JOINs availabilities and masterCommodities for commodity name & lot number.
+ */
+export async function getSellerGlobalLabReportsAction(): Promise<
+  LabActionResponse<SellerGlobalLabReportItem[]>
+> {
+  try {
+    const session = await verifySellerSession({ allowViewer: true });
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || 'Unauthorized' };
+    }
+
+    const rows = await db
+      .select({
+        id: labTests.id,
+        availabilityId: labTests.availabilityId,
+        companyId: labTests.companyId,
+        laboratoryName: labTests.laboratoryName,
+        laboratoryLocation: labTests.laboratoryLocation,
+        sampleId: labTests.sampleId,
+        sampleDate: labTests.sampleDate,
+        testDate: labTests.testDate,
+        reportNumber: labTests.reportNumber,
+        reportDate: labTests.reportDate,
+        validUntil: labTests.validUntil,
+        fileUrl: labTests.fileUrl,
+        status: labTests.status,
+        createdAt: labTests.createdAt,
+        lotNumber: availabilities.lotNumber,
+        commodityId: availabilities.commodityId,
+        commodityName: masterCommodities.name,
+      })
+      .from(labTests)
+      .leftJoin(availabilities, eq(labTests.availabilityId, availabilities.id))
+      .leftJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))
+      .where(eq(labTests.companyId, session.data.companyId))
+      .orderBy(desc(labTests.createdAt));
+
+    const data: SellerGlobalLabReportItem[] = rows.map((r) => {
+      const freshness = computeLabFreshness(r.testDate, r.validUntil);
+      const effectiveStatus =
+        r.status === 'Not Required'
+          ? 'Not Required'
+          : freshness === 'Expired' && r.status === 'Verified'
+          ? 'Expired'
+          : r.status;
+
+      return {
+        id: String(r.id),
+        availabilityId: String(r.availabilityId),
+        companyId: String(r.companyId),
+        laboratoryName: r.laboratoryName || '',
+        laboratoryLocation: r.laboratoryLocation || null,
+        sampleId: r.sampleId || null,
+        sampleDate: r.sampleDate ? new Date(r.sampleDate).toISOString() : null,
+        testDate: r.testDate ? new Date(r.testDate).toISOString() : new Date().toISOString(),
+        reportNumber: r.reportNumber || '',
+        reportDate: r.reportDate ? new Date(r.reportDate).toISOString() : new Date().toISOString(),
+        validUntil: r.validUntil ? new Date(r.validUntil).toISOString() : null,
+        fileUrl: r.fileUrl || null,
+        status: r.status || 'Under Review',
+        createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
+        lotNumber: r.lotNumber || null,
+        commodityId: r.commodityId || null,
+        commodityName: r.commodityName || null,
+        freshness,
+        effectiveStatus,
+      };
+    });
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (error: any) {
+    console.error('getSellerGlobalLabReportsAction error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch centralized lab reports.',
     };
   }
 }

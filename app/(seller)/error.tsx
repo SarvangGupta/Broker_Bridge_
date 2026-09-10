@@ -71,7 +71,7 @@ export default function SellerRootError({ error, reset }: ErrorProps) {
               className="w-full min-h-[48px] h-12 px-6 border-slate-300 text-slate-700 hover:bg-slate-50 font-bold rounded-xl cursor-pointer flex items-center justify-center gap-2"
             >
               <LayoutDashboard className="w-4 h-4 text-slate-600" />
-              <span>Command Center</span>
+              <span>Dashboard</span>
             </Button>
           </Link>
         </div>

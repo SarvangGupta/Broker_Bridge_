@@ -26,6 +26,7 @@ interface LabDocumentUploadProps {
   labTestId?: string;
   existingFileUrl?: string | null;
   onUploadComplete?: (fileUrl: string) => void;
+  onFileSelect?: (file: File) => void | Promise<void>;
   disabled?: boolean;
 }
 
@@ -38,6 +39,7 @@ export function LabDocumentUpload({
   labTestId,
   existingFileUrl,
   onUploadComplete,
+  onFileSelect,
   disabled = false,
 }: LabDocumentUploadProps) {
   const [fileUrl, setFileUrl] = useState<string | null>(existingFileUrl || null);
@@ -62,6 +64,15 @@ export function LabDocumentUpload({
       const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
       toast.error(`File is too large (${sizeMb}MB). Maximum allowed size is 5MB.`);
       return;
+    }
+
+    // Immediately trigger OCR extraction before / in parallel with storage upload
+    if (onFileSelect) {
+      try {
+        onFileSelect(file);
+      } catch (err) {
+        console.error("onFileSelect error:", err);
+      }
     }
 
     setIsUploading(true);
@@ -152,21 +163,16 @@ export function LabDocumentUpload({
     <div className="space-y-3">
       {/* Existing File Card if attached */}
       {fileUrl && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-emerald-200 bg-emerald-50/40 gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 gap-3">
           <div className="flex items-center space-x-3 overflow-hidden">
-            <div className="p-2 rounded-md bg-emerald-100 text-emerald-800 shrink-0">
+            <div className="p-2 rounded-lg bg-emerald-100 text-emerald-800 shrink-0">
               <FileCheck className="h-5 w-5" />
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-semibold text-slate-900 truncate">
+              <p className="text-sm font-bold text-slate-900 truncate">
                 {getCleanFileName(fileUrl)}
               </p>
-              <div className="flex items-center space-x-2 mt-0.5">
-                <Badge variant="outline" className="text-[10px] bg-white text-emerald-700 border-emerald-200 font-mono">
-                  Encrypted Vault
-                </Badge>
-                <span className="text-xs text-muted-foreground">Attached to Lot</span>
-              </div>
+              <p className="text-xs text-slate-500 mt-0.5">Attached to Lot</p>
             </div>
           </div>
 
@@ -177,14 +183,14 @@ export function LabDocumentUpload({
               size="sm"
               onClick={handleViewDocument}
               disabled={isViewing}
-              className="min-h-[48px] h-12 bg-white px-4 text-xs font-medium"
+              className="min-h-[48px] h-12 bg-white px-4 text-xs font-semibold rounded-xl"
             >
               {isViewing ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
               ) : (
                 <ExternalLink className="h-4 w-4 mr-1.5 text-slate-600" />
               )}
-              View Evidence
+              View Report
             </Button>
             <Button
               type="button"
@@ -192,7 +198,7 @@ export function LabDocumentUpload({
               size="sm"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || isUploading}
-              className="min-h-[48px] h-12 px-3 text-xs text-muted-foreground hover:text-slate-900"
+              className="min-h-[48px] h-12 px-3 text-xs text-slate-600 hover:text-slate-900 rounded-xl"
             >
               <RefreshCw className="h-4 w-4 mr-1" />
               Replace
@@ -208,12 +214,12 @@ export function LabDocumentUpload({
         onDrop={handleDrop}
         onClick={() => !isUploading && !disabled && fileInputRef.current?.click()}
         className={cn(
-          "flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 text-center min-h-[140px]",
+          "flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 text-center min-h-[140px]",
           isDragging
-            ? "border-primary bg-primary/5 scale-[0.99]"
-            : "border-slate-300 hover:border-slate-400 bg-slate-50/50 hover:bg-slate-50",
+            ? "border-emerald-600 bg-emerald-50/50 scale-[0.99]"
+            : "border-slate-300 hover:border-slate-400 bg-slate-50/60 hover:bg-slate-50",
           (disabled || isUploading) && "pointer-events-none opacity-60",
-          fileUrl ? "py-4" : "py-8"
+          fileUrl ? "py-4" : "py-6"
         )}
       >
         <input
@@ -227,28 +233,25 @@ export function LabDocumentUpload({
 
         {isUploading ? (
           <div className="flex flex-col items-center space-y-2">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm font-medium text-slate-700">
-              Uploading certificate to secure evidence vault...
+            <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
+            <p className="text-sm font-bold text-slate-800">
+              Reading report...
             </p>
-            <p className="text-xs text-muted-foreground">Encrypting file storage path</p>
+            <p className="text-xs text-slate-500">Please wait a moment</p>
           </div>
         ) : (
           <div className="flex flex-col items-center space-y-2">
-            <div className="p-3 rounded-full bg-slate-100 text-slate-600 border">
-              <UploadCloud className="h-6 w-6 text-primary" />
+            <div className="p-3 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+              <UploadCloud className="h-6 w-6 text-emerald-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-800">
-                <span className="text-primary font-semibold">Click to upload</span> or drag and drop
+              <p className="text-base font-bold text-slate-900">
+                Upload Lab Report
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Official Laboratory Report / COA (PDF, JPG, or PNG up to 5MB)
+              <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                PDF, JPG or PNG (up to 5MB)
               </p>
             </div>
-            <Badge variant="outline" className="text-[10px] text-slate-500 font-normal mt-1">
-              Protected by Supabase Private RLS Storage
-            </Badge>
           </div>
         )}
       </div>

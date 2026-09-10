@@ -11,6 +11,7 @@ import { getDealsByCompanyAction } from "@/src/server/actions/deal-actions"
 import { getMasterVehicleTypesAction } from "@/src/server/actions/master-data-actions"
 import { getSellerCommandCenterDataAction, SellerCommandCenterData } from "@/src/server/actions/analytics-actions"
 import { getSellerBrokerRequestsAction } from "@/src/server/actions/broker-request-actions"
+import { getSellerGlobalLabReportsAction, SellerGlobalLabReportItem } from "@/src/server/actions/lab-actions"
 import { SellerWorkspaceShell } from "@/src/components/dashboard/seller-workspace-shell"
 
 export default async function SellerDashboard() {
@@ -24,16 +25,18 @@ export default async function SellerDashboard() {
   let deals: any[] = []
   let brokerRequests: any[] = []
   let vehicleTypes: any[] = []
+  let labReports: SellerGlobalLabReportItem[] = []
   let fullProfileData: any = null
   let commandCenterData: SellerCommandCenterData | undefined = undefined
   let userRole = "SELLER_ADMIN"
 
   if (hasCompany) {
-    const [availabilitiesRes, dealsRes, brokerRequestsRes, vehicleTypesRes, fullProfileRes, commandCenterRes] = await Promise.all([
+    const [availabilitiesRes, dealsRes, brokerRequestsRes, vehicleTypesRes, labReportsRes, fullProfileRes, commandCenterRes] = await Promise.all([
       getMyAvailabilitiesAction(),
       getDealsByCompanyAction(),
       getSellerBrokerRequestsAction(),
       getMasterVehicleTypesAction(),
+      getSellerGlobalLabReportsAction(),
       getFullBuyerProfileDetailsAction(),
       getSellerCommandCenterDataAction(),
     ])
@@ -50,6 +53,9 @@ export default async function SellerDashboard() {
     if (vehicleTypesRes.success && vehicleTypesRes.data) {
       vehicleTypes = vehicleTypesRes.data
     }
+    if (labReportsRes.success && labReportsRes.data) {
+      labReports = labReportsRes.data
+    }
     if (fullProfileRes.success && fullProfileRes.data) {
       fullProfileData = fullProfileRes.data
       if (fullProfileData.user?.role) {
@@ -62,7 +68,7 @@ export default async function SellerDashboard() {
   }
 
   return (
-    <div className={!hasCompany ? "flex min-h-screen items-center justify-center p-4 bg-slate-50 font-sans antialiased" : "min-h-screen w-full bg-[#F8FAFC] font-sans antialiased"}>
+    <div className={!hasCompany ? "flex min-h-[calc(100vh-4rem)] items-center justify-center p-4" : "w-full bg-[#F8FAFC] font-sans antialiased"}>
       <RealtimeDealsListener />
       
       {!hasCompany ? (
@@ -77,7 +83,7 @@ export default async function SellerDashboard() {
                   Complete Seller Onboarding
                 </CardTitle>
                 <CardDescription className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                  Enter your verified company details to access the Seller Trading Command Center.
+                  Enter your verified company details to access the Seller Trading Dashboard.
                 </CardDescription>
               </div>
             </div>
@@ -102,6 +108,7 @@ export default async function SellerDashboard() {
           deals={deals}
           brokerRequests={brokerRequests}
           vehicleTypes={vehicleTypes}
+          labReports={labReports}
           commandCenterData={commandCenterData}
         />
       )}

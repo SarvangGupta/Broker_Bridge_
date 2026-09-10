@@ -29,47 +29,70 @@ export function QualityStatusBadge({
   className,
   showIcon = true,
 }: QualityStatusBadgeProps) {
-  const { effectiveStatus, freshness } = useMemo(() => {
-    if (!status && !testDate && !validUntil) {
-      return { effectiveStatus: "Seller Declared", freshness: null };
+  const effectiveStatus = useMemo(() => {
+    // 1. Sprint 15 Mathematical Expiry Guard:
+    // If validUntil exists and is in the past, FORCE "Lab Expired" (overrides 'Verified')
+    if (validUntil) {
+      const expiryTime = new Date(validUntil).getTime();
+      if (!isNaN(expiryTime) && expiryTime < Date.now()) {
+        return "Expired";
+      }
     }
 
-    const calculatedFreshness: LabFreshnessStatus | null = testDate
-      ? computeLabFreshness(testDate, validUntil)
-      : validUntil && new Date(validUntil).getTime() < Date.now()
-      ? "Expired"
-      : null;
-
-    // Mathematical Expiry Override
-    let resolvedStatus = status || "Seller Declared";
-    if (calculatedFreshness === "Expired" || (validUntil && new Date(validUntil).getTime() < Date.now())) {
-      resolvedStatus = "Expired";
+    if (testDate) {
+      const freshness = computeLabFreshness(testDate, validUntil);
+      if (freshness === "Expired") {
+        return "Expired";
+      }
     }
 
-    return {
-      effectiveStatus: resolvedStatus,
-      freshness: calculatedFreshness,
-    };
+    if (!status) {
+      return "No Lab Report";
+    }
+
+    if (status === "Not Required") {
+      return "Not Required";
+    }
+
+    if (status === "Under Review" || status === "Report Uploaded" || status === "Pending") {
+      return "Under Review";
+    }
+
+    if (status === "Verified") {
+      return "Verified";
+    }
+
+    if (status === "Correction Required") {
+      return "Correction Required";
+    }
+
+    if (status === "Rejected") {
+      return "Rejected";
+    }
+
+    if (status === "Expired") {
+      return "Expired";
+    }
+
+    return "No Lab Report";
   }, [status, validUntil, testDate]);
 
   switch (effectiveStatus) {
-    case "Verified":
+    case "Expired":
       return (
         <Badge
           variant="outline"
           className={cn(
-            "bg-emerald-50 text-emerald-700 border-emerald-200/90 font-semibold px-2.5 py-1 text-xs shrink-0 rounded-full flex items-center gap-1",
+            "bg-red-50 text-red-700 border-red-200 font-semibold px-2.5 py-1 text-xs shrink-0 rounded-full flex items-center gap-1",
             className
           )}
         >
-          {showIcon && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-          <span>Lab Verified</span>
+          {showIcon && <AlertCircle className="w-3.5 h-3.5 text-red-600" />}
+          <span>Lab Expired</span>
         </Badge>
       );
 
     case "Under Review":
-    case "Report Uploaded":
-    case "Pending":
       return (
         <Badge
           variant="outline"
@@ -80,6 +103,20 @@ export function QualityStatusBadge({
         >
           {showIcon && <Clock className="w-3.5 h-3.5 text-amber-600" />}
           <span>Under Review</span>
+        </Badge>
+      );
+
+    case "Verified":
+      return (
+        <Badge
+          variant="outline"
+          className={cn(
+            "bg-emerald-50 text-emerald-700 border-emerald-200/90 font-semibold px-2.5 py-1 text-xs shrink-0 rounded-full flex items-center gap-1",
+            className
+          )}
+        >
+          {showIcon && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+          <span>Verified</span>
         </Badge>
       );
 
@@ -111,32 +148,32 @@ export function QualityStatusBadge({
         </Badge>
       );
 
-    case "Expired":
+    case "Not Required":
       return (
         <Badge
           variant="outline"
           className={cn(
-            "bg-red-50 text-red-700 border-red-200 font-semibold px-2.5 py-1 text-xs shrink-0 rounded-full flex items-center gap-1",
+            "bg-slate-100 text-slate-600 border-slate-200 font-semibold px-2.5 py-1 text-xs shrink-0 rounded-full flex items-center gap-1",
             className
           )}
         >
-          {showIcon && <AlertCircle className="w-3.5 h-3.5 text-red-600" />}
-          <span>Lab Expired</span>
+          {showIcon && <FileCheck2 className="w-3.5 h-3.5 text-slate-500" />}
+          <span>No Lab Required</span>
         </Badge>
       );
 
-    case "Seller Declared":
+    case "No Lab Report":
     default:
       return (
         <Badge
           variant="outline"
           className={cn(
-            "bg-slate-100 text-slate-700 border-slate-200/90 font-medium px-2.5 py-1 text-xs shrink-0 rounded-full flex items-center gap-1",
+            "bg-slate-100 text-slate-600 border-slate-200 font-semibold px-2.5 py-1 text-xs shrink-0 rounded-full flex items-center gap-1",
             className
           )}
         >
-          {showIcon && <FileCheck2 className="w-3.5 h-3.5 text-slate-500" />}
-          <span>Seller Declared</span>
+          {showIcon && <FileCheck2 className="w-3.5 h-3.5 text-slate-400" />}
+          <span>No Lab Report</span>
         </Badge>
       );
   }

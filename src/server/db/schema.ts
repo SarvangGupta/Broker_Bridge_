@@ -108,6 +108,14 @@ export const masterQualityParameters = pgTable('master_quality_parameters', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const masterLaboratories = pgTable('master_laboratories', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  location: text('location'),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const requirements = pgTable('requirements', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id').references(() => companies.id).notNull(),

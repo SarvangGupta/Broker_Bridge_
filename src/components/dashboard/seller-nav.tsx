@@ -31,7 +31,7 @@ export interface NavItem {
 export const SELLER_NAV_ITEMS: NavItem[] = [
   {
     id: 'dashboard',
-    label: 'Command Center',
+    label: 'Dashboard',
     shortLabel: 'Dashboard',
     icon: LayoutDashboard,
     description: 'Operational overview & P0 action items',

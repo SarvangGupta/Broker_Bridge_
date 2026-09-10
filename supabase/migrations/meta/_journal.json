@@ -169,6 +169,13 @@
       "when": 1788862978979,
       "tag": "0030_add_seller_action_center_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789032984624,
+      "tag": "0031_add_master_laboratories",
+      "breakpoints": true
     }
   ]
 }

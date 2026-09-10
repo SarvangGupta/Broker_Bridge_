@@ -15,6 +15,7 @@ import {
   Truck,
   Clock,
   AlertCircle,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -51,6 +52,10 @@ export interface InventoryCardProps {
     stateName: string | null;
     districtName: string | null;
     lotNumber?: string | null;
+    lab_status?: string | null;
+    lab_valid_until?: Date | string | null;
+    labStatus?: string | null;
+    labValidUntil?: Date | string | null;
     labTestStatus?: string | null;
     labTestValidUntil?: Date | string | null;
     labTestTestDate?: Date | string | null;
@@ -133,8 +138,8 @@ export function InventoryCard({ item, onCancelSuccess }: InventoryCardProps) {
 
             {/* Quality Readiness Badge */}
             <QualityStatusBadge
-              status={item.labTestStatus}
-              validUntil={item.labTestValidUntil}
+              status={item.lab_status || item.labStatus || item.labTestStatus}
+              validUntil={item.lab_valid_until || item.labValidUntil || item.labTestValidUntil}
               testDate={item.labTestTestDate}
             />
 
@@ -237,7 +242,18 @@ export function InventoryCard({ item, onCancelSuccess }: InventoryCardProps) {
               className="w-full min-h-[48px] h-12 text-slate-800 hover:text-slate-900 hover:bg-emerald-50/60 border-slate-300 hover:border-emerald-300 font-semibold rounded-xl text-sm sm:text-base transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs group/btn"
             >
               <FlaskConical className="h-4 w-4 text-emerald-600 group-hover/btn:scale-110 transition-transform" />
-              <span>{item.labTestId ? "Manage Lab Report" : "Upload Lab Report"}</span>
+              <span>
+                {item.labTestId ||
+                item.lab_status === "Not Required" ||
+                item.labStatus === "Not Required" ||
+                item.labTestStatus === "Not Required" ||
+                item.lab_status === "Under Review" ||
+                item.lab_status === "Verified" ||
+                item.labStatus === "Under Review" ||
+                item.labStatus === "Verified"
+                  ? "Manage Lab Report"
+                  : "Upload Lab Report"}
+              </span>
             </Button>
           )}
 
@@ -307,24 +323,29 @@ export function InventoryCard({ item, onCancelSuccess }: InventoryCardProps) {
       {/* Lab Evidence Modal Dialog */}
       {canManageLotOperations && (
         <Dialog open={labDialogOpen} onOpenChange={setLabDialogOpen}>
-          <DialogContent className="sm:max-w-[780px] max-h-[90vh] overflow-y-auto p-0 rounded-2xl">
-            <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-slate-50/70 sticky top-0 z-10 backdrop-blur-xs">
+          <DialogContent showCloseButton={false} className="sm:max-w-[500px] max-h-[90dvh] flex flex-col overflow-hidden p-0 rounded-2xl">
+            <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-white flex flex-row items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="h-10 w-10 rounded-xl bg-emerald-100/90 text-emerald-700 flex items-center justify-center shrink-0 shadow-2xs">
                   <FlaskConical className="h-5 w-5" />
                 </div>
-                <div>
-                  <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900">
-                    Manage Laboratory Evidence: {item.lotNumber ? `Lot #${item.lotNumber}` : item.commodityName || "Availability Lot"}
-                  </DialogTitle>
-                  <DialogDescription className="text-xs text-slate-500 mt-0.5">
-                    Submit analytical laboratory parameters and physical COA test certificates for this supply lot.
-                  </DialogDescription>
-                </div>
+                <DialogTitle className="text-lg font-bold text-slate-900">
+                  Lab Test Report
+                </DialogTitle>
               </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setLabDialogOpen(false)}
+                className="h-10 w-10 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer flex items-center justify-center"
+                aria-label="Close dialog"
+              >
+                <X className="h-5 w-5" />
+              </Button>
             </DialogHeader>
 
-            <div className="p-4 sm:p-6">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <LabTestForm
                 availabilityId={item.id}
                 commodityId={item.commodityId || ""}

@@ -29,7 +29,7 @@ export default async function SellerPaymentsPage() {
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <BackButton label="Command Center" fallbackUrl="/seller" />
+            <BackButton label="Dashboard" fallbackUrl="/seller" />
             <div className="hidden sm:flex items-center gap-2">
               <span className="text-slate-300">/</span>
               <span className="text-sm font-bold text-slate-900">
