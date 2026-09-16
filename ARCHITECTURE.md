@@ -21,7 +21,22 @@ brokerbridge-enterprise/
 │   │           └── MasterDataTabs.tsx
 │   ├── (broker)/
 │   │   └── broker/
+│   │       ├── layout.tsx
+│   │       ├── loading.tsx
+│   │       ├── error.tsx
 │   │       ├── page.tsx
+│   │       ├── work/
+│   │       │   ├── page.tsx
+│   │       │   ├── loading.tsx
+│   │       │   └── supply/
+│   │       │       ├── page.tsx
+│   │       │       └── loading.tsx
+│   │       ├── deals/
+│   │       │   └── page.tsx
+│   │       ├── orders/
+│   │       │   └── page.tsx
+│   │       ├── more/
+│   │       │   └── page.tsx
 │   │       └── quotations/
 │   │           └── page.tsx
 │   ├── (buyer)/
@@ -457,6 +472,54 @@ The Seller Financial Settlement module provides high-integrity visibility into g
 - **Proactive Operational Financial Alerts**:
   - The settlement engine identifies overdue receivables (exceeding payment due dates) and active trade disputes, bubbling them up into P0 `<ActionRequiredBanner>` notifications on the Seller Command Center.
 
+### 28. Broker Lite App Shell, 360px Mobile Standard & Flat Role Architecture (Sprint 22)
+The Broker workspace transitions from a desktop-centric portal into **Broker Lite** — a focused, mobile-first operational shell designed for Tier-2/Tier-3 grain mandi environments:
+- **Mobile-First App Shell & 360px Viewport Standard (`layout.tsx`, `broker-mobile-nav.tsx`)**:
+  - Engineered specifically for low-cost Android smartphones (360px viewport standard) with zero horizontal scrolling.
+  - Features fixed bottom navigation with `env(safe-area-inset-bottom)` padding, haptic feedback classes, and minimum 48×48px thumb-friendly touch targets.
+  - Sticky mobile header provides real-time connectivity status and a live notification bell.
+  - Desktop view gracefully switches to a left navigation sidebar (`broker-sidebar.tsx`) with user profile menu and secure sign-out.
+- **5-Destination Information Architecture**:
+  - **Home (`/broker`)**: High-priority operational command center with P0 alerts, compact KPIs, active pipeline, and today's follow-ups.
+  - **Work (`/broker/work`)**: Core commercial pipeline covering Requirements, Demand-Supply Matches, Quality/Lab tolerances, and Active Negotiations.
+  - **Deals (`/broker/deals`)**: Finalized commercial contracts and mutual confirmations awaiting execution.
+  - **Orders (`/broker/orders`)**: Booked orders, truck dispatches, and in-transit logistics monitoring.
+  - **More (`/broker/more`)**: Secondary operational utilities including CRM contacts, payments ledger, document vault, and personal settings.
+- **Flat 4-Role Architecture (`admin`, `broker`, `buyer`, `seller`)**:
+  - The dual-hierarchy (`BROKER_ADMIN` vs. `BROKER_USER` or Manager/Viewer subtypes) has been completely eliminated.
+  - Permissions are enforced strictly server-side: all operational brokers hold equal day-to-day transaction capabilities.
+  - The operational UI strictly excludes "Team Management", "User Management", or technical authorization abstractions, keeping the broker focused solely on trading operations. Platform governance and user onboarding reside exclusively within Tier-0 `/admin`.
 
+### 29. Action-First Broker Operational Dashboard & Zero Data-Wall UI Principle (Sprint 22)
+The root Broker dashboard (`/app/(broker)/broker/page.tsx`) replaces the traditional analytics-wall design with an action-driven operational workflow:
+- **"Zero Data-Wall" UI Principle**:
+  - Traditional dense HTML `<table>` elements are strictly prohibited on the operational dashboard.
+  - All operational data is rendered in mobile-friendly, card-based components with structured selection, clear visual hierarchy, and 1-tap action deep links.
+- **P0 "Action Required" Prominence**:
+  - Alert cards with distinct left-border accents (`border-l-4 border-l-amber-500` for Counter Offers, `border-l-rose-500` for Delayed Dispatches, and `border-l-teal-500` for Ready-to-Book Mandates) sit directly beneath the compact KPI ribbon.
+  - Each alert features a thumb-friendly button deep-linking directly to the required workflow (e.g., `/broker/work?tab=negotiations`, `/broker/orders`).
+- **Strict Assignment Model (`broker-dashboard-actions.ts`)**:
+  - The backend server action `getBrokerDashboardDataAction()` enforces that brokers query **only** records where they are explicitly assigned (`eq(table.brokerId, session.user.id)`).
+  - Parallel Drizzle ORM queries (`Promise.all`) fetch active deals, open requirements, dispatches due, and monthly volume commissions.
+- **Hard Zero-Buyer PII Shield**:
+  - Buyer personal contact information (email, mobile, WhatsApp, GSTIN) is stripped at the query boundary.
+  - Counterparty entities are identified strictly by verified corporate company names or anonymized references (`"Verified Buyer #B-XXXX"`).
+- **Interactive CRM Follow-ups (`broker-follow-up-tasks.tsx`)**:
+  - CRM tasks due today feature an interactive checkbox with optimistic local state toggling, instant strikethrough animation, and server-side state persistence via `toggleTaskStatusAction()`.
 
+### 30. SPA Context Preservation, Confidential Price Governance & Non-Autonomous Decision Gate (Sprint 23)
+Connecting Buyer Demand to Seller Supply within the Broker Workspace enforces strict state preservation, privacy masking, and human decision gate invariants:
+- **SPA URL Parameter Context Preservation (`/broker/work/supply?requirementId=[id]&commodity=[id]`)**:
+  - To prevent operational friction and eliminate state loss when pivoting between Buyer Demand (Requirements inbox) and Seller Supply (Inventory discovery), BrokerBridge utilizes SPA URL parameters (`?tab=matches&reqId=...` and `/broker/work/supply?requirementId=[id]&commodity=[id]`).
+  - Next.js client router enables instantaneous navigation without full-page reloads or layout re-renders.
+  - The Seller Supply search workspace mounts a sticky contextual match banner displaying active requirement metrics (target quantity, commodity name, target price) while automatically pre-filtering inventory lots to match the requirement.
+  - Brokers retain the ability to dismiss or clear filters with a single tap to browse global inventory seamlessly.
+- **Confidential Minimum Price Authorization & Floor Governance (`broker-supply-actions.ts`)**:
+  - In strict compliance with commercial confidentiality, the Seller's `confidential_minimum_price` is masked from all Buyer views and raw API responses.
+  - However, in `getBrokerSupplySearchAction()`, the field is securely authorized and returned exclusively to authenticated Brokers.
+  - This empowers the Broker with the true commercial floor to negotiate effectively without exposing the Seller's bottom line to the Buyer or compromising platform integrity.
+- **Non-Autonomous Human Broker Decision Gate (`createBrokerRequestToSellerAction`)**:
+  - **Core Architectural Invariant**: AI is strictly for recommendation and match scoring; the licensed human Broker is the mandatory, legally accountable decision-maker.
+  - The system strictly rejects autonomous bot or background auto-dispatch triggers. All commercial proposals sent to Sellers require explicit human Broker initiation via `<SendRequestDialog />`.
+  - Submitting an outbound request inserts a commercial record into `quotations`, initializes Version 1 snapshot in `deal_versions`, triggers an in-app notification to the Seller dashboard (`/seller/requests?requestId=[id]`), and writes an immutable audit record to `audit_logs` via `logDecisionGateAuditEventAction` certifying human Broker provenance (`humanReviewed: true`).
 

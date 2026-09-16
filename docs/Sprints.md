@@ -144,6 +144,39 @@ __Phase 5: Enterprise Seller Command Center & Core Modules \(Sprints 13–20\)__
 
 ---
 
-### 🚀 **Global Platform Status: ALL SPRINTS 1–20 COMPLETE & PRODUCTION VALIDATED**
-Seller Platform MVP (Sprints 13–20) is 100% finished, audited against Seller PRD v3.0, verified with 100% UAT pass rates, and ready for production release.
+__Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
+
+- __Sprint 21: Pre-Broker Platform & Security Audit Gate__ (COMPLETED ✅)
+	- __Goal:__ Mandatory regression, integration, security, and data/state audit across Sprints 1–20 before commencing Broker feature implementation.
+	- __Key Tasks:__
+		- [x] __21.1 & 21.2 — Foundation & Seller Dashboard Audit:__ Completed and documented in `platform-audit-21.md`. Verified multi-tenant boundaries, zero client impersonation, and state machines.
+		- [x] __21.3 — Cross-Module Integration Audit:__ Completed and documented in `integration-audit-21.3.md`. Traced shared demand-to-supply pipeline (`Buyer` -> `Requirement` -> `Seller` -> `Lot` -> `Quotation` -> `Deal` -> `Booking` -> `Dispatch`).
+		- [x] __21.4 — Security & Flat Role Architecture Audit:__ Completed and documented in `security-audit-21.4.md`. Verified channel disintermediation, zero Buyer PII leakage, storage directory traversal guards, and officially transitioned to Flat 4-Role Architecture (`admin`, `broker`, `buyer`, `seller`).
+		- [x] __21.5 — Acceptance Gate:__ 100% test pass rates across 7 security gates, 10 positive UAT phases, and 5 negative boundary suites. Formally cleared for Sprint 22 (Green Light).
+	- __Technical Deliverables:__ `docs/platform-audit-21.md`, `docs/integration-audit-21.3.md`, `docs/security-audit-21.4.md`.
+
+- __Sprint 22: Broker Shell + Home (Broker Lite)__ (COMPLETED ✅)
+	- __Goal:__ Deploy mobile-first Broker Lite App Shell, 5-destination navigation, flat role operational security, and Action-First live data dashboard.
+	- __Key Tasks:__
+		- [x] __22.1 — Mobile Application Shell:__ Built Broker workspace root shell in `app/(broker)/broker/layout.tsx` tested at 360px viewport. Implemented Broker Global Loading Skeleton (`loading.tsx`) and Error Boundary (`error.tsx`).
+		- [x] __22.2 — Core Navigation & Flat Role Security:__ Built desktop left sidebar (`broker-sidebar.tsx`) and mobile bottom nav + sticky header (`broker-mobile-nav.tsx`) with 5 core operational tabs: **Home** (`/broker`), **Work** (`/broker/work`), **Deals** (`/broker/deals`), **Orders** (`/broker/orders`), and **More** (`/broker/more`). Strictly enforced flat `broker` role — zero "Team Management", "User Management", or `BROKER_ADMIN` sub-roles exposed.
+		- [x] __22.3 — Action-First Broker Dashboard (Zero Data-Walls):__ Completely stripped out legacy horizontal `<Tabs>` interface from `app/(broker)/broker/page.tsx`. Rebuilt with compact 4-card KPI ribbon (`Active Deals`, `Open Requirements`, `Dispatch Due`, `Commission This Month`) with Electric Teal (`#0D9488`) icon accents. Placed P0 "Action Required" alert cards with left-border accents above general metrics. Built 2-column lower section for Active Pipeline and Today's Follow-ups.
+		- [x] __22.4 — Live Data Integration (Strict Assignment Model):__ Built `getBrokerDashboardDataAction()` in `src/server/actions/broker-dashboard-actions.ts` executing parallel Drizzle ORM queries (`Promise.all`). Enforced strict assignment filter (`broker_id === currentUser.id`) and absolute Zero-Buyer-PII scrubbing. Converted `page.tsx` into an `async Server Component` with `<BrokerFollowUpTasks />` interactive client component wired to `toggleTaskStatusAction()`. Handled all empty states gracefully.
+	- __Technical Deliverables:__ `app/(broker)/broker/layout.tsx`, `page.tsx`, `loading.tsx`, `error.tsx`, `work/page.tsx`, `deals/page.tsx`, `orders/page.tsx`, `more/page.tsx`, `broker-sidebar.tsx`, `broker-mobile-nav.tsx`, `broker-follow-up-tasks.tsx`, `broker-dashboard-actions.ts`, and verified `npx tsc --noEmit` pass (0 errors).
+
+- __Sprint 23: Requirements + Seller Supply__ (COMPLETED ✅)
+	- __Goal:__ Buyer requirement processing, Seller inventory discovery, and broker outbound commercial trigger.
+	- __Key Tasks:__
+		- [x] __23.1 — Buyer Requirements Inbox:__ Built mobile-first, card-first Buyer Requirements Inbox inside `/broker/work` tab adhering strictly to Broker Assignment Model (`eq(requirements.brokerId, user.id)`), Zero Data-Wall rule, and zero Buyer PII leakage. Implemented read-only Drizzle server action `getBrokerAssignedRequirementsAction()` with multi-table joins. Built mobile `<RequirementCard />` with bold commercial metrics, sector breadcrumbs, and $\ge 48\text{px}$ touch targets for "Find Seller" (Electric Teal `#0D9488`) and "Ask Buyer". Integrated `<BrokerRequirementsInbox />`, `<BrokerWorkWorkspace />`, and specialized loading skeleton in `app/(broker)/broker/work/loading.tsx`.
+		- [x] __23.2 — Seller Supply Discovery:__ Built Seller Supply Search engine at `/broker/work/supply` with `getBrokerSupplySearchAction()`. Strictly enforced active lot filters (`validUntil > NOW()`), seller visibility boundaries (`visibility = 'global' OR brokerId = user.id`), and authorized Broker retrieval of Seller's `confidentialMinimumPrice`. Built `<SupplyFiltersComponent />` (mobile bottom Sheet + desktop 4-column panel with human-readable name resolvers) and `<SupplyCard />` with negotiation floor pricing.
+		- [x] __23.3 — Acceptance & Context Preservation:__ Connected "Find Seller" route from Requirement Card to `/broker/work/supply?requirementId=[id]&commodity=[id]`, displaying contextual match banner and pre-filtering supply parameters without full-page state loss.
+		- [x] __23.4 — Outbound Request Trigger (Seller Connection):__ Built `createBrokerRequestToSellerAction()` inserting commercial proposals into the existing `quotations` table, initializing Version 1 in `deal_versions`, and firing in-app notification to the Seller dashboard (`/seller/requests?requestId=[id]`) without altering Seller-side inbox logic from Sprint 16. Built responsive `<SendRequestDialog />` with 48px touch targets.
+	- __Technical Deliverables:__ `src/server/actions/broker-work-actions.ts`, `src/server/actions/broker-supply-actions.ts`, `src/server/actions/broker-outbound-actions.ts`, `src/components/broker/work/requirement-card.tsx`, `src/components/broker/work/broker-requirements-inbox.tsx`, `src/components/broker/work/broker-work-workspace.tsx`, `src/components/broker/work/supply-filters.tsx`, `src/components/broker/work/supply-card.tsx`, `src/components/broker/work/broker-supply-search-workspace.tsx`, `src/components/broker/work/send-request-dialog.tsx`, `app/(broker)/broker/work/page.tsx`, `app/(broker)/broker/work/supply/page.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
+
+---
+
+### 🚀 **Global Platform Status: SPRINT 23 COMPLETED | ADVANCING TO SPRINT 24**
+Sprint 23 (Requirements + Seller Supply) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 24: Matching + Quality**.
+
+
 

@@ -1,9 +1,9 @@
 # BrokerBridge Enterprise - Project State
 
 ## Overview
-Current Phase: **Phase 5: Multi-Sector Architecture & Platform Scaling (Sprints 13–20)**  
-Global Platform Status: **SPRINT 20 COMPLETE — SELLER PLATFORM PRODUCTION READY 🚀**  
-Status: **Sprint 20 Completed** ✅ (Seller MVP Validated, Audited & Approved for Production Release)
+Current Phase: **Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)**  
+Global Platform Status: **SPRINT 23 COMPLETE — REQUIREMENTS & SELLER SUPPLY ENGINE LIVE 🚀**  
+Status: **Sprint 23 Completed** ✅ (Next: Sprint 24: Matching + Quality)
 
 
 ---
@@ -338,8 +338,93 @@ Status: **Sprint 20 Completed** ✅ (Seller MVP Validated, Audited & Approved fo
     - [x] 360px mobile responsiveness with min-h-[48px] touch targets.
 - **Verification:** Passed `npx tsc --noEmit` with 0 errors. All 20 micro-sprints across Sprints 13 to 20 are 100% complete and approved for production release.
 
+---
 
+## Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)
 
+### 🟢 Sprint 21: Pre-Broker Platform & Security Audit Gate
+- **Status:** `COMPLETED` ✅
+- **Goal:** Comprehensive functional regression, cross-module integration, data isolation, and security audit across Sprints 1–20 prior to Broker build.
+- **Audit Findings & Reports:**
+  - `platform-audit-21.md`: Foundation & Seller Dashboard audit (100% PASS on 7 security gates, 10 UAT phases).
+  - `integration-audit-21.3.md`: Cross-module integration audit across Buyer demand, Seller inventory, quotations, deals, bookings, and dispatches.
+  - `security-audit-21.4.md`: Multi-tenant isolation, directory traversal guards, PII scrubbers, state machine gates, and transition to Flat 4-Role Architecture (`admin`, `broker`, `buyer`, `seller`).
+- **Verdict:** GREEN LIGHT — cleared for Sprint 22.
 
+---
 
+### 🟢 Sprint 22: Broker Shell + Home (Broker Lite)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Deploy mobile-first Broker Lite App Shell, 5-destination navigation, flat role operational security, and Action-First live data dashboard.
+- **Micro-Sprint 22.1 (Mobile Application Shell):** `COMPLETED` ✅
+  - Created `app/(broker)/broker/layout.tsx` hosting `BrokerSidebar` (desktop) and `BrokerMobileNav` (mobile).
+  - Enforced 360px viewport standard with `safe-area-inset` padding and min 48px touch targets.
+  - Created Global Loading Skeleton (`app/(broker)/broker/loading.tsx`) and Error Boundary (`app/(broker)/broker/error.tsx`).
+- **Micro-Sprint 22.2 (Core Navigation & Flat Role Security):** `COMPLETED` ✅
+  - Created `src/components/dashboard/broker-sidebar.tsx` and `src/components/dashboard/broker-mobile-nav.tsx`.
+  - Implemented 5 primary operational tabs: **Home** (`/broker`), **Work** (`/broker/work`), **Deals** (`/broker/deals`), **Orders** (`/broker/orders`), and **More** (`/broker/more`).
+  - Enforced Flat Role Model: absolutely ZERO `BROKER_ADMIN`, "Team Management", or "User Management" options exposed in the operational UI.
+- **Micro-Sprint 22.3 (Action-First Broker Dashboard):** `COMPLETED` ✅
+  - Completely stripped out legacy horizontal `<Tabs>` interface from `app/(broker)/broker/page.tsx`.
+  - Rebuilt with compact 4-card KPI ribbon (`Active Deals`, `Open Requirements`, `Dispatch Due`, `Commission This Month`) styled with Electric Teal (`#0D9488`) icon accents.
+  - Positioned P0 "Action Required" alert cards (`border-l-4` left-border accents) prominently above general metrics for Counter Offers, Delayed Dispatches, and Bookings Ready to Lock.
+  - Built 2-column layout for Active Pipeline cards and Today's Follow-ups.
+  - Strict "Zero Data-Walls" implementation (0 HTML `<table>` elements).
+- **Micro-Sprint 22.4 (Live Data Integration & Strict Assignment Model):** `COMPLETED` ✅
+  - Created backend server action `getBrokerDashboardDataAction()` in `src/server/actions/broker-dashboard-actions.ts`.
+  - Enforced strict assignment filter (`broker_id === currentUser.id`) and absolute Zero-Buyer-PII scrubbing.
+  - Parallelized database queries using `Promise.all` for sub-100ms response times.
+  - Converted `page.tsx` into an `async Server Component`.
+  - Built interactive `<BrokerFollowUpTasks />` client component with optimistic checkbox toggle wired to `toggleTaskStatusAction()`.
+  - Implemented graceful empty states for all sections.
+- **Verification:** `npx tsc --noEmit` exits with 0 errors. All 4 micro-sprints of Sprint 22 are 100% operational.
+ 
+---
 
+### 🟢 Sprint 23: Requirements + Seller Supply (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Buyer requirement processing, Seller inventory discovery, confidential price authorization, and broker outbound commercial trigger linking to the Seller dashboard.
+- **Log (The "Broker Bridge" Connected):** The Broker Bridge is successfully connected. Brokers can now receive assigned Buyer requirements, search authorized Seller supply within the SPA 'Work Hub' (Matches tab), preserve contextual demand state across views, and push commercial proposals directly to the Seller's dashboard without altering Seller-side inbox logic from Sprint 16.
+
+#### 🟢 Micro-Sprint 23.1: Buyer Requirements Inbox (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Deploy mobile-first, card-first Buyer Requirements Inbox inside the `/broker/work` tab adhering strictly to the Broker Assignment Model, Zero Data-Wall rule, and Buyer Privacy protection.
+- **Key Deliverables Completed:**
+  - [x] **Strict Assignment & Read-Only Server Action (`broker-work-actions.ts`):** Implemented `getBrokerAssignedRequirementsAction()` with strict session auth via `@supabase/ssr`, filtering by `eq(requirements.brokerId, user.id)`. Executed read-only Drizzle SELECT query joining `companies`, `masterCommodities`, `masterCategories`, `masterIndustries`, `masterGrades`, and `masterUnits`.
+  - [x] **Zero Buyer PII Leakage:** Scrubbed all direct Buyer contact info (zero phone, email, WhatsApp, or GST). Exclusively returned Buyer company name, verification status, trust score, and operational parameters.
+  - [x] **Operational Status Translation:** Translated raw SQL statuses into intuitive Broker-facing operational badges (`Action Required`, `New Demand`, `Sourcing`, `Matched`, `Partially Fulfilled`, `Fulfilled`, `Closed`).
+  - [x] **Mobile-Optimized Card (`requirement-card.tsx`):** Built Shadcn `<Card>` with sector breadcrumb typography (`Industry • Category | Commodity • Grade`), bold volume & target price metrics (`formatIndianCurrency`), delivery terms, target timeline with $\le 48\text{h}$ urgency badges, and quality parameters preview.
+  - [x] **The Triad Action Row with $\ge 48\text{px}$ Touch Targets:**
+    - Primary CTA: "Find Seller" with Electric Teal (`#0D9488`) accent deep-linking to matching/discovery.
+    - Secondary CTA: "Ask Buyer" outline button opening an interactive clarification inquiry modal.
+  - [x] **Broker Requirements Inbox & Workspace (`broker-requirements-inbox.tsx` & `broker-work-workspace.tsx`):** Added live search, status filter chips with dynamic counts, volume/urgency sorting, and empty state fallback.
+  - [x] **Server Component Integration & Loading Skeleton (`app/(broker)/broker/work/page.tsx` & `loading.tsx`):** Pre-fetched live requirements server-side and deployed specialized pulsing skeletons for CLS = 0.
+
+#### 🟢 Micro-Sprint 23.2: Seller Supply Discovery Engine (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Build high-performance Seller Supply Search Engine allowing Brokers to discover active inventory lots with authorized confidential pricing.
+- **Key Deliverables Completed:**
+  - [x] **Search Server Action (`broker-supply-actions.ts`):** Implemented `getBrokerSupplySearchAction(filters)` with strict session validation. Enforced active lot filters (`inArray(status, ['Active', 'Open'])`), date validity (`gt(validUntil, now)`), positive inventory (`gt(availableQuantity, 0)`), and Seller visibility boundaries (`visibility = 'global' OR brokerId = user.id`).
+  - [x] **Confidential Minimum Price Authorization:** Securely exposed Seller's `confidentialMinimumPrice` exclusively to authenticated Brokers for establishing negotiation floors.
+  - [x] **Zero Data-Wall Supply Cards (`supply-card.tsx`):** Built mobile-first supply cards with warehouse location, loading readiness status, available quantity, asking price, and confidential negotiation floor badge.
+  - [x] **Responsive Filter Drawer & Panel (`supply-filters.tsx`):** Built mobile bottom `<Sheet>` and desktop 4-column filter grid with human-readable name resolvers for Base UI `<SelectValue>` components.
+
+#### 🟢 Micro-Sprint 23.3: Context Preservation & Deep-Linking (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Maintain uninterrupted operational context between Buyer Demand and Seller Supply without full-page reloads.
+- **Key Deliverables Completed:**
+  - [x] **SPA Query Parameter Routing:** Connected "Find Seller" CTA on Requirement Cards to deep-link to `/broker/work/supply?requirementId=[id]&commodity=[id]`.
+  - [x] **Contextual Match Banner:** Rendered target volume, commodity name, and target price banner directly atop the Supply search workspace, automatically pre-filtering lots to match the active requirement.
+  - [x] **1-Tap Reset & Clear:** Enabled quick toggle to clear requirement context and browse global inventory freely.
+
+#### 🟢 Micro-Sprint 23.4: Outbound Request Trigger (The Seller-Side Connection) (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Connect Broker UI to push commercial proposals into the existing `quotations` / `broker_requests` schema and trigger Seller dashboard notifications without altering Seller Sprint 16 logic.
+- **Key Deliverables Completed:**
+  - [x] **Outbound Server Action (`broker-outbound-actions.ts`):** Implemented `createBrokerRequestToSellerAction(payload)` inserting proposal into `quotations` table with 48h validity.
+  - [x] **Deal Version 1 Initialization:** Initialized Version 1 snapshot in `deal_versions` table adhering to PRD v3.0 Deal Versioning Engine.
+  - [x] **Seller In-App Notification Dispatch:** Triggered instant notification to the Seller company via `queueNotificationAction` with deep-link URL `/seller/requests?requestId=[id]`.
+  - [x] **Decision Gate Audit Logging:** Recorded structured audit entry in `audit_logs` via `logDecisionGateAuditEventAction` confirming licensed human broker provenance.
+  - [x] **Send Request Modal (`send-request-dialog.tsx`):** Built responsive proposal dialog pre-populated with lot details, proposed rate, quantity, delivery date, and message notes with $\ge 48\text{px}$ touch targets.
+
+- **Verification:** Passed `npx tsc --noEmit` with 0 errors. Sprint 23 is 100% complete and verified. Moving to Sprint 24 (Matching + Quality).

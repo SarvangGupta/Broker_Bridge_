@@ -24,7 +24,7 @@ export default async function SellerQualityPage() {
             <div className="hidden sm:flex items-center gap-2">
               <span className="text-slate-300">/</span>
               <span className="text-sm font-bold text-slate-900">
-                Quality & Evidence Vault
+                Quality & Lab Reports
               </span>
             </div>
           </div>

@@ -49,29 +49,38 @@ function DropdownMenuContent({
   )
 }
 
-function DropdownMenuGroup({ ...props }: MenuPrimitive.Group.Props) {
-  return <MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
-}
+const DropdownMenuGroup = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<"div">
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    role="group"
+    data-slot="dropdown-menu-group"
+    className={className}
+    {...props}
+  />
+))
+DropdownMenuGroup.displayName = "DropdownMenuGroup"
 
-function DropdownMenuLabel({
-  className,
-  inset,
-  ...props
-}: MenuPrimitive.GroupLabel.Props & {
-  inset?: boolean
-}) {
-  return (
-    <MenuPrimitive.GroupLabel
-      data-slot="dropdown-menu-label"
-      data-inset={inset}
-      className={cn(
-        "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
-        className
-      )}
-      {...props}
-    />
-  )
-}
+const DropdownMenuLabel = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<"div"> & {
+    inset?: boolean
+  }
+>(({ className, inset, ...props }, ref) => (
+  <div
+    ref={ref}
+    data-slot="dropdown-menu-label"
+    data-inset={inset}
+    className={cn(
+      "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
+      className
+    )}
+    {...props}
+  />
+))
+DropdownMenuLabel.displayName = "DropdownMenuLabel"
 
 function DropdownMenuItem({
   className,

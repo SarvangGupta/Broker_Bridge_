@@ -1,0 +1,224 @@
+'use server';
+
+import { createClient } from '@/lib/supabase/server';
+import { db } from '@/src/server/db';
+import {
+  requirements,
+  companies,
+  masterCommodities,
+  masterCategories,
+  masterIndustries,
+  masterGrades,
+  masterUnits,
+  users,
+} from '@/src/server/db/schema';
+import { eq, desc, and } from 'drizzle-orm';
+import { format, differenceInHours, isPast } from 'date-fns';
+
+export type BrokerOperationalStatus =
+  | 'Action Required'
+  | 'New Demand'
+  | 'Sourcing'
+  | 'Matched'
+  | 'Partially Fulfilled'
+  | 'Fulfilled'
+  | 'Closed';
+
+export interface BrokerAssignedRequirement {
+  id: string;
+  requirementRef: string;
+  buyerCompanyName: string;
+  buyerCompanyVerified: boolean;
+  buyerTrustScore: number;
+  commodityId: string;
+  commodityName: string;
+  commodityCode: string | null;
+  categoryName: string | null;
+  industryName: string | null;
+  gradeId: string;
+  gradeName: string;
+  qualityParameters: Record<string, any> | null;
+  quantity: number;
+  unitName: string;
+  unitSymbol: string | null;
+  targetPrice: number;
+  deliveryTerms: string;
+  targetDateFormatted: string;
+  targetDateRaw: string;
+  isUrgent: boolean;
+  hoursUntilTarget: number;
+  status: string;
+  operationalStatus: BrokerOperationalStatus;
+  fulfilledQuantity: number;
+  fulfillmentPercentage: number;
+  visibility: string;
+  createdAtFormatted: string;
+}
+
+export type BrokerAssignedRequirementsResponse = {
+  success: boolean;
+  data?: BrokerAssignedRequirement[];
+  error?: string;
+};
+
+/**
+ * Micro-Sprint 23.1: Fetch Assigned Requirements (Broker Workspace)
+ *
+ * CRITICAL GUARDRAIL 1: BROKER ASSIGNMENT MODEL
+ * Strictly filters by eq(requirements.brokerId, user.id).
+ *
+ * CRITICAL GUARDRAIL 2: READ-ONLY DATA
+ * Pure SELECT queries. No mutations to the requirements table.
+ *
+ * PRIVACY RULE: Zero Buyer phone, email, WhatsApp, or GST details returned.
+ */
+export async function getBrokerAssignedRequirementsAction(): Promise<BrokerAssignedRequirementsResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user: authUser },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return { success: false, error: 'Unauthorized: Valid broker session required' };
+    }
+
+    // Verify user role & identity in database
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, authUser.id),
+    });
+
+    if (!dbUser) {
+      return { success: false, error: 'User not found in system' };
+    }
+
+    const role = (dbUser.role || '').toLowerCase();
+    if (role !== 'broker' && role !== 'admin') {
+      return { success: false, error: 'Forbidden: Broker access privileges required' };
+    }
+
+    const brokerId = dbUser.id;
+
+    // Execute Read-Only Drizzle Query strictly filtered by Broker ID
+    const rawRequirements = await db
+      .select({
+        id: requirements.id,
+        quantity: requirements.quantity,
+        targetPrice: requirements.targetPrice,
+        deliveryTermsId: requirements.deliveryTermsId,
+        targetDate: requirements.targetDate,
+        visibility: requirements.visibility,
+        status: requirements.status,
+        fulfilledQuantity: requirements.fulfilledQuantity,
+        createdAt: requirements.createdAt,
+        // Buyer Company details (zero PII)
+        buyerCompanyName: companies.name,
+        buyerCompanyVerified: companies.isVerified,
+        buyerTrustScore: companies.trustScore,
+        // Master Commodity details
+        commodityId: requirements.commodityId,
+        commodityName: masterCommodities.name,
+        commodityCode: masterCommodities.code,
+        // Master Category & Industry details
+        categoryName: masterCategories.name,
+        industryName: masterIndustries.name,
+        // Master Grade details
+        gradeId: requirements.gradeId,
+        gradeName: masterGrades.gradeName,
+        qualityParameters: masterGrades.parameters,
+        // Master Unit details
+        unitName: masterUnits.name,
+        unitSymbol: masterUnits.symbol,
+      })
+      .from(requirements)
+      .innerJoin(companies, eq(requirements.companyId, companies.id))
+      .innerJoin(masterCommodities, eq(requirements.commodityId, masterCommodities.id))
+      .leftJoin(masterCategories, eq(masterCommodities.categoryId, masterCategories.id))
+      .leftJoin(masterIndustries, eq(masterCategories.industryId, masterIndustries.id))
+      .innerJoin(masterGrades, eq(requirements.gradeId, masterGrades.id))
+      .innerJoin(masterUnits, eq(requirements.unitId, masterUnits.id))
+      .where(
+        // Strict Broker Assignment Filter (Guardrail 1)
+        eq(requirements.brokerId, brokerId)
+      )
+      .orderBy(desc(requirements.createdAt));
+
+    // Map into clean Broker Operational View Model
+    const mappedRequirements: BrokerAssignedRequirement[] = rawRequirements.map((req) => {
+      const targetDate = new Date(req.targetDate);
+      const hoursRemaining = differenceInHours(targetDate, new Date());
+      const isPastDue = isPast(targetDate);
+      const isUrgent = hoursRemaining <= 48 && !isPastDue;
+
+      // Determine clean Broker-facing operational status label
+      let operationalStatus: BrokerOperationalStatus = 'New Demand';
+      const rawStatus = (req.status || 'Open').toLowerCase();
+
+      if (rawStatus === 'open') {
+        if (isPastDue || isUrgent) {
+          operationalStatus = 'Action Required';
+        } else {
+          operationalStatus = 'New Demand';
+        }
+      } else if (rawStatus === 'in progress' || rawStatus === 'sourcing') {
+        operationalStatus = 'Sourcing';
+      } else if (rawStatus === 'matched') {
+        operationalStatus = 'Matched';
+      } else if (rawStatus === 'partially fulfilled') {
+        operationalStatus = 'Partially Fulfilled';
+      } else if (rawStatus === 'fulfilled' || rawStatus === 'completed') {
+        operationalStatus = 'Fulfilled';
+      } else if (rawStatus === 'cancelled' || rawStatus === 'closed') {
+        operationalStatus = 'Closed';
+      }
+
+      const totalQty = Number(req.quantity) || 0;
+      const fulfilledQty = Number(req.fulfilledQuantity) || 0;
+      const fulfillmentPercentage =
+        totalQty > 0 ? Math.min(100, Math.round((fulfilledQty / totalQty) * 100)) : 0;
+
+      return {
+        id: req.id,
+        requirementRef: `REQ-${req.id.slice(0, 8).toUpperCase()}`,
+        buyerCompanyName: req.buyerCompanyName || 'Registered Buyer',
+        buyerCompanyVerified: Boolean(req.buyerCompanyVerified),
+        buyerTrustScore: Number(req.buyerTrustScore) || 100,
+        commodityId: req.commodityId,
+        commodityName: req.commodityName,
+        commodityCode: req.commodityCode,
+        categoryName: req.categoryName,
+        industryName: req.industryName,
+        gradeId: req.gradeId,
+        gradeName: req.gradeName || 'Standard Quality',
+        qualityParameters: (req.qualityParameters as Record<string, any>) || null,
+        quantity: totalQty,
+        unitName: req.unitName,
+        unitSymbol: req.unitSymbol,
+        targetPrice: Number(req.targetPrice) || 0,
+        deliveryTerms: req.deliveryTermsId || 'Ex-Warehouse / Standard Dispatch',
+        targetDateFormatted: format(targetDate, 'dd MMM yyyy'),
+        targetDateRaw: targetDate.toISOString(),
+        isUrgent,
+        hoursUntilTarget: hoursRemaining,
+        status: req.status,
+        operationalStatus,
+        fulfilledQuantity: fulfilledQty,
+        fulfillmentPercentage,
+        visibility: req.visibility || 'global',
+        createdAtFormatted: format(new Date(req.createdAt), 'dd MMM yyyy, hh:mm a'),
+      };
+    });
+
+    return {
+      success: true,
+      data: mappedRequirements,
+    };
+  } catch (error: any) {
+    console.error('Error fetching broker assigned requirements:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch assigned buyer requirements',
+    };
+  }
+}

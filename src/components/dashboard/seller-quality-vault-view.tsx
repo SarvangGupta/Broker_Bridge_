@@ -6,17 +6,11 @@ import {
   FlaskConical,
   FileX,
   Search,
-  ShieldCheck,
-  Clock,
-  AlertCircle,
   Package,
   ArrowRight,
-  Filter,
-  CheckCircle2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { SellerGlobalLabReportItem } from "@/src/server/actions/lab-actions";
 import { GlobalLabReportCard } from "@/src/components/dashboard/global-lab-report-card";
 import { cn } from "@/lib/utils";
@@ -32,19 +26,6 @@ export function SellerQualityVaultView({
 }: SellerQualityVaultViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-
-  // Summary Metrics
-  const metrics = useMemo(() => {
-    const total = initialReports.length;
-    const verified = initialReports.filter((r) => r.effectiveStatus === "Verified").length;
-    const underReview = initialReports.filter(
-      (r) => r.effectiveStatus === "Under Review" || r.effectiveStatus === "Report Uploaded"
-    ).length;
-    const expired = initialReports.filter((r) => r.effectiveStatus === "Expired").length;
-    const notRequired = initialReports.filter((r) => r.effectiveStatus === "Not Required").length;
-
-    return { total, verified, underReview, expired, notRequired };
-  }, [initialReports]);
 
   // Filtered reports
   const filteredReports = useMemo(() => {
@@ -71,24 +52,13 @@ export function SellerQualityVaultView({
   }, [initialReports, searchTerm, statusFilter]);
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in-50 duration-200">
+    <div className="space-y-6 animate-in fade-in-50 duration-200">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Quality & Lab Reports Vault
-            </h1>
-            <Badge
-              variant="outline"
-              className="bg-emerald-50 text-[#047857] border-emerald-200 font-bold text-xs px-2.5 py-0.5"
-            >
-              Centralized Evidence
-            </Badge>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Complete archive of all official Certificate of Analysis (COA) test records and lot quality declarations.
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Quality & Lab Reports
+          </h1>
         </div>
 
         {onNavigateToInventory ? (
@@ -112,51 +82,6 @@ export function SellerQualityVaultView({
           </Link>
         )}
       </div>
-
-      {/* KPI Ribbon */}
-      {initialReports.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-              Total Reports
-            </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-              {metrics.total}
-            </div>
-            <span className="text-[11px] text-slate-500 block">Across active & past lots</span>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 block">
-              Verified
-            </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700">
-              {metrics.verified}
-            </div>
-            <span className="text-[11px] text-emerald-600/80 block">Audit & buyer cleared</span>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 block">
-              Under Review
-            </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-amber-700">
-              {metrics.underReview}
-            </div>
-            <span className="text-[11px] text-amber-600/80 block">Awaiting broker review</span>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600 block">
-              Expired
-            </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-rose-700">
-              {metrics.expired}
-            </div>
-            <span className="text-[11px] text-rose-600/80 block">Past 30d freshness validity</span>
-          </div>
-        </div>
-      )}
 
       {/* Main Content Area */}
       {initialReports.length === 0 ? (
@@ -198,7 +123,7 @@ export function SellerQualityVaultView({
         </div>
       ) : (
         /* TASK 4: Populated State (Mobile-First Cards Grid) */
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Search and Filters Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative flex-1">
@@ -239,13 +164,13 @@ export function SellerQualityVaultView({
 
           {/* Cards Grid */}
           {filteredReports.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-10 text-center space-y-2">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-10 text-center space-y-2 mt-6">
               <FileX className="w-8 h-8 text-slate-400 mx-auto" />
               <p className="text-sm font-bold text-slate-800">No matching reports found</p>
               <p className="text-xs text-slate-500">Try adjusting your search query or filter.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
               {filteredReports.map((report) => (
                 <GlobalLabReportCard key={report.id} report={report} />
               ))}
