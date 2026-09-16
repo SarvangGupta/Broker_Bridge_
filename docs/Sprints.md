@@ -173,10 +173,18 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 		- [x] __23.4 — Outbound Request Trigger (Seller Connection):__ Built `createBrokerRequestToSellerAction()` inserting commercial proposals into the existing `quotations` table, initializing Version 1 in `deal_versions`, and firing in-app notification to the Seller dashboard (`/seller/requests?requestId=[id]`) without altering Seller-side inbox logic from Sprint 16. Built responsive `<SendRequestDialog />` with 48px touch targets.
 	- __Technical Deliverables:__ `src/server/actions/broker-work-actions.ts`, `src/server/actions/broker-supply-actions.ts`, `src/server/actions/broker-outbound-actions.ts`, `src/components/broker/work/requirement-card.tsx`, `src/components/broker/work/broker-requirements-inbox.tsx`, `src/components/broker/work/broker-work-workspace.tsx`, `src/components/broker/work/supply-filters.tsx`, `src/components/broker/work/supply-card.tsx`, `src/components/broker/work/broker-supply-search-workspace.tsx`, `src/components/broker/work/send-request-dialog.tsx`, `app/(broker)/broker/work/page.tsx`, `app/(broker)/broker/work/supply/page.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
 
+- __Sprint 24: Matching + Quality__ (COMPLETED ✅)
+	- __Goal:__ Deterministic multi-factor AI match scoring, explainable compatibility drivers, human broker override compliance gate, and mobile-optimized COA/laboratory verification interface.
+	- __Key Tasks:__
+		- [x] __24.1 — Deterministic Matching Engine & Broker Pairing Interface:__ Implemented 6-factor deterministic scoring engine (`calculateMatchScore()`) in `src/server/utils/match-engine.ts` enforcing exact mathematical weights: **Commodity 35%**, **Grade 25%**, **Price 20%**, **Location 10%**, **Quantity 7%**, and **Delivery Date 3%** with zero external LLM API dependencies. Built `getRankedMatchesForRequirementAction()` in `src/server/actions/broker-match-actions.ts` with zero Buyer PII leakage. Built `<MatchesView />` with 0–100 score ring badges, classification tags (*Strong*, *Good*, *Partial*, *Low*), explainability accordions, and compliance-audited manual match override dialog backed by `logMatchOverrideAction()`.
+		- [x] __24.2 — Quality & COA Verification Interface:__ Implemented `getBrokerQualityComparisonAction()` in `src/server/actions/broker-quality-actions.ts` integrating master quality parameters, grade tolerances, seller declared values, and structured `lab_tests` / `lab_test_results`. Built `<BrokerQualityHub />` desk overview and `<QualityComparisonPanel />` responsive drawer featuring high-level compatibility summaries, Document State badges (*Verified*, *Received*, *Correction Required*, *Rejected*, *Required*, *Missing*), signed URL PDF viewer, and `<QualityActionBar />` sticky operational decision bar for recording broker approvals, correction requests, and lab rejections.
+		- [x] __24.3 — Acceptance & Zero Data-Wall Polish:__ Verified 360px mobile responsiveness, $\ge 48\text{px}$ touch targets, and full SPA routing with controlled tab state synchronization in `<BrokerWorkWorkspace />`.
+	- __Technical Deliverables:__ `src/server/utils/match-engine.ts`, `src/server/actions/broker-match-actions.ts`, `src/server/actions/broker-quality-actions.ts`, `src/components/broker/work/matches-view.tsx`, `src/components/broker/work/broker-quality-hub.tsx`, `src/components/broker/work/quality-comparison-panel.tsx`, `src/components/broker/work/quality-action-bar.tsx`, `src/components/broker/work/broker-work-workspace.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 23 COMPLETED | ADVANCING TO SPRINT 24**
-Sprint 23 (Requirements + Seller Supply) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 24: Matching + Quality**.
+### 🚀 **Global Platform Status: SPRINT 24 COMPLETED | ADVANCING TO SPRINT 25**
+Sprint 24 (Matching + Quality) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 25: Negotiation**.
 
 
 

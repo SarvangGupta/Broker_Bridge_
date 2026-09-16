@@ -148,25 +148,25 @@ Purpose: Sprint 21 is an audit sprint, not a feature sprint. It follows the same
 - [x] The broker_requests / quotations database table already exists. Connected the Broker outbound request trigger to write into this table.
 - [x] Do not rebuild the Seller inbox or Seller response flow.
 
-# Sprint 24 — Matching + Quality
+# Sprint 24 — Matching + Quality (COMPLETED ✅)
 
-## 24.1 — Matching
+## 24.1 — Matching (COMPLETED ✅)
 
-- Show Buyer Requirement alongside recommended Seller lots.
-- Initial weights: Commodity 35%, Grade 25%, Price 20%, Location 10%, Quantity 7%, Delivery date 3%.
-- Show 0–100 match score and plain-language Why?.
-- Allow manual override with a simple reason.
+- [x] Show Buyer Requirement alongside recommended Seller lots.
+- [x] Initial weights: Commodity 35%, Grade 25%, Price 20%, Location 10%, Quantity 7%, Delivery date 3%.
+- [x] Show 0–100 match score and plain-language Why?.
+- [x] Allow manual override with a simple reason.
 
-## 24.2 — Quality
+## 24.2 — Quality (COMPLETED ✅)
 
-- Use the shared commodity-specific Quality Parameter Master.
-- Show simple compatibility first; details on demand.
-- Support COA/lab documents and states: Required, Received, Verified, Missing.
-- Actions: Approve, Reject, Request Correction, Request New COA/Lab Report, Mark Pending.
+- [x] Use the shared commodity-specific Quality Parameter Master.
+- [x] Show simple compatibility first; details on demand.
+- [x] Support COA/lab documents and states: Required, Received, Verified, Missing.
+- [x] Actions: Approve, Reject, Request Correction, Request New COA/Lab Report, Mark Pending.
 
-## 24.3 — Acceptance
+## 24.3 — Acceptance (COMPLETED ✅)
 
-- Broker can select a commercially usable lot without navigating a complex technical or laboratory interface.
+- [x] Broker can select a commercially usable lot without navigating a complex technical or laboratory interface.
 
 # Sprint 25 — Negotiation
 
