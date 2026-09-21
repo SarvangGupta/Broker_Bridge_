@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)**  
-Global Platform Status: **SPRINT 23 COMPLETE — REQUIREMENTS & SELLER SUPPLY ENGINE LIVE 🚀**  
-Status: **Sprint 23 Completed** ✅ (Next: Sprint 24: Matching + Quality)
+Global Platform Status: **SPRINT 25 COMPLETE — DUAL-CHANNEL BROKER NEGOTIATION ENGINE LIVE 🚀**  
+Status: **Sprint 25 Completed** ✅ (Next: Sprint 26: Deal + Confirmation)
 
 
 ---
@@ -466,4 +466,31 @@ Status: **Sprint 23 Completed** ✅ (Next: Sprint 24: Matching + Quality)
   - [x] **Full TypeScript Health Check:** Verified 100% type safety with `npx tsc --noEmit` exiting with 0 errors.
 
 - **Verification:** Passed `npx tsc --noEmit` with 0 errors. Sprint 24 is 100% complete and verified. Moving to Sprint 25 (Negotiation).
+
+---
+
+### 🟢 Sprint 25: Commercial Negotiation & Dual-Channel Engine (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Isolated dual-channel negotiation streams (Seller-Broker and Buyer-Broker), privacy scrubber hardening, immutable deal versioning (`v1` → `v2`), optimistic concurrency protection (`STALE_VERSION_DETECTED`), and unified Master Timeline with Margin Spread tracking.
+- **Log (Dual-Channel Commercial Negotiation Engine Live):** The Broker Negotiation Engine is 100% operational. Brokers can now independently negotiate terms with Sellers (Seller Channel - Micro-Sprint 25.1) and translate them into landed proposals for Buyers (Buyer Channel - Micro-Sprint 25.2), while enforcing zero Buyer/Seller data leakage, optimistic concurrency locking, and master timeline margin tracking (Micro-Sprint 25.3).
+
+#### 🟢 Micro-Sprint 25.1: Seller Negotiation Channel (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Deliverables:** `sendProposalToSellerAction` server action, `SellerNegotiationPanel` UI form component, `BrokerSellerTimeline` component, and zero-Buyer-PII privacy lock.
+
+#### 🟢 Micro-Sprint 25.2: Buyer Negotiation Channel (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Deliverables:** `sendProposalToBuyerAction` server action, `BuyerNegotiationPanel` UI form component, `BrokerBuyerTimeline` component, and zero-Seller-leakage privacy lock (excluding seller min floor, identity, and lot location).
+
+#### 🟢 Micro-Sprint 25.3: Privacy + History & Version Integration (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Deliverables:** `sanitizePayloadForBuyer` & `sanitizePayloadForSeller` in `privacy-scrubber.ts`, version-engine integration via `createDealVersionInTransaction` with `STALE_VERSION_DETECTED` optimistic locking, and `BrokerMasterTimeline` component with gross margin spread analytics.
+
+#### 🟢 Micro-Sprint 25.4: Negotiation Acceptance Gate & Final Audit (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Deliverables:** Verified mathematical privacy disintermediation across Buyer & Seller endpoints, zero shared conversation database entities, immutable deal version creation with `STALE_VERSION_DETECTED` optimistic concurrency control, and 360px mobile touch target compliance.
+
+- **Verification:** Passed `npx tsc --noEmit` with 0 errors. Sprint 25 is 100% complete and verified. Moving to Sprint 26 (Deal + Confirmation).
+
+
 

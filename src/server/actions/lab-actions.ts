@@ -1,5 +1,6 @@
 'use server';
 
+import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { db } from '@/src/server/db';
 import {
@@ -521,85 +522,87 @@ export type SellerGlobalLabReportItem = {
  * Fetches all lab reports belonging to the current authenticated seller's company.
  * LEFT JOINs availabilities and masterCommodities for commodity name & lot number.
  */
-export async function getSellerGlobalLabReportsAction(): Promise<
-  LabActionResponse<SellerGlobalLabReportItem[]>
-> {
-  try {
-    const session = await verifySellerSession({ allowViewer: true });
-    if (!session.success || !session.data) {
-      return { success: false, error: session.error || 'Unauthorized' };
-    }
+export const getSellerGlobalLabReportsAction = cache(
+  async function getSellerGlobalLabReportsAction(): Promise<
+    LabActionResponse<SellerGlobalLabReportItem[]>
+  > {
+    try {
+      const session = await verifySellerSession({ allowViewer: true });
+      if (!session.success || !session.data) {
+        return { success: false, error: session.error || 'Unauthorized' };
+      }
 
-    const rows = await db
-      .select({
-        id: labTests.id,
-        availabilityId: labTests.availabilityId,
-        companyId: labTests.companyId,
-        laboratoryName: labTests.laboratoryName,
-        laboratoryLocation: labTests.laboratoryLocation,
-        sampleId: labTests.sampleId,
-        sampleDate: labTests.sampleDate,
-        testDate: labTests.testDate,
-        reportNumber: labTests.reportNumber,
-        reportDate: labTests.reportDate,
-        validUntil: labTests.validUntil,
-        fileUrl: labTests.fileUrl,
-        status: labTests.status,
-        createdAt: labTests.createdAt,
-        lotNumber: availabilities.lotNumber,
-        commodityId: availabilities.commodityId,
-        commodityName: masterCommodities.name,
-      })
-      .from(labTests)
-      .leftJoin(availabilities, eq(labTests.availabilityId, availabilities.id))
-      .leftJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))
-      .where(eq(labTests.companyId, session.data.companyId))
-      .orderBy(desc(labTests.createdAt));
+      const rows = await db
+        .select({
+          id: labTests.id,
+          availabilityId: labTests.availabilityId,
+          companyId: labTests.companyId,
+          laboratoryName: labTests.laboratoryName,
+          laboratoryLocation: labTests.laboratoryLocation,
+          sampleId: labTests.sampleId,
+          sampleDate: labTests.sampleDate,
+          testDate: labTests.testDate,
+          reportNumber: labTests.reportNumber,
+          reportDate: labTests.reportDate,
+          validUntil: labTests.validUntil,
+          fileUrl: labTests.fileUrl,
+          status: labTests.status,
+          createdAt: labTests.createdAt,
+          lotNumber: availabilities.lotNumber,
+          commodityId: availabilities.commodityId,
+          commodityName: masterCommodities.name,
+        })
+        .from(labTests)
+        .leftJoin(availabilities, eq(labTests.availabilityId, availabilities.id))
+        .leftJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))
+        .where(eq(labTests.companyId, session.data.companyId))
+        .orderBy(desc(labTests.createdAt));
 
-    const data: SellerGlobalLabReportItem[] = rows.map((r) => {
-      const freshness = computeLabFreshness(r.testDate, r.validUntil);
-      const effectiveStatus =
-        r.status === 'Not Required'
-          ? 'Not Required'
-          : freshness === 'Expired' && r.status === 'Verified'
-          ? 'Expired'
-          : r.status;
+      const data: SellerGlobalLabReportItem[] = rows.map((r) => {
+        const freshness = computeLabFreshness(r.testDate, r.validUntil);
+        const effectiveStatus =
+          r.status === 'Not Required'
+            ? 'Not Required'
+            : freshness === 'Expired' && r.status === 'Verified'
+            ? 'Expired'
+            : r.status;
+
+        return {
+          id: String(r.id),
+          availabilityId: String(r.availabilityId),
+          companyId: String(r.companyId),
+          laboratoryName: r.laboratoryName || '',
+          laboratoryLocation: r.laboratoryLocation || null,
+          sampleId: r.sampleId || null,
+          sampleDate: r.sampleDate ? new Date(r.sampleDate).toISOString() : null,
+          testDate: r.testDate ? new Date(r.testDate).toISOString() : new Date().toISOString(),
+          reportNumber: r.reportNumber || '',
+          reportDate: r.reportDate ? new Date(r.reportDate).toISOString() : new Date().toISOString(),
+          validUntil: r.validUntil ? new Date(r.validUntil).toISOString() : null,
+          fileUrl: r.fileUrl || null,
+          status: r.status || 'Under Review',
+          createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
+          lotNumber: r.lotNumber || null,
+          commodityId: r.commodityId || null,
+          commodityName: r.commodityName || null,
+          freshness,
+          effectiveStatus,
+        };
+      });
 
       return {
-        id: String(r.id),
-        availabilityId: String(r.availabilityId),
-        companyId: String(r.companyId),
-        laboratoryName: r.laboratoryName || '',
-        laboratoryLocation: r.laboratoryLocation || null,
-        sampleId: r.sampleId || null,
-        sampleDate: r.sampleDate ? new Date(r.sampleDate).toISOString() : null,
-        testDate: r.testDate ? new Date(r.testDate).toISOString() : new Date().toISOString(),
-        reportNumber: r.reportNumber || '',
-        reportDate: r.reportDate ? new Date(r.reportDate).toISOString() : new Date().toISOString(),
-        validUntil: r.validUntil ? new Date(r.validUntil).toISOString() : null,
-        fileUrl: r.fileUrl || null,
-        status: r.status || 'Under Review',
-        createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
-        lotNumber: r.lotNumber || null,
-        commodityId: r.commodityId || null,
-        commodityName: r.commodityName || null,
-        freshness,
-        effectiveStatus,
+        success: true,
+        data,
       };
-    });
-
-    return {
-      success: true,
-      data,
-    };
-  } catch (error: any) {
-    console.error('getSellerGlobalLabReportsAction error:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to fetch centralized lab reports.',
-    };
+    } catch (error: any) {
+      console.error('getSellerGlobalLabReportsAction error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch centralized lab reports.',
+      };
+    }
   }
-}
+);
 
 /**
  * Fetches structured lab test record for an availability lot with computed freshness.

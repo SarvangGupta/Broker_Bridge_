@@ -181,10 +181,20 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 		- [x] __24.3 — Acceptance & Zero Data-Wall Polish:__ Verified 360px mobile responsiveness, $\ge 48\text{px}$ touch targets, and full SPA routing with controlled tab state synchronization in `<BrokerWorkWorkspace />`.
 	- __Technical Deliverables:__ `src/server/utils/match-engine.ts`, `src/server/actions/broker-match-actions.ts`, `src/server/actions/broker-quality-actions.ts`, `src/components/broker/work/matches-view.tsx`, `src/components/broker/work/broker-quality-hub.tsx`, `src/components/broker/work/quality-comparison-panel.tsx`, `src/components/broker/work/quality-action-bar.tsx`, `src/components/broker/work/broker-work-workspace.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
 
+- __Sprint 25: Negotiation__ (COMPLETED ✅)
+	- __Goal:__ Deploy isolated dual-channel negotiation streams (Seller-Broker and Buyer-Broker), privacy scrubber hardening, immutable deal versioning (`v1` → `v2`), optimistic concurrency protection (`STALE_VERSION_DETECTED`), and unified Master Timeline with Margin Spread tracking.
+	- __Key Tasks:__
+		- [x] __25.1 — Seller Negotiation Channel:__ Built `sendProposalToSellerAction()` server action in `broker-negotiation-actions.ts`, `<SellerNegotiationPanel />` UI form component, `<BrokerSellerTimeline />` read-only channel history component, and zero-Buyer-PII privacy lock.
+		- [x] __25.2 — Buyer Negotiation Channel:__ Built `sendProposalToBuyerAction()` server action in `broker-buyer-actions.ts`, `<BuyerNegotiationPanel />` UI form component, `<BrokerBuyerTimeline />` read-only channel history component, and zero-Seller-leakage privacy lock (excluding seller min floor, identity, and lot location).
+		- [x] __25.3 — Privacy + History & Version Integration:__ Built `sanitizePayloadForBuyer()` and `sanitizePayloadForSeller()` in `privacy-scrubber.ts`. Integrated `createDealVersionInTransaction()` with `STALE_VERSION_DETECTED` optimistic concurrency control. Built `<BrokerMasterTimeline />` component with gross margin spread analytics (Broker Eyes Only).
+		- [x] __25.4 — Negotiation Acceptance Gate & Final Audit:__ Completed automated privacy audit (zero cross-channel PII leakage, zero shared conversation entities), state machine version integrity check, 360px mobile touch target audit ($\ge 48\text{px}$), and full TypeScript compilation check.
+	- __Technical Deliverables:__ `src/server/utils/privacy-scrubber.ts`, `src/server/actions/broker-negotiation-actions.ts`, `src/server/actions/broker-buyer-actions.ts`, `src/types/negotiation-schema.ts`, `src/types/buyer-negotiation-schema.ts`, `src/components/broker/work/seller-negotiation-panel.tsx`, `src/components/broker/work/buyer-negotiation-panel.tsx`, `src/components/broker/work/broker-seller-timeline.tsx`, `src/components/broker/work/broker-buyer-timeline.tsx`, `src/components/broker/work/broker-master-timeline.tsx`, `src/components/broker/negotiation/broker-negotiations-hub.tsx`, `src/components/broker/work/broker-work-workspace.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 24 COMPLETED | ADVANCING TO SPRINT 25**
-Sprint 24 (Matching + Quality) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 25: Negotiation**.
+### 🚀 **Global Platform Status: SPRINT 25 COMPLETED | ADVANCING TO SPRINT 26**
+Sprint 25 (Negotiation) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 26: Deal + Confirmation**.
+
 
 
 

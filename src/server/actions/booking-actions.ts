@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/src/server/db";
 import {
@@ -481,171 +482,191 @@ export interface BookedOrderSummary {
  * 2. Zero Buyer PII: Strips all buyer personal/contact data at the query boundary.
  * 3. Read-Only Snapshot: Reads from immutable locked version snapshots.
  */
-export async function getSellerBookedOrdersAction(): Promise<{
-  success: boolean;
-  data?: BookedOrderSummary[];
-  error?: string;
-}> {
-  try {
-    const session = await verifySellerSession({ allowViewer: true });
-    if (!session.success || !session.data) {
-      return { success: false, error: session.error || "Unauthorized: Valid seller session required." };
-    }
-
-    const sellerCompanyId = session.data.companyId;
-    const isPlatformAdmin =
-      session.data.user.role === "admin" ||
-      session.data.user.role === "ADMIN";
-
-    // 1. Fetch all bookings
-    const allBookings = await db
-      .select({
-        id: bookings.id,
-        bookingReference: bookings.bookingReference,
-        dealId: bookings.dealId,
-        lockedVersionId: bookings.lockedVersionId,
-        status: bookings.status,
-        createdAt: bookings.createdAt,
-      })
-      .from(bookings)
-      .orderBy(desc(bookings.createdAt));
-
-    if (!allBookings.length) {
-      return { success: true, data: [] };
-    }
-
-    // 2. Fetch associated deals, quotations, versions, and lots
-    const bookedOrders: BookedOrderSummary[] = [];
-
-    for (const b of allBookings) {
-      // Find deal record
-      let dealRecord = await db.query.deals.findFirst({
-        where: or(eq(deals.id, b.dealId), eq(deals.quotationId, b.dealId)),
-      });
-
-      // Find quotation
-      const quotationId = dealRecord ? dealRecord.quotationId : b.dealId;
-      const quotationRecord = await db.query.quotations.findFirst({
-        where: eq(quotations.id, quotationId),
-      });
-
-      // Find availability/lot
-      const lotRecord = quotationRecord?.sellerAvailabilityId
-        ? await db.query.availabilities.findFirst({
-            where: eq(availabilities.id, quotationRecord.sellerAvailabilityId),
-          })
-        : null;
-
-      // Ownership Verification: Must match sellerCompanyId unless admin
-      const dealSellerId = dealRecord?.sellerId;
-      const lotCompanyId = lotRecord?.companyId;
-
-      const isOwnedBySeller =
-        isPlatformAdmin ||
-        dealSellerId === sellerCompanyId ||
-        dealSellerId === session.data.user.id ||
-        lotCompanyId === sellerCompanyId;
-
-      if (!isOwnedBySeller) {
-        continue;
+export const getSellerBookedOrdersAction = cache(
+  async function getSellerBookedOrdersAction(): Promise<{
+    success: boolean;
+    data?: BookedOrderSummary[];
+    error?: string;
+  }> {
+    try {
+      const session = await verifySellerSession({ allowViewer: true });
+      if (!session.success || !session.data) {
+        return { success: false, error: session.error || "Unauthorized: Valid seller session required." };
       }
 
-      // Fetch locked version snapshot
-      let versionRecord = await db.query.dealVersions.findFirst({
-        where: eq(dealVersions.id, b.lockedVersionId),
-      });
+      const sellerCompanyId = session.data.companyId;
+      const userId = session.data.user.id;
+      const isPlatformAdmin =
+        session.data.user.role === "admin" ||
+        session.data.user.role === "ADMIN";
 
-      if (!versionRecord && quotationId) {
-        versionRecord = await db.query.dealVersions.findFirst({
-          where: eq(dealVersions.requestId, quotationId),
-          orderBy: desc(dealVersions.versionNumber),
-        });
+      // 1. Single Joined Batch Query
+      const joinedRows = await db
+        .select({
+          bookingId: bookings.id,
+          bookingReference: bookings.bookingReference,
+          dealId: bookings.dealId,
+          lockedVersionId: bookings.lockedVersionId,
+          bookingStatus: bookings.status,
+          bookingCreatedAt: bookings.createdAt,
+          // Deal
+          realDealId: deals.id,
+          agreedPrice: deals.agreedPrice,
+          agreedQuantity: deals.agreedQuantity,
+          dealStatus: deals.status,
+          dealSellerId: deals.sellerId,
+          dealQuotationId: deals.quotationId,
+          // Quotation
+          quotationId: quotations.id,
+          sellerAvailabilityId: quotations.sellerAvailabilityId,
+          // Availability
+          lotNumber: availabilities.lotNumber,
+          lotCompanyId: availabilities.companyId,
+          // Version
+          versionNumber: dealVersions.versionNumber,
+          versionSnapshot: dealVersions.snapshotPayload,
+        })
+        .from(bookings)
+        .leftJoin(deals, or(eq(bookings.dealId, deals.id), eq(bookings.dealId, deals.quotationId)))
+        .leftJoin(quotations, eq(quotations.id, deals.quotationId))
+        .leftJoin(availabilities, eq(availabilities.id, quotations.sellerAvailabilityId))
+        .leftJoin(dealVersions, eq(dealVersions.id, bookings.lockedVersionId))
+        .orderBy(desc(bookings.createdAt));
+
+      if (!joinedRows.length) {
+        return { success: true, data: [] };
       }
 
-      const snap = (versionRecord?.snapshotPayload || {}) as DealVersionSnapshot;
+      // Filter by Tenant Isolation
+      const filtered = joinedRows.filter((r) => {
+        if (isPlatformAdmin) return true;
+        return (
+          r.dealSellerId === sellerCompanyId ||
+          r.dealSellerId === userId ||
+          r.lotCompanyId === sellerCompanyId
+        );
+      });
 
-      // Fetch dispatches and negotiation dispatch events for partial fulfillment tracking
-      const dealIdToQuery = dealRecord ? dealRecord.id : b.dealId;
-      const [existingDispatches, dispatchEvents] = await Promise.all([
-        db.query.dispatches.findMany({
-          where: eq(dispatches.dealId, dealIdToQuery),
-        }),
-        quotationId
+      if (!filtered.length) {
+        return { success: true, data: [] };
+      }
+
+      // Collect deal IDs & quotation IDs for batch queries
+      const dealIds = Array.from(
+        new Set(filtered.map((r) => r.realDealId || r.dealId).filter(Boolean))
+      ) as string[];
+
+      const quotationIds = Array.from(
+        new Set(filtered.map((r) => r.quotationId || r.dealQuotationId).filter(Boolean))
+      ) as string[];
+
+      // 2. Batch subqueries for dispatches & dispatch events (Parallel)
+      const [allDispatches, allDispatchEvents] = await Promise.all([
+        dealIds.length > 0
+          ? db.query.dispatches.findMany({
+              where: inArray(dispatches.dealId, dealIds),
+            })
+          : Promise.resolve([]),
+        quotationIds.length > 0
           ? db
               .select()
               .from(negotiationEvents)
               .where(
                 and(
-                  eq(negotiationEvents.requestId, quotationId),
+                  inArray(negotiationEvents.requestId, quotationIds),
                   eq(negotiationEvents.actionType, "DISPATCH_SUBMITTED")
                 )
               )
-          : [],
+          : Promise.resolve([]),
       ]);
 
-      const bookedQty = Number(dealRecord?.agreedQuantity || snap.quantity || 0);
-      const lockedRate = Number(dealRecord?.agreedPrice || snap.rate || 0);
-      const totalVal = bookedQty * lockedRate;
+      const dispatchesMap = new Map<string, typeof allDispatches>();
+      for (const disp of allDispatches) {
+        const list = dispatchesMap.get(disp.dealId) || [];
+        list.push(disp);
+        dispatchesMap.set(disp.dealId, list);
+      }
 
-      const alreadyDispatched = dispatchEvents.reduce(
-        (sum, ev) => sum + Number((ev.payload as any)?.dispatchQuantity || 0),
-        0
-      );
-      const remainingQty = Math.max(0, Number((bookedQty - alreadyDispatched).toFixed(4)));
+      const dispatchEventsMap = new Map<string, typeof allDispatchEvents>();
+      for (const ev of allDispatchEvents) {
+        const list = dispatchEventsMap.get(ev.requestId) || [];
+        list.push(ev);
+        dispatchEventsMap.set(ev.requestId, list);
+      }
 
-      const destParts = [snap.deliveryLocation, snap.deliveryDistrict, snap.deliveryState].filter(Boolean);
-      const destString = destParts.length > 0 ? destParts.join(", ") : "Ex-Warehouse";
+      // 3. In-Memory Synthesis
+      const bookedOrders: BookedOrderSummary[] = [];
 
-      const orderSummary: BookedOrderSummary = {
-        id: b.id,
-        bookingReference: b.bookingReference,
-        dealId: dealRecord ? dealRecord.id : b.dealId,
-        quotationId: quotationRecord?.id,
-        lockedVersionId: b.lockedVersionId,
-        versionNumber: versionRecord?.versionNumber || 1,
-        commodityName: snap.commodityName || "Agricultural Commodity",
-        gradeName: snap.gradeName || "Standard Grade",
-        lotNumber: snap.lotNumber || lotRecord?.lotNumber || "N/A",
-        bookedQuantity: bookedQty,
-        alreadyDispatchedQuantity: alreadyDispatched,
-        remainingQuantity: remainingQty,
-        unitSymbol: snap.unitSymbol || "MT",
-        lockedRate: lockedRate,
-        totalValuation: totalVal,
-        deliveryLocation: destString,
-        deliveryState: snap.deliveryState || undefined,
-        deliveryDistrict: snap.deliveryDistrict || undefined,
-        deliveryTerms: snap.deliveryTerms || "Ex-Warehouse",
-        expectedDeliveryDate: snap.deliveryDate || null,
-        paymentTerms: snap.paymentTerms || "Broker Escrow Settlement",
-        dealStatus: dealRecord?.status || "Dispatch Pending",
-        bookingStatus: b.status || "Confirmed",
-        bookingCreatedAt: b.createdAt.toISOString(),
-        dispatchesCount: existingDispatches.length,
-        hasDispatched:
-          existingDispatches.length > 0 ||
-          alreadyDispatched > 0 ||
-          dealRecord?.status === "In Transit" ||
-          dealRecord?.status === "Dispatched" ||
-          dealRecord?.status === "Partially Dispatched",
-        isFullyDispatched: remainingQty === 0 && bookedQty > 0,
+      for (const r of filtered) {
+        const targetDealId = r.realDealId || r.dealId;
+        const qId = r.quotationId || r.dealQuotationId;
+        const snap = (r.versionSnapshot || {}) as DealVersionSnapshot;
+
+        const existingDispatches = dispatchesMap.get(targetDealId) || [];
+        const dispatchEvents = qId ? dispatchEventsMap.get(qId) || [] : [];
+
+        const bookedQty = Number(r.agreedQuantity || snap.quantity || 0);
+        const lockedRate = Number(r.agreedPrice || snap.rate || 0);
+        const totalVal = bookedQty * lockedRate;
+
+        const alreadyDispatched = dispatchEvents.reduce(
+          (sum, ev) => sum + Number((ev.payload as any)?.dispatchQuantity || 0),
+          0
+        );
+        const remainingQty = Math.max(0, Number((bookedQty - alreadyDispatched).toFixed(4)));
+
+        const destParts = [snap.deliveryLocation, snap.deliveryDistrict, snap.deliveryState].filter(Boolean);
+        const destString = destParts.length > 0 ? destParts.join(", ") : "Ex-Warehouse";
+
+        bookedOrders.push({
+          id: r.bookingId,
+          bookingReference: r.bookingReference,
+          dealId: targetDealId,
+          quotationId: qId || undefined,
+          lockedVersionId: r.lockedVersionId,
+          versionNumber: r.versionNumber || 1,
+          commodityName: snap.commodityName || "Agricultural Commodity",
+          gradeName: snap.gradeName || "Standard Grade",
+          lotNumber: snap.lotNumber || r.lotNumber || "N/A",
+          bookedQuantity: bookedQty,
+          alreadyDispatchedQuantity: alreadyDispatched,
+          remainingQuantity: remainingQty,
+          unitSymbol: snap.unitSymbol || "MT",
+          lockedRate: lockedRate,
+          totalValuation: totalVal,
+          deliveryLocation: destString,
+          deliveryState: snap.deliveryState || undefined,
+          deliveryDistrict: snap.deliveryDistrict || undefined,
+          deliveryTerms: snap.deliveryTerms || "Ex-Warehouse",
+          expectedDeliveryDate: snap.deliveryDate || undefined,
+          paymentTerms: snap.paymentTerms || "Broker Escrow Settlement",
+          dealStatus: r.dealStatus || "Dispatch Pending",
+          bookingStatus: r.bookingStatus || "Confirmed",
+          bookingCreatedAt: r.bookingCreatedAt.toISOString(),
+          dispatchesCount: existingDispatches.length,
+          hasDispatched:
+            existingDispatches.length > 0 ||
+            alreadyDispatched > 0 ||
+            r.dealStatus === "In Transit" ||
+            r.dealStatus === "Dispatched" ||
+            r.dealStatus === "Partially Dispatched",
+          isFullyDispatched: remainingQty === 0 && bookedQty > 0,
+        });
+      }
+
+      return {
+        success: true,
+        data: bookedOrders,
       };
-
-      bookedOrders.push(orderSummary);
+    } catch (error: any) {
+      console.error("Failed to fetch seller booked orders:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to fetch booked orders",
+      };
     }
-
-    return {
-      success: true,
-      data: bookedOrders,
-    };
-  } catch (error: any) {
-    console.error("Get seller booked orders error:", error);
-    return {
-      success: false,
-      error: error.message || "Failed to load booked orders.",
-    };
   }
-}
+);
 
 export interface BookingForDispatchDetails {
   booking: {

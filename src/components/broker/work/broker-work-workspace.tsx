@@ -15,6 +15,7 @@ import {
 import { BrokerRequirementsInbox } from './broker-requirements-inbox';
 import { MatchesView } from './matches-view';
 import { BrokerQualityHub } from './broker-quality-hub';
+import { BrokerNegotiationsHub } from '../negotiation/broker-negotiations-hub';
 import type { BrokerAssignedRequirement } from '@/src/server/actions/broker-work-actions';
 
 interface BrokerWorkWorkspaceProps {
@@ -124,24 +125,9 @@ export function BrokerWorkWorkspace({
           />
         </TabsContent>
 
-        {/* Tab Content: Negotiations (Sprint 26) */}
+        {/* Tab Content: Negotiations (Micro-Sprint 25.1 LIVE) */}
         <TabsContent value="negotiations" className="mt-0 focus-visible:outline-hidden">
-          <Card className="border-dashed border-2 border-slate-200 bg-white/60">
-            <CardContent className="p-8 sm:p-12 text-center space-y-4">
-              <div className="mx-auto w-12 h-12 rounded-full bg-teal-50 border border-teal-200/80 flex items-center justify-center text-[#0D9488]">
-                <Handshake className="w-6 h-6" />
-              </div>
-              <div className="space-y-1 max-w-sm mx-auto">
-                <h3 className="font-bold text-slate-800 text-base">Commercial Negotiations</h3>
-                <p className="text-xs sm:text-sm text-slate-500">
-                  Versioned deal proposals, counter-offers, and multi-party commercial revisions.
-                </p>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium text-teal-700 bg-teal-50/80 border border-teal-200/60">
-                <span>Module scheduled for Sprint 26</span>
-              </div>
-            </CardContent>
-          </Card>
+          <BrokerNegotiationsHub />
         </TabsContent>
       </Tabs>
     </div>

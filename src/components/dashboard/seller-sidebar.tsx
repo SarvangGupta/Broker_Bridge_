@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, Suspense } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import { 
@@ -13,18 +13,18 @@ import {
   TrendingUp, 
   FolderLock, 
   Users, 
-  Menu, 
   Sparkles,
-  ChevronRight,
+  ChevronDown,
+  ChevronUp,
   LogOut,
   User,
   HelpCircle,
   ArrowLeftRight,
   Building2,
+  MoreHorizontal,
   MoreVertical
 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,7 +38,7 @@ import { SellerProfileDialog } from "@/src/components/dialogs/seller-profile-dia
 import { SupportDialog } from "@/src/components/dialogs/support-dialog"
 import { signOutAction } from "@/src/server/actions/auth-actions"
 import { NotificationBell } from "@/src/components/layout/notification-bell"
-import { SellerHeaderDropdown } from "@/src/components/dashboard/seller-header-dropdown"
+import { SellerMobileNav } from "@/src/components/dashboard/seller-mobile-nav"
 
 export interface NavItem {
   id: string
@@ -51,7 +51,8 @@ export interface NavItem {
   description?: string
 }
 
-export const SELLER_NAV_ITEMS: NavItem[] = [
+// 1. PRIMARY LINKS (Always visible in desktop sidebar & mobile nav)
+export const PRIMARY_SELLER_NAV_ITEMS: NavItem[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
@@ -69,14 +70,6 @@ export const SELLER_NAV_ITEMS: NavItem[] = [
     description: 'Active supply lots, pricing & renewals',
   },
   {
-    id: 'quality',
-    label: 'Quality & Lab',
-    shortLabel: 'Quality',
-    icon: FlaskConical,
-    href: '/seller?tab=quality',
-    description: 'Dynamic parameters & COA lab records',
-  },
-  {
     id: 'deals',
     label: 'Requests & Deals',
     shortLabel: 'Deals',
@@ -91,6 +84,18 @@ export const SELLER_NAV_ITEMS: NavItem[] = [
     icon: Truck,
     href: '/seller?tab=orders',
     description: 'Logistics tracking & shipment dispatch',
+  },
+]
+
+// 2. SECONDARY LINKS (Revealed inside "More" accordion / section)
+export const SECONDARY_SELLER_NAV_ITEMS: NavItem[] = [
+  {
+    id: 'quality',
+    label: 'Quality & Lab',
+    shortLabel: 'Quality',
+    icon: FlaskConical,
+    href: '/seller?tab=quality',
+    description: 'Dynamic parameters & COA lab records',
   },
   {
     id: 'payments',
@@ -127,6 +132,12 @@ export const SELLER_NAV_ITEMS: NavItem[] = [
   },
 ]
 
+// Export combined list for backwards compatibility
+export const SELLER_NAV_ITEMS: NavItem[] = [
+  ...PRIMARY_SELLER_NAV_ITEMS,
+  ...SECONDARY_SELLER_NAV_ITEMS,
+]
+
 interface SellerSidebarProps {
   profile?: any
   fullProfile?: any
@@ -153,11 +164,6 @@ function SidebarNavContent({
     userRole.toUpperCase().includes("SELLER") ||
     !userRole
 
-  const visibleNavItems = SELLER_NAV_ITEMS.filter(item => {
-    if (item.adminOnly && !isSellerAdmin) return false
-    return true
-  })
-
   const isItemActive = (item: NavItem) => {
     if (pathname === '/seller') {
       if (item.id === 'dashboard') {
@@ -174,12 +180,30 @@ function SidebarNavContent({
     return false
   }
 
+  // Filter secondary items by admin role
+  const visibleSecondaryItems = SECONDARY_SELLER_NAV_ITEMS.filter(item => {
+    if (item.adminOnly && !isSellerAdmin) return false
+    return true
+  })
+
+  // Auto-expand "More" if an active tab is inside secondary items
+  const isAnySecondaryActive = visibleSecondaryItems.some(item => isItemActive(item))
+  const [isMoreOpen, setIsMoreOpen] = useState(isAnySecondaryActive)
+
+  useEffect(() => {
+    if (isAnySecondaryActive) {
+      setIsMoreOpen(true)
+    }
+  }, [isAnySecondaryActive])
+
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Seller Main Navigation">
       <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-        Workspace Modules
+        Primary Workspace
       </div>
-      {visibleNavItems.map((item) => {
+
+      {/* Primary 4 Links */}
+      {PRIMARY_SELLER_NAV_ITEMS.map((item) => {
         const Icon = item.icon
         const isActive = isItemActive(item)
 
@@ -189,10 +213,10 @@ function SidebarNavContent({
             href={item.href}
             onClick={onItemClick}
             className={`
-              group flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all duration-150 cursor-pointer min-h-[48px]
+              group flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all duration-150 cursor-pointer min-h-[48px]
               ${isActive 
-                ? 'bg-[#ECFDF5] text-[#059669] font-bold shadow-2xs' 
-                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                ? 'bg-[#ECFDF5] text-[#059669] font-bold shadow-2xs border border-emerald-200/80' 
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
               }
             `}
           >
@@ -210,6 +234,72 @@ function SidebarNavContent({
           </Link>
         )
       })}
+
+      {/* Task 2: "More" Collapsible Accordion Section */}
+      <div className="pt-2">
+        <button
+          onClick={() => setIsMoreOpen(!isMoreOpen)}
+          className={`
+            w-full group flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm transition-all duration-150 cursor-pointer min-h-[48px] text-left
+            ${isAnySecondaryActive
+              ? 'bg-emerald-50/50 text-[#059669] font-bold'
+              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+            }
+          `}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <MoreHorizontal 
+              className={`w-5 h-5 shrink-0 transition-colors ${
+                isAnySecondaryActive ? 'text-[#059669] stroke-[2.25]' : 'text-slate-400 group-hover:text-slate-700'
+              }`} 
+            />
+            <span className="truncate">More Modules</span>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {isAnySecondaryActive && (
+              <span className="w-2 h-2 rounded-full bg-[#059669]" />
+            )}
+            {isMoreOpen ? (
+              <ChevronUp className="w-4 h-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            )}
+          </div>
+        </button>
+
+        {/* Revealed Secondary Links */}
+        {isMoreOpen && (
+          <div className="mt-1 pl-3 space-y-1 border-l-2 border-emerald-100 ml-5 py-1">
+            {visibleSecondaryItems.map((item) => {
+              const Icon = item.icon
+              const isActive = isItemActive(item)
+
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  onClick={onItemClick}
+                  className={`
+                    group flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs transition-all duration-150 cursor-pointer min-h-[44px]
+                    ${isActive 
+                      ? 'bg-[#ECFDF5] text-[#059669] font-bold border border-emerald-200/80 shadow-2xs' 
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                    }
+                  `}
+                >
+                  <Icon 
+                    className={`w-4 h-4 shrink-0 transition-colors ${
+                      isActive ? 'text-[#059669] stroke-[2.25]' : 'text-slate-400 group-hover:text-slate-700'
+                    }`} 
+                  />
+                  <span className="truncate flex-1">{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </nav>
   )
 }
@@ -370,19 +460,23 @@ export function SellerSidebar({
     >
       {/* 1. TOP SECTION: BRAND HEADER & NAVIGATION */}
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="p-5 border-b border-slate-100 flex items-center gap-3 shrink-0">
+        {/* Task 1: Wrapped logo block in <Link href="/seller"> with cursor-pointer */}
+        <Link 
+          href="/seller" 
+          className="p-5 border-b border-slate-100 flex items-center gap-3 shrink-0 cursor-pointer group hover:bg-slate-50/80 transition-colors"
+        >
           <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-xs shrink-0 text-white font-black text-sm tracking-tighter">
             BB
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="font-extrabold text-slate-900 tracking-tight text-base leading-tight">
+            <span className="font-extrabold text-slate-900 tracking-tight text-base leading-tight group-hover:text-[#059669] transition-colors">
               BrokerBridge
             </span>
             <span className="inline-flex items-center w-fit px-2 py-0.5 mt-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#047857] border border-emerald-200/80">
               Seller Workspace
             </span>
           </div>
-        </div>
+        </Link>
 
         <Suspense fallback={<div className="flex-1 p-4 text-xs text-slate-400">Loading navigation...</div>}>
           <SidebarNavContent 
@@ -412,90 +506,17 @@ export function SellerSidebar({
   )
 }
 
+// Export SellerMobileHeader for compatibility, rendering SellerMobileNav
 export function SellerMobileHeader({
   profile,
   fullProfile,
   userRole = "SELLER_ADMIN",
 }: SellerSidebarProps) {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const companyName = fullProfile?.company?.name || profile?.name || "Seller Workspace"
-
   return (
-    <header className="flex md:hidden h-16 w-full border-b border-slate-200 items-center justify-between px-4 bg-white sticky top-0 z-40 shadow-2xs">
-      {/* LEFT: LOGO */}
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shadow-xs shrink-0 text-white font-black text-xs">
-          BB
-        </div>
-        <div className="flex flex-col">
-          <span className="font-extrabold text-slate-900 tracking-tight text-sm leading-none">
-            BrokerBridge
-          </span>
-          <span className="text-[10px] text-emerald-700 font-bold tracking-tight mt-0.5">
-            Seller Workspace
-          </span>
-        </div>
-      </div>
-
-      {/* RIGHT: NOTIFICATIONS, USER AVATAR & HAMBURGER SHEET */}
-      <div className="flex items-center gap-2">
-        <NotificationBell />
-        <SellerHeaderDropdown
-          profile={profile}
-          fullProfile={fullProfile}
-          role={userRole}
-        />
-        
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setMobileNavOpen(true)}
-          className="h-10 w-10 text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl cursor-pointer"
-          aria-label="Open navigation menu"
-        >
-          <Menu className="w-5 h-5 stroke-[2]" />
-        </Button>
-        
-        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-          <SheetContent side="left" className="w-[85vw] max-w-sm p-0 flex flex-col bg-white">
-            {/* Drawer Header */}
-            <SheetHeader className="p-5 border-b border-slate-100 text-left bg-slate-50/60">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-sm shrink-0">
-                  <span className="text-white font-bold text-sm tracking-tighter">BB</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <SheetTitle className="text-base font-bold text-slate-900 leading-snug truncate">
-                    {companyName}
-                  </SheetTitle>
-                  <SheetDescription className="text-xs text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
-                    <Sparkles className="w-3 h-3 text-emerald-600" />
-                    Seller Operational Hub
-                  </SheetDescription>
-                </div>
-              </div>
-            </SheetHeader>
-
-            {/* Drawer Navigation Links */}
-            <div className="flex-1 overflow-y-auto">
-              <Suspense fallback={<div className="p-4 text-xs text-slate-400">Loading modules...</div>}>
-                <SidebarNavContent 
-                  profile={profile} 
-                  fullProfile={fullProfile} 
-                  userRole={userRole} 
-                  onItemClick={() => setMobileNavOpen(false)}
-                />
-              </Suspense>
-            </div>
-
-            {/* Drawer Footer Info */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500 text-center">
-              <div className="font-semibold text-slate-700">BrokerBridge Enterprise v3.0</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Seller Operational Platform · Tier-2 India</div>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-    </header>
+    <SellerMobileNav 
+      profile={profile}
+      fullProfile={fullProfile}
+      userRole={userRole}
+    />
   )
 }

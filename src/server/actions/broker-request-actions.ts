@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { db } from "@/src/server/db";
 import {
   quotations,
@@ -45,69 +46,69 @@ export type BrokerActionResponse<T = any> = {
  * Strips all Buyer private identity (phone, email, WhatsApp, GST, company name).
  * Returns only operational, commercial, and delivery specifications + Verified Broker Attribution.
  */
-export async function getSellerBrokerRequestsAction(
-  statusFilter?: string
-): Promise<BrokerActionResponse<SellerBrokerRequestItem[]>> {
-  try {
-    const session = await verifySellerSession({ allowViewer: true });
-    if (!session.success || !session.data) {
-      return { success: false, error: session.error || "Unauthorized" };
-    }
+export const getSellerBrokerRequestsAction = cache(
+  async function getSellerBrokerRequestsAction(
+    statusFilter?: string
+  ): Promise<BrokerActionResponse<SellerBrokerRequestItem[]>> {
+    try {
+      const session = await verifySellerSession({ allowViewer: true });
+      if (!session.success || !session.data) {
+        return { success: false, error: session.error || "Unauthorized" };
+      }
 
-    const sellerCompanyId = session.data.companyId;
-    const brokerCompanies = aliasedTable(companies, "broker_companies");
+      const sellerCompanyId = session.data.companyId;
+      const brokerCompanies = aliasedTable(companies, "broker_companies");
 
-    // Join quotations with the owning seller's availabilities and requirement specs
-    const query = db
-      .select({
-        id: quotations.id,
-        requirementId: quotations.requirementId,
-        sellerAvailabilityId: quotations.sellerAvailabilityId,
-        offeredPrice: quotations.offeredPrice,
-        status: quotations.status,
-        validUntil: quotations.validUntil,
-        createdAt: quotations.createdAt,
-        rejectionReason: quotations.rejectionReason,
-        counterPrice: quotations.counterPrice,
-        counterNotes: quotations.counterNotes,
-        // Lot / Availability specs
-        lotNumber: availabilities.lotNumber,
-        askingPrice: availabilities.askingPrice,
-        commodityName: masterCommodities.name,
-        categoryName: masterCategories.name,
-        industryName: masterIndustries.name,
-        gradeName: masterGrades.gradeName,
-        unitSymbol: masterUnits.symbol,
-        // Requirement specs (Requested terms from Broker)
-        requestedQuantity: requirements.quantity,
-        targetDate: requirements.targetDate,
-        deliveryTermsId: requirements.deliveryTermsId,
-        // Broker info (Broker name + firm name is safe; zero buyer contact info)
-        brokerName: users.name,
-        brokerCompanyName: brokerCompanies.name,
-        isBrokerCompanyVerified: brokerCompanies.isVerified,
-      })
-      .from(quotations)
-      .innerJoin(availabilities, eq(quotations.sellerAvailabilityId, availabilities.id))
-      .innerJoin(requirements, eq(quotations.requirementId, requirements.id))
-      .leftJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))
-      .leftJoin(masterCategories, eq(masterCategories.id, masterCommodities.categoryId))
-      .leftJoin(masterIndustries, eq(masterIndustries.id, masterCategories.industryId))
-      .leftJoin(masterGrades, eq(availabilities.gradeId, masterGrades.id))
-      .leftJoin(masterUnits, eq(availabilities.unitId, masterUnits.id))
-      .leftJoin(users, eq(quotations.brokerId, users.id))
-      .leftJoin(brokerCompanies, eq(users.companyId, brokerCompanies.id))
-      .where(eq(availabilities.companyId, sellerCompanyId))
-      .orderBy(desc(quotations.createdAt));
+      // Join quotations with the owning seller's availabilities and requirement specs
+      const query = await db
+        .select({
+          id: quotations.id,
+          requirementId: quotations.requirementId,
+          sellerAvailabilityId: quotations.sellerAvailabilityId,
+          offeredPrice: quotations.offeredPrice,
+          status: quotations.status,
+          validUntil: quotations.validUntil,
+          createdAt: quotations.createdAt,
+          rejectionReason: quotations.rejectionReason,
+          counterPrice: quotations.counterPrice,
+          counterNotes: quotations.counterNotes,
+          // Lot / Availability specs
+          lotNumber: availabilities.lotNumber,
+          askingPrice: availabilities.askingPrice,
+          commodityName: masterCommodities.name,
+          categoryName: masterCategories.name,
+          industryName: masterIndustries.name,
+          gradeName: masterGrades.gradeName,
+          unitSymbol: masterUnits.symbol,
+          // Requirement specs (Requested terms from Broker)
+          requestedQuantity: requirements.quantity,
+          targetDate: requirements.targetDate,
+          deliveryTermsId: requirements.deliveryTermsId,
+          // Broker info (Broker name + firm name is safe; zero buyer contact info)
+          brokerName: users.name,
+          brokerCompanyName: brokerCompanies.name,
+          isBrokerCompanyVerified: brokerCompanies.isVerified,
+        })
+        .from(quotations)
+        .innerJoin(availabilities, eq(quotations.sellerAvailabilityId, availabilities.id))
+        .innerJoin(requirements, eq(quotations.requirementId, requirements.id))
+        .leftJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))
+        .leftJoin(masterCategories, eq(masterCategories.id, masterCommodities.categoryId))
+        .leftJoin(masterIndustries, eq(masterIndustries.id, masterCategories.industryId))
+        .leftJoin(masterGrades, eq(availabilities.gradeId, masterGrades.id))
+        .leftJoin(masterUnits, eq(availabilities.unitId, masterUnits.id))
+        .leftJoin(users, eq(quotations.brokerId, users.id))
+        .leftJoin(brokerCompanies, eq(users.companyId, brokerCompanies.id))
+        .where(eq(availabilities.companyId, sellerCompanyId))
+        .orderBy(desc(quotations.createdAt));
 
-    const rows = await query;
+      if (!query.length) {
+        return { success: true, data: [] };
+      }
 
-    // Fetch latest deal version for these quotations to support optimistic locking
-    const requestIds = rows.map((r) => r.id);
-    const versionMap = new Map<string, number>();
-
-    if (requestIds.length > 0) {
-      const allVersions = await db
+      // Collect request IDs to fetch latest version numbers in batch
+      const requestIds = query.map((q) => q.id);
+      const latestVersions = await db
         .select({
           requestId: dealVersions.requestId,
           versionNumber: dealVersions.versionNumber,
@@ -116,77 +117,84 @@ export async function getSellerBrokerRequestsAction(
         .where(inArray(dealVersions.requestId, requestIds))
         .orderBy(desc(dealVersions.versionNumber));
 
-      for (const v of allVersions) {
+      const versionMap = new Map<string, number>();
+      for (const v of latestVersions) {
         if (!versionMap.has(v.requestId)) {
           versionMap.set(v.requestId, v.versionNumber);
         }
       }
-    }
 
-    // Normalize & sanitize into strict Seller-Safe items
-    const now = new Date();
-    const items: SellerBrokerRequestItem[] = rows.map((r) => {
-      const isExpired = new Date(r.validUntil) < now && (r.status === 'Sent' || r.status === 'Pending');
-      let effectiveStatus = (isExpired ? 'Expired' : r.status) as SellerBrokerRequestItem['status'];
+      const now = new Date();
 
-      return {
-        id: r.id,
-        requirementId: r.requirementId,
-        sellerAvailabilityId: r.sellerAvailabilityId,
-        commodityName: r.commodityName || 'Commodity',
-        categoryName: r.categoryName || null,
-        industryName: r.industryName || null,
-        gradeName: r.gradeName || 'Standard Grade',
-        lotNumber: r.lotNumber || null,
-        requestedQuantity: Number(r.requestedQuantity || 0),
-        unitSymbol: r.unitSymbol || 'MT',
-        proposedRate: Number(r.offeredPrice || 0),
-        askingPrice: r.askingPrice ? Number(r.askingPrice) : null,
-        deliveryTerms: r.deliveryTermsId || 'Ex-Warehouse / Standard Dispatch',
-        paymentTerms: 'Standard Escrow Settlement via Broker Desk',
-        targetDate: r.targetDate,
-        brokerNotes: r.counterNotes || null,
-        brokerName: r.brokerName || 'Assigned Broker Desk',
-        brokerCompany: r.brokerCompanyName || 'BrokerBridge Institutional Partner',
-        isBrokerVerified: r.isBrokerCompanyVerified ?? true,
-        status: effectiveStatus,
-        expiresAt: r.validUntil,
-        createdAt: r.createdAt,
-        counterPrice: r.counterPrice ? Number(r.counterPrice) : null,
-        counterNotes: r.counterNotes || null,
-        rejectionReason: r.rejectionReason || null,
-        latestVersionNumber: versionMap.get(r.id) ?? 1,
-      };
-    });
+      const items: SellerBrokerRequestItem[] = query.map((r) => {
+        let effectiveStatus: string = r.status || 'Pending';
+        if (
+          r.validUntil &&
+          new Date(r.validUntil) < now &&
+          (effectiveStatus === 'Pending' || effectiveStatus === 'Sent')
+        ) {
+          effectiveStatus = 'Expired';
+        }
 
-    if (statusFilter && statusFilter !== 'all') {
-      const filtered = items.filter((item) => {
-        if (statusFilter === 'pending') {
-          return item.status === 'Pending' || item.status === 'Sent';
-        }
-        if (statusFilter === 'accepted') {
-          return item.status === 'Seller Accepted' || item.status === 'Accepted';
-        }
-        if (statusFilter === 'rejected') {
-          return item.status === 'Seller Rejected' || item.status === 'Rejected';
-        }
-        if (statusFilter === 'countered') {
-          return item.status === 'Seller Countered' || item.status === 'Countered';
-        }
-        if (statusFilter === 'expired') {
-          return item.status === 'Expired';
-        }
-        return true;
+        return {
+          id: r.id,
+          requirementId: r.requirementId,
+          sellerAvailabilityId: r.sellerAvailabilityId,
+          lotNumber: r.lotNumber || 'N/A',
+          commodityName: r.commodityName || 'Agricultural Commodity',
+          categoryName: r.categoryName || 'Standard Category',
+          industryName: r.industryName || 'Institutional',
+          gradeName: r.gradeName || 'Standard Grade',
+          unitSymbol: r.unitSymbol || 'MT',
+          requestedQuantity: Number(r.requestedQuantity || 0),
+          proposedRate: Number(r.offeredPrice || r.askingPrice || 0),
+          askingPrice: Number(r.askingPrice || 0),
+          deliveryTerms: r.deliveryTermsId || 'Ex-Warehouse',
+          paymentTerms: 'Standard Escrow Settlement via Broker Desk',
+          targetDate: r.targetDate ? new Date(r.targetDate).toISOString() : null,
+          brokerNotes: r.counterNotes || null,
+          brokerName: r.brokerName || 'Institutional Broker',
+          brokerCompany: r.brokerCompanyName || 'BrokerBridge Institutional Partner',
+          isBrokerVerified: r.isBrokerCompanyVerified ?? true,
+          status: effectiveStatus as any,
+          expiresAt: r.validUntil,
+          createdAt: r.createdAt,
+          counterPrice: r.counterPrice ? Number(r.counterPrice) : null,
+          counterNotes: r.counterNotes || null,
+          rejectionReason: r.rejectionReason || null,
+          latestVersionNumber: versionMap.get(r.id) ?? 1,
+        };
       });
-      return { success: true, data: filtered };
-    }
 
-    return { success: true, data: items };
-  } catch (error: any) {
-    console.error("Failed to fetch seller broker requests:", error);
-    return { success: false, error: error.message || "Failed to fetch broker requests" };
+      if (statusFilter && statusFilter !== 'all') {
+        const filtered = items.filter((item) => {
+          if (statusFilter === 'pending') {
+            return item.status === 'Pending' || item.status === 'Sent';
+          }
+          if (statusFilter === 'accepted') {
+            return item.status === 'Seller Accepted' || item.status === 'Accepted';
+          }
+          if (statusFilter === 'rejected') {
+            return item.status === 'Seller Rejected' || item.status === 'Rejected';
+          }
+          if (statusFilter === 'countered') {
+            return item.status === 'Seller Countered' || item.status === 'Countered';
+          }
+          if (statusFilter === 'expired') {
+            return item.status === 'Expired';
+          }
+          return true;
+        });
+        return { success: true, data: filtered };
+      }
+
+      return { success: true, data: items };
+    } catch (error: any) {
+      console.error("Failed to fetch seller broker requests:", error);
+      return { success: false, error: error.message || "Failed to fetch broker requests" };
+    }
   }
-}
+);
 
 /**
  * Responds to a broker-originated commercial proposal (Accept / Reject / Counter).

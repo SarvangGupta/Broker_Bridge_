@@ -1,5 +1,6 @@
 'use server';
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/src/server/db";
 import { quotations, deals, availabilities, users, companies, masterCommodities, requirements } from "@/src/server/db/schema";
@@ -200,78 +201,80 @@ export async function counterQuotationAction(data: unknown) {
  * HARD PRIVACY RULE: If the caller is a Seller, Buyer private PII is NEVER exposed.
  * The buyer name is anonymized as "Verified Buyer #B-XXXX", and only operational fulfillment fields are returned.
  */
-export async function getDealsByCompanyAction() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "Unauthorized" };
+export const getDealsByCompanyAction = cache(
+  async function getDealsByCompanyAction() {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { success: false, error: "Unauthorized" };
 
-    const userId = user.id;
-    const userRecords = await db.select().from(users).where(eq(users.id, userId));
-    if (!userRecords.length) return { success: false, error: "User not found" };
-    
-    const dbUser = userRecords[0];
-    const companyId = dbUser.companyId;
+      const userId = user.id;
+      const userRecords = await db.select().from(users).where(eq(users.id, userId));
+      if (!userRecords.length) return { success: false, error: "User not found" };
+      
+      const dbUser = userRecords[0];
+      const companyId = dbUser.companyId;
 
-    if (!companyId) return { success: false, error: "User is not associated with a company" };
+      if (!companyId) return { success: false, error: "User is not associated with a company" };
 
-    // Fetch all deals where buyerId or sellerId is companyId
-    const buyerCompanyTable = aliasedTable(companies, 'buyerCompany');
-    const sellerCompanyTable = aliasedTable(companies, 'sellerCompany');
+      // Fetch all deals where buyerId or sellerId is companyId
+      const buyerCompanyTable = aliasedTable(companies, 'buyerCompany');
+      const sellerCompanyTable = aliasedTable(companies, 'sellerCompany');
 
-    const rawCompanyDeals = await db
-      .select({
-        deal: deals,
-        requirement: requirements,
-        commodity: masterCommodities,
-        grade: masterGrades,
-        buyerCompany: {
-          id: buyerCompanyTable.id,
-          name: buyerCompanyTable.name,
-          isVerified: buyerCompanyTable.isVerified,
-          trustScore: buyerCompanyTable.trustScore,
-        },
-        sellerCompany: {
-          id: sellerCompanyTable.id,
-          name: sellerCompanyTable.name,
-          isVerified: sellerCompanyTable.isVerified,
-          trustScore: sellerCompanyTable.trustScore,
-        }
-      })
-      .from(deals)
-      .innerJoin(requirements, eq(deals.requirementId, requirements.id))
-      .innerJoin(masterCommodities, eq(requirements.commodityId, masterCommodities.id))
-      .innerJoin(masterGrades, eq(requirements.gradeId, masterGrades.id))
-      .innerJoin(buyerCompanyTable, eq(deals.buyerId, buyerCompanyTable.id))
-      .innerJoin(sellerCompanyTable, eq(deals.sellerId, sellerCompanyTable.id))
-      .where(or(eq(deals.buyerId, companyId), eq(deals.sellerId, companyId)))
-      .orderBy(desc(deals.createdAt));
+      const rawCompanyDeals = await db
+        .select({
+          deal: deals,
+          requirement: requirements,
+          commodity: masterCommodities,
+          grade: masterGrades,
+          buyerCompany: {
+            id: buyerCompanyTable.id,
+            name: buyerCompanyTable.name,
+            isVerified: buyerCompanyTable.isVerified,
+            trustScore: buyerCompanyTable.trustScore,
+          },
+          sellerCompany: {
+            id: sellerCompanyTable.id,
+            name: sellerCompanyTable.name,
+            isVerified: sellerCompanyTable.isVerified,
+            trustScore: sellerCompanyTable.trustScore,
+          }
+        })
+        .from(deals)
+        .innerJoin(requirements, eq(deals.requirementId, requirements.id))
+        .innerJoin(masterCommodities, eq(requirements.commodityId, masterCommodities.id))
+        .innerJoin(masterGrades, eq(requirements.gradeId, masterGrades.id))
+        .innerJoin(buyerCompanyTable, eq(deals.buyerId, buyerCompanyTable.id))
+        .innerJoin(sellerCompanyTable, eq(deals.sellerId, sellerCompanyTable.id))
+        .where(or(eq(deals.buyerId, companyId), eq(deals.sellerId, companyId)))
+        .orderBy(desc(deals.createdAt));
 
-    // Apply strict privacy transformation for Seller-facing view
-    const companyDeals = rawCompanyDeals.map((row) => {
-      const isSellerViewing = row.deal.sellerId === companyId && row.deal.buyerId !== companyId && dbUser.role !== 'admin';
+      // Apply strict privacy transformation for Seller-facing view
+      const companyDeals = rawCompanyDeals.map((row) => {
+        const isSellerViewing = row.deal.sellerId === companyId && row.deal.buyerId !== companyId && dbUser.role !== 'admin';
 
-      return {
-        ...row,
-        buyerCompany: {
-          id: row.buyerCompany.id,
-          name: isSellerViewing
-            ? `Verified Buyer #B-${row.deal.buyerId.slice(0, 4).toUpperCase()}`
-            : row.buyerCompany.name,
-          isVerified: row.buyerCompany.isVerified,
-          trustScore: row.buyerCompany.trustScore,
-        },
-        sellerCompany: {
-          id: row.sellerCompany.id,
-          name: row.sellerCompany.name,
-          isVerified: row.sellerCompany.isVerified,
-          trustScore: row.sellerCompany.trustScore,
-        }
-      };
-    });
+        return {
+          ...row,
+          buyerCompany: {
+            id: row.buyerCompany.id,
+            name: isSellerViewing
+              ? `Verified Buyer #B-${row.deal.buyerId.slice(0, 4).toUpperCase()}`
+              : row.buyerCompany.name,
+            isVerified: row.buyerCompany.isVerified,
+            trustScore: row.buyerCompany.trustScore,
+          },
+          sellerCompany: {
+            id: row.sellerCompany.id,
+            name: row.sellerCompany.name,
+            isVerified: row.sellerCompany.isVerified,
+            trustScore: row.sellerCompany.trustScore,
+          }
+        };
+      });
 
-    return { success: true, data: companyDeals };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to fetch deals" };
+      return { success: true, data: companyDeals };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Failed to fetch deals" };
+    }
   }
-}
+);

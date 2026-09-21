@@ -1,5 +1,6 @@
 'use server';
 
+import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { db } from '../db';
 import { 
@@ -68,18 +69,20 @@ export async function getMasterLaboratoriesAction() {
   }
 }
 
-export async function getMasterVehicleTypesAction() {
-  try {
-    const types = await db
-      .select()
-      .from(masterVehicleTypes)
-      .where(eq(masterVehicleTypes.status, true))
-      .orderBy(asc(masterVehicleTypes.name));
-    return { success: true, data: types };
-  } catch (error: any) {
-    return { success: false, error: error.message || 'Failed to fetch vehicle types' };
+export const getMasterVehicleTypesAction = cache(
+  async function getMasterVehicleTypesAction() {
+    try {
+      const types = await db
+        .select()
+        .from(masterVehicleTypes)
+        .where(eq(masterVehicleTypes.status, true))
+        .orderBy(asc(masterVehicleTypes.name));
+      return { success: true, data: types };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to fetch vehicle types' };
+    }
   }
-}
+);
 
 export async function getIndustriesAction() {
   try {

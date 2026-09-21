@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { db } from "@/src/server/db";
 import {
   masterCommodities,
@@ -94,7 +95,8 @@ export async function createAvailabilityAction(data: unknown) {
  * Fetches listed availabilities belonging strictly to the authenticated Seller organization.
  * Confidential minimum price is only accessible to the owning Seller organization.
  */
-export async function getMyAvailabilitiesAction() {
+export const getMyAvailabilitiesAction = cache(
+  async function getMyAvailabilitiesAction() {
   try {
     const session = await verifySellerSession({ allowViewer: true });
     if (!session.success || !session.data) {
@@ -166,6 +168,7 @@ export async function getMyAvailabilitiesAction() {
     return { success: false, error: error.message };
   }
 }
+);
 
 /**
  * Cancels an active/open availability lot. Enforces company tenant boundary and role check.

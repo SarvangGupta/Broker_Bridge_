@@ -41,8 +41,8 @@ export default async function SellerLayout({
           />
         </Suspense>
 
-        {/* Scrollable Main Viewport */}
-        <main className="flex-1 overflow-y-auto focus:outline-none bg-[#F8FAFC]">
+        {/* Scrollable Main Viewport with Mobile Bottom Nav Padding */}
+        <main className="flex-1 overflow-y-auto focus:outline-none bg-[#F8FAFC] pb-20 md:pb-6">
           {children}
         </main>
       </div>
