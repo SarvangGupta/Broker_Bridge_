@@ -7,7 +7,6 @@ import { BackButton } from "@/src/components/ui/back-button";
 import { getDealVersionSnapshotAction } from "@/src/server/actions/version-actions";
 import { VisualDiffSnapshot } from "@/src/components/dashboard/visual-diff-snapshot";
 import { FinalConfirmationActions } from "@/src/components/dashboard/final-confirmation-actions";
-import { DevFinalizationGateTester } from "@/src/components/dashboard/dev-finalization-gate-tester";
 
 export const dynamic = "force-dynamic";
 
@@ -96,12 +95,8 @@ export default async function ConfirmDealPage({ params }: ConfirmDealPageProps) 
         {snapshotData && (
           <FinalConfirmationActions record={snapshotData} />
         )}
-
-        {/* DEV-ONLY BROKER FINALIZATION GATE SIMULATOR */}
-        {snapshotData && process.env.NODE_ENV !== "production" && (
-          <DevFinalizationGateTester record={snapshotData} />
-        )}
       </main>
     </div>
   );
 }
+

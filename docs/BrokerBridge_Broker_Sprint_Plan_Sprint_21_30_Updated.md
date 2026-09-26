@@ -190,7 +190,7 @@ Purpose: Sprint 21 is an audit sprint, not a feature sprint. It follows the same
 
 - Broker can manage both sides of the negotiation without exposing protected information.
 
-# Sprint 26 — Deal + Confirmation
+# Sprint 26 — Deal + Confirmation (COMPLETED ✅)
 
 ## 26.1 — Deal Builder
 
@@ -212,7 +212,7 @@ Purpose: Sprint 21 is an audit sprint, not a feature sprint. It follows the same
 - Booking cannot proceed until required confirmations are complete.
 - Post-confirmation commercial changes create a new Deal version and reconfirmation flow.
 
-# Sprint 27 — Booking + Orders
+# Sprint 27 — Booking + Orders (COMPLETED ✅)
 
 ## 27.1 — Booking
 

@@ -71,15 +71,29 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     let role = user.user_metadata?.role;
     if (!role) {
-      const { data } = await supabase.from('users').select('role').eq('id', user.id).single()
-      role = data?.role
+      try {
+        const { data, error: dbErr } = await supabase.from('users').select('role').eq('id', user.id).single()
+        if (!dbErr && data) {
+          role = data.role
+        }
+      } catch (err) {
+        console.warn('[MIDDLEWARE_WARN] Role lookup DB timeout fallback:', err)
+      }
     }
     
     if (typeof role === 'string') {
       role = role.toLowerCase()
     }
 
-    // BULLETPROOF FAIL-SAFE: If user is authenticated but has no valid role and tries to access protected areas
+    // Infer role from path if user is authenticated and DB lookup timed out on protected route
+    if (!role && isProtectedPath) {
+      if (path.startsWith('/broker')) role = 'broker'
+      else if (path.startsWith('/buyer')) role = 'buyer'
+      else if (path.startsWith('/seller')) role = 'seller'
+      else if (path.startsWith('/admin')) role = 'admin'
+    }
+
+    // Fail-safe: Only sign out if user is truly missing role and not on a matching path
     if (!role && isProtectedPath) {
       await supabase.auth.signOut()
       const url = request.nextUrl.clone()

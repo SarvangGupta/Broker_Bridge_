@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ import {
   FileEdit,
   User,
   TrendingUp,
+  FileCheck2,
 } from 'lucide-react';
 import {
   getBrokerActiveNegotiationsAction,
@@ -93,42 +95,58 @@ export function BrokerNegotiationsHub() {
     startTransition(async () => {
       await fetchNegotiations();
       if (selectedItem) {
-        await loadDetailsAndTimeline(selectedItem);
+        await loadTabChannelData(selectedItem, channelTab);
       }
     });
   };
 
-  const loadDetailsAndTimeline = async (item: any) => {
+  const loadTabChannelData = async (item: any, tab: 'seller' | 'buyer' | 'master') => {
+    if (!item) return;
     setIsDetailLoading(true);
     const requestId = item.requestId;
     const requirementId = item.requirementId;
 
-    const [selDetRes, selTimeRes, buyDetRes, buyTimeRes, masterRes] = await Promise.all([
-      getSellerNegotiationDetailsAction(requestId),
-      getNegotiationTimelineAction(requestId),
-      getBuyerNegotiationDetailsAction(requirementId),
-      getBuyerNegotiationTimelineAction(requirementId),
-      getBrokerMasterTimelineAction(requestId),
-    ]);
-
-    if (selDetRes.success && selDetRes.data) setSellerDetails(selDetRes.data);
-    if (selTimeRes.success && selTimeRes.data) setSellerTimeline(selTimeRes.data);
-    if (buyDetRes.success && buyDetRes.data) setBuyerDetails(buyDetRes.data);
-    if (buyTimeRes.success && buyTimeRes.data) setBuyerTimeline(buyTimeRes.data);
-
-    if (masterRes.success && masterRes.data) {
-      setMasterTimeline(masterRes.data.timeline || []);
-      setMarginSpread(masterRes.data.marginSpread || null);
+    try {
+      if (tab === 'seller') {
+        const [selDetRes, selTimeRes] = await Promise.all([
+          getSellerNegotiationDetailsAction(requestId),
+          getNegotiationTimelineAction(requestId),
+        ]);
+        if (selDetRes.success && selDetRes.data) setSellerDetails(selDetRes.data);
+        if (selTimeRes.success && selTimeRes.data) setSellerTimeline(selTimeRes.data);
+      } else if (tab === 'buyer') {
+        const [buyDetRes, buyTimeRes] = await Promise.all([
+          getBuyerNegotiationDetailsAction(requirementId),
+          getBuyerNegotiationTimelineAction(requirementId),
+        ]);
+        if (buyDetRes.success && buyDetRes.data) setBuyerDetails(buyDetRes.data);
+        if (buyTimeRes.success && buyTimeRes.data) setBuyerTimeline(buyTimeRes.data);
+      } else if (tab === 'master') {
+        const masterRes = await getBrokerMasterTimelineAction(requestId);
+        if (masterRes.success && masterRes.data) {
+          setMasterTimeline(masterRes.data.timeline || []);
+          setMarginSpread(masterRes.data.marginSpread || null);
+        }
+      }
+    } catch (err) {
+      console.error('[LAZY_TAB_LOAD_ERROR]', err);
+    } finally {
+      setIsDetailLoading(false);
     }
-
-    setIsDetailLoading(false);
   };
 
   const handleOpenChannelDrawer = (item: any, defaultTab: 'seller' | 'buyer' | 'master' = 'seller') => {
     setSelectedItem(item);
     setChannelTab(defaultTab);
     setIsSheetOpen(true);
-    loadDetailsAndTimeline(item);
+    loadTabChannelData(item, defaultTab);
+  };
+
+  const handleTabSwitch = (tab: 'seller' | 'buyer' | 'master') => {
+    setChannelTab(tab);
+    if (selectedItem) {
+      loadTabChannelData(selectedItem, tab);
+    }
   };
 
   // Filter negotiations by search & status filter
@@ -325,12 +343,12 @@ export function BrokerNegotiationsHub() {
                 </CardContent>
 
                 {/* Card Action Triad */}
-                <div className="p-4 pt-0 grid grid-cols-3 gap-1.5">
+                <div className="p-4 pt-0 grid grid-cols-3 gap-1.5 pb-2">
                   <Button
                     onClick={() => handleOpenChannelDrawer(item, 'seller')}
-                    className="min-h-[44px] bg-[#0D9488] hover:bg-[#0F766E] text-white font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-2xs px-2"
+                    className="min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-2xs px-2 border border-slate-200"
                   >
-                    <Building2 className="w-3.5 h-3.5 mr-1 shrink-0" />
+                    <Building2 className="w-3.5 h-3.5 mr-1 shrink-0 text-teal-700" />
                     <span>Seller</span>
                   </Button>
 
@@ -351,6 +369,19 @@ export function BrokerNegotiationsHub() {
                     <TrendingUp className="w-3.5 h-3.5 mr-1 text-teal-400 shrink-0" />
                     <span>Master</span>
                   </Button>
+                </div>
+
+                {/* Task 4: Proceed to Final Contract UI Routing Hotfix */}
+                <div className="p-4 pt-0">
+                  <Link href={`/broker/deals/${item.requestId}`} className="w-full block">
+                    <Button
+                      className="w-full min-h-[44px] bg-[#0D9488] hover:bg-[#0D9488]/90 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <FileCheck2 className="w-4 h-4" />
+                      <span>Proceed to Final Contract</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Button>
+                  </Link>
                 </div>
               </Card>
             );
@@ -375,7 +406,7 @@ export function BrokerNegotiationsHub() {
             {/* TRIPLE CHANNEL TAB SWITCHER */}
             <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-200/80 rounded-xl">
               <button
-                onClick={() => setChannelTab('seller')}
+                onClick={() => handleTabSwitch('seller')}
                 className={`py-2 px-1.5 sm:px-2.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 min-w-0 ${
                   channelTab === 'seller'
                     ? 'bg-slate-900 text-white shadow-xs'
@@ -387,7 +418,7 @@ export function BrokerNegotiationsHub() {
               </button>
 
               <button
-                onClick={() => setChannelTab('buyer')}
+                onClick={() => handleTabSwitch('buyer')}
                 className={`py-2 px-1.5 sm:px-2.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 min-w-0 ${
                   channelTab === 'buyer'
                     ? 'bg-blue-900 text-white shadow-xs'
@@ -399,7 +430,7 @@ export function BrokerNegotiationsHub() {
               </button>
 
               <button
-                onClick={() => setChannelTab('master')}
+                onClick={() => handleTabSwitch('master')}
                 className={`py-2 px-1.5 sm:px-2.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 min-w-0 ${
                   channelTab === 'master'
                     ? 'bg-teal-900 text-white shadow-xs'
@@ -444,10 +475,32 @@ export function BrokerNegotiationsHub() {
                 </p>
               )
             ) : (
-              <BrokerMasterTimeline
-                marginSpread={marginSpread}
-                timeline={masterTimeline}
-              />
+              <div className="space-y-4">
+                {selectedItem?.requestId && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-teal-950 via-slate-900 to-slate-950 text-white rounded-xl border border-teal-800/80 shadow-xs">
+                    <div className="text-xs space-y-0.5">
+                      <span className="font-bold text-teal-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                        Ready to Structure Final Deal?
+                      </span>
+                      <p className="text-slate-300 text-[11px]">
+                        Open the Deal Builder to set commission spread and freeze the version snapshot.
+                      </p>
+                    </div>
+                    <Link href={`/broker/deals/${selectedItem.requestId}`}>
+                      <Button size="sm" className="bg-[#0D9488] hover:bg-[#0D9488]/90 text-white font-bold text-xs h-10 px-3.5 gap-1.5 shrink-0 min-h-[40px] w-full sm:w-auto">
+                        <FileCheck2 className="w-4 h-4" />
+                        <span>Open Deal Builder</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+                <BrokerMasterTimeline
+                  marginSpread={marginSpread}
+                  timeline={masterTimeline}
+                />
+              </div>
             )}
           </div>
         </SheetContent>

@@ -190,10 +190,30 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 		- [x] __25.4 — Negotiation Acceptance Gate & Final Audit:__ Completed automated privacy audit (zero cross-channel PII leakage, zero shared conversation entities), state machine version integrity check, 360px mobile touch target audit ($\ge 48\text{px}$), and full TypeScript compilation check.
 	- __Technical Deliverables:__ `src/server/utils/privacy-scrubber.ts`, `src/server/actions/broker-negotiation-actions.ts`, `src/server/actions/broker-buyer-actions.ts`, `src/types/negotiation-schema.ts`, `src/types/buyer-negotiation-schema.ts`, `src/components/broker/work/seller-negotiation-panel.tsx`, `src/components/broker/work/buyer-negotiation-panel.tsx`, `src/components/broker/work/broker-seller-timeline.tsx`, `src/components/broker/work/broker-buyer-timeline.tsx`, `src/components/broker/work/broker-master-timeline.tsx`, `src/components/broker/negotiation/broker-negotiations-hub.tsx`, `src/components/broker/work/broker-work-workspace.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
 
+- __Sprint 26: Deal + Confirmation__ (COMPLETED ✅)
+	- __Goal:__ Build Broker Deal Builder, immutable buyer/seller snapshot isolation, dual confirmation tracking, and pre-flight finalization gate.
+	- __Key Tasks:__
+		- [x] __26.1 — Buyer Snapshot Isolation:__ Created `buyer_snapshot` excluding Seller deduction & min floor.
+		- [x] __26.2 — Seller Snapshot Isolation & Version Control:__ Created `seller_snapshot` excluding Buyer markup & target price. Incrementing `deal_versions` rows created on snapshot generation.
+		- [x] __26.3 — Dual Confirmation Tracking:__ Independent Buyer & Seller state cards in `<ConfirmationTracker />`.
+		- [x] __26.4 — Pre-Flight Finalization Gate:__ Enforced pre-flight gate rules and SPA deep-link routing.
+	- __Technical Deliverables:__ `src/types/deal-builder-schema.ts`, `src/server/actions/broker-deal-actions.ts`, `src/server/actions/broker-confirmation-actions.ts`, `src/components/broker/work/deal-builder.tsx`, `src/components/broker/deals/confirmation-tracker.tsx`, `app/(broker)/broker/deals/[id]/page.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
+
+- __Sprint 27: Booking + Orders__ (COMPLETED ✅)
+	- __Goal:__ Deploy Broker Booking Finalization Gate, Order Operations State Machine, and Dispatch Capture & Monitoring interface wired to existing Sprint 18 production backend.
+	- __Key Tasks:__
+		- [x] __27.1 — Broker Booking & Pre-Flight Finalization Gate UI:__ Built `<BookingGate />` visual checklist (Seller Signature, Buyer Signature, Inventory Check, Expiry & Validity Check) and primary `"Finalize & Generate Booking"` trigger with locked `BKG-YYYY-XXXX` badge display.
+		- [x] __27.2 — Broker Order Operations & Logistics Tracker:__ Built `getBrokerActiveOrdersAction()` with strict broker assignment filter (`broker_id === currentUser.id`), `<FinalizedDealCard />`, and `<LogisticsTracker />` 6-stage visual state machine (`Booked`, `Dispatch Planned`, `Dispatched`, `In Transit`, `Delivered`, `Completed`) with exception flags.
+		- [x] __27.3 — Broker Dispatch Capture & Monitoring:__ Built `getBrokerDispatchDetailsAction()`, `<DispatchDetailsCard />` with signed URL attachments (LR, E-Way Bill), `"Manage Transit Status"` dialog (ETA update, Delayed/Disputed status), and `"Log Dispatch Manually"` form on behalf of Seller.
+		- [x] __27.4 — Sprint 27 Final Audit & Acceptance Gate:__ Conducted read-only architectural scan, 360px mobile viewport audit, zero-data-wall check, and 100% TypeScript compilation check (`npx tsc --noEmit`).
+		- [x] __27.5 — Seller-Side Connection & Finalization Wiring:__ Safely removed legacy `<DevFinalizationGateTester />` from Seller view, connected Broker UI directly to Sprint 18 `finalizeDealAction` and `createIdempotentBookingAction` with optimistic version concurrency guard.
+	- __Technical Deliverables:__ `src/server/actions/broker-order-actions.ts`, `src/server/actions/broker-logistics-actions.ts`, `src/components/broker/deals/booking-gate.tsx`, `src/components/broker/orders/logistics-tracker.tsx`, `src/components/broker/orders/finalized-deal-card.tsx`, `src/components/broker/orders/dispatch-details-card.tsx`, `app/(broker)/broker/deals/page.tsx`, `app/(broker)/broker/orders/page.tsx`, `app/(broker)/broker/orders/[bookingId]/page.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 25 COMPLETED | ADVANCING TO SPRINT 26**
-Sprint 25 (Negotiation) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 26: Deal + Confirmation**.
+### 🚀 **Global Platform Status: SPRINT 27 COMPLETED | ADVANCING TO SPRINT 28**
+Sprint 27 (Booking + Orders) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 28: Finance + CRM**.
+
 
 
 

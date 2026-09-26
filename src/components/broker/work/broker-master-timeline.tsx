@@ -27,8 +27,8 @@ export interface MarginSpreadInfo {
   currentOfferedPrice: number;
   grossSpread: number;
   currentMargin: number;
-  unitSymbol: string;
-  commodityName: string;
+  unitSymbol: string | null;
+  commodityName: string | null;
   sellerCompanyName: string;
 }
 

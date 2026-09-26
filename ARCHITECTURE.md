@@ -523,3 +523,17 @@ Connecting Buyer Demand to Seller Supply within the Broker Workspace enforces st
   - The system strictly rejects autonomous bot or background auto-dispatch triggers. All commercial proposals sent to Sellers require explicit human Broker initiation via `<SendRequestDialog />`.
   - Submitting an outbound request inserts a commercial record into `quotations`, initializes Version 1 snapshot in `deal_versions`, triggers an in-app notification to the Seller dashboard (`/seller/requests?requestId=[id]`), and writes an immutable audit record to `audit_logs` via `logDecisionGateAuditEventAction` certifying human Broker provenance (`humanReviewed: true`).
 
+### 31. Broker Booking Finalization & Logistics State Machine Engine (Sprint 27)
+The Broker Booking & Orders module (`/broker/deals` and `/broker/orders`) connects the Broker UI to the existing production-ready Seller booking engine (Sprint 18) with strict concurrency safety and fulfillment isolation:
+- **Broker UI Wiring to Production Booking Engine (`booking-gate.tsx`)**:
+  - The Broker's Booking Gate UI performs pre-flight verification of mutual confirmations (Seller Confirmation + Buyer Confirmation).
+  - Triggers the existing idempotent `finalizeDealAction` and `createIdempotentBookingAction` (`booking-actions.ts`).
+  - Utilizes optimistic concurrency control (`expectedVersion` version matching) to guarantee that double-clicks, concurrent edits, or network retries gracefully handle `STALE_VERSION_DETECTED` exceptions without producing duplicate booking references or over-allocating inventory.
+- **Logistics & Dispatch Operations State Machine (`logistics-tracker.tsx`, `dispatch-details-card.tsx`)**:
+  - Maps post-finalization fulfillment across 6 canonical operational stages: `Booked` -> `Dispatch Planned` -> `Dispatched` -> `In Transit` -> `Delivered` -> `Completed`.
+  - Supports exception flags (`Delayed`, `Cancelled`, `Disputed`) with non-destructive status recovery.
+  - Safely renders signed document links (LRs, Invoices, e-Way bills) and transit updates without hydration mismatches or horizontal scrolling on 360px mobile viewports.
+- **Strict Assignment Model Isolation (`getBrokerActiveOrdersAction`)**:
+  - All order operations and deal queries enforce server-side `@supabase/ssr` identity checks and filter strictly by `broker_id === user.id`, preventing cross-broker data leaks.
+
+

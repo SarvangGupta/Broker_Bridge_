@@ -458,8 +458,8 @@ export async function getBrokerMasterTimelineAction(requestId: string) {
       .innerJoin(availabilities, eq(quotations.sellerAvailabilityId, availabilities.id))
       .innerJoin(companies, eq(availabilities.companyId, companies.id))
       .innerJoin(requirements, eq(quotations.requirementId, requirements.id))
-      .innerJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))
-      .innerJoin(masterUnits, eq(availabilities.unitId, masterUnits.id))
+      .leftJoin(masterCommodities, eq(availabilities.commodityId, masterCommodities.id))
+      .leftJoin(masterUnits, eq(availabilities.unitId, masterUnits.id))
       .where(eq(quotations.id, requestId))
       .limit(1);
 
