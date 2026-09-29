@@ -67,7 +67,7 @@ export default async function BrokerLayout({
         <BrokerMobileNav user={currentUser} />
 
         {/* Page Viewport */}
-        <div className="flex-1 w-full max-w-full">
+        <div className="flex-1 w-full max-w-full overflow-x-hidden">
           {children}
         </div>
       </main>

@@ -17,6 +17,7 @@ import {
   ExternalLink,
   ChevronRight,
   Info,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -333,7 +334,7 @@ export function RequirementCard({ requirement, onFindSeller }: RequirementCardPr
               type="button"
               variant="outline"
               onClick={() => setIsClarifyOpen(false)}
-              className="min-h-[44px] h-11"
+              className="min-h-[48px] h-12"
               disabled={isSubmittingClarify}
             >
               Cancel
@@ -342,10 +343,13 @@ export function RequirementCard({ requirement, onFindSeller }: RequirementCardPr
               type="button"
               onClick={handleSendClarification}
               disabled={isSubmittingClarify || !clarifyNotes.trim()}
-              className="min-h-[44px] h-11 bg-[#0D9488] hover:bg-teal-700 text-white font-semibold flex items-center gap-2"
+              className="min-h-[48px] h-12 bg-[#0D9488] hover:bg-teal-700 text-white font-semibold flex items-center gap-2"
             >
               {isSubmittingClarify ? (
-                <span>Sending...</span>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Sending...</span>
+                </>
               ) : (
                 <>
                   <MessageSquare className="w-4 h-4" />

@@ -139,7 +139,7 @@ export function FinalizedDealCard({ order }: FinalizedDealCardProps) {
       <CardFooter className="p-4 bg-slate-50/80 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-2">
         <Link href={`/broker/orders/${order.bookingReference}`} className="w-full sm:flex-1">
           <Button
-            className="w-full h-10 bg-[#0D9488] hover:bg-[#0D9488]/90 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px]"
+            className="w-full h-12 bg-[#0D9488] hover:bg-[#0D9488]/90 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer min-h-[48px]"
           >
             <Truck className="w-3.5 h-3.5" />
             <span>View Tracking</span>
@@ -150,7 +150,7 @@ export function FinalizedDealCard({ order }: FinalizedDealCardProps) {
         <Link href={`/broker/deals/${order.quotationId}`} className="w-full sm:w-auto">
           <Button
             variant="outline"
-            className="w-full h-10 border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 px-3 cursor-pointer min-h-[44px]"
+            className="w-full h-12 border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 px-3 cursor-pointer min-h-[48px]"
           >
             <FileText className="w-3.5 h-3.5 text-slate-500" />
             <span>Snapshot</span>

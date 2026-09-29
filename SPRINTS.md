@@ -2,9 +2,9 @@
 
 > **Canonical Document**: See [`docs/Sprints.md`](file:///c:/Users/user/Desktop/BrokerBridge/brokerbridge-enterprise/docs/Sprints.md) for full historical sprint details.
 
-## Global Platform Status: SPRINT 27 COMPLETED | ADVANCING TO SPRINT 28
+## Global Platform Status: SPRINT 29 COMPLETED | ADVANCING TO SPRINT 30 🚀
 
-Sprint 27 (Booking + Orders) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 28: Finance + CRM**.
+Sprint 29 (Hardening) is 100% complete, fully audited, and verified. The platform is ready to begin **Sprint 30: End-to-End UAT & Release**.
 
 ---
 
@@ -29,5 +29,26 @@ Sprint 27 (Booking + Orders) is 100% complete, manually verified, and audited. T
 
 ---
 
-### Sprint 28: Finance + CRM (UPCOMING 🚀)
-- **Goal:** Deploy Broker Financial Ledger, Commission Spread Calculations, Escrow Settlement Overview, and CRM Activity Feed.
+### Sprint 28: Finance + CRM (COMPLETED ✅)
+- **Goal:** Deploy Broker Financial Ledger, Commission Spread Calculations, Escrow Settlement Overview, Lightweight CRM Contact Cards, and Dispute Resolution Center.
+- **Key Deliverables:**
+  - [x] **28.1 — Broker Payments & Settlement Tracker:** Built `getBrokerFinancialLedgerAction()`, `<SettlementTracker />`, `<LogPaymentModal />`.
+  - [x] **28.2 — Broker Commission Engine & Ledger:** Built `getBrokerCommissionLedgerAction()` & Commission Ledger view.
+  - [x] **28.3 — Broker Lightweight CRM & Contact Cards:** Built `getBrokerContactAggregatedProfileAction()` & 360-degree `<ContactCard />`.
+  - [x] **28.4 — Broker Dispute Resolution Center:** Built `getBrokerActiveDisputesAction()`, `resolveDisputeAction()`, & Dispute Center.
+  - [x] **28.5 — Sprint 28 Final Audit & Acceptance Gate:** Architectural & mobile audit passed cleanly.
+
+---
+
+### Sprint 29: Hardening (COMPLETED ✅)
+- **Goal:** Security, concurrency, low-bandwidth, mobile, and regression hardening across Sprints 1–28.
+- **Key Deliverables:**
+  - [x] **29.1 — Security & Authorization Audit:** Server-side auth, multi-tenant isolation, PII privacy scrubbing (`privacy-scrubber.ts`), and 900s storage TTL verified.
+  - [x] **29.2 — Integrity & Concurrency Audit:** Atomic `db.transaction()` blocks, optimistic version locking (`STALE_VERSION_DETECTED`), and database `UNIQUE` booking failsafes verified.
+  - [x] **29.3 — Mobile & Connectivity Resilience Audit:** 360px viewport overflow hardening, 48px touch targets, double-click prevention (`useTransition`/`Loader2`), loading skeletons, and error boundaries implemented.
+  - [x] **29.4 — Global Regression Audit & Sprint 29 Closure:** End-to-end state machine verification completed with clean regression results.
+
+---
+
+### Sprint 30: End-to-End UAT & Release (UPCOMING 🚀)
+- **Goal:** Comprehensive platform testing, user acceptance testing (UAT), and production deployment.

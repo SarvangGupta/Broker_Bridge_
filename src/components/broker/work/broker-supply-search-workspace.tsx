@@ -170,7 +170,7 @@ export function BrokerSupplySearchWorkspace({
             placeholder="Search by seller company, lot ID, commodity, or grade..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-24 min-h-[44px] h-11 bg-white border-slate-200/90 rounded-xl text-xs sm:text-sm focus-visible:ring-[#0D9488]"
+            className="pl-10 pr-24 min-h-[48px] h-12 bg-white border-slate-200/90 rounded-xl text-xs sm:text-sm focus-visible:ring-[#0D9488]"
           />
           <Button
             type="submit"
@@ -210,7 +210,7 @@ export function BrokerSupplySearchWorkspace({
             <Button
               variant="outline"
               onClick={() => window.location.reload()}
-              className="min-h-[44px] h-11"
+              className="min-h-[48px] h-12"
             >
               Retry
             </Button>
@@ -248,7 +248,7 @@ export function BrokerSupplySearchWorkspace({
                 setSearchQuery('');
                 handleFilterChange({});
               }}
-              className="min-h-[44px] h-11 text-xs font-semibold"
+              className="min-h-[48px] h-12 text-xs font-semibold"
             >
               Reset All Filters
             </Button>

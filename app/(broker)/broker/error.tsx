@@ -45,7 +45,7 @@ export default function BrokerError({
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
           <Button
             onClick={() => reset()}
-            className="w-full sm:w-auto min-h-[44px] px-5 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white font-semibold shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+            className="w-full sm:w-auto min-h-[48px] px-5 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white font-semibold shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Try Again</span>
@@ -53,7 +53,7 @@ export default function BrokerError({
 
           <Link
             href="/broker"
-            className="w-full sm:w-auto min-h-[44px] px-5 rounded-xl border border-border bg-white text-slate-700 hover:bg-slate-50 font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-2xs"
+            className="w-full sm:w-auto min-h-[48px] px-5 rounded-xl border border-border bg-white text-slate-700 hover:bg-slate-50 font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-2xs"
           >
             <Home className="w-4 h-4" />
             <span>Back to Home</span>

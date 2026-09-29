@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)**  
-Global Platform Status: **SPRINT 27 COMPLETE — BROKER BOOKING & ORDER OPERATIONS ENGINE LIVE 🚀**  
-Status: **Sprint 27 Completed** ✅ (Next: Sprint 28: Finance + CRM)
+Global Platform Status: **SPRINT 29 COMPLETE — HARDENING & SECURITY AUDIT PASSED 🚀**  
+Status: **Sprint 29 Completed** ✅ (Next: Sprint 30: End-to-End UAT & Release)
 
 
 ---
@@ -543,6 +543,35 @@ Status: **Sprint 27 Completed** ✅ (Next: Sprint 28: Finance + CRM)
 - **Deliverables:** Safely removed legacy `<DevFinalizationGateTester />` from Seller view, connected Broker UI directly to Sprint 18 `finalizeDealAction` and `createIdempotentBookingAction` with optimistic version concurrency guard.
 
 - **Verification:** Passed `npx tsc --noEmit` with 0 errors. Sprint 27 is 100% complete and verified. Moving to Sprint 28 (Finance + CRM).
+
+---
+
+### 🟢 Sprint 28: Finance + CRM (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Deploy Broker Financial Ledger, Commission Spread Calculations, Escrow Settlement Overview, Lightweight CRM Contact Cards, and Dispute Resolution Center.
+- **Log (Finance + CRM Engine Live):** Brokers can track separated Buyer Payables and Seller Settlements, monitor immutable commission spreads, manage 360-degree CRM relationship cards with 1-tap follow-up logging, and arbitrate trade disputes offline without direct Buyer-Seller chat.
+
+#### 🟢 Micro-Sprint 28.1: Broker Payments & Settlement Tracker (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Deliverables:** Built `getBrokerFinancialLedgerAction()` in `src/server/actions/broker-finance-actions.ts` computing Buyer Payable, Seller Settlement, Broker Commission, Paid Amount, and Outstanding Balance strictly server-side from locked `deal_versions` snapshots. Built `<SettlementTracker />` UI dashboard and `<LogPaymentModal />` Dialog. Integrated into `/broker/orders/[bookingId]`.
+
+#### 🟢 Micro-Sprint 28.2: Broker Commission Engine & Ledger (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Deliverables:** Built `getBrokerCommissionLedgerAction()` in `src/server/actions/broker-commission-actions.ts` computing Expected, Collected, and Pending brokerage revenue from locked deal version snapshots. Built Commission Ledger page at `/broker/more/commission` with 3 KPI cards (Total Expected, Total Collected in Electric Teal `#0D9488`, Pending Commission).
+
+#### 🟢 Micro-Sprint 28.3: Broker Lightweight CRM & Contact Cards (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Deliverables:** Built `getBrokerContactAggregatedProfileAction()` in `src/server/actions/broker-crm-actions.ts` executing parallel queries across `crm_contacts`, `crm_tasks`, `crm_activities`, `requirements`, and `deals`. Built 360-degree `<ContactCard />` component displaying open mandates, active deals, follow-up status badges, and 3-item recent interaction timeline. Integrated "One-Tap Follow Up" button (Electric Teal) pre-filling contact ID into `<CrmActivityDialog />`. Built CRM Workspace page at `/broker/more/crm`.
+
+#### 🟢 Micro-Sprint 28.4: Broker Dispute Resolution Center (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Deliverables:** Built `getBrokerActiveDisputesAction()` & `resolveDisputeAction()` in `src/server/actions/broker-dispute-actions.ts` handling strictly normalized PRD categories (`Quality`, `Quantity`, `Delivery`, `Document`, `Payment`, `Commercial`, `Other`). Built Dispute Center page at `/broker/more/disputes` featuring open/resolved KPI summary cards and `<DisputeCard />` feed. Built `<DisputeResolutionModal />` displaying read-only evidence attachments (weighbridge slips, COAs, LRs), Broker internal mediation notes `<Textarea>`, and "Mark as Resolved" trigger. Enforced 100% Broker-mediated boundary (zero direct Buyer-Seller chat).
+
+#### 🟢 Micro-Sprint 28.5: Sprint 28 Final Audit & Acceptance Gate (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Deliverables:** Executed read-only architectural scan, 360px mobile viewport audit, zero-data-wall check, and 100% TypeScript compilation check (`npx tsc --noEmit`).
+
+- **Verification:** Passed `npx tsc --noEmit` with 0 errors. Sprint 28 is 100% complete and verified. Moving to Sprint 29 (Hardening).
 
 
 

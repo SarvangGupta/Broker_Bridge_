@@ -38,54 +38,84 @@ import { activitySchema } from "@/src/types/crm-schema"
 import { logActivityAction, getCrmContactsAction } from "@/src/server/actions/crm-actions"
 
 interface CrmActivityDialogProps {
-  onLogged?: () => void
+  onLogged?: () => void;
+  defaultContactId?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  customTrigger?: React.ReactNode;
 }
 
-export function CrmActivityDialog({ onLogged }: CrmActivityDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [contacts, setContacts] = useState<any[]>([])
-  
+export function CrmActivityDialog({
+  onLogged,
+  defaultContactId,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
+  customTrigger,
+}: CrmActivityDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const [contacts, setContacts] = useState<any[]>([]);
+
+  const isControlled = typeof controlledOpen === 'boolean';
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (val: boolean) => {
+    if (isControlled && setControlledOpen) {
+      setControlledOpen(val);
+    } else {
+      setInternalOpen(val);
+    }
+  };
+
   useEffect(() => {
     if (open && contacts.length === 0) {
-      getCrmContactsAction().then(res => {
+      getCrmContactsAction().then((res) => {
         if (res.success && res.data) {
-          setContacts(res.data)
+          setContacts(res.data);
         }
-      })
+      });
     }
-  }, [open, contacts.length])
+  }, [open, contacts.length]);
 
   const form = useForm<z.infer<typeof activitySchema>>({
     resolver: zodResolver(activitySchema),
     defaultValues: {
-      contact_id: "",
-      type: "Call",
-      notes: "",
+      contact_id: defaultContactId || '',
+      type: 'Call',
+      notes: '',
+    },
+  });
+
+  useEffect(() => {
+    if (defaultContactId && open) {
+      form.setValue('contact_id', defaultContactId);
     }
-  })
+  }, [defaultContactId, open, form]);
 
   async function onSubmit(values: z.infer<typeof activitySchema>) {
     try {
-      const res = await logActivityAction(values)
+      const res = await logActivityAction(values);
       if (res.success) {
-        toast.success("Activity logged successfully")
-        setOpen(false)
-        form.reset()
-        if (onLogged) onLogged()
+        toast.success('Activity logged successfully');
+        setOpen(false);
+        form.reset();
+        if (onLogged) onLogged();
       } else {
-        toast.error(res.error || "Failed to log activity")
+        toast.error(res.error || 'Failed to log activity');
       }
     } catch (e) {
-      toast.error("Unexpected error occurred")
+      toast.error('Unexpected error occurred');
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" className="min-h-[44px] rounded-xl border-slate-200 gap-2 font-semibold text-sm cursor-pointer" />}>
-        <Plus className="h-4 w-4" />
-        Log Activity
-      </DialogTrigger>
+      {customTrigger ? (
+        <DialogTrigger render={customTrigger as any} />
+      ) : (
+        <DialogTrigger render={<Button variant="outline" className="min-h-[44px] rounded-xl border-slate-200 gap-2 font-semibold text-sm cursor-pointer" />}>
+          <Plus className="h-4 w-4" />
+          Log Activity
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[450px] p-6 bg-white">
         <DialogHeader className="text-left pb-2">
           <DialogTitle className="text-xl font-bold text-slate-900">Log CRM Activity</DialogTitle>

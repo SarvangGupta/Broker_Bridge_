@@ -108,7 +108,7 @@ export function BrokerRequirementsInbox({
           <Button
             variant="outline"
             onClick={() => window.location.reload()}
-            className="min-h-[44px] h-11 border-rose-200 text-rose-700 hover:bg-rose-100"
+            className="min-h-[48px] h-12 border-rose-200 text-rose-700 hover:bg-rose-100"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             <span>Retry Connection</span>
@@ -130,7 +130,7 @@ export function BrokerRequirementsInbox({
             placeholder="Search by commodity, grade, buyer, or REQ ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 min-h-[44px] h-11 bg-white border-slate-200/90 rounded-xl text-xs sm:text-sm focus-visible:ring-[#0D9488]"
+            className="pl-10 min-h-[48px] h-12 bg-white border-slate-200/90 rounded-xl text-xs sm:text-sm focus-visible:ring-[#0D9488]"
           />
           {searchQuery && (
             <button
@@ -298,7 +298,7 @@ export function BrokerRequirementsInbox({
                   setSearchQuery('');
                   setActiveFilter('ALL');
                 }}
-                className="min-h-[44px] h-11 text-xs font-semibold"
+                className="min-h-[48px] h-12 text-xs font-semibold"
               >
                 Reset All Filters
               </Button>

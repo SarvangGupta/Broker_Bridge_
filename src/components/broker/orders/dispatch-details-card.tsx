@@ -217,7 +217,7 @@ export function DispatchDetailsCard({
             </div>
             <Button
               onClick={() => setIsLogDispatchOpen(true)}
-              className="bg-[#0D9488] hover:bg-[#0D9488]/90 text-white text-xs font-bold h-10 px-4 rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer min-h-[44px]"
+              className="bg-[#0D9488] hover:bg-[#0D9488]/90 text-white text-xs font-bold h-12 px-4 rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer min-h-[48px]"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Log Dispatch Manually</span>

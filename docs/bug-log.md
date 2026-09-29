@@ -155,5 +155,15 @@ This document tracks UI/UX anomalies, architectural logic bugs, and their eventu
   1. Enhanced `getDispatchTrackingAction` to pull `DISPATCH_SUBMITTED` events from `negotiation_events`, computing `shipmentNumber`, `totalShipments`, `isPartial`, and exact `dispatchQuantity`.
   2. Upgraded `<LogisticsTracker />` and the dispatch page to display "Shipment X of Y (36 MT Partial Load vs 14 MT Final Load)" badges and truck-scoped document upload vaults.
 
+---
+
+## Sprint 28.1 - Next.js Server Action Non-Async Export Violation
+- **Issue:** Next.js Turbopack dev server threw runtime error: `A "use server" file can only export async functions, found object` during route module evaluation on `/broker/orders/[bookingId]`.
+- **Root Cause:** `src/server/actions/broker-finance-actions.ts` had `'use server'` at the top and exported a Zod schema object (`export const logBrokerPaymentSchema = z.object(...)`). Next.js mandates that `'use server'` entrypoint modules must ONLY export async functions.
+- **Resolution:**
+  1. Changed `export const logBrokerPaymentSchema` to an internal `const logBrokerPaymentSchema` without the `export` keyword.
+  2. Cleared stale `.next/dev/types/validator.ts` build cache file.
+  3. Re-ran `npx tsc --noEmit` and confirmed 100% clean compilation.
+
 
 

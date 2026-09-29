@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { getBrokerOrderDetailsAction } from '@/src/server/actions/broker-order-actions';
 import { LogisticsTracker } from '@/src/components/broker/orders/logistics-tracker';
 import { DispatchDetailsCard } from '@/src/components/broker/orders/dispatch-details-card';
+import { SettlementTracker } from '@/src/components/broker/finance/settlement-tracker';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,6 +104,9 @@ export default async function BrokerOrderDetailPage({ params }: BrokerOrderDetai
 
       {/* TASK 2 & 3: BROKER DISPATCH CAPTURE & MONITORING CARD */}
       <DispatchDetailsCard bookingIdOrReference={bookingIdOrRef} />
+
+      {/* SPRINT 28.1: BROKER FINANCIAL SETTLEMENT LEDGER & PAYMENT TRACKER */}
+      <SettlementTracker bookingIdOrReference={bookingIdOrRef} />
 
       {/* 2-COLUMN OPERATIONAL DETAILS SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

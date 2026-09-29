@@ -264,7 +264,7 @@ export function BookingGate({
               onClick={handleCopyBookingId}
               variant="outline"
               size="sm"
-              className="h-10 px-4 border-teal-300 bg-white text-teal-800 hover:bg-teal-50 font-semibold text-xs rounded-xl flex items-center gap-2 cursor-pointer self-start sm:self-auto min-h-[44px]"
+              className="h-12 px-4 border-teal-300 bg-white text-teal-800 hover:bg-teal-50 font-semibold text-xs rounded-xl flex items-center gap-2 cursor-pointer self-start sm:self-auto min-h-[48px]"
             >
               {copied ? (
                 <>

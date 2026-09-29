@@ -140,7 +140,7 @@ export function SupplyFiltersComponent({
             })
           }
         >
-          <SelectTrigger className="w-full min-h-[44px] h-11 bg-white border-slate-200 text-xs sm:text-sm">
+          <SelectTrigger className="w-full min-h-[48px] h-12 bg-white border-slate-200 text-xs sm:text-sm">
             <SelectValue placeholder="All Commodities">
               {getCommodityName(localFilters.commodityId)}
             </SelectValue>
@@ -174,7 +174,7 @@ export function SupplyFiltersComponent({
             })
           }
         >
-          <SelectTrigger className="w-full min-h-[44px] h-11 bg-white border-slate-200 text-xs sm:text-sm">
+          <SelectTrigger className="w-full min-h-[48px] h-12 bg-white border-slate-200 text-xs sm:text-sm">
             <SelectValue placeholder="All Grades / Specifications">
               {getGradeName(localFilters.gradeId)}
             </SelectValue>
@@ -208,7 +208,7 @@ export function SupplyFiltersComponent({
             })
           }
         >
-          <SelectTrigger className="w-full min-h-[44px] h-11 bg-white border-slate-200 text-xs sm:text-sm">
+          <SelectTrigger className="w-full min-h-[48px] h-12 bg-white border-slate-200 text-xs sm:text-sm">
             <SelectValue placeholder="All States">
               {getStateName(localFilters.stateId)}
             </SelectValue>
@@ -242,7 +242,7 @@ export function SupplyFiltersComponent({
               const val = e.target.value ? Number(e.target.value) : undefined;
               setLocalFilters((prev) => ({ ...prev, maxPrice: val }));
             }}
-            className="pl-7 min-h-[44px] h-11 bg-white border-slate-200 text-xs sm:text-sm"
+            className="pl-7 min-h-[48px] h-12 bg-white border-slate-200 text-xs sm:text-sm"
           />
         </div>
       </div>
@@ -341,7 +341,7 @@ export function SupplyFiltersComponent({
                 })
               }
             >
-              <SelectTrigger className="w-full min-h-[40px] h-10 bg-slate-50/70 border-slate-200 text-xs">
+              <SelectTrigger className="w-full min-h-[48px] h-12 bg-slate-50/70 border-slate-200 text-xs">
                 <SelectValue placeholder="All Commodities">
                   {getCommodityName(filters.commodityId)}
                 </SelectValue>
@@ -369,7 +369,7 @@ export function SupplyFiltersComponent({
                 })
               }
             >
-              <SelectTrigger className="w-full min-h-[40px] h-10 bg-slate-50/70 border-slate-200 text-xs">
+              <SelectTrigger className="w-full min-h-[48px] h-12 bg-slate-50/70 border-slate-200 text-xs">
                 <SelectValue placeholder="All Grades">
                   {getGradeName(filters.gradeId)}
                 </SelectValue>
@@ -397,7 +397,7 @@ export function SupplyFiltersComponent({
                 })
               }
             >
-              <SelectTrigger className="w-full min-h-[40px] h-10 bg-slate-50/70 border-slate-200 text-xs">
+              <SelectTrigger className="w-full min-h-[48px] h-12 bg-slate-50/70 border-slate-200 text-xs">
                 <SelectValue placeholder="All States">
                   {getStateName(filters.stateId)}
                 </SelectValue>
@@ -428,7 +428,7 @@ export function SupplyFiltersComponent({
                   const val = e.target.value ? Number(e.target.value) : undefined;
                   onFilterChange({ ...filters, maxPrice: val });
                 }}
-                className="pl-6 min-h-[40px] h-10 bg-slate-50/70 border-slate-200 text-xs"
+                className="pl-6 min-h-[48px] h-12 bg-slate-50/70 border-slate-200 text-xs"
               />
             </div>
           </div>

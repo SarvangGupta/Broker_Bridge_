@@ -15,6 +15,7 @@ import {
   Sparkles,
   Info,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -218,7 +219,7 @@ export function SendRequestDialog({
                 value={proposedQuantity}
                 onChange={(e) => setProposedQuantity(Number(e.target.value))}
                 required
-                className="min-h-[44px] h-11 bg-white border-slate-200 text-xs sm:text-sm font-semibold focus-visible:ring-[#0D9488]"
+                className="min-h-[48px] h-12 bg-white border-slate-200 text-xs sm:text-sm font-semibold focus-visible:ring-[#0D9488]"
               />
               <span className="text-[10px] text-slate-400 block">
                 Max available: {lot.availableQuantity} {unitSymbol}
@@ -240,7 +241,7 @@ export function SendRequestDialog({
                   value={proposedPrice}
                   onChange={(e) => setProposedPrice(Number(e.target.value))}
                   required
-                  className="pl-7 min-h-[44px] h-11 bg-white border-slate-200 text-xs sm:text-sm font-bold text-slate-900 focus-visible:ring-[#0D9488]"
+                  className="pl-7 min-h-[48px] h-12 bg-white border-slate-200 text-xs sm:text-sm font-bold text-slate-900 focus-visible:ring-[#0D9488]"
                 />
               </div>
               <span className="text-[10px] text-slate-400 block">
@@ -259,7 +260,7 @@ export function SendRequestDialog({
               type="date"
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
-              className="min-h-[44px] h-11 bg-white border-slate-200 text-xs sm:text-sm focus-visible:ring-[#0D9488]"
+              className="min-h-[48px] h-12 bg-white border-slate-200 text-xs sm:text-sm focus-visible:ring-[#0D9488]"
             />
           </div>
 
@@ -297,7 +298,10 @@ export function SendRequestDialog({
               className="min-h-[48px] h-12 flex-1 bg-[#0D9488] hover:bg-teal-700 text-white font-bold text-sm shadow-xs rounded-xl flex items-center justify-center gap-2"
             >
               {isPending ? (
-                <span>Dispatching Request...</span>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Dispatching Request...</span>
+                </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />

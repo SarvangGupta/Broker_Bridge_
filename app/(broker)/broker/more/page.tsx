@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Users2,
@@ -11,6 +12,7 @@ import {
   ChevronRight,
   Sparkles,
   LogOut,
+  Zap,
 } from 'lucide-react';
 import { signOutAction } from '@/src/server/actions/auth-actions';
 
@@ -19,25 +21,37 @@ interface ToolItem {
   title: string;
   description: string;
   icon: React.ElementType;
+  href?: string;
   badge?: string;
   color: string;
 }
 
 const MORE_TOOLS: ToolItem[] = [
   {
+    id: 'commission',
+    title: 'Commission & Revenue Ledger',
+    description: 'Track locked buyer markups, seller deductions, and historical revenue spread.',
+    icon: Zap,
+    href: '/broker/more/commission',
+    badge: 'Sprint 28',
+    color: 'text-[#0D9488] bg-teal-50 border-teal-200/80',
+  },
+  {
     id: 'crm',
-    title: 'CRM & Tasks',
-    description: 'Manage buyer/seller contacts, scheduled call follow-ups, and mandate reminders.',
+    title: 'CRM & Relationship Cards',
+    description: '360-degree buyer/seller contact cards, open mandate telemetry, and 1-tap follow-up logging.',
     icon: Users2,
-    badge: 'Sprint 29',
+    href: '/broker/more/crm',
+    badge: 'Sprint 28',
     color: 'text-blue-600 bg-blue-50 border-blue-200/80',
   },
   {
     id: 'payments',
-    title: 'Payments & Ledger',
+    title: 'Payments & Settlement Ledger',
     description: 'Track trade settlements, brokerage invoices, payouts, and financial sheets.',
     icon: Wallet,
-    badge: 'Sprint 30',
+    href: '/broker/orders',
+    badge: 'Live',
     color: 'text-emerald-600 bg-emerald-50 border-emerald-200/80',
   },
   {
@@ -50,10 +64,11 @@ const MORE_TOOLS: ToolItem[] = [
   },
   {
     id: 'disputes',
-    title: 'Disputes',
+    title: 'Disputes & Exception Desk',
     description: 'Arbitrate trade differences, weight discrepancies, and quality variances.',
     icon: AlertTriangle,
-    badge: 'Support',
+    href: '/broker/more/disputes',
+    badge: 'Sprint 28',
     color: 'text-amber-600 bg-amber-50 border-amber-200/80',
   },
   {
@@ -83,12 +98,8 @@ export default function BrokerMorePage() {
       <div className="space-y-3">
         {MORE_TOOLS.map((tool) => {
           const Icon = tool.icon;
-
-          return (
-            <Card
-              key={tool.id}
-              className="border border-border bg-white hover:border-[#0D9488]/40 hover:shadow-xs transition-all cursor-pointer group"
-            >
+          const content = (
+            <Card className="border border-border bg-white hover:border-[#0D9488]/40 hover:shadow-xs transition-all cursor-pointer group">
               <CardContent className="p-4 sm:p-5 flex items-center justify-between gap-4 min-h-[56px]">
                 <div className="flex items-center gap-3.5 min-w-0 flex-1">
                   {/* Icon */}
@@ -123,6 +134,16 @@ export default function BrokerMorePage() {
               </CardContent>
             </Card>
           );
+
+          if (tool.href) {
+            return (
+              <Link key={tool.id} href={tool.href} className="block">
+                {content}
+              </Link>
+            );
+          }
+
+          return <div key={tool.id}>{content}</div>;
         })}
       </div>
 
@@ -155,7 +176,7 @@ export default function BrokerMorePage() {
       <div className="p-4 rounded-xl bg-teal-50/60 border border-teal-200/60 flex items-start gap-3">
         <Sparkles className="w-5 h-5 text-[#0D9488] shrink-0 mt-0.5" />
         <div className="text-xs text-teal-900 leading-relaxed">
-          <span className="font-bold">Broker Lite Workstation Architecture:</span> Operating on a flat role model. Advanced CRM contact tracking and ledger settlement tools are scheduled for automated rollout in Sprints 29 & 30.
+          <span className="font-bold">Broker Workstation Architecture:</span> Operating on a flat role model. Advanced CRM contact tracking and dispute arbitration modules are scheduled for automated rollout in Sprints 29 & 30.
         </div>
       </div>
     </div>

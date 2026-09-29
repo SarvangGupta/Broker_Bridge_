@@ -346,7 +346,7 @@ export function BrokerNegotiationsHub() {
                 <div className="p-4 pt-0 grid grid-cols-3 gap-1.5 pb-2">
                   <Button
                     onClick={() => handleOpenChannelDrawer(item, 'seller')}
-                    className="min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-2xs px-2 border border-slate-200"
+                    className="min-h-[48px] h-12 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-2xs px-2 border border-slate-200"
                   >
                     <Building2 className="w-3.5 h-3.5 mr-1 shrink-0 text-teal-700" />
                     <span>Seller</span>
@@ -355,7 +355,7 @@ export function BrokerNegotiationsHub() {
                   <Button
                     onClick={() => handleOpenChannelDrawer(item, 'buyer')}
                     variant="outline"
-                    className="min-h-[44px] border-blue-300 text-blue-800 hover:bg-blue-50 font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-2xs px-2"
+                    className="min-h-[48px] h-12 border-blue-300 text-blue-800 hover:bg-blue-50 font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-2xs px-2"
                   >
                     <Building className="w-3.5 h-3.5 mr-1 text-blue-600 shrink-0" />
                     <span>Buyer</span>
@@ -364,7 +364,7 @@ export function BrokerNegotiationsHub() {
                   <Button
                     onClick={() => handleOpenChannelDrawer(item, 'master')}
                     variant="secondary"
-                    className="min-h-[44px] bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-2xs px-2"
+                    className="min-h-[48px] h-12 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-2xs px-2"
                   >
                     <TrendingUp className="w-3.5 h-3.5 mr-1 text-teal-400 shrink-0" />
                     <span>Master</span>
@@ -375,7 +375,7 @@ export function BrokerNegotiationsHub() {
                 <div className="p-4 pt-0">
                   <Link href={`/broker/deals/${item.requestId}`} className="w-full block">
                     <Button
-                      className="w-full min-h-[44px] bg-[#0D9488] hover:bg-[#0D9488]/90 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full min-h-[48px] h-12 bg-[#0D9488] hover:bg-[#0D9488]/90 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <FileCheck2 className="w-4 h-4" />
                       <span>Proceed to Final Contract</span>
