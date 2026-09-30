@@ -9,7 +9,7 @@ export const companyOnboardingSchema = z.object({
   business_type_id: z.string().min(1, { message: "Business type is required." }),
   state_id: z.string().min(1, { message: "State is required." }),
   district_id: z.string().min(1, { message: "District is required." }),
-  mobile: z.string().min(10, { message: "Valid 10-digit mobile number required" }),
+  mobile: z.string().regex(/^[0-9]{10}$/, { message: "Mobile number must be exactly 10 digits." }),
 });
 
 export type CompanyOnboardingFormValues = z.infer<typeof companyOnboardingSchema>;

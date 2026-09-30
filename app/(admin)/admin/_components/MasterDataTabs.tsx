@@ -64,6 +64,7 @@ import { CompanyApprovalQueue } from "./company-approval-queue"
 import { DealDeskQueue } from "./deal-desk-queue"
 import { AdminDisputeQueue } from "./admin-dispute-queue"
 import { AdminHelpDeskQueue } from "./admin-help-desk-queue"
+import { AdminBrokersVault } from "./admin-brokers-vault"
 import { QualityParameterDialog } from "./quality-parameter-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -362,6 +363,10 @@ export function MasterDataTabs() {
           <TabsTrigger value="approvals" className="justify-start px-3 py-2 text-sm text-slate-600 data-[state=active]:bg-[#F1F5F9] data-[state=active]:text-[#334155] data-[state=active]:font-semibold rounded-md transition-colors w-full border-none shadow-none text-left flex items-center gap-2">
             <ListChecks className="w-4 h-4" />
             Approvals
+          </TabsTrigger>
+          <TabsTrigger value="brokers" className="justify-start px-3 py-2 text-sm text-slate-600 data-[state=active]:bg-[#F1F5F9] data-[state=active]:text-[#334155] data-[state=active]:font-semibold rounded-md transition-colors w-full border-none shadow-none text-left flex items-center gap-2">
+            <Users className="w-4 h-4 text-emerald-600" />
+            Brokers Vault
           </TabsTrigger>
           <TabsTrigger value="dealdesk" className="justify-start px-3 py-2 text-sm text-slate-600 data-[state=active]:bg-[#F1F5F9] data-[state=active]:text-[#334155] data-[state=active]:font-semibold rounded-md transition-colors w-full border-none shadow-none text-left flex items-center gap-2">
             <Scale className="w-4 h-4" />
@@ -1113,6 +1118,11 @@ export function MasterDataTabs() {
             {/* HELP DESK TAB */}
             <TabsContent value="helpdesk" className="m-0 outline-none">
               <AdminHelpDeskQueue />
+            </TabsContent>
+
+            {/* BROKERS VAULT TAB */}
+            <TabsContent value="brokers" className="m-0 outline-none">
+              <AdminBrokersVault />
             </TabsContent>
 
           </div>

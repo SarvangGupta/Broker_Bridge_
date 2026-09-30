@@ -1,9 +1,8 @@
 'use client'
 
-import React, { useState, useTransition } from 'react'
+import React, { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { RotateCw, CheckCircle2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { RotateCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface DataFreshnessProps {
@@ -13,19 +12,29 @@ interface DataFreshnessProps {
 }
 
 export function DataFreshness({
-  timestamp = new Date(),
+  timestamp,
   className,
   onRefresh,
 }: DataFreshnessProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [lastRefreshedTime, setLastRefreshedTime] = useState<Date>(
-    timestamp instanceof Date ? timestamp : new Date(timestamp)
-  )
+  const [mounted, setMounted] = useState(false)
+
+  const [initialTime] = useState<Date>(() => {
+    if (!timestamp) return new Date()
+    return timestamp instanceof Date ? timestamp : new Date(timestamp)
+  })
+
+  const [lastRefreshedTime, setLastRefreshedTime] = useState<Date>(initialTime)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleRefresh = () => {
     startTransition(() => {
-      setLastRefreshedTime(new Date())
+      const now = new Date()
+      setLastRefreshedTime(now)
       if (onRefresh) {
         onRefresh()
       } else {
@@ -47,6 +56,8 @@ export function DataFreshness({
     }
   }
 
+  const timeToDisplay = mounted ? lastRefreshedTime : initialTime
+
   return (
     <div
       className={cn(
@@ -57,7 +68,9 @@ export function DataFreshness({
       <div className="flex items-center gap-1.5 font-medium">
         <span className="flex h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
         <span className="text-slate-600">Updated:</span>
-        <span className="font-semibold text-slate-800">{formatTime(lastRefreshedTime)}</span>
+        <span className="font-semibold text-slate-800" suppressHydrationWarning>
+          {formatTime(timeToDisplay)}
+        </span>
       </div>
 
       <button

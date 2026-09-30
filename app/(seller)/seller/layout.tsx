@@ -4,6 +4,7 @@ import { getFullBuyerProfileDetailsAction } from "@/src/server/actions/user-prof
 import { SellerSidebar, SellerMobileHeader } from "@/src/components/dashboard/seller-sidebar"
 
 export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 export default async function SellerLayout({
   children,
@@ -18,6 +19,17 @@ export default async function SellerLayout({
   const profile = profileRes.success && profileRes.data ? profileRes.data : null
   const fullProfile = fullProfileRes.success && fullProfileRes.data ? fullProfileRes.data : null
   const userRole = fullProfile?.user?.role || "SELLER_ADMIN"
+
+  const onboardingStatus = profileRes.status || 'NONE'
+  const isApproved = onboardingStatus === 'APPROVED'
+
+  if (!isApproved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 py-12">
+        {children}
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">

@@ -54,27 +54,49 @@ export async function getCompanyProfile() {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      return { success: false, error: 'Unauthorized' }
+      return { success: false, error: 'Unauthorized', status: 'NONE' as const }
     }
 
     // Get user's companyId
     const currentUser = await db.select().from(users).where(eq(users.id, user.id))
     
     if (!currentUser.length || !currentUser[0].companyId) {
-      return { success: false, error: 'Company profile not found' }
+      return { success: false, error: 'Company profile not found', status: 'NONE' as const }
     }
 
+    const dbUser = currentUser[0]
+
     // Get company
-    const company = await db.select().from(companies).where(eq(companies.id, currentUser[0].companyId))
+    const company = await db.select().from(companies).where(eq(companies.id, dbUser.companyId!))
     
     if (!company.length) {
-       return { success: false, error: 'Company not found' }
+       return { success: false, error: 'Company not found', status: 'NONE' as const }
     }
     
-    return { success: true, data: company[0] }
+    const dbCompany = company[0]
+
+    let onboardingStatus: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED' = 'NONE'
+
+    const isApproved = Boolean(dbCompany.status) || Boolean(dbCompany.isVerified) || String(dbCompany.status) === 'true' || String(dbCompany.isVerified) === 'true'
+    const isRejected = dbUser.status === false && !isApproved
+
+    if (isApproved) {
+      onboardingStatus = 'APPROVED'
+    } else if (isRejected) {
+      onboardingStatus = 'REJECTED'
+    } else {
+      onboardingStatus = 'PENDING'
+    }
+
+    return { 
+      success: true, 
+      data: dbCompany,
+      user: dbUser,
+      status: onboardingStatus 
+    }
   } catch (error: any) {
     console.error("getCompanyProfile DB error:", error)
-    return { success: false, error: error.message || 'Failed to fetch company profile' }
+    return { success: false, error: error.message || 'Failed to fetch company profile', status: 'NONE' as const }
   }
 }
 
@@ -98,12 +120,12 @@ export async function getPendingCompaniesAction() {
           id: users.id,
           name: users.name,
           email: users.email,
+          status: users.status,
         },
         stateName: masterStates.name,
         districtName: masterDistricts.name,
       })
       .from(companies)
-      .where(eq(companies.status, false))
       .leftJoin(users, eq(users.companyId, companies.id))
       // Cast UUID to text to avoid Postgres operator errors
       .leftJoin(masterStates, sql`${companies.stateId} = ${masterStates.id}::text`)
@@ -128,7 +150,7 @@ export async function approveCompanyAction(companyId: string) {
       return { success: false, error: 'Unauthorized: Admin access required' }
     }
 
-    await db.update(companies).set({ status: true }).where(eq(companies.id, companyId))
+    await db.update(companies).set({ status: true, isVerified: true }).where(eq(companies.id, companyId))
     await db.update(users).set({ status: true }).where(eq(users.companyId, companyId))
 
     return { success: true }
@@ -150,7 +172,7 @@ export async function rejectCompanyAction(companyId: string) {
       return { success: false, error: 'Unauthorized: Admin access required' }
     }
 
-    await db.update(companies).set({ status: false }).where(eq(companies.id, companyId))
+    await db.update(companies).set({ status: false, isVerified: false }).where(eq(companies.id, companyId))
     await db.update(users).set({ status: false }).where(eq(users.companyId, companyId))
 
     return { success: true }

@@ -36,7 +36,7 @@ export default async function SellerBrokerRequestsPage() {
 
             <div className="hidden sm:flex items-center gap-2">
               <span className="text-slate-300">/</span>
-              <span className="text-sm font-bold text-slate-900">Broker Requests Inbox</span>
+              <span className="text-sm font-bold text-slate-900">Trade Offers</span>
             </div>
           </div>
 

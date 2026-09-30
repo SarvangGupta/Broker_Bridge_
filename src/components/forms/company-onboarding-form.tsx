@@ -120,7 +120,18 @@ export function CompanyOnboardingForm() {
             <FormItem>
               <FormLabel>WhatsApp / Mobile Number</FormLabel>
               <FormControl>
-                <Input type="tel" inputMode="tel" placeholder="e.g. 9876543210" className="min-h-[48px]" {...field} />
+                <Input 
+                  type="tel" 
+                  inputMode="numeric" 
+                  maxLength={10} 
+                  placeholder="e.g. 9876543210" 
+                  className="min-h-[48px]" 
+                  {...field}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "").slice(0, 10)
+                    field.onChange(value)
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -174,7 +185,7 @@ export function CompanyOnboardingForm() {
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </PopoverTrigger>
                   </FormControl>
-                  <PopoverContent className="w-[300px] p-0" align="start">
+                  <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[240px] p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Search state..." />
                       <CommandList>
@@ -232,7 +243,7 @@ export function CompanyOnboardingForm() {
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </PopoverTrigger>
                   </FormControl>
-                  <PopoverContent className="w-[300px] p-0" align="start">
+                  <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[240px] p-0" align="end">
                     <Command>
                       <CommandInput placeholder="Search district..." />
                       <CommandList>

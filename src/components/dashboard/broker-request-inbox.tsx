@@ -64,7 +64,6 @@ import {
 } from "@/src/types/broker-request-schema";
 import {
   respondToBrokerRequestAction,
-  createMockBrokerRequestAction,
 } from "@/src/server/actions/broker-request-actions";
 
 interface BrokerRequestInboxProps {
@@ -107,7 +106,6 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
 
   const [requests, setRequests] = useState<SellerBrokerRequestItem[]>(initialRequests);
   const [activeTab, setActiveTab] = useState<string>("all");
-  const [isGeneratingMock, setIsGeneratingMock] = useState(false);
 
   // Timeline Sheet State (Micro-Sprint 17.5)
   const [timelineRequest, setTimelineRequest] = useState<SellerBrokerRequestItem | null>(null);
@@ -383,24 +381,7 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
     }
   }
 
-  // Generate Mock Request for Local Testing
-  async function handleGenerateMock() {
-    setIsGeneratingMock(true);
-    try {
-      const res = await createMockBrokerRequestAction();
-      if (res.success) {
-        toast.success(res.message || "Mock Broker Request created!");
-        queryClient.invalidateQueries({ queryKey: ['in-app-notifications'] });
-        router.refresh();
-      } else {
-        toast.error(res.error || "Failed to seed test request");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "An unexpected error occurred");
-    } finally {
-      setIsGeneratingMock(false);
-    }
-  }
+
 
   // Helper to format countdown tag
   function renderDeadlineBadge(expiresAt: Date | string, status: string) {
@@ -438,60 +419,48 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
   return (
     <div className="space-y-6">
       
-      {/* 1. TOP HEADER RIBBON & DEV CONTROLS */}
+      {/* 1. TOP HEADER RIBBON */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-              Broker Request Inbox
-            </h2>
-            <Badge variant="outline" className="bg-emerald-50 text-[#047857] border-emerald-200 font-bold text-xs">
-              Broker-Mediated
-            </Badge>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Review and respond to official trade proposals routed through your verified Broker desk.
+          <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
+            Trade Offers
+          </h2>
+          <p className="text-sm sm:text-base text-slate-600 mt-1">
+            Review and respond to price offers from your broker.
           </p>
         </div>
-
-        {/* Dev Seeder Button (Available for testing) */}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={isGeneratingMock}
-          onClick={handleGenerateMock}
-          className="min-h-[44px] h-11 border-dashed border-emerald-300 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50 hover:border-emerald-400 font-semibold rounded-xl text-xs sm:text-sm gap-2 shadow-2xs cursor-pointer"
-        >
-          {isGeneratingMock ? (
-            <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
-          ) : (
-            <Sparkles className="h-4 w-4 text-emerald-600" />
-          )}
-          <span>Generate Test Request</span>
-        </Button>
       </div>
 
       {/* 2. FILTER TABS */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-slate-100/90 p-1 rounded-xl h-auto flex flex-wrap gap-1">
-          <TabsTrigger value="all" className="rounded-lg py-2 px-3.5 text-xs sm:text-sm font-semibold cursor-pointer">
-            All Requests ({requests.length})
-          </TabsTrigger>
-          <TabsTrigger value="pending" className="rounded-lg py-2 px-3.5 text-xs sm:text-sm font-semibold cursor-pointer">
-            Pending Action ({requests.filter(r => PENDING_PROPOSAL_STATES.includes(r.status)).length})
-          </TabsTrigger>
-          <TabsTrigger value="accepted" className="rounded-lg py-2 px-3.5 text-xs sm:text-sm font-semibold cursor-pointer">
-            Accepted ({requests.filter(r => ACCEPTED_PROPOSAL_STATES.includes(r.status)).length})
-          </TabsTrigger>
-          <TabsTrigger value="countered" className="rounded-lg py-2 px-3.5 text-xs sm:text-sm font-semibold cursor-pointer">
-            Countered ({requests.filter(r => r.status === 'Seller Countered' || r.status === 'Countered').length})
-          </TabsTrigger>
-          <TabsTrigger value="rejected" className="rounded-lg py-2 px-3.5 text-xs sm:text-sm font-semibold cursor-pointer">
-            Rejected ({requests.filter(r => r.status === 'Seller Rejected' || r.status === 'Rejected').length})
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {(() => {
+        const allCount = requests.length;
+        const pendingCount = requests.filter(r => PENDING_PROPOSAL_STATES.includes(r.status)).length;
+        const acceptedCount = requests.filter(r => ACCEPTED_PROPOSAL_STATES.includes(r.status)).length;
+        const counteredCount = requests.filter(r => r.status === 'Seller Countered' || r.status === 'Countered').length;
+        const rejectedCount = requests.filter(r => r.status === 'Seller Rejected' || r.status === 'Rejected').length;
+
+        return (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="group-data-horizontal/tabs:h-auto h-auto w-full sm:w-auto inline-flex flex-wrap bg-slate-200/80 p-1.5 rounded-2xl gap-1.5 border border-slate-300/70 shadow-2xs">
+              <TabsTrigger value="all" className="rounded-xl min-h-[44px] sm:min-h-[48px] py-2.5 px-4 text-sm sm:text-base font-bold cursor-pointer text-slate-700 data-active:bg-white data-active:text-slate-900 data-active:shadow-sm transition-all">
+                All {allCount > 0 && <span className="ml-1.5 rounded-full bg-slate-100 text-slate-900 px-2 py-0.5 text-xs font-bold border border-slate-300/60">{allCount}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="rounded-xl min-h-[44px] sm:min-h-[48px] py-2.5 px-4 text-sm sm:text-base font-bold cursor-pointer text-slate-700 data-active:bg-white data-active:text-slate-900 data-active:shadow-sm transition-all">
+                Pending {pendingCount > 0 && <span className="ml-1.5 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-xs font-bold border border-amber-300/60">{pendingCount}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="accepted" className="rounded-xl min-h-[44px] sm:min-h-[48px] py-2.5 px-4 text-sm sm:text-base font-bold cursor-pointer text-slate-700 data-active:bg-white data-active:text-slate-900 data-active:shadow-sm transition-all">
+                Accepted {acceptedCount > 0 && <span className="ml-1.5 rounded-full bg-emerald-100 text-emerald-900 px-2 py-0.5 text-xs font-bold border border-emerald-300/60">{acceptedCount}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="countered" className="rounded-xl min-h-[44px] sm:min-h-[48px] py-2.5 px-4 text-sm sm:text-base font-bold cursor-pointer text-slate-700 data-active:bg-white data-active:text-slate-900 data-active:shadow-sm transition-all">
+                Countered {counteredCount > 0 && <span className="ml-1.5 rounded-full bg-sky-100 text-sky-900 px-2 py-0.5 text-xs font-bold border border-sky-300/60">{counteredCount}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="rejected" className="rounded-xl min-h-[44px] sm:min-h-[48px] py-2.5 px-4 text-sm sm:text-base font-bold cursor-pointer text-slate-700 data-active:bg-white data-active:text-slate-900 data-active:shadow-sm transition-all">
+                Rejected {rejectedCount > 0 && <span className="ml-1.5 rounded-full bg-rose-100 text-rose-900 px-2 py-0.5 text-xs font-bold border border-rose-300/60">{rejectedCount}</span>}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        );
+      })()}
 
       {/* 3. REQUEST CARDS LIST */}
       {filteredRequests.length === 0 ? (
@@ -499,21 +468,10 @@ export function BrokerRequestInbox({ initialRequests }: BrokerRequestInboxProps)
           <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
             <Handshake className="h-6 w-6 stroke-[1.75]" />
           </div>
-          <h3 className="text-base font-bold text-slate-900">No proposals in this view</h3>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-sm mt-1 mb-4">
-            When verified brokers match and send commercial proposals for your active inventory lots, they will appear here.
+          <h3 className="text-lg sm:text-xl font-bold text-slate-900">No active offers right now</h3>
+          <p className="text-sm sm:text-base text-slate-600 max-w-md mt-1 leading-relaxed">
+            When a broker sends a price offer for your inventory, it will appear here.
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleGenerateMock}
-            disabled={isGeneratingMock}
-            className="rounded-xl text-xs font-semibold gap-2 cursor-pointer"
-          >
-            <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-            <span>Seed a Test Broker Proposal</span>
-          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">

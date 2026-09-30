@@ -16,8 +16,8 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  // Default to buyer
-  const [role, setRole] = useState<"buyer" | "broker" | "seller">("buyer")
+  // Default to buyer (Invite-only broker model)
+  const [role, setRole] = useState<"buyer" | "seller">("buyer")
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -101,7 +101,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* Segmented Control for Account Type */}
+            {/* Segmented Control for Account Type (Buyer / Seller) */}
             <div className="space-y-2">
               <Label className="text-slate-700 font-medium text-sm">Account Type</Label>
               <div className="flex p-1 bg-slate-100 rounded-xl">
@@ -118,20 +118,6 @@ export default function RegisterPage() {
                   }`}
                 >
                   Buyer
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setRole("broker");
-                  }}
-                  className={`relative z-10 flex-1 h-12 text-sm font-semibold rounded-lg transition-all cursor-pointer touch-manipulation ${
-                    role === "broker" 
-                      ? "bg-white text-slate-900 shadow-sm border border-slate-200/50" 
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  Broker
                 </button>
                 <button
                   type="button"

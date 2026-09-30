@@ -7,7 +7,7 @@ import { redirect } from "next/navigation"
 
 import { z } from "zod"
 
-const allowedRegistrationRoles = z.enum(["buyer", "seller", "broker"])
+const allowedRegistrationRoles = z.enum(["buyer", "seller"])
 
 export async function signUpAction(formData: FormData) {
   const email = formData.get("email") as string
@@ -19,9 +19,13 @@ export async function signUpAction(formData: FormData) {
     return { error: "Missing required fields" }
   }
 
+  if (rawRole === "broker") {
+    return { error: "Broker registration is invite-only. Please contact platform Admin." }
+  }
+
   const roleValidation = allowedRegistrationRoles.safeParse(rawRole)
   if (!roleValidation.success) {
-    return { error: "Invalid registration role. Admin registration is restricted." }
+    return { error: "Invalid registration role. Admin & Broker registration are restricted." }
   }
   const role = roleValidation.data
 

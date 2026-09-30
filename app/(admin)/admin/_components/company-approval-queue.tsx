@@ -37,7 +37,7 @@ export function CompanyApprovalQueue() {
     const res = await approveCompanyAction(id)
     if (res.success) {
       toast.success("Company approved successfully.")
-      loadCompanies()
+      await loadCompanies()
     } else {
       toast.error(res.error || "Failed to approve company.")
     }
@@ -48,12 +48,36 @@ export function CompanyApprovalQueue() {
     setProcessingId(id)
     const res = await rejectCompanyAction(id)
     if (res.success) {
-      toast.success("Company rejected.")
-      loadCompanies()
+      toast.error("Company Rejected", {
+        description: "The company profile has been rejected."
+      })
+      await loadCompanies()
     } else {
       toast.error(res.error || "Failed to reject company.")
     }
     setProcessingId(null)
+  }
+
+  const getStatusBadge = (item: any) => {
+    if (item.company.status === true || item.company.isVerified === true) {
+      return (
+        <span className="px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-[#ECFDF5] text-[#047857] border border-[#A7F3D0]">
+          Approved
+        </span>
+      )
+    }
+    if (item.user?.status === false) {
+      return (
+        <span className="px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
+          Rejected
+        </span>
+      )
+    }
+    return (
+      <span className="px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+        Pending
+      </span>
+    )
   }
 
   return (
@@ -63,6 +87,9 @@ export function CompanyApprovalQueue() {
           <h2 className="text-2xl font-bold tracking-tight text-[#334155]">Company Approvals</h2>
           <p className="text-sm text-slate-500 mt-1">Review and approve new company registrations.</p>
         </div>
+        <Button variant="outline" size="sm" onClick={loadCompanies} disabled={loading}>
+          Refresh Queue
+        </Button>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -81,46 +108,50 @@ export function CompanyApprovalQueue() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {companies.map((item) => (
-                <TableRow key={item.company.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                  <TableCell className="font-medium text-[#334155]">{item.company.name}</TableCell>
-                  <TableCell className="text-slate-600">{item.company.gst || 'N/A'}</TableCell>
-                  <TableCell className="text-slate-600">
-                    {item.districtName}, {item.stateName}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-[#334155] font-medium">{item.user?.name}</div>
-                    <div className="text-xs text-slate-500">{item.user?.email}</div>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${item.company.status ? 'bg-[#ECFDF5] text-[#047857] border border-[#A7F3D0]' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}>
-                      {item.company.status ? 'Approved' : 'Pending'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleApprove(item.company.id)}
-                      disabled={processingId === item.company.id || item.company.status}
-                      className="text-green-700 border-green-200 bg-green-50 hover:bg-green-100 hover:text-green-800"
-                    >
-                      {processingId === item.company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
-                      Approve
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleReject(item.company.id)}
-                      disabled={processingId === item.company.id || !item.company.status}
-                      className="text-red-700 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-800"
-                    >
-                      {processingId === item.company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
-                      Reject
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {companies.map((item) => {
+                const isApproved = item.company.status === true || item.company.isVerified === true
+                const isRejected = item.user?.status === false && !isApproved
+                const isProcessing = processingId === item.company.id
+
+                return (
+                  <TableRow key={item.company.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                    <TableCell className="font-medium text-[#334155]">{item.company.name}</TableCell>
+                    <TableCell className="text-slate-600">{item.company.gst || 'N/A'}</TableCell>
+                    <TableCell className="text-slate-600">
+                      {item.districtName ? `${item.districtName}, ` : ''}{item.stateName || 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-[#334155] font-medium">{item.user?.name}</div>
+                      <div className="text-xs text-slate-500">{item.user?.email}</div>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(item)}
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleApprove(item.company.id)}
+                        disabled={isProcessing || isApproved}
+                        className="text-green-700 border-green-200 bg-green-50 hover:bg-green-100 hover:text-green-800"
+                      >
+                        {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
+                        Approve
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleReject(item.company.id)}
+                        disabled={isProcessing || isRejected}
+                        className="text-red-700 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-800"
+                      >
+                        {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
+                        Reject
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
               {companies.length === 0 && (
                 <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-12">No companies found in queue.</TableCell></TableRow>
               )}

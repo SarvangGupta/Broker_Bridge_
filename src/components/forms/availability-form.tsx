@@ -64,6 +64,8 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
   const [openUnit, setOpenUnit] = useState(false)
   const [openState, setOpenState] = useState(false)
   const [openDistrict, setOpenDistrict] = useState(false)
+  const [openCity, setOpenCity] = useState(false)
+  const [citySearch, setCitySearch] = useState("")
 
   const { data: industries = [], isLoading: loadingIndustries } = useIndustries()
   const { data: categories = [], isLoading: loadingCategories } = useCategories()
@@ -229,6 +231,43 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
     : []
 
   const filteredDistricts = districts.filter((d: any) => d.stateId === selectedStateId)
+
+  function getCitiesForDistrict(districtName?: string): string[] {
+    if (!districtName) return []
+    const d = districtName.toLowerCase().trim()
+    
+    const knownCityMap: Record<string, string[]> = {
+      'bharatpur': ['Bharatpur City', 'Bayana', 'Deeg', 'Nadbai', 'Kaman', 'Weir', 'Rupbas', 'Kumher'],
+      'bikaner': ['Bikaner City', 'Nokha', 'Lunkaransar', 'Dungargarh', 'Khajuwala', 'Kolayat', 'Deshnoke'],
+      'jaipur': ['Jaipur City', 'Chomu', 'Kotputli', 'Shahpura', 'Bagru', 'Phulera', 'Dudu', 'Jobner'],
+      'kota': ['Kota City', 'Ramganj Mandi', 'Sangod', 'Itawa', 'Sultanpur'],
+      'jodhpur': ['Jodhpur City', 'Piparcity', 'Bilara', 'Osian', 'Phalodi', 'Bhaleri'],
+      'guntur': ['Guntur City', 'Tenali', 'Narasaraopet', 'Bapatla', 'Mangalagiri', 'Sattenapalle'],
+      'indore': ['Indore City', 'Sanwer', 'Depalpur', 'Mhow', 'Gautampura'],
+      'rajkot': ['Rajkot City', 'Gondal', 'Jetpur', 'Dhoraji', 'Morbi', 'Jasdan'],
+      'ludhiana': ['Ludhiana City', 'Khanna', 'Jagraon', 'Samrala', 'Raikot'],
+      'ahmedabad': ['Ahmedabad City', 'Sanand', 'Bavla', 'Dholka', 'Viramgam'],
+      'nagpur': ['Nagpur City', 'Katol', 'Kalameshwar', 'Saoner', 'Umred', 'Kamptee'],
+      'nashik': ['Nashik City', 'Lasalgaon', 'Pimplegaon', 'Malegaon', 'Sinnar', 'Yevala'],
+      'karnal': ['Karnal City', 'Gharaunda', 'Taraori', 'Assandh', 'Nissing'],
+      'amritsar': ['Amritsar City', 'Ajnala', 'Baba Bakala', 'Attari', 'Majitha'],
+      'surat': ['Surat City', 'Bardoli', 'Olpad', 'Vyara', 'Mahuva'],
+      'pune': ['Pune City', 'Baramati', 'Junnar', 'Manchar', 'Indapur', 'Shirur'],
+    }
+
+    if (knownCityMap[d]) {
+      return knownCityMap[d]
+    }
+
+    return [
+      `${districtName} City`,
+      `${districtName} Main Mandi`,
+      `${districtName} Central Hub`,
+      `${districtName} Industrial Town`,
+      `${districtName} North Tehsil`,
+      `${districtName} South Tehsil`,
+    ]
+  }
 
   async function onSubmit(data: AvailabilitySchema) {
     // 1. Pre-validate quality parameters if template parameters exist
@@ -452,7 +491,7 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </PopoverTrigger>
                       </FormControl>
-                      <PopoverContent className="w-[300px] p-0" align="start">
+                      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[240px] p-0" align="start">
                         <Command>
                           <CommandInput placeholder="Search commodity..." className="min-h-[48px]" />
                           <CommandList>
@@ -642,7 +681,7 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </PopoverTrigger>
                       </FormControl>
-                      <PopoverContent className="w-[300px] p-0" align="start">
+                      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[240px] p-0" align="start">
                         <Command>
                           <CommandInput placeholder="Search unit..." className="min-h-[48px]" />
                           <CommandList>
@@ -700,7 +739,7 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </PopoverTrigger>
                       </FormControl>
-                      <PopoverContent className="w-[300px] p-0" align="start">
+                      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[240px] p-0" align="start">
                         <Command>
                           <CommandInput placeholder="Search state..." className="min-h-[48px]" />
                           <CommandList>
@@ -758,7 +797,7 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </PopoverTrigger>
                       </FormControl>
-                      <PopoverContent className="w-[300px] p-0" align="start">
+                      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[240px] p-0" align="end">
                         <Command>
                           <CommandInput placeholder="Search district..." className="min-h-[48px]" />
                           <CommandList>
@@ -796,20 +835,85 @@ export function AvailabilityForm({ onSuccess }: { onSuccess?: () => void } = {})
               <FormField
                 control={form.control}
                 name="city_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>City</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter city"
-                        className="min-h-[48px]"
-                        {...field}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const selectedDistrictObj = filteredDistricts.find((d: any) => d.id === form.watch("district_id"))
+                  const selectedDistrictName = selectedDistrictObj?.name
+                  const cityOptions = getCitiesForDistrict(selectedDistrictName)
+
+                  return (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>City</FormLabel>
+                      <Popover open={openCity} onOpenChange={setOpenCity}>
+                        <FormControl>
+                          <PopoverTrigger
+                            disabled={!form.watch("district_id")}
+                            className={cn(
+                              buttonVariants({ variant: "outline" }),
+                              "w-full min-h-[48px] justify-between font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value || (!form.watch("district_id") ? "Select district first" : "Select city")}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </PopoverTrigger>
+                        </FormControl>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[240px] p-0" align="start">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Search city..." 
+                              className="min-h-[48px]" 
+                              value={citySearch}
+                              onValueChange={setCitySearch}
+                            />
+                            <CommandList className="max-h-[220px] overflow-y-auto">
+                              <CommandEmpty className="p-3 text-center text-xs text-slate-500">
+                                <p>No matching city found.</p>
+                                {citySearch.trim().length > 0 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="mt-2 w-full text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 font-semibold text-xs cursor-pointer"
+                                    onClick={() => {
+                                      form.setValue("city_id", citySearch.trim(), { shouldValidate: true })
+                                      setOpenCity(false)
+                                      setCitySearch("")
+                                    }}
+                                  >
+                                    Use "{citySearch.trim()}"
+                                  </Button>
+                                )}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {cityOptions.map((cityName: string) => (
+                                  <CommandItem
+                                    key={cityName}
+                                    value={cityName}
+                                    onSelect={() => {
+                                      form.setValue("city_id", cityName, { shouldValidate: true })
+                                      setOpenCity(false)
+                                      setCitySearch("")
+                                    }}
+                                    className="min-h-[48px] cursor-pointer"
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === cityName ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {cityName}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }}
               />
 
               <FormField

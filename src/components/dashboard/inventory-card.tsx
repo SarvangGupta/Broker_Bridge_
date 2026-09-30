@@ -351,7 +351,6 @@ export function InventoryCard({ item, onCancelSuccess }: InventoryCardProps) {
                 commodityId={item.commodityId || ""}
                 onSuccess={() => {
                   setLabDialogOpen(false);
-                  toast.success("Laboratory test record updated successfully");
                   router.refresh();
                 }}
                 onCancel={() => setLabDialogOpen(false)}

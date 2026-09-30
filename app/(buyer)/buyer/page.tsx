@@ -1,4 +1,4 @@
-import { signOutAction } from "@/src/server/actions/auth-actions"
+import { SignOutButton } from "@/src/components/auth/sign-out-button"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
@@ -48,11 +48,7 @@ export default async function BuyerDashboard() {
             <CompanyOnboardingForm />
           </CardContent>
           <CardFooter className="justify-center border-t pt-4">
-            <form action={signOutAction}>
-              <Button type="submit" variant="ghost" size="sm">
-                Sign Out
-              </Button>
-            </form>
+            <SignOutButton />
           </CardFooter>
         </Card>
       ) : (

@@ -401,7 +401,7 @@ export function LabTestForm({
         if (payload.is_lab_required === false) {
           toast.success("Self-declared quality status saved (No Lab Required).");
         } else {
-          toast.success("Laboratory test record saved successfully!");
+          toast.success("Laboratory test record updated successfully");
         }
         router.refresh();
         onSuccess?.();
