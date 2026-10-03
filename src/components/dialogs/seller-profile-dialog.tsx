@@ -21,6 +21,7 @@ import {
 } from "@/src/server/actions/user-profile-actions"
 import { useStates, useDistricts } from "@/src/hooks/use-master-data"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { KycStatusBadge } from "@/src/components/shared/kyc-status-badge"
 
 interface SellerProfileDialogProps {
   open: boolean
@@ -41,6 +42,8 @@ export function SellerProfileDialog({ open, onOpenChange, initialProfileData }: 
   const [gst, setGst] = useState("")
   const [stateId, setStateId] = useState("")
   const [districtId, setDistrictId] = useState("")
+  const [isVerified, setIsVerified] = useState<boolean>(false)
+  const [status, setStatus] = useState<string>("PENDING")
 
   // Security State
   const [password, setPassword] = useState("")
@@ -74,6 +77,11 @@ export function SellerProfileDialog({ open, onOpenChange, initialProfileData }: 
       setGst(data.company.gst || "")
       setStateId(data.company.stateId || "")
       setDistrictId(data.company.districtId || "")
+      setIsVerified(Boolean(data.company.isVerified))
+      setStatus(
+        data.company.onboardingStatus ||
+        (data.company.isVerified || data.company.status ? 'APPROVED' : 'PENDING')
+      )
     }
   }
 
@@ -198,9 +206,12 @@ export function SellerProfileDialog({ open, onOpenChange, initialProfileData }: 
                     </div>
                   </div>
 
-                  {/* Company Section */}
+                    {/* Company Section */}
                   <div className="space-y-4 pt-4">
-                    <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">Company Details</h3>
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <h3 className="text-sm font-semibold text-slate-900">Company Details</h3>
+                      <KycStatusBadge isVerified={isVerified} status={status} size="sm" />
+                    </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">

@@ -18,35 +18,11 @@ const updateProfileSchema = z.object({
 
 const updatePasswordSchema = z.string().min(6, "Password must be at least 6 characters")
 
+import { getFullBuyerProfileDetailsAction as getFullBuyerProfileDetailsFromCompany } from "@/src/server/actions/company-actions"
+
 export const getFullBuyerProfileDetailsAction = cache(
   async function getFullBuyerProfileDetailsAction() {
-    try {
-      const supabase = await createClient()
-      const { data: { user }, error } = await supabase.auth.getUser()
-      if (error || !user) throw new Error("Not authenticated")
-
-      // Fetch user details
-      const userRecord = await db.select().from(users).where(eq(users.id, user.id)).limit(1)
-      if (!userRecord || userRecord.length === 0) throw new Error("User profile not found")
-
-      let companyRecord = null
-      if (userRecord[0].companyId) {
-        const comp = await db.select().from(companies).where(eq(companies.id, userRecord[0].companyId)).limit(1)
-        if (comp && comp.length > 0) {
-          companyRecord = comp[0]
-        }
-      }
-
-      return { 
-        success: true, 
-        data: {
-          user: userRecord[0],
-          company: companyRecord
-        } 
-      }
-    } catch (error: any) {
-      return { success: false, error: error.message }
-    }
+    return getFullBuyerProfileDetailsFromCompany()
   }
 )
 

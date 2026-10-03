@@ -7,24 +7,19 @@ import { quotations, deals, availabilities, users, companies, masterCommodities,
 import { eq, and, or, desc, aliasedTable } from "drizzle-orm";
 import { acceptQuotationSchema, rejectQuotationSchema, counterQuotationSchema } from "@/src/types/deal-schema";
 import { masterGrades } from "@/src/server/db/schema";
+import { verifyBuyerSession } from "@/src/server/utils/buyer-auth";
+import { sanitizePayloadForBuyer } from "@/src/server/utils/privacy-scrubber";
 
 export async function acceptQuotationAction(data: unknown) {
   try {
     const parsedData = acceptQuotationSchema.parse(data);
     
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "Unauthorized" };
+    const session = await verifyBuyerSession();
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized" };
+    }
 
-    const userId = user.id;
-
-    // Fetch user details to verify role and get company ID
-    const userRecords = await db.select().from(users).where(eq(users.id, userId));
-    if (!userRecords.length) return { success: false, error: "User not found" };
-    const dbUser = userRecords[0];
-    const companyId = dbUser.companyId;
-
-    if (!companyId) return { success: false, error: "User is not associated with a company" };
+    const companyId = session.data.companyId;
 
     // Use transaction
     const deal = await db.transaction(async (tx) => {
@@ -121,14 +116,12 @@ export async function rejectQuotationAction(data: unknown) {
   try {
     const parsedData = rejectQuotationSchema.parse(data);
     
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return { success: false, error: "Unauthorized" };
+    const session = await verifyBuyerSession();
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized" };
+    }
 
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id),
-    });
-    if (!dbUser || !dbUser.companyId) return { success: false, error: "Company profile not found" };
+    const companyId = session.data.companyId;
 
     await db.transaction(async (tx) => {
       const quotationRecords = await tx.select().from(quotations).where(eq(quotations.id, parsedData.quotation_id));
@@ -138,7 +131,7 @@ export async function rejectQuotationAction(data: unknown) {
       const reqRecords = await tx.select().from(requirements).where(eq(requirements.id, quotation.requirementId));
       if (!reqRecords.length) throw new Error("Requirement not found");
 
-      if (reqRecords[0].companyId !== dbUser.companyId && dbUser.role !== 'admin') {
+      if (reqRecords[0].companyId !== companyId && session.data.user.role !== 'admin') {
         throw new Error("Not authorized to reject this quotation");
       }
 
@@ -160,14 +153,12 @@ export async function counterQuotationAction(data: unknown) {
   try {
     const parsedData = counterQuotationSchema.parse(data);
     
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return { success: false, error: "Unauthorized" };
+    const session = await verifyBuyerSession();
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized" };
+    }
 
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id),
-    });
-    if (!dbUser || !dbUser.companyId) return { success: false, error: "Company profile not found" };
+    const companyId = session.data.companyId;
 
     await db.transaction(async (tx) => {
       const quotationRecords = await tx.select().from(quotations).where(eq(quotations.id, parsedData.quotation_id));
@@ -177,7 +168,7 @@ export async function counterQuotationAction(data: unknown) {
       const reqRecords = await tx.select().from(requirements).where(eq(requirements.id, quotation.requirementId));
       if (!reqRecords.length) throw new Error("Requirement not found");
 
-      if (reqRecords[0].companyId !== dbUser.companyId && dbUser.role !== 'admin') {
+      if (reqRecords[0].companyId !== companyId && session.data.user.role !== 'admin') {
         throw new Error("Not authorized to counter this quotation");
       }
 
@@ -199,7 +190,7 @@ export async function counterQuotationAction(data: unknown) {
 /**
  * Fetches deals associated with the authenticated user's company (as Buyer or Seller).
  * HARD PRIVACY RULE: If the caller is a Seller, Buyer private PII is NEVER exposed.
- * The buyer name is anonymized as "Verified Buyer #B-XXXX", and only operational fulfillment fields are returned.
+ * If the caller is a Buyer, Seller private details are stripped using sanitizePayloadForBuyer.
  */
 export const getDealsByCompanyAction = cache(
   async function getDealsByCompanyAction() {
@@ -249,11 +240,12 @@ export const getDealsByCompanyAction = cache(
         .where(or(eq(deals.buyerId, companyId), eq(deals.sellerId, companyId)))
         .orderBy(desc(deals.createdAt));
 
-      // Apply strict privacy transformation for Seller-facing view
+      // Apply strict privacy transformation for Seller and Buyer views
       const companyDeals = rawCompanyDeals.map((row) => {
         const isSellerViewing = row.deal.sellerId === companyId && row.deal.buyerId !== companyId && dbUser.role !== 'admin';
+        const isBuyerViewing = row.deal.buyerId === companyId && row.deal.sellerId !== companyId && dbUser.role !== 'admin';
 
-        return {
+        let processed = {
           ...row,
           buyerCompany: {
             id: row.buyerCompany.id,
@@ -270,6 +262,12 @@ export const getDealsByCompanyAction = cache(
             trustScore: row.sellerCompany.trustScore,
           }
         };
+
+        if (isBuyerViewing) {
+          processed = sanitizePayloadForBuyer(processed);
+        }
+
+        return processed;
       });
 
       return { success: true, data: companyDeals };

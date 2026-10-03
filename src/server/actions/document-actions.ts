@@ -317,14 +317,25 @@ export async function getDispatchDocumentsAction(
   error?: string;
 }> {
   try {
-    const session = await verifySellerSession({ allowViewer: true });
-    if (!session.success || !session.data) {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return { success: false, error: "Unauthorized: Active session required." };
     }
 
     if (!dispatchId) {
       return { success: false, error: "Dispatch ID is required." };
     }
+
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+    if (!dbUser) {
+      return { success: false, error: "User profile not found." };
+    }
+
+    const userCompanyId = dbUser.companyId;
+    const isPlatformAdmin = dbUser.role === "admin" || dbUser.role === "ADMIN";
 
     // Verify Dispatch Record & Tenant Ownership
     const dispatchRecord = await db.query.dispatches.findFirst({
@@ -334,10 +345,6 @@ export async function getDispatchDocumentsAction(
     if (!dispatchRecord) {
       return { success: false, error: "Dispatch record not found." };
     }
-
-    const sellerCompanyId = session.data.companyId;
-    const isPlatformAdmin =
-      session.data.user.role === "admin" || session.data.user.role === "ADMIN";
 
     const dealRecord = await db.query.deals.findFirst({
       where: eq(deals.id, dispatchRecord.dealId),
@@ -357,10 +364,9 @@ export async function getDispatchDocumentsAction(
 
     const isAuthorized =
       isPlatformAdmin ||
-      dispatchRecord.sellerId === session.data.user.id ||
-      dealRecord?.sellerId === sellerCompanyId ||
-      dealRecord?.sellerId === session.data.user.id ||
-      lotRecord?.companyId === sellerCompanyId;
+      dispatchRecord.sellerId === user.id ||
+      (userCompanyId && (dealRecord?.sellerId === userCompanyId || dealRecord?.buyerId === userCompanyId || lotRecord?.companyId === userCompanyId)) ||
+      (dealRecord?.brokerId && dealRecord.brokerId === user.id);
 
     if (!isAuthorized) {
       return {
@@ -374,12 +380,26 @@ export async function getDispatchDocumentsAction(
       orderBy: desc(dispatchDocuments.createdAt),
     });
 
-    const supabase = await createClient();
-
     // Generate short-lived signed URLs (15 minutes = 900 seconds)
     const docsWithSignedUrls: DispatchDocumentItem[] = await Promise.all(
       docs.map(async (doc) => {
         let signedUrl: string | null = null;
+
+        // Path Traversal Defense
+        if (doc.fileUrl.includes('..') || doc.fileUrl.includes('\\') || doc.fileUrl.includes('\0')) {
+          console.warn("Blocked path traversal attempt in dispatch document fileUrl:", doc.id);
+          return {
+            id: doc.id,
+            dispatchId: doc.dispatchId,
+            documentType: doc.documentType,
+            fileUrl: doc.fileUrl,
+            signedUrl: null,
+            uploadedBy: doc.uploadedBy,
+            createdAt: doc.createdAt.toISOString(),
+            fileName: "invalid_document.pdf",
+          };
+        }
+
         try {
           const { data, error } = await supabase.storage
             .from("brokerbridge_documents")

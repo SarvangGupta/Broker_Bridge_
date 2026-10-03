@@ -6,6 +6,7 @@ import { db } from "@/src/server/db"
 import { deals, requirements, availabilities, users, companies, dispatches, disputes, bookings } from "@/src/server/db/schema"
 import { eq, and, ne, notInArray, inArray, sql } from "drizzle-orm"
 import { getSellerSettlementOverviewAction } from "@/src/server/actions/settlement-actions"
+import { verifyBuyerSession } from "@/src/server/utils/buyer-auth"
 
 export type AdminKpis = {
   totalGmv: number
@@ -163,16 +164,8 @@ export async function getBrokerKpisAction(): Promise<{ success: boolean; data?: 
  */
 export async function getBuyerKpisAction(): Promise<{ success: boolean; data?: BuyerKpis; error?: string }> {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return { success: false, error: "Unauthorized" }
-    }
-
-    const userRecords = await db.select().from(users).where(eq(users.id, user.id))
-    const companyId = userRecords[0]?.companyId
-
-    if (!companyId) {
+    const session = await verifyBuyerSession()
+    if (!session.success || !session.data) {
       return {
         success: true,
         data: {
@@ -182,6 +175,8 @@ export async function getBuyerKpisAction(): Promise<{ success: boolean; data?: B
         },
       }
     }
+
+    const companyId = session.data.companyId
 
     const [activeReqsRes, bookedDealsRes, spentRes] = await Promise.all([
       db

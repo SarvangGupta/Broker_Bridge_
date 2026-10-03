@@ -34,12 +34,11 @@ function LoginForm() {
       setIsLoading(false)
     } else if (result?.success) {
       toast.success(result.success)
-      // Keep isLoading(true) so the button stays locked during navigation
       
       if (result.redirectUrl) {
-        router.push(result.redirectUrl)
+        window.location.href = result.redirectUrl
       } else {
-        router.push("/")
+        window.location.href = "/"
       }
     }
   }

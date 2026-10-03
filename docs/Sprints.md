@@ -209,10 +209,43 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 		- [x] __27.5 — Seller-Side Connection & Finalization Wiring:__ Safely removed legacy `<DevFinalizationGateTester />` from Seller view, connected Broker UI directly to Sprint 18 `finalizeDealAction` and `createIdempotentBookingAction` with optimistic version concurrency guard.
 	- __Technical Deliverables:__ `src/server/actions/broker-order-actions.ts`, `src/server/actions/broker-logistics-actions.ts`, `src/components/broker/deals/booking-gate.tsx`, `src/components/broker/orders/logistics-tracker.tsx`, `src/components/broker/orders/finalized-deal-card.tsx`, `src/components/broker/orders/dispatch-details-card.tsx`, `app/(broker)/broker/deals/page.tsx`, `app/(broker)/broker/orders/page.tsx`, `app/(broker)/broker/orders/[bookingId]/page.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
 
+- __Sprint 28: Finance + CRM__ (COMPLETED ✅)
+	- __Goal:__ Deploy Broker Financial Ledger, Commission Spread Calculations, Escrow Settlement Overview, Lightweight CRM Contact Cards, and Dispute Resolution Center.
+	- __Key Tasks:__
+		- [x] __28.1 — Broker Payments & Settlement Tracker:__ Built `getBrokerFinancialLedgerAction()`, `<SettlementTracker />`, `<LogPaymentModal />`.
+		- [x] __28.2 — Broker Commission Engine & Ledger:__ Built `getBrokerCommissionLedgerAction()` & Commission Ledger view.
+		- [x] __28.3 — Broker Lightweight CRM & Contact Cards:__ Built `getBrokerContactAggregatedProfileAction()` & 360-degree `<ContactCard />`.
+		- [x] __28.4 — Broker Dispute Resolution Center:__ Built `getBrokerActiveDisputesAction()`, `resolveDisputeAction()`, & Dispute Center.
+		- [x] __28.5 — Sprint 28 Final Audit & Acceptance Gate:__ Architectural & mobile audit passed cleanly.
+
+- __Sprint 29: Hardening & Security Audit__ (COMPLETED ✅)
+	- __Goal:__ Security, concurrency, low-bandwidth, mobile, and regression hardening across Sprints 1–28.
+	- __Key Tasks:__
+		- [x] __29.1 — Security & Authorization Audit:__ Server-side auth, multi-tenant isolation, PII privacy scrubbing (`privacy-scrubber.ts`), and 900s storage TTL verified.
+		- [x] __29.2 — Integrity & Concurrency Audit:__ Atomic `db.transaction()` blocks, optimistic version locking (`STALE_VERSION_DETECTED`), and database `UNIQUE` booking failsafes verified.
+		- [x] __29.3 — Mobile & Connectivity Resilience Audit:__ 360px viewport overflow hardening, 48px touch targets, double-click prevention (`useTransition`/`Loader2`), loading skeletons, and error boundaries implemented.
+		- [x] __29.4 — Global Regression Audit & Sprint 29 Closure:__ End-to-end state machine verification completed with clean regression results.
+
+- __Sprint 30: End-to-End UAT & Release__ (COMPLETED ✅)
+	- __Goal:__ Comprehensive platform testing, user acceptance testing (UAT), trade offers UI simplification, and broker registration security hardening.
+	- __Key Tasks:__
+		- [x] __30.1 — Trade Offers UI Simplification:__ Streamlined Seller and Admin trade offer interfaces for quick execution.
+		- [x] __30.2 — Broker Registration Hardening:__ Made Broker registration strictly invite-only by Admin to protect platform integrity.
+		- [x] __30.3 — End-to-End UAT Verification:__ Conducted full platform regression and UAT verification across Admin, Broker, Seller, and Buyer flows.
+
+- __Sprint 31: Buyer Foundation & Access__ (COMPLETED ✅)
+	- __Goal:__ Comprehensive read-only Buyer foundation audit, BUYER_ADMIN authentication enforcer, multi-tenant organization isolation, and Buyer Profile & KYC workspace.
+	- __Key Tasks:__
+		- [x] __31.1 — Existing Buyer Foundation Audit:__ Conducted thorough read-only audit of existing Buyer routes, Server Actions, schema, and RLS policies; published [`docs/buyer-foundation-audit-31.1.md`](file:///c:/Users/user/Desktop/BrokerBridge/brokerbridge-enterprise/docs/buyer-foundation-audit-31.1.md).
+		- [x] __31.2 — BUYER_ADMIN Authentication:__ Built `src/server/utils/buyer-auth.ts` implementing `verifyBuyerSession()` server helper; enforced flat `BUYER_ADMIN` role.
+		- [x] __31.3 — Buyer Organization Isolation:__ Verified database RLS subqueries and enforced strict `companyId` scoping on all Buyer server actions and route guards (`BuyerLayout`).
+		- [x] __31.4 — Buyer Profile & KYC Foundation Workspace:__ Built dedicated Organization Profile & KYC page at `/buyer/profile` (`app/(buyer)/buyer/profile/page.tsx`) with `<KycStatusBadge />` and verified credential displays.
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 27 COMPLETED | ADVANCING TO SPRINT 28**
-Sprint 27 (Booking + Orders) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 28: Finance + CRM**.
+### 🚀 **Global Platform Status: SPRINT 31 COMPLETED | ADVANCING TO SPRINT 32**
+Sprint 31 (Buyer Foundation & Access) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 32: Buyer Shell, Navigation & Dashboard**.
+
 
 
 

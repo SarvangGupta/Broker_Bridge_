@@ -15,6 +15,8 @@ import {
 } from "@/src/server/db/schema";
 import { sendQuotationWhatsAppNotification } from "@/src/server/services/whatsapp-service";
 import { logDecisionGateAuditEventAction } from "@/src/server/actions/audit-actions";
+import { verifyBuyerSession } from "@/src/server/utils/buyer-auth";
+import { sanitizePayloadForBuyer } from "@/src/server/utils/privacy-scrubber";
 
 export async function createQuotationAction(data: unknown) {
   try {
@@ -275,25 +277,25 @@ export async function sendQuotationAction(quotationId: string) {
 
 export async function getBuyerQuotationsAction() {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return { success: false, error: "Unauthorized" };
-
-    const userId = user.id;
-    const userRecords = await db.select().from(users).where(eq(users.id, userId));
-    if (!userRecords.length || !userRecords[0].companyId) {
-      return { success: false, error: "User is not associated with a company" };
+    const session = await verifyBuyerSession();
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || "Unauthorized" };
     }
-    const companyId = userRecords[0].companyId;
+    const companyId = session.data.companyId;
 
-    // Fetch quotations for requirements belonging to this company
+    // Fetch quotations for requirements belonging to this buyer company
     const results = await db
       .select({
         quotation: quotations,
         requirement: requirements,
         commodity: masterCommodities,
         grade: masterGrades,
-        sellerCompany: companies,
+        sellerCompany: {
+          id: companies.id,
+          name: companies.name,
+          isVerified: companies.isVerified,
+          trustScore: companies.trustScore,
+        },
       })
       .from(quotations)
       .innerJoin(requirements, eq(quotations.requirementId, requirements.id))
@@ -304,7 +306,10 @@ export async function getBuyerQuotationsAction() {
       .where(eq(requirements.companyId, companyId))
       .orderBy(desc(quotations.createdAt));
 
-    return { success: true, data: results };
+    // Anti-Leakage Rule (Task 3): Strip confidential Seller fields before sending payload to Buyer UI
+    const sanitizedResults = sanitizePayloadForBuyer(results);
+
+    return { success: true, data: sanitizedResults };
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to fetch quotations" };
   }

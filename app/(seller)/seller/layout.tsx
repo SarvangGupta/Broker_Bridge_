@@ -1,6 +1,5 @@
 import React, { Suspense } from "react"
 import { getCompanyProfile } from "@/src/server/actions/company-actions"
-import { getFullBuyerProfileDetailsAction } from "@/src/server/actions/user-profile-actions"
 import { SellerSidebar, SellerMobileHeader } from "@/src/components/dashboard/seller-sidebar"
 
 export const dynamic = "force-dynamic"
@@ -11,33 +10,35 @@ export default async function SellerLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [profileRes, fullProfileRes] = await Promise.all([
-    getCompanyProfile(),
-    getFullBuyerProfileDetailsAction(),
-  ])
+  const profileRes = await getCompanyProfile()
 
   const profile = profileRes.success && profileRes.data ? profileRes.data : null
-  const fullProfile = fullProfileRes.success && fullProfileRes.data ? fullProfileRes.data : null
-  const userRole = fullProfile?.user?.role || "SELLER_ADMIN"
+  const dbUser = profileRes.user || null
+  const userRole = dbUser?.role || "SELLER_ADMIN"
 
   const onboardingStatus = profileRes.status || 'NONE'
-  const isApproved = onboardingStatus === 'APPROVED'
+  const isApproved = onboardingStatus === 'APPROVED' && Boolean(profile?.id)
 
+  // 1. STRICT FOCUS MODE FORK:
+  // If user does NOT have a valid companyId or status is NOT 'APPROVED':
+  // Return Focus Mode container with ONLY children, and ABSOLUTELY NO navigation elements.
   if (!isApproved) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 py-12">
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 py-12 w-full overflow-x-hidden">
         {children}
       </div>
     )
   }
 
+  // 2. FULL WORKSPACE MODE:
+  // Render standard layout with Desktop Sidebar, Mobile Header, and scrollable Canvas
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
       {/* 1. Desktop Fixed Left Sidebar */}
       <Suspense fallback={<div className="hidden md:flex w-64 border-r border-slate-200 bg-white h-screen shrink-0" />}>
         <SellerSidebar 
           profile={profile}
-          fullProfile={fullProfile}
+          fullProfile={{ user: dbUser, company: profile }}
           userRole={userRole}
         />
       </Suspense>
@@ -48,7 +49,7 @@ export default async function SellerLayout({
         <Suspense fallback={<div className="md:hidden h-16 w-full border-b border-slate-200 bg-white shrink-0" />}>
           <SellerMobileHeader 
             profile={profile}
-            fullProfile={fullProfile}
+            fullProfile={{ user: dbUser, company: profile }}
             userRole={userRole}
           />
         </Suspense>

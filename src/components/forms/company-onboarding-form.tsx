@@ -70,8 +70,8 @@ export function CompanyOnboardingForm() {
       const result = await createCompanyProfile(data)
       
       if (result.success) {
-        toast.success("Company profile created successfully!")
-        router.refresh() // Refresh to update layout guards
+        toast.success("Company profile submitted! Verification in progress.")
+        window.location.reload()
       } else {
         toast.error(result.error || "Failed to create company profile.")
       }

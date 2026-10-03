@@ -12,8 +12,10 @@ import {
   masterGrades,
   companies,
   users,
+  quotations,
+  requirements,
 } from '@/src/server/db/schema';
-import { eq, asc, desc } from 'drizzle-orm';
+import { eq, and, asc, desc } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { computeLabFreshness, LabFreshnessStatus } from '@/src/types/lab-schema';
 
@@ -157,6 +159,11 @@ export async function getSignedLabDocumentUrlAction(
       return { success: false, error: 'No physical laboratory evidence document is attached to this lot.' };
     }
 
+    // Path Traversal Defense: Block directory traversal sequences
+    if (labTest.fileUrl.includes('..') || labTest.fileUrl.includes('\\') || labTest.fileUrl.includes('\0')) {
+      return { success: false, error: 'Unauthorized: Invalid file path format.' };
+    }
+
     const dbUser = await db.query.users.findFirst({
       where: eq(users.id, user.id),
     });
@@ -168,7 +175,23 @@ export async function getSignedLabDocumentUrlAction(
     const isBrokerOrAdmin = dbUser.role === 'admin' || dbUser.role === 'broker';
     const isOwner = dbUser.companyId && dbUser.companyId === labTest.companyId;
 
-    if (!isBrokerOrAdmin && !isOwner) {
+    let isBuyerParticipant = false;
+    if (!isBrokerOrAdmin && !isOwner && dbUser.companyId) {
+      const availabilityMatch = await db.query.quotations.findFirst({
+        where: eq(quotations.sellerAvailabilityId, labTest.availabilityId),
+      });
+      if (availabilityMatch) {
+        const reqMatch = await db.query.requirements.findFirst({
+          where: and(
+            eq(requirements.id, availabilityMatch.requirementId),
+            eq(requirements.companyId, dbUser.companyId)
+          ),
+        });
+        if (reqMatch) isBuyerParticipant = true;
+      }
+    }
+
+    if (!isBrokerOrAdmin && !isOwner && !isBuyerParticipant) {
       return {
         success: false,
         error: 'Unauthorized: You do not have permission to view this evidence document.',

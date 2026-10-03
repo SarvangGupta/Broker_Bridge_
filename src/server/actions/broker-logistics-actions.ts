@@ -154,6 +154,9 @@ export async function getBrokerDispatchDetailsAction(
     const getSignedUrl = async (pathOrUrl: string): Promise<string | null> => {
       try {
         if (!pathOrUrl) return null;
+        if (pathOrUrl.includes('..') || pathOrUrl.includes('\\') || pathOrUrl.includes('\0')) {
+          return null;
+        }
         if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
           return pathOrUrl;
         }

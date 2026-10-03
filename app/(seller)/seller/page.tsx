@@ -1,11 +1,9 @@
 import { SignOutButton } from "@/src/components/auth/sign-out-button"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyProfile } from "@/src/server/actions/company-actions"
 import { CompanyOnboardingForm } from "@/src/components/forms/company-onboarding-form"
 import { RealtimeDealsListener } from "@/src/components/realtime-deals-listener"
-import { getFullBuyerProfileDetailsAction } from "@/src/server/actions/user-profile-actions"
 import { getMyAvailabilitiesAction } from "@/src/server/actions/availability-actions"
 import { getDealsByCompanyAction } from "@/src/server/actions/deal-actions"
 import { getMasterVehicleTypesAction } from "@/src/server/actions/master-data-actions"
@@ -13,34 +11,33 @@ import { getSellerCommandCenterDataAction, SellerCommandCenterData } from "@/src
 import { getSellerBrokerRequestsAction } from "@/src/server/actions/broker-request-actions"
 import { getSellerGlobalLabReportsAction, SellerGlobalLabReportItem } from "@/src/server/actions/lab-actions"
 import { SellerWorkspaceShell } from "@/src/components/dashboard/seller-workspace-shell"
-import { Clock, XCircle, ShieldAlert } from "lucide-react"
+import { Clock, XCircle } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
 export default async function SellerDashboard() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
   const profileRes = await getCompanyProfile()
   const onboardingStatus = profileRes.status || 'NONE'
+  const companyId = profileRes.data?.id || null
+  const dbUser = profileRes.user || null
 
   let availabilities: any[] = []
   let deals: any[] = []
   let brokerRequests: any[] = []
   let vehicleTypes: any[] = []
   let labReports: SellerGlobalLabReportItem[] = []
-  let fullProfileData: any = null
   let commandCenterData: SellerCommandCenterData | undefined = undefined
-  let userRole = "SELLER_ADMIN"
+  const userRole = dbUser?.role || "SELLER_ADMIN"
 
-  if (onboardingStatus === 'APPROVED') {
-    const [availabilitiesRes, dealsRes, brokerRequestsRes, vehicleTypesRes, labReportsRes, fullProfileRes, commandCenterRes] = await Promise.all([
+  const isApproved = onboardingStatus === 'APPROVED' && Boolean(companyId)
+
+  if (isApproved) {
+    const [availabilitiesRes, dealsRes, brokerRequestsRes, vehicleTypesRes, labReportsRes, commandCenterRes] = await Promise.all([
       getMyAvailabilitiesAction(),
       getDealsByCompanyAction(),
       getSellerBrokerRequestsAction(),
       getMasterVehicleTypesAction(),
       getSellerGlobalLabReportsAction(),
-      getFullBuyerProfileDetailsAction(),
       getSellerCommandCenterDataAction(),
     ])
 
@@ -49,21 +46,17 @@ export default async function SellerDashboard() {
     if (brokerRequestsRes.success && brokerRequestsRes.data) brokerRequests = brokerRequestsRes.data
     if (vehicleTypesRes.success && vehicleTypesRes.data) vehicleTypes = vehicleTypesRes.data
     if (labReportsRes.success && labReportsRes.data) labReports = labReportsRes.data
-    if (fullProfileRes.success && fullProfileRes.data) {
-      fullProfileData = fullProfileRes.data
-      if (fullProfileData.user?.role) userRole = fullProfileData.user.role
-    }
     if (commandCenterRes.success && commandCenterRes.data) commandCenterData = commandCenterRes.data
   }
 
-  // 1. APPROVED STATUS: Full Workspace
-  if (onboardingStatus === 'APPROVED') {
+  // 1. APPROVED STATUS & VALID COMPANY: Full Workspace
+  if (isApproved) {
     return (
       <div className="w-full bg-[#F8FAFC] font-sans antialiased">
         <RealtimeDealsListener />
         <SellerWorkspaceShell 
           profile={profileRes.data}
-          fullProfile={fullProfileData}
+          fullProfile={{ user: dbUser, company: profileRes.data }}
           userRole={userRole}
           availabilities={availabilities}
           deals={deals}
@@ -138,7 +131,7 @@ export default async function SellerDashboard() {
     )
   }
 
-  // 4. NONE STATUS: Initial Onboarding Form Card
+  // 4. NONE STATUS / MISSING COMPANY ID: Initial Onboarding Form Card
   return (
     <div className="w-full flex items-center justify-center">
       <RealtimeDealsListener />

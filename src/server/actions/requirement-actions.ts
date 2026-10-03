@@ -13,15 +13,15 @@ import {
 import { eq, and, inArray, desc } from "drizzle-orm"
 import { requirementSchema } from "@/src/types/requirement-schema"
 import { revalidatePath } from "next/cache"
+import { verifyBuyerSession } from "@/src/server/utils/buyer-auth"
 
 export async function createRequirementAction(rawData: unknown) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Unauthorized' }
+    const session = await verifyBuyerSession()
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || 'Unauthorized' }
     }
+    const companyId = session.data.companyId
 
     // Validate data using Zod
     const validation = requirementSchema.safeParse(rawData)
@@ -30,15 +30,7 @@ export async function createRequirementAction(rawData: unknown) {
     }
     const data = validation.data
 
-    // Ensure user has a linked company_id
-    const currentUser = await db.select().from(users).where(eq(users.id, user.id))
-    const companyId = currentUser[0]?.companyId
-
-    if (!companyId) {
-      return { success: false, error: 'No associated company profile found. Please complete onboarding.' }
-    }
-
-    // Insert requirement
+    // Anti-Spoofing Rule: Insert requirement using server-derived companyId exclusively
     const newReq = await db.insert(requirements).values({
       companyId,
       commodityId: data.commodity_id,
@@ -62,19 +54,11 @@ export async function createRequirementAction(rawData: unknown) {
 
 export async function getMyRequirementsAction() {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Unauthorized' }
+    const session = await verifyBuyerSession()
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || 'Unauthorized' }
     }
-
-    const currentUser = await db.select().from(users).where(eq(users.id, user.id))
-    const companyId = currentUser[0]?.companyId
-
-    if (!companyId) {
-      return { success: false, error: 'No associated company profile found.' }
-    }
+    const companyId = session.data.companyId
 
     const results = await db
       .select({
@@ -100,19 +84,11 @@ export async function getMyRequirementsAction() {
 
 export async function cancelRequirementAction(id: string) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Unauthorized' }
+    const session = await verifyBuyerSession()
+    if (!session.success || !session.data) {
+      return { success: false, error: session.error || 'Unauthorized' }
     }
-
-    const currentUser = await db.select().from(users).where(eq(users.id, user.id))
-    const companyId = currentUser[0]?.companyId
-
-    if (!companyId) {
-      return { success: false, error: 'No associated company profile found.' }
-    }
+    const companyId = session.data.companyId
 
     // Only allow cancelling if it belongs to the company and is Open or Draft
     const updated = await db
@@ -136,3 +112,4 @@ export async function cancelRequirementAction(id: string) {
     return { success: false, error: error.message || 'Failed to cancel requirement' }
   }
 }
+
