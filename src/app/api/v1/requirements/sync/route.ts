@@ -40,8 +40,8 @@ export async function POST(req: Request) {
           quantity: validation.data.quantity,
           unitId: validation.data.unit_id,
           targetPrice: validation.data.target_price,
-          deliveryTermsId: validation.data.delivery_terms_id,
-          targetDate: new Date(validation.data.target_date), // safe coerce
+          deliveryTermsId: validation.data.delivery_terms_id || 'EXW',
+          targetDate: validation.data.target_date || new Date(Date.now() + 14 * 86400000),
           status: 'Open',
         })
       }

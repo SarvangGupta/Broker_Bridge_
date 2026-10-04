@@ -1,16 +1,12 @@
-import React from 'react';
-import { ClipboardList } from 'lucide-react';
-import { SprintPlaceholder } from '@/src/components/ui/sprint-placeholder';
+import React from 'react'
+import { getBuyerRequirementsListAction } from '@/src/server/actions/buyer-requirement-actions'
+import { BuyerRequirementsFeed } from '@/src/components/buyer/requirements/buyer-requirements-feed'
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
 
-export default function BuyerRequirementsPage() {
-  return (
-    <SprintPlaceholder
-      title="Requirements Module"
-      sprintName="Coming in Sprint 33: Requirements (Create & Manage)"
-      description="You will be able to create, edit, and track procurement requirements here."
-      icon={<ClipboardList className="w-7 h-7 text-[#0284C7]" />}
-    />
-  );
+export default async function BuyerRequirementsPage() {
+  const res = await getBuyerRequirementsListAction()
+  const initialItems = res.success && res.data ? res.data : []
+
+  return <BuyerRequirementsFeed initialItems={initialItems} />
 }

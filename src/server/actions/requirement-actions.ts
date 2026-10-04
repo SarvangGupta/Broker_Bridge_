@@ -38,11 +38,12 @@ export async function createRequirementAction(rawData: unknown) {
       quantity: data.quantity,
       unitId: data.unit_id,
       targetPrice: data.target_price,
-      deliveryTermsId: data.delivery_terms_id,
-      targetDate: data.target_date, // Zod coerces to Date object
-      visibility: data.visibility,
+      deliveryTermsId: data.delivery_terms_id || 'EXW',
+      targetDate: data.target_date || new Date(Date.now() + 14 * 86400000),
+      visibility: data.visibility || 'global',
       status: 'Open',
       brokerId: data.broker_id || null,
+
     }).returning()
 
     revalidatePath('/', 'layout')

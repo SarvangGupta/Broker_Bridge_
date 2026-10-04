@@ -241,10 +241,30 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 		- [x] __31.3 — Buyer Organization Isolation:__ Verified database RLS subqueries and enforced strict `companyId` scoping on all Buyer server actions and route guards (`BuyerLayout`).
 		- [x] __31.4 — Buyer Profile & KYC Foundation Workspace:__ Built dedicated Organization Profile & KYC page at `/buyer/profile` (`app/(buyer)/buyer/profile/page.tsx`) with `<KycStatusBadge />` and verified credential displays.
 
+- __Sprint 32: Buyer Shell, Navigation & Dashboard__ (COMPLETED ✅)
+	- __Goal:__ Deploy mobile-first (360px) Buyer App Shell, 10-item navigation taxonomy, Procurement Command Center dashboard, and mobile resilience.
+	- __Key Tasks:__
+		- [x] __32.1 — Mobile-First Buyer Shell:__ Built responsive 360px-first Buyer layout (`app/(buyer)/buyer/layout.tsx`), desktop sidebar, mobile fixed bottom nav with 48px touch targets, and Profile Dropdown with Trader Workspace Toggle (`/seller`).
+		- [x] __32.2 — Buyer Navigation:__ Implemented locked 10-item Buyer navigation taxonomy (Dashboard, Requirements, Proposals, Negotiations, Orders, Quality & Documents, Payments, Disputes, Notifications, Profile) with secondary route placeholders (`<SprintPlaceholder />`).
+		- [x] __32.3 — Procurement Command Center (Buyer Dashboard):__ Deployed `/buyer/page.tsx` backed by `getBuyerDashboardSummaryAction()`; built 4-metric KPI Grid, P0 Action Required Feed with severity borders, and 2-column Active Demand & Live Shipments cards.
+		- [x] __32.4 — Mobile Resilience & Dashboard States:__ Implemented Tier-2 network resilience, loading skeleton (`loading.tsx`), centered Error Boundary (`error.tsx`), zero-data-wall empty state fallbacks, and double-click prevention.
+	- __Technical Deliverables:__ `app/(buyer)/buyer/layout.tsx`, `app/(buyer)/buyer/page.tsx`, `app/(buyer)/buyer/loading.tsx`, `app/(buyer)/buyer/error.tsx`, `src/components/buyer/dashboard/*`, `src/server/actions/buyer-dashboard-actions.ts`, `src/components/ui/sprint-placeholder.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
+
+- __Sprint 33: Requirements — Create & Manage__ (COMPLETED ✅)
+	- __Goal:__ Upgrade requirement submission into a 6-step mobile-first wizard (360px viewport), cascading master data dropdowns, partial fulfillment rules, tabbed requirement inbox with 48-hour auto-hide cleanup, and detail view partial fulfillment visualizer.
+	- __Key Tasks:__
+		- [x] __33.1 — Buyer Requirement Wizard & Data Structure:__ Built 6-step Zod validation schema (`src/lib/validations/requirement-schema.ts`), 360px-first `<RequirementWizard />` component with sticky progress bar (Ocean Blue `#0284C7`), fixed bottom action bar (`min-h-[48px]` touch targets), cascading Commodity/Grade/State/District dropdowns, visual "Allow Partial Fulfillment" toggle switch, and Sprint 5 `createRequirementAction` integration.
+		- [x] __33.2 — Requirement Wizard Steps 3–6 & Submission:__ Built cascading location locks (State → District → City), delivery window timeline date pickers with ordering validation, commercial & freight terms cards, read-only Step 6 summary card, and final submission handler wired to `createRequirementAction` with `useTransition` and success toast.
+		- [x] __33.3 — Buyer Requirement Edit & State Management:__ Built `updateRequirementAction`, `cancelRequirementAction`, and `saveDraftRequirementAction` server actions with strict backend state machine locks (preventing edits/cancellations on `Negotiating`, `Booked`, `Accepted`, `Fulfilled`, `Closed` states). Added "Save as Draft" button bypassing strict step validation, pre-filled Edit Mode support in `<RequirementWizard />`, and built responsive mobile 360px `<CancelRequirementDialog />`.
+		- [x] __33.4 — Buyer Requirement Inbox & Feed:__ Built `getBuyerRequirementsListAction()` enforcing strict `companyId` data isolation and joining Master Data. Built human-readable status badge mapper, tabbed inbox navigation (Active, Drafts, History & Cancelled), 48-hour auto-hide UI cleanup rule for Cancelled requirements, restored status dropdown filter, and mobile-first `<RequirementCard />`.
+		- [x] __33.5 — Requirement Detail & Partial Fulfillment View:__ Built `getBuyerRequirementDetailAction()` with partial fulfillment math (`originalQuantity`, `bookedQuantity`, `remainingQuantity`, `progressPercentage`). Built `<DetailFulfillmentCard />` displaying progress bar and explicit 3-column math grid, `<DetailTermsGrid />`, and dynamic route `/buyer/requirements/[id]`.
+	- __Technical Deliverables:__ `src/components/buyer/requirements/requirement-wizard.tsx`, `src/components/buyer/requirements/buyer-requirements-feed.tsx`, `src/components/buyer/requirements/requirement-card.tsx`, `src/components/buyer/requirements/detail-fulfillment-card.tsx`, `src/server/actions/buyer-requirement-actions.ts`, `app/(buyer)/buyer/requirements/page.tsx`, `app/(buyer)/buyer/requirements/[id]/page.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 31 COMPLETED | ADVANCING TO SPRINT 32**
-Sprint 31 (Buyer Foundation & Access) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 32: Buyer Shell, Navigation & Dashboard**.
+### 🚀 **Global Platform Status: SPRINT 33 COMPLETED | ADVANCING TO SPRINT 34**
+Sprint 33 (Requirements: Create & Manage) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 34: Quality Requirements & Documents**.
+
 
 
 

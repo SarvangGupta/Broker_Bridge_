@@ -536,4 +536,33 @@ The Broker Booking & Orders module (`/broker/deals` and `/broker/orders`) connec
 - **Strict Assignment Model Isolation (`getBrokerActiveOrdersAction`)**:
   - All order operations and deal queries enforce server-side `@supabase/ssr` identity checks and filter strictly by `broker_id === user.id`, preventing cross-broker data leaks.
 
+### 32. Enterprise Buyer Workspace Shell, Single-Sign-On Trader Toggle & Zero Data-Wall Mobile Standard (Sprint 32)
+The Buyer workspace introduces a mobile-first operational shell (`app/(buyer)/buyer/layout.tsx`) with single-sign-on workspace switching and zero data-wall command center rendering:
+- **Single-Sign-On Trader Workspace Toggle (`/buyer` <-> `/seller`)**:
+  - The Buyer App Shell layout and profile dropdown (`buyer-sidebar.tsx`, `buyer-mobile-nav.tsx`) explicitly integrate a "Switch to Seller Workspace" toggle routing directly to `/seller`.
+  - Enables enterprise accounts with dual trading roles (buying and selling) to switch contexts seamlessly without re-authenticating or breaking session state, preserving single-sign-on (SSO) credentials verified via `verifyBuyerSession()` and `verifySellerSession()`.
+- **Zero Data-Wall Mobile-First 360px Standard**:
+  - The Procurement Command Center (`/buyer/page.tsx`) replaces traditional dense tables with card-based layouts (4-metric KPI ribbon, P0 Action Required Feed with color-coded severity borders, and 2-column Active Demand & Live Shipments pipeline cards).
+  - Designed for low-bandwidth 360px mobile viewports with zero horizontal overflow and 48px thumb-friendly touch targets.
+- **Resilience State Boundaries & Temporary Scaffolding**:
+  - Includes block-card loading skeletons (`loading.tsx`), centered Error Boundaries (`error.tsx`) with `useTransition` double-click prevention and 48px touch-target retry buttons, and temporary route scaffolding (`sprint-placeholder.tsx`).
+
+### 33. Buyer Requirement Engine 2.0, 6-Step Wizard & Partial Fulfillment Visualizer (Sprint 33)
+The Buyer Requirement module (`/buyer/requirements`) extends the basic Sprint 5 requirement creation engine into a 6-step mobile-first wizard and partial fulfillment visualizer while strictly preserving the existing database schema:
+- **Zero-Migration Extension of Sprint 5 Schema**:
+  - Maintained complete backward compatibility with the `requirements` PostgreSQL schema (`schema.ts`).
+  - Implemented dynamic database lookups (e.g. `masterUnits` fallback query) in `saveDraftRequirementAction` and `updateRequirementAction` to resolve missing foreign keys safely when users save incomplete drafts before selecting measurement units or commercial defaults, avoiding foreign key constraint violations without modifying NOT NULL database columns.
+- **6-Step Mobile Creation Wizard & Draft State Machine (`requirement-wizard.tsx`, `buyer-requirement-actions.ts`)**:
+  - Steps: What -> How Much -> Where -> When -> Commercials -> Review.
+  - Features cascading master data locks (State -> District -> City), mobile date pickers with order validation, and visual partial fulfillment toggles.
+  - State machine lock enforces that requirements in active negotiation or fulfillment (`Negotiating`, `Booked`, `Accepted`, `Fulfilled`, `Closed`) cannot be edited or cancelled.
+- **Tabbed Inbox & 48-Hour Cancelled Auto-Hide Filter (`buyer-requirements-feed.tsx`, `requirement-card.tsx`)**:
+  - Divided feed into 3 tabs: Active Requirements, Draft Specs, and History & Cancelled.
+  - Implemented client-side/server-side 48-hour auto-hide rule for `Cancelled` requirements based on `updatedAt`/`createdAt`, cleanly removing stale cancelled demands from the UI without deleting database records.
+  - Cancelled requirement cards render a subtle `Hides in [X]h` countdown timer.
+- **Partial Fulfillment Visualizer Math (`detail-fulfillment-card.tsx`)**:
+  - Detail view (`/buyer/requirements/[id]`) explicitly visualizes original target quantity, confirmed booked quantity, remaining unfulfilled quantity, and progress percentage.
+
+
+
 
