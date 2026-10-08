@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { format, addDays } from 'date-fns'
+import { format, addDays, startOfDay } from 'date-fns'
 
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
@@ -68,6 +68,13 @@ import {
   useDistricts 
 } from '@/src/hooks/use-master-data'
 import { saveRequirementOffline } from '@/src/lib/offline-queue'
+import { 
+  QualityParametersForm, 
+  QualityParameterValue 
+} from './quality-parameters-form'
+import { saveRequirementQualitySpecsAction } from '@/src/server/actions/buyer-quality-actions'
+import { DocumentChecklistForm } from './document-checklist-form'
+import { saveRequirementDocumentsAction } from '@/src/server/actions/buyer-document-actions'
 
 const PAYMENT_TERMS_OPTIONS = [
   '100% Advance',
@@ -135,6 +142,90 @@ export function RequirementWizard({
   const [brokers, setBrokers] = useState<any[]>([])
   const [loadingBrokers, setLoadingBrokers] = useState(false)
 
+  // Micro-Sprint 34.1: Quality Parameters State
+  const [qualityParameters, setQualityParameters] = useState<QualityParameterValue[]>(() => {
+    if (initialData?.quality_parameters && Array.isArray(initialData.quality_parameters)) {
+      return initialData.quality_parameters
+    }
+    if (initialData?.qualityParameters && Array.isArray(initialData.qualityParameters)) {
+      return initialData.qualityParameters
+    }
+    return []
+  })
+
+  const handleQualityChange = (vals: QualityParameterValue[]) => {
+    setQualityParameters(vals)
+    form.setValue('quality_parameters' as any, vals)
+    if (typeof window !== 'undefined') {
+      try {
+        const storageKey = `brokerbridge_buyer_draft_quality_${requirementId || 'new'}`
+        localStorage.setItem(storageKey, JSON.stringify(vals))
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  // Micro-Sprint 34.2: Dynamic Quality Validation Guard
+  const [isQualityValid, setIsQualityValid] = useState(true)
+  const [qualityValidationErrors, setQualityValidationErrors] = useState<Record<string, string>>({})
+
+  const handleQualityValidationChange = (isValid: boolean, errors: Record<string, string>) => {
+    setIsQualityValid(isValid)
+    setQualityValidationErrors(errors)
+  }
+
+  // Micro-Sprint 34.3: Required Documents State
+  const [requiredDocuments, setRequiredDocuments] = useState<string[]>(() => {
+    if (initialData?.required_documents && Array.isArray(initialData.required_documents)) {
+      return initialData.required_documents
+    }
+    if (initialData?.requiredDocuments && Array.isArray(initialData.requiredDocuments)) {
+      return initialData.requiredDocuments
+    }
+    return ['Certificate of Analysis', 'Lorry Receipt', 'Weighbridge Slip', 'GST Invoice']
+  })
+
+  const handleDocumentsChange = (docs: string[]) => {
+    setRequiredDocuments(docs)
+    if (typeof window !== 'undefined') {
+      try {
+        const storageKey = `brokerbridge_buyer_draft_docs_${requirementId || 'new'}`
+        localStorage.setItem(storageKey, JSON.stringify(docs))
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  // Restore quality parameters & documents from draft cache if available
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const qualityKey = `brokerbridge_buyer_draft_quality_${requirementId || 'new'}`
+        const cachedQuality = localStorage.getItem(qualityKey)
+        if (cachedQuality && (!qualityParameters || qualityParameters.length === 0)) {
+          const parsed = JSON.parse(cachedQuality)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setQualityParameters(parsed)
+            form.setValue('quality_parameters' as any, parsed)
+          }
+        }
+
+        const docsKey = `brokerbridge_buyer_draft_docs_${requirementId || 'new'}`
+        const cachedDocs = localStorage.getItem(docsKey)
+        if (cachedDocs) {
+          const parsedDocs = JSON.parse(cachedDocs)
+          if (Array.isArray(parsedDocs) && parsedDocs.length > 0) {
+            setRequiredDocuments(parsedDocs)
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [requirementId])
+
   useEffect(() => {
     async function fetchBrokers() {
       setLoadingBrokers(true)
@@ -169,15 +260,16 @@ export function RequirementWizard({
       delivery_state_id: initialData?.delivery_state_id || initialData?.stateId || '',
       delivery_district_id: initialData?.delivery_district_id || initialData?.districtId || '',
       delivery_city_id: initialData?.delivery_city_id || initialData?.city || '',
-      delivery_window_start: initialData?.delivery_window_start ? new Date(initialData.delivery_window_start) : new Date(),
-      delivery_window_end: initialData?.delivery_window_end ? new Date(initialData.delivery_window_end) : (initialData?.targetDate ? new Date(initialData.targetDate) : addDays(new Date(), 14)),
-      target_date: initialData?.targetDate ? new Date(initialData.targetDate) : addDays(new Date(), 14),
+      delivery_window_start: initialData?.delivery_window_start ? new Date(initialData.delivery_window_start) : startOfDay(new Date()),
+      delivery_window_end: initialData?.delivery_window_end ? new Date(initialData.delivery_window_end) : (initialData?.targetDate ? new Date(initialData.targetDate) : addDays(startOfDay(new Date()), 14)),
+      target_date: initialData?.targetDate ? new Date(initialData.targetDate) : addDays(startOfDay(new Date()), 14),
       payment_terms: initialData?.payment_terms || PAYMENT_TERMS_OPTIONS[0],
       packaging_type: initialData?.packaging_type || PACKAGING_OPTIONS[1],
       freight_terms: initialData?.deliveryTermsId || initialData?.freight_terms || 'EXW',
       delivery_terms_id: initialData?.deliveryTermsId || initialData?.delivery_terms_id || 'EXW',
       visibility: initialData?.visibility || 'global',
       broker_id: initialData?.brokerId || initialData?.broker_id || '',
+      quality_parameters: initialData?.quality_parameters || initialData?.qualityParameters || [],
     },
   })
 
@@ -215,6 +307,14 @@ export function RequirementWizard({
           form.setError(issue.path[0] as any, { message: issue.message })
         })
         toast.error('Please select both Commodity and Quality Grade')
+        return false
+      }
+
+      // Micro-Sprint 34.2: Step 1 Quality Parameter Validation Guard
+      if (!isQualityValid) {
+        const errValues = Object.values(qualityValidationErrors)
+        const firstMsg = errValues.length > 0 ? errValues[0] : 'Please correct quality parameter validation errors.'
+        toast.error(firstMsg)
         return false
       }
     } else if (currentStep === 2) {
@@ -324,6 +424,7 @@ export function RequirementWizard({
           packaging_type: values.packaging_type,
           freight_terms: values.freight_terms,
           allow_partial_fulfillment: values.allow_partial_fulfillment,
+          quality_parameters: qualityParameters,
         }
 
         let result
@@ -334,6 +435,31 @@ export function RequirementWizard({
         }
 
         if (result.success) {
+          const targetId = result.data?.id || requirementId || initialData?.id
+          if (targetId && qualityParameters.length > 0) {
+            try {
+              const specs = qualityParameters.map((p) => ({
+                parameterId: p.parameter_id,
+                targetValue: Number(p.required_value),
+              }))
+              await saveRequirementQualitySpecsAction(targetId, specs)
+            } catch (qErr) {
+              console.warn('Draft quality specs persistence notice:', qErr)
+            }
+          }
+          if (targetId && requiredDocuments.length > 0) {
+            try {
+              await saveRequirementDocumentsAction(targetId, requiredDocuments)
+            } catch (dErr) {
+              console.warn('Draft documents persistence notice:', dErr)
+            }
+          }
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem(`brokerbridge_buyer_draft_quality_${requirementId || 'new'}`)
+              localStorage.removeItem(`brokerbridge_buyer_draft_docs_${requirementId || 'new'}`)
+            } catch (e) {}
+          }
           toast.success('Requirement saved as Draft successfully!')
           onSuccess?.()
           router.push('/buyer/requirements')
@@ -370,6 +496,7 @@ export function RequirementWizard({
           packaging_type: values.packaging_type,
           freight_terms: values.freight_terms,
           allow_partial_fulfillment: values.allow_partial_fulfillment,
+          quality_parameters: qualityParameters,
         }
 
         if (typeof window !== 'undefined' && !navigator.onLine) {
@@ -388,6 +515,34 @@ export function RequirementWizard({
         }
 
         if (result.success) {
+          const targetId = result.data?.id || requirementId || initialData?.id
+          if (targetId && qualityParameters.length > 0) {
+            try {
+              const specs = qualityParameters.map((p) => ({
+                parameterId: p.parameter_id,
+                targetValue: Number(p.required_value),
+              }))
+              const qRes = await saveRequirementQualitySpecsAction(targetId, specs)
+              if (!qRes.success) {
+                console.warn('Quality specs persistence warning:', qRes.error)
+              }
+            } catch (qErr) {
+              console.error('Failed to persist quality specs:', qErr)
+            }
+          }
+          if (targetId && requiredDocuments.length > 0) {
+            try {
+              await saveRequirementDocumentsAction(targetId, requiredDocuments)
+            } catch (dErr) {
+              console.error('Failed to persist required documents:', dErr)
+            }
+          }
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem(`brokerbridge_buyer_draft_quality_${requirementId || 'new'}`)
+              localStorage.removeItem(`brokerbridge_buyer_draft_docs_${requirementId || 'new'}`)
+            } catch (e) {}
+          }
           toast.success(isEditMode ? 'Requirement updated successfully!' : 'Procurement Requirement posted successfully!')
           onSuccess?.()
           router.push('/buyer/requirements')
@@ -598,8 +753,17 @@ export function RequirementWizard({
                                       key={c.id}
                                       value={c.name}
                                       onSelect={() => {
-                                        form.setValue("commodity_id", c.id)
-                                        form.setValue("grade_id", "")
+                                        if (field.value !== c.id) {
+                                          form.setValue("commodity_id", c.id)
+                                          form.setValue("grade_id", "")
+                                          setQualityParameters([])
+                                          form.setValue("quality_parameters" as any, [])
+                                          if (typeof window !== 'undefined') {
+                                            try {
+                                              localStorage.removeItem(`brokerbridge_buyer_draft_quality_${requirementId || 'new'}`)
+                                            } catch (e) {}
+                                          }
+                                        }
                                         setOpenCommodity(false)
                                       }}
                                     >
@@ -684,6 +848,20 @@ export function RequirementWizard({
                       </FormItem>
                     )}
                   />
+
+                  {/* Micro-Sprint 34.1: Dynamic Quality Parameters (Master-Driven) */}
+                  {selectedCommodityId && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <QualityParametersForm
+                        commodityId={selectedCommodityId}
+                        gradeId={form.watch('grade_id')}
+                        value={qualityParameters}
+                        onChange={handleQualityChange}
+                        onValidationChange={handleQualityValidationChange}
+                        disabled={isPending}
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -1084,10 +1262,9 @@ export function RequirementWizard({
                         <Button
                           key={preset.days}
                           type="button"
-                          variant="outline"
-                          className="min-h-[44px] text-xs font-semibold hover:border-[#0284C7] hover:text-[#0284C7]"
+                                                   className="min-h-[44px] text-xs font-semibold hover:border-[#0284C7] hover:text-[#0284C7]"
                           onClick={() => {
-                            const startDate = new Date()
+                            const startDate = startOfDay(new Date())
                             const endDate = addDays(startDate, preset.days)
                             form.setValue('delivery_window_start', startDate)
                             form.setValue('delivery_window_end', endDate)
@@ -1127,7 +1304,17 @@ export function RequirementWizard({
                               <Calendar
                                 mode="single"
                                 selected={field.value}
-                                onSelect={(d) => d && field.onChange(d)}
+                                disabled={(date: Date) => date < startOfDay(new Date())}
+                                onSelect={(d) => {
+                                  if (d) {
+                                    field.onChange(d)
+                                    const currentEnd = form.getValues('delivery_window_end')
+                                    if (currentEnd && currentEnd < d) {
+                                      form.setValue('delivery_window_end', d)
+                                      form.setValue('target_date', d)
+                                    }
+                                  }
+                                }}
                               />
                             </PopoverContent>
                           </Popover>
@@ -1162,9 +1349,10 @@ export function RequirementWizard({
                               <Calendar
                                 mode="single"
                                 selected={field.value}
-                                disabled={(date: Date) => 
-                                  deliveryWindowStart ? date < deliveryWindowStart : date < new Date()
-                                }
+                                disabled={(date: Date) => {
+                                  const minDate = deliveryWindowStart ? startOfDay(deliveryWindowStart) : startOfDay(new Date())
+                                  return date < minDate
+                                }}
                                 onSelect={(d) => {
                                   if (d) {
                                     field.onChange(d)
@@ -1374,6 +1562,15 @@ export function RequirementWizard({
                       </FormItem>
                     )}
                   />
+
+                  {/* Micro-Sprint 34.3: Mandatory Fulfillment Documents Checklist */}
+                  <div className="pt-2">
+                    <DocumentChecklistForm
+                      value={requiredDocuments}
+                      onChange={handleDocumentsChange}
+                      disabled={isPending}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -1405,6 +1602,30 @@ export function RequirementWizard({
                       <span className="font-bold text-slate-900 text-right">
                         {selectedCommodity?.name || '—'} ({selectedGrade?.gradeName || '—'})
                       </span>
+                    </div>
+
+                    {/* Quality Parameters (Micro-Sprint 34.1) */}
+                    <div className="p-3.5 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Quality Parameters</span>
+                        <span className="font-semibold text-slate-900 text-right">
+                          {qualityParameters.length > 0
+                            ? `${qualityParameters.length} Parameter${qualityParameters.length > 1 ? 's' : ''} Configured`
+                            : 'Standard Grade Baseline'}
+                        </span>
+                      </div>
+                      {qualityParameters.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {qualityParameters.map((qp) => (
+                            <span
+                              key={qp.parameter_id}
+                              className="inline-flex items-center text-[11px] bg-sky-50 text-[#0284C7] px-2 py-0.5 rounded font-medium border border-sky-100"
+                            >
+                              {qp.parameter_name || 'Param'}: {qp.required_value}{qp.unit ? ` ${qp.unit}` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* How Much */}
@@ -1477,6 +1698,30 @@ export function RequirementWizard({
                         {form.watch('visibility') === 'global' ? 'Global Pool' : `Private (${selectedBroker?.name || 'Broker Assigned'})`}
                       </span>
                     </div>
+
+                    {/* Mandatory Fulfillment Documents (Micro-Sprint 34.3) */}
+                    <div className="p-3.5 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Mandatory Fulfillment Documents</span>
+                        <span className="font-semibold text-slate-900 text-right">
+                          {requiredDocuments.length > 0
+                            ? `${requiredDocuments.length} Document${requiredDocuments.length > 1 ? 's' : ''} Enforced`
+                            : 'No specific documents enforced'}
+                        </span>
+                      </div>
+                      {requiredDocuments.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {requiredDocuments.map((docName) => (
+                            <span
+                              key={docName}
+                              className="inline-flex items-center text-[11px] bg-sky-50 text-[#0284C7] px-2 py-0.5 rounded font-medium border border-sky-100"
+                            >
+                              {docName}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-1">
@@ -1534,8 +1779,12 @@ export function RequirementWizard({
               <Button
                 type="button"
                 onClick={handleNext}
-                disabled={isPending}
-                className="min-h-[48px] px-4 sm:px-6 text-xs sm:text-sm font-semibold bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-sm"
+                disabled={isPending || (currentStep === 1 && !isQualityValid)}
+                className={cn(
+                  "min-h-[48px] px-4 sm:px-6 text-xs sm:text-sm font-semibold bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-sm transition-all",
+                  currentStep === 1 && !isQualityValid && "opacity-50 cursor-not-allowed"
+                )}
+                title={currentStep === 1 && !isQualityValid ? "Resolve quality parameter validation errors to proceed" : undefined}
               >
                 Next
                 <ArrowRight className="w-4 h-4 ml-1.5" />
@@ -1544,8 +1793,12 @@ export function RequirementWizard({
               <Button
                 type="button"
                 onClick={form.handleSubmit(onSubmit)}
-                disabled={isPending}
-                className="min-h-[48px] px-4 sm:px-6 text-xs sm:text-sm font-semibold bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-md"
+                disabled={isPending || !isQualityValid}
+                className={cn(
+                  "min-h-[48px] px-4 sm:px-6 text-xs sm:text-sm font-semibold bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-md transition-all",
+                  !isQualityValid && "opacity-50 cursor-not-allowed"
+                )}
+                title={!isQualityValid ? "Resolve quality parameter validation errors to submit" : undefined}
               >
                 {isPending ? (
                   <>

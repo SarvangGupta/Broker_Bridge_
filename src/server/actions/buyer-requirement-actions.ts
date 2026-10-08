@@ -1,7 +1,16 @@
 'use server'
 
 import { db } from "@/src/server/db"
-import { requirements, masterCommodities, masterGrades, masterUnits, users } from "@/src/server/db/schema"
+import { 
+  requirements, 
+  requirementQualitySpecs, 
+  requirementDocuments,
+  masterQualityParameters, 
+  masterCommodities, 
+  masterGrades, 
+  masterUnits, 
+  users 
+} from "@/src/server/db/schema"
 import { eq, and, desc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { verifyBuyerSession } from "@/src/server/utils/buyer-auth"
@@ -102,11 +111,50 @@ export async function getBuyerRequirementDetailAction(requirementId: string) {
       ? Math.min(100, Math.round((bookedQuantity / originalQuantity) * 100)) 
       : 0
 
+    // Micro-Sprint 34.2: Fetch Persisted Quality Specifications
+    let qualitySpecs: any[] = []
+    try {
+      qualitySpecs = await db
+        .select({
+          id: requirementQualitySpecs.id,
+          parameterId: requirementQualitySpecs.parameterId,
+          targetValue: requirementQualitySpecs.targetValue,
+          tolerance: requirementQualitySpecs.tolerance,
+          name: masterQualityParameters.name,
+          unit: masterQualityParameters.unit,
+          minValue: masterQualityParameters.minValue,
+          maxValue: masterQualityParameters.maxValue,
+          isRequired: masterQualityParameters.isRequired,
+        })
+        .from(requirementQualitySpecs)
+        .innerJoin(
+          masterQualityParameters,
+          eq(masterQualityParameters.id, requirementQualitySpecs.parameterId)
+        )
+        .where(eq(requirementQualitySpecs.requirementId, requirementId))
+    } catch (qErr) {
+      // Table may not have records yet or pending migration
+    }
+
+    // Micro-Sprint 34.3: Fetch Persisted Document Requirements
+    let requiredDocuments: string[] = []
+    try {
+      const docRecords = await db
+        .select({ documentType: requirementDocuments.documentType })
+        .from(requirementDocuments)
+        .where(eq(requirementDocuments.requirementId, requirementId))
+      requiredDocuments = docRecords.map((d) => d.documentType)
+    } catch (dErr) {
+      // Table may not have records yet or pending migration
+    }
+
     return {
       success: true,
       data: {
         ...item,
         brokerName,
+        qualitySpecs,
+        requiredDocuments,
         fulfillment: {
           originalQuantity,
           bookedQuantity,
@@ -189,7 +237,13 @@ export async function updateRequirementAction(
 
     revalidatePath('/', 'layout')
     revalidatePath('/buyer/requirements')
-    return { success: true, data: updated[0] }
+    return { 
+      success: true, 
+      data: {
+        ...updated[0],
+        quality_parameters: data.quality_parameters || [],
+      } 
+    }
   } catch (error: any) {
     return { success: false, error: error.message || 'Failed to update requirement' }
   }
@@ -281,7 +335,13 @@ export async function saveDraftRequirementAction(rawData: unknown) {
 
     revalidatePath('/', 'layout')
     revalidatePath('/buyer/requirements')
-    return { success: true, data: newReq[0] }
+    return { 
+      success: true, 
+      data: {
+        ...newReq[0],
+        quality_parameters: data.quality_parameters || [],
+      } 
+    }
   } catch (error: any) {
     return { success: false, error: error.message || 'Failed to save draft' }
   }

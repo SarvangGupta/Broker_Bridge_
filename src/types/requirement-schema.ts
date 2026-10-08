@@ -31,6 +31,17 @@ export const requirementBaseSchema = z.object({
   packaging_type: z.string().optional(),
   freight_terms: z.string().optional(),
   allow_partial_fulfillment: z.boolean().optional().default(true),
+  quality_parameters: z
+    .array(
+      z.object({
+        parameter_id: z.string(),
+        required_value: z.union([z.number(), z.string()]),
+        parameter_name: z.string().optional(),
+        unit: z.string().nullable().optional(),
+      })
+    )
+    .optional()
+    .default([]),
 })
 
 export const requirementSchema = requirementBaseSchema.superRefine((data, ctx) => {

@@ -1,9 +1,20 @@
 import { z } from "zod"
 
+// Quality Parameter item schema (Micro-Sprint 34.1)
+export const qualityParameterItemSchema = z.object({
+  parameter_id: z.string(),
+  required_value: z.union([z.number(), z.string()]),
+  parameter_name: z.string().optional(),
+  unit: z.string().nullable().optional(),
+})
+
+export type QualityParameterItem = z.infer<typeof qualityParameterItemSchema>
+
 // Step 1: What
 export const step1WhatSchema = z.object({
   commodity_id: z.string().min(1, { message: "Commodity selection is required" }),
   grade_id: z.string().min(1, { message: "Grade / Quality parameter selection is required" }),
+  quality_parameters: z.array(qualityParameterItemSchema).optional().default([]),
 })
 
 // Step 2: How Much
@@ -29,7 +40,12 @@ export const step3WhereSchema = z.object({
 // Step 4: When
 export const step4WhenSchema = z
   .object({
-    delivery_window_start: z.coerce.date().optional(),
+    delivery_window_start: z.coerce
+      .date()
+      .optional()
+      .refine((date) => !date || date >= new Date(new Date().setHours(0, 0, 0, 0)), {
+        message: "Dispatch ready start date cannot be in the past",
+      }),
     delivery_window_end: z.coerce
       .date()
       .optional()

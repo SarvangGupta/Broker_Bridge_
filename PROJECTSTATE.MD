@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 7: Buyer Workspace Shell & Enterprise Buyer Capabilities (Sprints 31–40)**  
-Global Platform Status: **SPRINT 33 COMPLETE — BUYER REQUIREMENTS ENGINE & FULFILLMENT VISUALIZER LIVE 🚀**  
-Status: **Sprint 33 Completed** ✅ (Next: Sprint 34: Quality Requirements & Documents)
+Global Platform Status: **SPRINT 34 COMPLETED — ADVANCING TO SPRINT 35: BROKER PROPOSALS 🚀**  
+Status: **Sprint 34 Completed** ✅ (Next: Sprint 35: Broker Proposals & Negotiation Engine)
 
 
 
@@ -643,10 +643,38 @@ Status: **Sprint 33 Completed** ✅ (Next: Sprint 34: Quality Requirements & Doc
   - **Partial Fulfillment Math:** Successfully calculated on backend and rendered on frontend 3-column visualizer.
   - **TypeScript Integrity:** Passed `npx tsc --noEmit` with 0 errors. Enforced zero horizontal scroll on 360px viewports. Sprint 33 is 100% complete and verified. Moving to Sprint 34 (Quality Requirements & Documents).
 
+---
 
-
-
-
+### 🟢 Sprint 34: Quality Requirements & Documents (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Commodity-specific parameters, grade-specific baseline limits, master-driven quality specifications, supporting document attachments, and server-side quality validation.
+- **Micro-Sprint 34.1 (Buyer Quality Parameter Master Integration):** `COMPLETED` ✅
+  - Built `getCommodityQualityParametersAction(commodityId, gradeId)` in `src/server/actions/buyer-quality-actions.ts` querying `master_quality_parameters` without modifying table schema, cross-referencing and sorting by `master_grades.parameters` baseline limits, and returning standardized attributes (`name`, `unit`, `min_value`, `max_value`, `is_mandatory`, `grade_baseline`).
+  - Built mobile-first client component `<QualityParametersForm />` (`src/components/buyer/requirements/quality-parameters-form.tsx`) dynamically rendering master parameters with Tier-2 thumb usability (`min-h-[48px] h-12` inputs, `inputMode="decimal"` for mobile numeric keypad), master range helper text, and zero free-text parameter bypass.
+  - State Integration with Requirement Wizard: Extended `step1WhatSchema` and `requirementWizardSchema` (`src/lib/validations/requirement-schema.ts`), embedded `<QualityParametersForm />` in Step 1 below Grade Combobox, added Quality Specifications row to Step 6 Review summary grid, and integrated quality parameter state persistence into "Save as Draft" (`handleSaveDraft`), `onSubmit`, and local storage cache.
+  - Verified 100% type safety with `npx tsc --noEmit` exiting with 0 errors and zero horizontal scroll on 360px viewports.
+- **Micro-Sprint 34.2 (Buyer Quality Parameter Validation & Storage):** `COMPLETED` ✅
+  - **Dynamic Quality Zod Validation Factory (`src/lib/validations/buyer-quality-schema.ts`):** Implemented `createDynamicQualitySchema(masterParams)` generating dynamic Zod validators with mathematical bounds (`.min().max()`), custom range error labels (`"[Parameter Name] must be between [min] and [max] [unit]"`), and robust decimal pre-coercion. Built `validateSingleQualityParam()` and `validateAllQualityParams()`.
+  - **Dynamic UI Range Indicators (`src/components/buyer/requirements/quality-parameters-form.tsx`):** Added master range badges (`Allowed: X – Y %`), real-time inline validation feedback, destructive red borders (`border-destructive`) on out-of-bounds inputs, and green check indicators on valid entries. Added `onValidationChange` prop to broadcast validation state.
+  - **Form Submission Guard (`src/components/buyer/requirements/requirement-wizard.tsx`):** Next button on Step 1 and Submit button on Step 6 dynamically disable when quality parameters violate master bounds or mandatory parameters are blank. Step 1 `validateCurrentStep()` blocks advancement with explicit error toasts.
+  - **Server Action for Quality Persistence (`src/server/actions/buyer-quality-actions.ts`):** Implemented `saveRequirementQualitySpecsAction` and `getRequirementQualitySpecsAction`. Authenticated via `@supabase/ssr` / `verifyBuyerSession()` with strict `BUYER_ADMIN` role enforcement, tenant ownership verification, state machine guard (`'Draft'` | `'Open'`), server-side bounds re-verification to prevent API tampering, and atomic Drizzle `db.transaction()` updating `requirement_quality_specs`.
+  - **Detail View Integration (`src/components/buyer/requirements/detail-terms-grid.tsx`):** Added verified Quality Specifications card displaying persisted target values, units, and permissible ranges on the requirement detail page (`/buyer/requirements/[id]`).
+  - **Database Migration:** Generated `supabase/migrations/0032_add_requirement_quality_specs.sql` with table creation and foreign key indices, paired with runtime DDL fallback resilience.
+  - Passed `npx tsc --noEmit` with 0 errors. All guardrails (360px mobile responsiveness, 48px touch targets, server-first security) verified.
+- **Micro-Sprint 34.3 (Buyer Document Requirements Checklist):** `COMPLETED` ✅
+  - **Drizzle Schema & Migration (`src/server/db/schema.ts`):** Defined `requirementDocuments` table with `id`, `requirementId` (FK referencing `requirements.id` ON DELETE cascade), `documentType`, `isMandatory` (default `true`), `createdAt`, and `updatedAt`. Generated `supabase/migrations/0033_add_requirement_documents_table.sql` with index `idx_req_documents_req_id` using Drizzle Kit workflow. Verified 0 schema drift (`No schema changes, nothing to migrate`).
+  - **Server Actions (`src/server/actions/buyer-document-actions.ts`):** Built `saveRequirementDocumentsAction(requirementId, documents)` and `getRequirementDocumentsAction(requirementId)`. Enforced `@supabase/ssr` authentication, tenant company ownership, state machine lock (`'Draft'` | `'Open'`), standardized whitelist filtering (`STANDARD_DOCUMENT_TYPES`), and atomic `db.transaction()` deleting old and bulk-inserting new mandatory records.
+  - **Document Checklist UI Component (`src/components/buyer/requirements/document-checklist-form.tsx`):** Built `'use client'` component presenting standardized fulfillment documents (`Certificate of Analysis`, `Lorry Receipt`, `Weighbridge Slip`, `GST Invoice`, `Phytosanitary Certificate`). Designed with `min-h-[48px]` touch targets, badge classification (`Quality`, `Logistics`, `Commercial`, `Compliance`), and descriptive helper text.
+  - **Wizard & Detail Integration (`src/components/buyer/requirements/requirement-wizard.tsx` & `detail-terms-grid.tsx`):** Embedded `<DocumentChecklistForm />` in Step 5 (Commercial Terms & Visibility) and added summary row to Step 6 Review card. Wired persistence to `handleSaveDraft` and `onSubmit` with localStorage recovery. Updated `getBuyerRequirementDetailAction` and `<DetailTermsGrid />` to display mandatory fulfillment gates on requirement detail pages (`/buyer/requirements/[id]`).
+  - **Strict Guardrails Enforced:** Zero free-text document types, zero middleware modifications, 100% mobile-first 360px viewport compliance (`break-words max-w-full`).
+- **Micro-Sprint 34.4 (Quality/Document Integration & Sprint 34 Audit):** `COMPLETED` ✅
+  - **Detail View Integration (`src/server/actions/buyer-requirement-actions.ts` & `src/components/buyer/requirements/detail-terms-grid.tsx`):** `getBuyerRequirementDetailAction` fetches associated `requirement_quality_specs` (joined with `master_quality_parameters`) and `requirement_documents`. In `<DetailTermsGrid />`, replaced placeholders with live mathematical quality limits (target value, permissible range, e.g. "Moisture: 12% Max") and mandatory document fulfillment gates with contractual lock notices. Enforced strict 360px mobile viewport compliance (`flex-col` stacking, `break-words`).
+  - **Read-Only Architectural Health Check:**
+    1. Validation Guard (34.2): Verified `saveRequirementQualitySpecsAction` strictly validates the Buyer's target values against global `master_quality_parameters` limits.
+    2. Document Guard (34.3): Verified `saveRequirementDocumentsAction` uses an atomic `db.transaction()` to delete and recreate mandatory document lists, with `ON DELETE cascade` present in both Drizzle schema and PostgreSQL migration.
+    3. Mobile Constraints: Confirmed all quality decimal inputs (`min-h-[48px] h-12`) and document checkboxes (`min-h-[48px]`) enforce the Tier-2 touch target rule.
+  - **Sprint 34 Result:** Buyer Quality and Document engines are fully operational. Buyers can now enforce mathematical quality bounds and mandate legal fulfillment documents.
+- **Next Up:** Sprint 35 (Broker Proposals).
 
 ---
 

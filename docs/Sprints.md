@@ -260,10 +260,20 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 		- [x] __33.5 — Requirement Detail & Partial Fulfillment View:__ Built `getBuyerRequirementDetailAction()` with partial fulfillment math (`originalQuantity`, `bookedQuantity`, `remainingQuantity`, `progressPercentage`). Built `<DetailFulfillmentCard />` displaying progress bar and explicit 3-column math grid, `<DetailTermsGrid />`, and dynamic route `/buyer/requirements/[id]`.
 	- __Technical Deliverables:__ `src/components/buyer/requirements/requirement-wizard.tsx`, `src/components/buyer/requirements/buyer-requirements-feed.tsx`, `src/components/buyer/requirements/requirement-card.tsx`, `src/components/buyer/requirements/detail-fulfillment-card.tsx`, `src/server/actions/buyer-requirement-actions.ts`, `app/(buyer)/buyer/requirements/page.tsx`, `app/(buyer)/buyer/requirements/[id]/page.tsx`, and verified `npx tsc --noEmit` pass (0 errors).
 
+- __Sprint 34: Quality Requirements & Documents__ (COMPLETED ✅)
+	- __Goal:__ Build commodity-specific parameters, grade-specific baseline limits, dynamic master-driven quality specifications, supporting fulfillment documents checklist, server-side mathematical validation, and detail view integration.
+	- __Key Tasks:__
+		- [x] __34.1 — Buyer Quality Parameter Master Integration:__ Built `getCommodityQualityParametersAction` querying `master_quality_parameters` without table modification, sorting by `master_grades.parameters` baseline limits. Built `<QualityParametersForm />` with Tier-2 thumb usability (`min-h-[48px] h-12` inputs, `inputMode="decimal"`).
+		- [x] __34.2 — Buyer Quality Parameter Validation & Storage:__ Implemented dynamic Zod validation factory `createDynamicQualitySchema`, real-time UI range indicators (`Allowed: X – Y %`), form submission guard, and `saveRequirementQualitySpecsAction` with server-side bounds re-verification and atomic `db.transaction()` updating `requirement_quality_specs`. Generated migration `0032_add_requirement_quality_specs.sql`.
+		- [x] __34.3 — Buyer Document Requirements Checklist:__ Defined `requirement_documents` table with `ON DELETE cascade` (migration `0033_add_requirement_documents_table.sql`). Built `saveRequirementDocumentsAction` and `getRequirementDocumentsAction` with atomic transaction. Built `<DocumentChecklistForm />` with standardized industry fulfillment documents (COA, Lorry Receipt, Weighbridge Slip, GST Invoice, Phytosanitary Certificate) and `min-h-[48px]` touch targets.
+		- [x] __34.4 — Quality/Document Integration & Sprint 34 Audit:__ Integrated quality specs and document checklist into `<RequirementWizard />` (Steps 5 and 6) and `<DetailTermsGrid />` (`/buyer/requirements/[id]`). Verified validation guards, document guards with `ON DELETE cascade`, and 360px mobile responsiveness. Passed `npx tsc --noEmit` with 0 errors.
+	- __Technical Deliverables:__ `src/types/requirement-document-types.ts`, `src/lib/validations/buyer-quality-schema.ts`, `src/components/buyer/requirements/quality-parameters-form.tsx`, `src/components/buyer/requirements/document-checklist-form.tsx`, `src/server/actions/buyer-quality-actions.ts`, `src/server/actions/buyer-document-actions.ts`, `src/components/buyer/requirements/detail-terms-grid.tsx`, `supabase/migrations/0032_add_requirement_quality_specs.sql`, `supabase/migrations/0033_add_requirement_documents_table.sql`, and verified `npx tsc --noEmit` pass (0 errors).
+
 ---
 
-### 🚀 **Global Platform Status: SPRINT 33 COMPLETED | ADVANCING TO SPRINT 34**
-Sprint 33 (Requirements: Create & Manage) is 100% complete, manually verified, and audited. The platform is ready to begin **Sprint 34: Quality Requirements & Documents**.
+### 🚀 **Global Platform Status: SPRINT 34 COMPLETED | ADVANCING TO SPRINT 35 (BROKER PROPOSALS)**
+Sprint 34 (Quality Requirements & Documents) is 100% complete, verified, and audited. The Buyer Quality and Document engines are fully operational. Buyers can enforce mathematical quality bounds and mandate legal fulfillment documents. The platform is ready to advance to **Sprint 35: Broker Proposals**.
+
 
 
 

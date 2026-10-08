@@ -133,6 +133,25 @@ export const requirements = pgTable('requirements', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const requirementQualitySpecs = pgTable('requirement_quality_specs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requirementId: uuid('requirement_id').references(() => requirements.id, { onDelete: 'cascade' }).notNull(),
+  parameterId: uuid('parameter_id').references(() => masterQualityParameters.id).notNull(),
+  targetValue: numeric('target_value').notNull(),
+  tolerance: numeric('tolerance'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const requirementDocuments = pgTable('requirement_documents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requirementId: uuid('requirement_id').references(() => requirements.id, { onDelete: 'cascade' }).notNull(),
+  documentType: text('document_type').notNull(),
+  isMandatory: boolean('is_mandatory').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const availabilities = pgTable('availabilities', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id').references(() => companies.id).notNull(),
