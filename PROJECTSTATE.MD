@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 7: Buyer Workspace Shell & Enterprise Buyer Capabilities (Sprints 31–40)**  
-Global Platform Status: **SPRINT 34 COMPLETED — ADVANCING TO SPRINT 35: BROKER PROPOSALS 🚀**  
-Status: **Sprint 34 Completed** ✅ (Next: Sprint 35: Broker Proposals & Negotiation Engine)
+Global Platform Status: **SPRINT 35 COMPLETED — ADVANCING TO SPRINT 36: BUYER ↔ BROKER NEGOTIATION 🚀**  
+Status: **Sprint 35 Completed** ✅ (Next: Sprint 36: Buyer ↔ Broker Negotiation)
 
 
 
@@ -675,6 +675,24 @@ Status: **Sprint 34 Completed** ✅ (Next: Sprint 35: Broker Proposals & Negotia
     3. Mobile Constraints: Confirmed all quality decimal inputs (`min-h-[48px] h-12`) and document checkboxes (`min-h-[48px]`) enforce the Tier-2 touch target rule.
   - **Sprint 34 Result:** Buyer Quality and Document engines are fully operational. Buyers can now enforce mathematical quality bounds and mandate legal fulfillment documents.
 - **Next Up:** Sprint 35 (Broker Proposals).
+
+---
+
+### 🟢 Sprint 35: Broker Proposals (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Build Buyer Proposal Inbox, Proposal Detail View with Commercial Breakdown, Immutable Version History & Ledger, and Response Actions (Accept, Counter, Reject) with Optimistic Concurrency Guard and automated 48-hour UI auto-clean timer.
+- **Deliverables:**
+  - [x] **Micro-Sprint 35.1 — Buyer Proposal Inbox & Feed:** Built `getBuyerProposalsInboxAction` in `src/server/actions/buyer-proposal-actions.ts` with multi-tenant company isolation, zero Seller PII exposure, tabbed status filters (All, New, Countered, Pending, Accepted, Expired & Rejected), 48-hour auto-clean timer filter for declined proposals, and mobile-first `<ProposalCard />`.
+  - [x] **Micro-Sprint 35.2 — Buyer Proposal Detail View & Commercial Terms:** Built `getBuyerProposalDetailAction` with net landed rate breakdown (brokerage, loading/handling, transit escrow), delivery logistics, mandatory lab specs, payment terms, and sticky `<ProposalActionBar />`. Deployed `/buyer/proposals/[id]/page.tsx`.
+  - [x] **Micro-Sprint 35.3 — Buyer Proposal Versions & Historical Ledger:** Built `getBuyerProposalVersionsAction` enforcing read-only deal version immutability, predecessor synthesizer, and `<ProposalVersionTimeline />` paired with `<VersionComparisonCard />` for visual delta tracking across negotiation rounds.
+  - [x] **Micro-Sprint 35.4 — Buyer Proposal Actions (Accept, Counter, Reject) & Concurrency Guard:** Built `acceptBuyerProposalAction`, `counterBuyerProposalAction`, and `rejectBuyerProposalAction` with optimistic version locking (`STALE_VERSION_DETECTED`), atomic `db.transaction()` mutations, immutable `negotiation_events` auditing (`actor_role = 'buyer'`), and 48-hour UI retention countdown badges.
+  - [x] **Micro-Sprint 35.5 — Sprint 35 Final Acceptance Gate, Security Audit & Documentation:** Conducted read-only DevSecOps privacy audit, tenant and channel isolation verification, state machine concurrency check, 360px viewport compliance, and 48px touch target validation completed with 0 errors (`npx tsc --noEmit`).
+- **Status & Verification:**
+  - **Buyer Proposal Workflow:** 100% operational across Inbox feed, commercial terms card, immutable versioning engine, optimistic locking, and response actions.
+  - **Complete Seller Anonymity & Privacy Firewall:** Guaranteed 100% scrubbing of Seller contact info (phone, email, WhatsApp), warehouse physical addresses, and confidential minimum prices. Zero Seller PII leakage across all API and UI channels.
+  - **Strict Channel Isolation:** All Buyer actions (Accept, Counter-Offer, Reject) route exclusively through the assigned Broker desk; zero direct Seller queries, updates, or notifications are dispatched.
+  - **48-Hour UI Retention:** Auto-clean timer excludes declined proposals older than 48 hours to keep the UI clean, while displaying real-time countdown chips for active declined offers.
+  - **TypeScript Integrity:** Passed `npx tsc --noEmit` with 0 errors. Enforced zero horizontal scroll on 360px viewports. Sprint 35 is 100% complete and verified. Moving to Sprint 36 (Buyer ↔ Broker Negotiation).
 
 ---
 

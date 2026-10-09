@@ -271,8 +271,20 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 
 ---
 
-### 🚀 **Global Platform Status: SPRINT 34 COMPLETED | ADVANCING TO SPRINT 35 (BROKER PROPOSALS)**
-Sprint 34 (Quality Requirements & Documents) is 100% complete, verified, and audited. The Buyer Quality and Document engines are fully operational. Buyers can enforce mathematical quality bounds and mandate legal fulfillment documents. The platform is ready to advance to **Sprint 35: Broker Proposals**.
+- __Sprint 35: Broker Proposals__ (COMPLETED ✅)
+	- __Goal:__ Build Buyer Proposal Inbox, Proposal Detail View with Commercial Breakdown, Immutable Version History & Ledger, and Action Triad (Accept, Counter-Offer, Reject) with Optimistic Concurrency Locking and automated 48-hour UI auto-clean timer.
+	- __Key Tasks:__
+		- [x] __35.1 — Buyer Proposal Inbox & Feed:__ Built `getBuyerProposalsInboxAction` with multi-tenant company isolation, zero Seller PII exposure, tabbed proposal categorization (All, New, Countered, Pending, Accepted, Expired & Rejected), 48-hour auto-clean filter for declined proposals, and mobile-first `<ProposalCard />`.
+		- [x] __35.2 — Buyer Proposal Detail View & Commercial Terms:__ Built `getBuyerProposalDetailAction` with net landed rate breakdown (applicable brokerage, loading/handling, transit escrow charges), delivery logistics, mandatory lab specifications, payment terms, and sticky `<ProposalActionBar />`.
+		- [x] __35.3 — Buyer Proposal Versions & Historical Ledger:__ Built `getBuyerProposalVersionsAction` enforcing read-only deal version immutability, predecessor version synthesizer, and `<ProposalVersionTimeline />` paired with `<VersionComparisonCard />` for side-by-side commercial delta tracking.
+		- [x] __35.4 — Buyer Proposal Actions (Accept, Counter, Reject) & Concurrency Guard:__ Built `acceptBuyerProposalAction`, `counterBuyerProposalAction`, and `rejectBuyerProposalAction` with optimistic locking (`STALE_VERSION_DETECTED`), atomic `db.transaction()` mutations, immutable `negotiation_events` auditing (`actor_role = 'buyer'`), and 48-hour UI retention badge.
+		- [x] __35.5 — Sprint 35 Final Acceptance Gate, Security Audit & Documentation:__ Read-only DevSecOps privacy audit, tenant and channel isolation verification, optimistic concurrency check, 360px viewport compliance, and 48px touch target validation completed with 0 errors (`npx tsc --noEmit`).
+	- __Technical Deliverables:__ `src/types/buyer-proposal.ts`, `src/server/actions/buyer-proposal-actions.ts`, `app/(buyer)/buyer/proposals/page.tsx`, `app/(buyer)/buyer/proposals/[id]/page.tsx`, `src/components/buyer/proposals/*`, and verified `npx tsc --noEmit` pass (0 errors).
+
+---
+
+### 🚀 **Global Platform Status: SPRINT 35 COMPLETED | ADVANCING TO SPRINT 36 (BUYER ↔ BROKER NEGOTIATION)**
+Sprint 35 (Broker Proposals) is 100% complete, verified, and audited. The Buyer Proposal workflow is fully functional (Inbox feed, commercial breakdown, version immutability, optimistic locking, and response actions). The platform is ready to advance to **Sprint 36: Buyer ↔ Broker Negotiation**.
 
 
 

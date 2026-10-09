@@ -563,6 +563,29 @@ The Buyer Requirement module (`/buyer/requirements`) extends the basic Sprint 5 
 - **Partial Fulfillment Visualizer Math (`detail-fulfillment-card.tsx`)**:
   - Detail view (`/buyer/requirements/[id]`) explicitly visualizes original target quantity, confirmed booked quantity, remaining unfulfilled quantity, and progress percentage.
 
+### 34. Buyer Proposal Engine, Dual-Channel Privacy Firewall & Immutable Versioning (Sprint 35)
+The Buyer Proposal module (`/buyer/proposals` and `/buyer/proposals/[id]`) implements a secure commercial review and response lifecycle mediated exclusively by the Broker desk:
+- **Append-Only Versioning Pattern for Buyer Counter-Offers**:
+  - Historical commercial versions in `deal_versions` remain strictly immutable and read-only.
+  - When a Buyer submits a counter-offer (`counterBuyerProposalAction`), the current active version is atomically updated to `status = 'Superseded'`, while an append-only new record is inserted with `version_number = expectedVersionNumber + 1`, `status = 'Countered'`, and a frozen `snapshot_payload` containing the adjusted terms.
+  - Historical payloads are never mutated, overwritten, or deleted, preserving an audit-grade commercial negotiation ledger.
+- **State-Machine Transition Sequence**:
+  - Opening proposal state: `Proposed` (mapped to `New` in Buyer UI).
+  - Transition triad: `Proposed` → `Countered` | `Accepted` | `Rejected`.
+  - **Acceptance Gate (`acceptBuyerProposalAction`)**: Transitions deal, quotation, requirement, and latest version to `Accepted` within an atomic `db.transaction()`, creating an immutable audit record in `negotiation_events` (`action_type = 'BUYER_ACCEPTED'`, `actor_role = 'buyer'`).
+  - **Counter Flow (`counterBuyerProposalAction`)**: Records `BUYER_COUNTERED` in `negotiation_events`, increments the version number, and updates the parent quotation and deal to `Countered`.
+  - **Rejection Flow (`rejectBuyerProposalAction`)**: Marks proposal as `Rejected`, records structured rejection reasons and notes in `negotiation_events` (`BUYER_REJECTED`), and triggers terminal state locking on action buttons.
+- **Dual-Channel Privacy Firewall & Seller Anonymity**:
+  - `getBuyerProposalsInboxAction`, `getBuyerProposalDetailAction`, and `getBuyerProposalVersionsAction` scrub all Seller PII using `sanitizePayloadForBuyer()`.
+  - Seller phone numbers, emails, WhatsApp identifiers, company names, physical warehouse addresses, and confidential minimum prices are mathematically purged before returning data to the client.
+  - The Buyer channel communicates strictly with the Broker desk; no direct Seller queries, updates, or notifications are allowed.
+- **Optimistic Concurrency Control (Version Guards)**:
+  - All proposal mutation actions mandate `expectedVersionNumber`.
+  - If the database version exceeds `expectedVersionNumber`, actions abort with `STALE_VERSION_DETECTED` to prevent acting on superseded terms.
+- **48-Hour UI Retention Auto-Clean Filter**:
+  - Rejected proposals remain visible in the inbox for 48 hours displaying an informational `Auto-cleans in [X]h` countdown badge.
+  - Queries automatically exclude proposals rejected more than 48 hours ago (`REJECTED_PROPOSAL_RETENTION_MS`), cleaning the workspace without deleting underlying records.
+
 
 
 
