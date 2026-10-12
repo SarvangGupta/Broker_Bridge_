@@ -190,6 +190,13 @@
       "when": 1791469450821,
       "tag": "0033_add_requirement_documents_table",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791780000000,
+      "tag": "0034_enforce_negotiation_immutability",
+      "breakpoints": true
     }
   ]
 }

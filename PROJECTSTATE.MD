@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 7: Buyer Workspace Shell & Enterprise Buyer Capabilities (Sprints 31–40)**  
-Global Platform Status: **SPRINT 35 COMPLETED — ADVANCING TO SPRINT 36: BUYER ↔ BROKER NEGOTIATION 🚀**  
-Status: **Sprint 35 Completed** ✅ (Next: Sprint 36: Buyer ↔ Broker Negotiation)
+Global Platform Status: **SPRINT 36 COMPLETED — ADVANCING TO SPRINT 37: FINAL DEAL & BUYER CONFIRMATION 🚀**  
+Status: **Sprint 36 Completed** ✅ (Next: Sprint 37: Final Deal & Buyer Confirmation)
 
 
 
@@ -693,6 +693,24 @@ Status: **Sprint 35 Completed** ✅ (Next: Sprint 36: Buyer ↔ Broker Negotiati
   - **Strict Channel Isolation:** All Buyer actions (Accept, Counter-Offer, Reject) route exclusively through the assigned Broker desk; zero direct Seller queries, updates, or notifications are dispatched.
   - **48-Hour UI Retention:** Auto-clean timer excludes declined proposals older than 48 hours to keep the UI clean, while displaying real-time countdown chips for active declined offers.
   - **TypeScript Integrity:** Passed `npx tsc --noEmit` with 0 errors. Enforced zero horizontal scroll on 360px viewports. Sprint 35 is 100% complete and verified. Moving to Sprint 36 (Buyer ↔ Broker Negotiation).
+
+---
+
+### 🟢 Sprint 36: Buyer ↔ Broker Negotiation (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Build strictly isolated Buyer ↔ Broker Negotiation Channel, chronological negotiation timeline, counter-offer form with optimistic version locking, backend PostgreSQL immutability triggers, and 6-state negotiation lifecycle engine.
+- **Deliverables:**
+  - [x] **Micro-Sprint 36.1 — Buyer-Broker Negotiation Channel:** Built `src/server/utils/buyer-privacy-scrubber.ts` with mathematical Seller PII firewall (`sanitizeBuyerNegotiationPayload`, `filterBuyerNegotiationEvents`, `isBuyerPermittedNegotiationEvent`). Built `submitBuyerCounterOfferAction` and `getBuyerNegotiationChannelAction` in `src/server/actions/buyer-negotiation-actions.ts`. Created `<NegotiationChannel />` container in `src/components/buyer/proposals/negotiation-channel.tsx` with deep-linking (`?tab=negotiation`) from proposal detail view.
+  - [x] **Micro-Sprint 36.2 — Chronological Negotiation Timeline:** Built `getBuyerNegotiationTimelineAction` returning strictly filtered Buyer/Broker event stream ordered by `created_at ASC`. Built `<NegotiationTimeline />` in `src/components/buyer/proposals/negotiation-timeline.tsx` with Ocean Blue (`#0284C7`) Buyer dots, Slate Broker dots, loading skeletons, and terms delta summaries.
+  - [x] **Micro-Sprint 36.3 — Buyer Counter Offer Engine:** Created Zod schema `buyerCounterOfferSchema` in `src/lib/validations/buyer-negotiation-schema.ts`. Built mobile-first `<CounterOfferForm />` in `src/components/buyer/proposals/counter-offer-form.tsx` featuring pre-filled commercial terms, numeric inputs, date picker, select dropdowns, character counter, live delta preview card, `STALE_VERSION_DETECTED` conflict alert with 1-click refresh, and `min-h-[48px]` touch targets.
+  - [x] **Micro-Sprint 36.4 — Immutable Negotiation History & Append-Only Engine:** Authored PostgreSQL migration `supabase/migrations/0034_enforce_negotiation_immutability.sql` establishing database triggers `prevent_negotiation_events_mutation()` (blocking UPDATE/DELETE on `negotiation_events`) and `prevent_deal_version_snapshot_tampering()` (blocking DELETE and snapshot/version tampering on `deal_versions`, permitting only status transitions). Enforced atomic transaction wrapper in `submitBuyerCounterOfferAction`. Synchronized Drizzle `meta/_journal.json`. Created automated integration test suite in `src/server/tests/verify-negotiation-immutability.ts`.
+  - [x] **Micro-Sprint 36.5 — Negotiation States & Sprint 36 Acceptance Gate:** Exported `deriveNegotiationState` with 6-state lifecycle ('Open', 'Waiting for Broker', 'Waiting for Buyer', 'Agreed', 'Closed', 'Expired'). Enforced server-side Mutation Guard throwing `INVALID_NEGOTIATION_STATE` if counter offer submitted in locked states. Enhanced `<NegotiationChannel />` with semantic state indicator badges (Blue, Amber, Emerald, Red, Slate) and dynamic UI locks (hiding `<CounterOfferForm>` when waiting for broker or in terminal states).
+- **Status & Verification:**
+  - **Zero Seller PII Leakage:** Guaranteed complete isolation between Buyer and Seller negotiations. All events and snapshots expose only Broker and Buyer personas.
+  - **Database-Level Immutability:** Permanent legal records defended by PostgreSQL triggers. 0 updates or deletes permitted on historical negotiation communications.
+  - **Optimistic Concurrency Guard:** Stale version attempts return `STALE_VERSION_DETECTED` and immediately roll back the database transaction.
+  - **Compilation & Validation:** Passed `npx tsc --noEmit` with **0 errors**. All interactive touch targets enforce `min-h-[48px]` for 360px mobile viewports.
+  - **Roadmap Advance:** Sprint 36 is 100% complete and verified. Advancing to **Sprint 37: Final Deal & Buyer Confirmation**.
 
 ---
 
