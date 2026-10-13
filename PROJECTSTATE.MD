@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 7: Buyer Workspace Shell & Enterprise Buyer Capabilities (Sprints 31–40)**  
-Global Platform Status: **SPRINT 37 COMPLETED ✅ — ADVANCING TO SPRINT 38 (ORDERS, BOOKING & DELIVERY)**  
-Status: **Sprint 37 Completed** (Buyer Final Deal Confirmation flow, Visual Diff engine, and server-side signature capture are 100% operational)
+Global Platform Status: **SPRINT 38 COMPLETED ✅ — ADVANCING TO SPRINT 39 (QUALITY, DOCUMENTS, PAYMENTS & DISPUTES)**  
+Status: **Sprint 38 Completed ✅** (Buyer Order Hub, Dispatch Tracking Engine, and Partial Fulfillment Visualizer are 100% Operational)
 
 
 
@@ -746,6 +746,53 @@ Status: **Sprint 37 Completed** (Buyer Final Deal Confirmation flow, Visual Diff
   - **Visual Diff Engine:** 100% operational.
   - **Server-Side Digital Signature Capture:** 100% operational.
 - **Next Up:** Sprint 38: Orders, Booking & Delivery.
+
+---
+
+### 🟢 Sprint 38: Orders, Booking & Delivery (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Surface locked Booking IDs, order overview, dispatch lifecycle, delivery information, and partial fulfillment math to the Buyer.
+- **Deliverables:**
+  - [x] **Micro-Sprint 38.1 — Buyer Booking Visibility Engine:**
+    - Built `getBuyerBookingVisibilityAction(bookingId)` in `src/server/actions/buyer-order-actions.ts` with strict `BUYER_ADMIN` auth via `verifyBuyerSession()` and multi-tenant isolation (`deal.buyerId === companyId` or `requirement.companyId === companyId`).
+    - Enforced Read-Only Guardrail: Buyer strictly tracks order; zero mutation or booking creation permissions.
+    - Built fallback handling: Correctly identifies unfinalized deals and surfaces `Awaiting Broker Finalization` status until the Broker mints the physical Booking ID.
+    - Built premium mobile-first `<BookingVisibilityCard />` in `src/components/buyer/orders/booking-visibility-card.tsx` rendering prominent Ocean Blue (`#0284C7`) Booking ID, 1-click copy button, semantic status badges, and 4-column compact summary grid (Deal Reference, Matched Commodity & Grade, Locked Final Quantity, Total Contract Value).
+    - Scaffolded dynamic order detail page at `app/(buyer)/buyer/orders/[id]/page.tsx` with sticky navigation header, back button, and 360px viewport compliance (`w-full max-w-full overflow-x-hidden`).
+    - Authored automated test suite `src/server/tests/verify-sprint381-booking-visibility.ts` (15/15 tests passed, 100%).
+  - [x] **Micro-Sprint 38.2 — Buyer "My Orders" Hub:**
+    - Built `getBuyerOrdersListAction(filters)` in `src/server/actions/buyer-order-actions.ts` with strict session auth (`verifyBuyerSession`), tenant isolation (`deals.buyerId === buyerCompanyId` / `requirements.companyId === buyerCompanyId`), master data joins (`masterCommodities`, `masterGrades`, `masterUnits`), and ordering by `createdAt` descending.
+    - Built mobile-first Shadcn `<OrderSummaryCard />` in `src/components/buyer/orders/order-summary-card.tsx` rendering Ocean Blue (`#0284C7`) Booking ID, status badges (`In Transit`, `Dispatch Planned`, `Delivered`, `Booked`), Commodity & Grade, Agreed Volume, Total Contract Value, Delivery Location, Booked Date, and `min-h-[48px]` "Track Order" button routing to `/buyer/orders/[bookingId]`.
+    - Built `<BuyerOrdersFeed />` in `src/components/buyer/orders/buyer-orders-feed.tsx` with filter tabs (`All Orders`, `In Transit`, `Dispatch Planned`, `Delivered`), search bar, responsive 3-column CSS grid (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`), and empty state handling.
+    - Completely replaced `<SprintPlaceholder>` at `app/(buyer)/buyer/orders/page.tsx` with Async Server Component awaiting `getBuyerOrdersListAction()` and mounting `<BuyerOrdersFeed />`.
+    - Enforced 360px viewport zero-bleed standard (`w-full max-w-full overflow-x-hidden`) and prohibited generic HTML tables.
+    - Authored automated test suite `src/server/tests/verify-sprint382-orders-hub.ts` (15/15 tests passed, 100%).
+    - Passed `npx tsc --noEmit` with **0 errors**.
+  - [x] **Micro-Sprint 38.3 — Buyer Order Detail & Partial Fulfillment UI:**
+    - Upgraded `getBuyerBookingVisibilityAction(bookingId)` in `src/server/actions/buyer-order-actions.ts` to join parent `deals` and root `requirements` to calculate fulfillment math: `originalQuantity`, `bookedQuantity`, `remainingQuantity`, `fulfillmentPercentage`, and structured `fulfillmentMath` block.
+    - Built mobile-first Shadcn `<OrderFulfillmentCard />` in `src/components/buyer/orders/order-fulfillment-card.tsx` rendering Ocean Blue (`#0284C7`) visual progress bar, fulfillment percentage, and 3-column grid displaying exact PRD labels: *Original Quantity*, *Booked Quantity*, and *Remaining Unfulfilled Quantity*.
+    - Built read-only, vertical `<LogisticsTimeline />` component in `src/components/buyer/orders/logistics-timeline.tsx` tracking static dispatch stages (*Booked*, *Dispatch Planned*, *Dispatched*, *Delivered*) with active stage highlighted in Ocean Blue (`#0284C7`) and future stages grayed out.
+    - Upgraded dynamic order detail route at `app/(buyer)/buyer/orders/[id]/page.tsx` mounting `<BookingVisibilityCard />`, `<OrderFulfillmentCard />`, and `<LogisticsTimeline />` within an app-like `max-w-3xl mx-auto p-4 space-y-4` layout.
+    - Enforced 360px viewport zero-bleed standard (`overflow-x-hidden w-full max-w-full`) and strictly read-only tracking.
+    - Authored automated test suite `src/server/tests/verify-sprint383-partial-fulfillment.ts` (21/21 tests passed, 100%).
+    - Passed `npx tsc --noEmit` with **0 errors**.
+  - [x] **Micro-Sprints 38.4 & 38.5 — Buyer Dispatch Tracking & Delivery Logistics:**
+    - Upgraded `getBuyerBookingVisibilityAction(bookingId)` in `src/server/actions/buyer-order-actions.ts` to join `dispatches` and `dispatchDocuments` under strict tenant isolation, returning structured dispatch metrics: Dispatch Date, ETA, Vehicle Number, Transporter Name, Loading Location, Destination, Loaded Quantity, and document references.
+    - Exported `getBuyerDispatchDocumentSignedUrlAction` in `src/server/actions/buyer-order-actions.ts` with path traversal security defense.
+    - Upgraded `<LogisticsTimeline />` in `src/components/buyer/orders/logistics-timeline.tsx` to dynamic 6-state live progression (*Booked* → *Dispatch Planned* → *Dispatched* → *In Transit* → *Delivered* → *Completed*), highlighting past and current stages in Ocean Blue (`#0284C7`), and rendering prominent exception badges for *Delayed*, *Cancelled*, and *Disputed* states.
+    - Built mobile-first Shadcn `<DeliveryDetailsCard />` in `src/components/buyer/orders/delivery-details-card.tsx` rendering assigned vehicle number badge, transporter name, explicit loaded quantity (for partial fulfillment cross-referencing), 2-column transit grid, clean empty state (*Awaiting Dispatch*), and `min-h-[48px]` document viewing buttons for Lorry Receipt (LR) and E-Way Bill.
+    - Mounted all 4 order modules into `app/(buyer)/buyer/orders/[id]/page.tsx` maintaining `max-w-3xl mx-auto p-4 space-y-4` and 360px zero-bleed compliance.
+    - Authored automated test suite `src/server/tests/verify-sprint384-385-dispatch-delivery.ts` (25/25 tests passed, 100%).
+    - Passed `npx tsc --noEmit` with **0 errors**.
+  - [x] **Micro-Sprint 38.6 — Sprint 38 Final Audit & Acceptance Gate:**
+    - **Read-Only Code Health Check Passed:** Verified tenant isolation via `companyId` scoping on all queries, explicit partial fulfillment math calculation and visualization, live 6-state timeline mapping with exception handling, read-only integrity (zero editable inputs in delivery cards), and 360px mobile viewport zero-bleed compliance (`w-full max-w-full overflow-x-hidden`).
+    - **Compilation & Test Pass:** Passed `npx tsc --noEmit` with **0 errors**. Automated test suites passed 100% across all Sprint 38 modules.
+- **Operational Status:**
+  - **Buyer Order Hub:** 100% operational (`/buyer/orders`).
+  - **Dispatch Tracking Engine:** 100% operational (6-state timeline with exception badges).
+  - **Partial Fulfillment Visualizer:** 100% operational (explicit 3-column math and progress bar).
+  - **Read-Only Architectural Boundary:** 100% enforced (Broker/Seller mutate dispatch; Buyer strictly observes).
+- **Next Up:** Sprint 39: Quality, Documents, Payments & Disputes.
 
 ---
 

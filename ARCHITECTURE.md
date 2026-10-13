@@ -628,6 +628,34 @@ Sprint 37 implements the Buyer's Final Deal Review interface, Red/Green Visual D
   - Top-level routes (`/buyer/deals/[id]`, `/buyer/deals/[id]/confirm`) and components enforce `w-full max-w-full overflow-x-hidden`, eliminating horizontal scrolling on 360px mobile viewports.
   - Action buttons in `<FinalConfirmationActions />` and modal dialog footers enforce `min-h-[48px] h-12` thumb-friendly touch targets with `<Loader2 />` double-click prevention via `useTransition`.
 
+### 37. Buyer Orders, Partial Fulfillment Math & Read-Only Dispatch Tracking Architecture (Sprint 38)
+Sprint 38 implements the Buyer Orders Hub, Partial Fulfillment Math Visualizer, Live Logistics State Machine, and Delivery Information UI while establishing a strict read-only boundary for the Buyer persona:
+- **Read-Only Architectural Boundary of Fulfillment Tracking**:
+  - **Mutation Authority**: The physical dispatch lifecycle (`dispatches`, `dispatch_documents`, vehicle assignment, driver details, loading verification, weighbridge certification, and transit document generation) is mutated strictly by the Seller, Transporter, and Broker desks.
+  - **Buyer Observability Boundary**: The Buyer operates strictly in a read-only observability layer. The Buyer does **not** mint Booking IDs, assign vehicles, issue gate passes, or modify transit logistics.
+  - **Zero Editable Controls**: UI components (`<DeliveryDetailsCard />`, `<LogisticsTimeline />`, `<BookingVisibilityCard />`) contain zero `<input>`, `<textarea>`, or `<select>` form elements. Document buttons (LR, E-Way Bill) act exclusively as secure view triggers opening signed URLs in read-only viewers.
+- **Strict Multi-Tenant Isolation & URL Defense (`buyer-order-actions.ts`)**:
+  - `getBuyerOrdersListAction`: Drizzle queries join `bookings`, `deals`, and `requirements` enforcing `or(eq(deals.buyerId, sessionCompanyId), eq(requirements.companyId, sessionCompanyId))`.
+  - `getBuyerBookingVisibilityAction`: Verifies that the resolved deal or requirement belongs strictly to the authenticated `sessionCompanyId`. Unauthorized URL guessing attempts return an explicit access denial (`"Access denied: You do not have permission to view this booking under organization isolation rules"`).
+  - Document access (`getBuyerDispatchDocumentSignedUrlAction`) validates the caller's session and applies directory traversal defenses (`..`, `\`, `\0`) before generating private storage signed URLs.
+- **Partial Fulfillment Math Engine (`order-fulfillment-card.tsx`)**:
+  - Explicitly calculates and visualizes four critical parameters based on the root requirement:
+    1. **Original Quantity**: Total volume requested in the parent requirement.
+    2. **Booked Quantity**: Total locked volume across active bookings/deals for the requirement.
+    3. **Remaining Unfulfilled Quantity**: `Math.max(0, originalQuantity - bookedQuantity)` available for subsequent tranches.
+    4. **Fulfillment Ratio**: `(bookedQuantity / originalQuantity) * 100` visualized with an Ocean Blue (`#0284C7`) progress bar.
+  - Presented in a clean 3-column grid adhering to exact PRD labeling and financial-grade number formatting (`en-IN`).
+- **Live Logistics State Machine & Exception Handling (`logistics-timeline.tsx`)**:
+  - Canonical 6-state progression: `Booked` → `Dispatch Planned` → `Dispatched` → `In Transit` → `Delivered` → `Completed`.
+  - Stages before and including the active status render in Ocean Blue (`#0284C7`); future stages remain slate gray.
+  - Real-time exception state handler (`getExceptionState`) evaluates `Delayed`, `Cancelled`, and `Disputed` statuses, rendering prominent amber/red exception alert banners and warning badges in the card header.
+  - Gracefully surfaces `Awaiting Broker Finalization` if commercial terms are confirmed but physical booking has not yet been minted by the broker desk.
+- **Mobile-First Layout & 360px Viewport Constraints**:
+  - Strict layout containment: Page containers enforce `w-full max-w-full overflow-x-hidden`.
+  - 3-column math grid uses an `overflow-x-auto min-w-[280px]` wrapper to eliminate horizontal page scroll on small 360px screens.
+  - Interactive touch targets across back buttons, order cards, and transit document viewers strictly enforce `min-h-[48px]` for Tier-2 mobile usability.
+
+
 
 
 

@@ -306,8 +306,31 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 
 ---
 
-### 🚀 **Global Platform Status: SPRINT 37 COMPLETED | ADVANCING TO SPRINT 38 (ORDERS, BOOKING & DELIVERY)**
-Sprint 37 (Final Deal & Buyer Confirmation) is 100% complete, verified, and audited. The Buyer Final Deal Review interface, Visual Diff engine, and server-side digital signature capture are fully operational. The platform is ready to advance to **Sprint 38: Orders, Booking & Delivery**.
+- __Sprint 38: Orders, Booking & Delivery__ (COMPLETED ✅)
+	- __Goal:__ Surface locked Booking IDs, order overview, dispatch lifecycle, delivery information, and partial fulfillment math to the Buyer.
+	- __Key Tasks:__
+		- [x] __38.1 — Buyer Booking Visibility Engine:__ Built `getBuyerBookingVisibilityAction(bookingId)` in `src/server/actions/buyer-order-actions.ts` with strict session auth (`verifyBuyerSession`), multi-tenant isolation, read-only guardrails, and graceful pending handling (`Awaiting Broker Finalization`). Built `<BookingVisibilityCard />` in `src/components/buyer/orders/booking-visibility-card.tsx` with Ocean Blue (`#0284C7`) Booking ID, 1-click copy, and status badges. Scaffolded order detail page at `app/(buyer)/buyer/orders/[id]/page.tsx`. Verified 15/15 tests in `verify-sprint381-booking-visibility.ts`.
+		- [x] __38.2 — Buyer "My Orders" Hub:__ Built `getBuyerOrdersListAction(filters)` in `src/server/actions/buyer-order-actions.ts` with strict tenant isolation (`deals.buyerId === buyerCompanyId` / `requirements.companyId === buyerCompanyId`), master data joins, and descending chronological order. Built mobile-first `<OrderSummaryCard />` in `src/components/buyer/orders/order-summary-card.tsx` with Ocean Blue (`#0284C7`) Booking ID, status badges, Commodity & Grade, Agreed Volume, Contract Value, Delivery Location, and `min-h-[48px]` "Track Order" button. Built `<BuyerOrdersFeed />` in `src/components/buyer/orders/buyer-orders-feed.tsx` with filter tabs, search bar, 3-column CSS grid (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`), and empty state. Completely replaced `<SprintPlaceholder>` at `app/(buyer)/buyer/orders/page.tsx`. Verified 15/15 tests in `verify-sprint382-orders-hub.ts`.
+		- [x] __38.3 — Buyer Order Detail & Partial Fulfillment UI:__ Upgraded `getBuyerBookingVisibilityAction(bookingId)` in `src/server/actions/buyer-order-actions.ts` to calculate fulfillment math: `originalQuantity`, `bookedQuantity`, `remainingQuantity`, `fulfillmentPercentage`, and `fulfillmentMath`. Built Shadcn `<OrderFulfillmentCard />` in `src/components/buyer/orders/order-fulfillment-card.tsx` with Ocean Blue (`#0284C7`) progress bar and 3-column grid (*Original Quantity*, *Booked Quantity*, *Remaining Unfulfilled Quantity*). Built read-only vertical `<LogisticsTimeline />` in `src/components/buyer/orders/logistics-timeline.tsx` with 4 static dispatch stages (*Booked*, *Dispatch Planned*, *Dispatched*, *Delivered*) and active stage highlighted in Ocean Blue. Integrated into `app/(buyer)/buyer/orders/[id]/page.tsx` within `max-w-3xl mx-auto p-4 space-y-4` layout. Verified 21/21 tests in `verify-sprint383-partial-fulfillment.ts`.
+		- [x] __38.4 & 38.5 — Buyer Dispatch Tracking & Delivery Logistics:__ Upgraded `getBuyerBookingVisibilityAction(bookingId)` in `src/server/actions/buyer-order-actions.ts` to join `dispatches` and `dispatchDocuments` under strict tenant isolation, returning structured transit metrics: Dispatch Date, ETA, Vehicle Number, Transporter Name, Loading Location, Destination, Loaded Quantity, and document references. Exported `getBuyerDispatchDocumentSignedUrlAction` with directory traversal defense. Upgraded `<LogisticsTimeline />` to 6-state live machine (*Booked* → *Dispatch Planned* → *Dispatched* → *In Transit* → *Delivered* → *Completed*) with Ocean Blue highlighting and exception badges (*Delayed*, *Cancelled*, *Disputed*). Built mobile-first `<DeliveryDetailsCard />` with vehicle number badge, transporter name, explicit loaded quantity, empty state (*Awaiting Dispatch*), and `min-h-[48px]` document viewing buttons for LR and E-Way Bill. Integrated into `app/(buyer)/buyer/orders/[id]/page.tsx`. Verified 25/25 tests in `verify-sprint384-385-dispatch-delivery.ts`.
+		- [x] __38.6 — Sprint 38 Final Audit & Acceptance Gate:__ Conducted read-only code health check: verified tenant isolation via `companyId` scoping on all queries, explicit partial fulfillment math calculation and visualization, live 6-state timeline mapping with exception handling, read-only integrity (zero editable inputs in delivery cards), and 360px mobile viewport zero-bleed compliance (`w-full max-w-full overflow-x-hidden`). Passed `npx tsc --noEmit` with 0 errors.
+	- __Technical Deliverables:__ `src/types/buyer-order-types.ts`, `src/server/actions/buyer-order-actions.ts`, `src/components/buyer/orders/*`, `app/(buyer)/buyer/orders/page.tsx`, `app/(buyer)/buyer/orders/[id]/page.tsx`, and verified test suites.
+
+---
+
+- __Sprint 39: Quality, Documents, Payments & Disputes__ (READY TO START 📋)
+	- __Goal:__ Provide Buyer visibility into lab test reports, post-deal fulfillment documents, payment milestone tracking, and dispute raising/tracking.
+	- __Key Tasks:__
+		- [ ] __39.1 — Buyer Quality Inspection & Lab Reports:__ Surface verified lab test certificates and inspection results tied to booked lots with zero seller PII leakage.
+		- [ ] __39.2 — Post-Deal Fulfillment Documents Hub:__ Deliver unified document repository for Buyer invoices, weighing slips, and regulatory clearances.
+		- [ ] __39.3 — Payment Milestones & Settlement Tracking:__ Build Buyer payment lifecycle tracking (Advance, Post-Weighment, Final Settlement) with immutable transaction status.
+		- [ ] __39.4 — Buyer Dispute Submission & Escalation Engine:__ Build formal dispute filing interface with quality/weight discrepancy evidence attachments and Broker mediation tracking.
+	- __Technical Deliverables:__ `src/server/actions/buyer-quality-view-actions.ts`, `src/server/actions/buyer-payment-actions.ts`, `src/server/actions/buyer-dispute-actions.ts`, Buyer UI components in `src/components/buyer/*`.
+
+---
+
+### 🚀 **Global Platform Status: SPRINT 38 COMPLETED ✅ — ADVANCING TO SPRINT 39 (QUALITY, DOCUMENTS, PAYMENTS & DISPUTES)**
+Sprint 38 (Orders, Booking & Delivery) is 100% complete, verified, and audited across all micro-sprints (38.1 through 38.5). Zero TypeScript compiler errors (`npx tsc --noEmit`). Codebase is positioned to begin Sprint 39.
 
 
 

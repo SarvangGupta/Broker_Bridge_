@@ -25,7 +25,7 @@ export default async function BuyerLayout({
   const { user, company } = sessionRes.data;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F8FAFC] w-full max-w-full">
+    <div className="fixed inset-0 flex h-dvh overflow-hidden bg-[#F8FAFC] w-full max-w-full">
       {/* Desktop Sidebar (md:flex) */}
       <BuyerSidebar user={user} company={company} />
 
