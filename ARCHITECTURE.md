@@ -586,6 +586,49 @@ The Buyer Proposal module (`/buyer/proposals` and `/buyer/proposals/[id]`) imple
   - Rejected proposals remain visible in the inbox for 48 hours displaying an informational `Auto-cleans in [X]h` countdown badge.
   - Queries automatically exclude proposals rejected more than 48 hours ago (`REJECTED_PROPOSAL_RETENTION_MS`), cleaning the workspace without deleting underlying records.
 
+### 35. Buyer ↔ Broker Negotiation Channel & Database-Level Immutability Engine (Sprint 36)
+The Buyer ↔ Broker Negotiation subsystem establishes a strictly mediated communication channel with zero Seller PII exposure and database-enforced immutability:
+- **Seller PII Scrubbing Firewall (`buyer-privacy-scrubber.ts`)**:
+  - The negotiation stream (`getBuyerNegotiationChannelAction`, `getBuyerNegotiationTimelineAction`) strips all direct Seller identity attributes, warehouse locations, and private price margins.
+  - Buyer interacts exclusively with the Broker desk (`persona: 'Broker Desk'`); counterparty events are normalized to protect marketplace neutrality.
+- **Database-Level Immutability Triggers (Migration `0034_enforce_negotiation_immutability.sql`)**:
+  - `prevent_negotiation_events_mutation()`: Blocks `UPDATE` and `DELETE` operations on `negotiation_events` at the PostgreSQL engine level, guaranteeing tamper-proof negotiation history.
+  - `prevent_deal_version_snapshot_tampering()`: Prohibits `DELETE` and changes to `snapshot_payload` or `version_number` in `deal_versions`, permitting only status transitions (`status = 'Superseded'`, `'Buyer Confirmed'`, etc.).
+- **6-State Negotiation Lifecycle & Dynamic UI Gate (`buyer-negotiation-state.ts`)**:
+  - Mapped canonical states: `Open`, `Waiting for Broker`, `Waiting for Buyer`, `Agreed`, `Closed`, `Expired`.
+  - Mutation guards block counter-offers in non-actionable or terminal states (`INVALID_NEGOTIATION_STATE`).
+  - Mobile-first `<CounterOfferForm />` features optimistic version locking (`STALE_VERSION_DETECTED`) and 1-click timeline refresh.
+
+### 36. Buyer Final Deal Confirmation & Decoupled Booking Gate Architecture (Sprint 37)
+Sprint 37 implements the Buyer's Final Deal Review interface, Red/Green Visual Diff Engine, and formal digital signature capture while strictly enforcing the decoupled booking boundary:
+- **Visual Diff Comparison Engine (`visual-diff-engine.ts`, `final-deal-review.tsx`)**:
+  - Compares the frozen snapshot terms against the predecessor version (`v{n-1}`).
+  - Identifies deltas across Commodity, Grade, Quantity, Net Landed Rate, Delivery Window, Packaging, Payment Terms, and Quality Specifications.
+  - Automatically highlights changes using `<DiffFieldDisplay />`: previous values rendered with red strikethrough (`bg-red-50 text-red-700 line-through`), and agreed new values in bold green (`bg-green-50 text-green-700 font-bold`).
+  - Read-Only Interface: The interface is strictly non-editable, featuring zero input controls for modifying commercial parameters.
+- **Controlled Amendment Workflow (`requestDealAmendmentAction`)**:
+  - When commercial revisions are required, the Buyer cannot directly alter terms. Instead, an amendment request is submitted with mandatory structured feedback (minimum 5 chars).
+  - Transitions the deal state to `Amendment Required` and logs `AMENDMENT_REQUESTED` into `negotiation_events`.
+  - The Broker desk is alerted to revise parameters and generate a new snapshot version, enforcing controlled reconfirmation.
+- **Atomic Confirmation Engine & Optimistic Concurrency Guard (`buyer-deal-actions.ts`)**:
+  - `confirmFinalDealAction` operates inside a Drizzle `db.transaction()` wrapper.
+  - Concurrency Guard: Compares `expectedVersion` against the latest `version_number` in `deal_versions`. If a new version exists, the transaction rolls back with `STALE_VERSION_DETECTED`.
+  - Terminal State Guard: Prevents double-confirmation if the deal is already confirmed or finalized.
+- **Decoupled Architecture & Broker Booking Gate Isolation**:
+  - **Core Architectural Invariant**: Buyer confirmation records mutual commercial agreement and logs an immutable audit event (`action_type: 'BUYER_FINAL_CONFIRMATION'`) in `negotiation_events`.
+  - **No System Booking ID Generated**: Buyer confirmation does **not** generate the system Booking ID or reserve physical warehouse allocation.
+  - The decoupled architecture is strictly maintained: Buyer confirmation unlocks the Broker Finalization Gate, leaving the legal generation of the physical Booking ID exclusively to the authorized human Broker desk upon two-party verification.
+- **5-State Confirmation Lifecycle**:
+  - `Awaiting Buyer Confirmation`: Commercial snapshot frozen, awaiting Buyer review and confirmation.
+  - `Buyer Confirmed`: Buyer digital signature recorded in audit ledger; broker finalization gate unlocked.
+  - `Awaiting Seller Confirmation`: Buyer signed; awaiting counterparty sign-off.
+  - `Confirmed`: Both parties confirmed; final terms locked by Broker desk.
+  - `Amendment Required`: Modifications requested by Buyer; Broker revising parameters.
+- **Tier-2 Mobile Resilience & Touch Standard**:
+  - Top-level routes (`/buyer/deals/[id]`, `/buyer/deals/[id]/confirm`) and components enforce `w-full max-w-full overflow-x-hidden`, eliminating horizontal scrolling on 360px mobile viewports.
+  - Action buttons in `<FinalConfirmationActions />` and modal dialog footers enforce `min-h-[48px] h-12` thumb-friendly touch targets with `<Loader2 />` double-click prevention via `useTransition`.
+
+
 
 
 

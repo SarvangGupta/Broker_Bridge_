@@ -283,8 +283,32 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 
 ---
 
-### 🚀 **Global Platform Status: SPRINT 35 COMPLETED | ADVANCING TO SPRINT 36 (BUYER ↔ BROKER NEGOTIATION)**
-Sprint 35 (Broker Proposals) is 100% complete, verified, and audited. The Buyer Proposal workflow is fully functional (Inbox feed, commercial breakdown, version immutability, optimistic locking, and response actions). The platform is ready to advance to **Sprint 36: Buyer ↔ Broker Negotiation**.
+- __Sprint 36: Buyer ↔ Broker Negotiation__ (COMPLETED ✅)
+	- __Goal:__ Build strictly isolated Buyer ↔ Broker Negotiation Channel, chronological negotiation timeline, counter-offer form with optimistic version locking, backend PostgreSQL immutability triggers, and 6-state negotiation lifecycle engine.
+	- __Key Tasks:__
+		- [x] __36.1 — Buyer-Broker Negotiation Channel:__ Built `src/server/utils/buyer-privacy-scrubber.ts` with mathematical Seller PII firewall (`sanitizeBuyerNegotiationPayload`, `filterBuyerNegotiationEvents`). Built `submitBuyerCounterOfferAction` and `getBuyerNegotiationChannelAction` in `src/server/actions/buyer-negotiation-actions.ts`. Created `<NegotiationChannel />` container in `src/components/buyer/proposals/negotiation-channel.tsx` with deep-linking (`?tab=negotiation`).
+		- [x] __36.2 — Chronological Negotiation Timeline:__ Built `getBuyerNegotiationTimelineAction` returning strictly filtered Buyer/Broker event stream ordered by `created_at ASC`. Built `<NegotiationTimeline />` in `src/components/buyer/proposals/negotiation-timeline.tsx` with Ocean Blue (`#0284C7`) Buyer dots, Slate Broker dots, loading skeletons, and terms delta summaries.
+		- [x] __36.3 — Buyer Counter Offer Engine:__ Created Zod schema `buyerCounterOfferSchema` in `src/lib/validations/buyer-negotiation-schema.ts`. Built mobile-first `<CounterOfferForm />` in `src/components/buyer/proposals/counter-offer-form.tsx` featuring pre-filled commercial terms, numeric inputs, date picker, select dropdowns, character counter, live delta preview card, `STALE_VERSION_DETECTED` conflict alert with 1-click refresh, and `min-h-[48px]` touch targets.
+		- [x] __36.4 — Immutable Negotiation History & Append-Only Engine:__ Authored PostgreSQL migration `supabase/migrations/0034_enforce_negotiation_immutability.sql` establishing database triggers `prevent_negotiation_events_mutation()` and `prevent_deal_version_snapshot_tampering()`. Enforced atomic transaction wrapper in `submitBuyerCounterOfferAction`. Verified automated integration test suite in `src/server/tests/verify-negotiation-immutability.ts`.
+		- [x] __36.5 — Negotiation States & Sprint 36 Acceptance Gate:__ Exported `deriveNegotiationState` with 6-state lifecycle ('Open', 'Waiting for Broker', 'Waiting for Buyer', 'Agreed', 'Closed', 'Expired'). Enforced server-side Mutation Guard throwing `INVALID_NEGOTIATION_STATE` if counter offer submitted in locked states. Enhanced `<NegotiationChannel />` with semantic state indicator badges and dynamic UI locks.
+	- __Technical Deliverables:__ `src/server/actions/buyer-negotiation-actions.ts`, `src/components/buyer/proposals/negotiation-channel.tsx`, `src/components/buyer/proposals/negotiation-timeline.tsx`, `src/components/buyer/proposals/counter-offer-form.tsx`, `supabase/migrations/0034_enforce_negotiation_immutability.sql`, and verified `npx tsc --noEmit` pass (0 errors).
+
+---
+
+- __Sprint 37: Final Deal & Buyer Confirmation__ (COMPLETED ✅)
+	- __Goal:__ Build Buyer Final Deal Review interface, Red/Green Visual Diff Engine, immutable deal snapshots, Buyer confirmation workflow, confirmation protection, and 5-state confirmation lifecycle.
+	- __Key Tasks:__
+		- [x] __37.1 — Buyer Final Deal Review & Visual Diff Engine:__ Built `getFinalDealReviewAction(dealId)` in `src/server/actions/buyer-deal-actions.ts` with strict `BUYER_ADMIN` session auth, tenant isolation, preceding version lookup, and Seller PII firewall (`sanitizeBuyerNegotiationPayload`). Built Visual Diff Engine utility in `src/utils/visual-diff-engine.ts` with `computeDealTermsDiff` detecting deltas across commodity, grade, quantity, price, delivery, and quality limits. Built strictly read-only, mobile-first `<FinalDealReview />` UI component in `src/components/buyer/deals/final-deal-review.tsx` featuring stacked cards and Red/Green diff badges. Deployed route at `/buyer/deals/[id]`.
+		- [x] __37.2 — Buyer Final Confirmation Engine & Audit Logging:__ Built `confirmFinalDealAction(dealId, expectedVersion)` in `src/server/actions/buyer-deal-actions.ts` with `BUYER_ADMIN` session auth, tenant ownership verification, optimistic concurrency guard (`STALE_VERSION_DETECTED`), atomic `db.transaction()` updating `deal_versions` status to 'Buyer Confirmed', updating parent records, and logging immutable audit signature to `negotiation_events` (`actionType: 'BUYER_FINAL_CONFIRMATION'`). Built `requestDealAmendmentAction(dealId, expectedVersion, reason)` updating status to 'Amendment Required' and logging structured feedback. Built `<FinalConfirmationActions />` sticky bar (`min-h-[48px]` touch targets), confirmation dialog, amendment request dialog, and terminal state guards.
+		- [x] __37.3 — Confirmation Protection & Architecture Decoupling:__ Enforced read-only parameters preventing Buyer direct edits to finalized commercial terms; amendments require Broker revision and controlled reconfirmation. Verified decoupling architecture where Buyer confirmation strictly unlocks broker gate without generating booking ID (broker booking responsibility preserved).
+		- [x] __37.4 — Confirmation States & Full Verification:__ Mapped locked 5-state confirmation lifecycle ('Awaiting Buyer Confirmation', 'Buyer Confirmed', 'Awaiting Seller Confirmation', 'Confirmed', 'Amendment Required'). Verified test suites `verify-sprint37-final-deal-review.ts` (19/19 passed) and `verify-sprint372-confirmation-engine.ts` (9/9 passed). Verified 0 compilation errors (`npx tsc --noEmit`).
+	- __Technical Deliverables:__ `src/types/buyer-deal-review.ts`, `src/utils/visual-diff-engine.ts`, `src/server/actions/buyer-deal-actions.ts`, `src/components/buyer/deals/final-deal-review.tsx`, `src/components/buyer/deals/final-confirmation-actions.tsx`, `app/(buyer)/buyer/deals/[id]/page.tsx`, `app/(buyer)/buyer/deals/[id]/confirm/page.tsx`, and verified test suites.
+
+---
+
+### 🚀 **Global Platform Status: SPRINT 37 COMPLETED | ADVANCING TO SPRINT 38 (ORDERS, BOOKING & DELIVERY)**
+Sprint 37 (Final Deal & Buyer Confirmation) is 100% complete, verified, and audited. The Buyer Final Deal Review interface, Visual Diff engine, and server-side digital signature capture are fully operational. The platform is ready to advance to **Sprint 38: Orders, Booking & Delivery**.
+
 
 
 

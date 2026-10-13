@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   Check, 
@@ -13,7 +14,8 @@ import {
   FileCheck2,
   Lock,
   Loader2,
-  Info
+  Info,
+  ArrowRight
 } from 'lucide-react';
 import { BuyerProposalDetail } from '@/src/types/buyer-proposal';
 import { ProposalCounterDrawer } from '@/src/components/buyer/proposals/proposal-counter-drawer';
@@ -112,11 +114,22 @@ export function ProposalActionBar({ proposal, className }: ProposalActionBarProp
           {isTerminal ? (
             <div className="w-full md:w-auto flex items-center gap-3">
               {proposal.status === 'Accepted' ? (
-                <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm font-semibold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>
-                    This proposal was <strong>Accepted</strong> on {formatDate(proposal.updatedAt)}. Awaiting Deal Contract.
-                  </span>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full">
+                  <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm font-semibold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      This proposal was <strong>Accepted</strong> on {formatDate(proposal.updatedAt)}. Commercial snapshot locked.
+                    </span>
+                  </div>
+
+                  <Link
+                    href={`/buyer/deals/${proposal.dealId || proposal.id}/confirm`}
+                    className="inline-flex items-center justify-center min-h-[48px] px-5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] active:bg-[#075985] text-white text-xs sm:text-sm font-bold shadow-xs transition-all shrink-0"
+                  >
+                    <FileCheck2 className="w-4 h-4 mr-2" />
+                    <span>Proceed to Confirmation</span>
+                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                  </Link>
                 </div>
               ) : proposal.status === 'Rejected' ? (
                 <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-rose-50/80 border border-rose-200 text-rose-900 text-xs sm:text-sm font-semibold">

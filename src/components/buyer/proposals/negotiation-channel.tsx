@@ -268,7 +268,7 @@ export function NegotiationChannel({
               </span>
               <button
                 type="button"
-                onClick={() => router.push(`/buyer/proposals/${proposal.id}?tab=confirmation`)}
+                onClick={() => router.push(`/buyer/deals/${proposal.dealId || proposal.id}/confirm`)}
                 className="inline-flex items-center justify-center gap-2 min-h-[48px] px-5 py-2.5 rounded-xl bg-[#059669] hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-xs"
               >
                 <span>Proceed to Confirmation</span>

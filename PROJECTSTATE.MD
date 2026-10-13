@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 7: Buyer Workspace Shell & Enterprise Buyer Capabilities (Sprints 31–40)**  
-Global Platform Status: **SPRINT 36 COMPLETED — ADVANCING TO SPRINT 37: FINAL DEAL & BUYER CONFIRMATION 🚀**  
-Status: **Sprint 36 Completed** ✅ (Next: Sprint 37: Final Deal & Buyer Confirmation)
+Global Platform Status: **SPRINT 37 COMPLETED ✅ — ADVANCING TO SPRINT 38 (ORDERS, BOOKING & DELIVERY)**  
+Status: **Sprint 37 Completed** (Buyer Final Deal Confirmation flow, Visual Diff engine, and server-side signature capture are 100% operational)
 
 
 
@@ -711,6 +711,41 @@ Status: **Sprint 36 Completed** ✅ (Next: Sprint 37: Final Deal & Buyer Confirm
   - **Optimistic Concurrency Guard:** Stale version attempts return `STALE_VERSION_DETECTED` and immediately roll back the database transaction.
   - **Compilation & Validation:** Passed `npx tsc --noEmit` with **0 errors**. All interactive touch targets enforce `min-h-[48px]` for 360px mobile viewports.
   - **Roadmap Advance:** Sprint 36 is 100% complete and verified. Advancing to **Sprint 37: Final Deal & Buyer Confirmation**.
+
+---
+
+### 🟢 Sprint 37: Final Deal & Buyer Confirmation (COMPLETED ✅)
+- **Status:** `COMPLETED` ✅
+- **Goal:** Build Buyer Final Deal Review interface, Red/Green Visual Diff Engine, immutable deal snapshots, Buyer confirmation workflow, confirmation protection, and 5-state confirmation lifecycle.
+- **Deliverables:**
+  - [x] **Micro-Sprint 37.1 — Buyer Final Deal Review & Visual Diff Engine:**
+    - Built `getFinalDealReviewAction(dealId)` in `src/server/actions/buyer-deal-actions.ts` with strict `BUYER_ADMIN` session auth, tenant isolation, preceding version lookup, and Seller PII firewall (`sanitizeBuyerNegotiationPayload`).
+    - Built Visual Diff Engine utility in `src/utils/visual-diff-engine.ts` with `computeDealTermsDiff` comparing current vs previous versions, flagging changes in commodity, grade, quantity, landed rate, payment, delivery window, packaging, freight, and quality limits.
+    - Built strictly read-only, mobile-first `<FinalDealReview />` UI component in `src/components/buyer/deals/final-deal-review.tsx` featuring stacked `<Card>` layouts (Core Commercials, Net Landed Breakdown, Operations & Logistics, Quality Parameters, Broker Governance & Booking Isolation Seal).
+    - Deployed 5-state confirmation state banners (`Awaiting Buyer Confirmation`, `Buyer Confirmed`, `Awaiting Seller Confirmation`, `Confirmed`, `Amendment Required`).
+    - Built dynamic route at `app/(buyer)/buyer/deals/[id]/page.tsx` and wired direct review link from accepted proposals in `<ProposalActionBar />`.
+    - Passed `npx tsc --noEmit` with **0 errors**.
+  - [x] **Micro-Sprint 37.2 — Buyer Final Confirmation Engine & Audit Logging:**
+    - Built `confirmFinalDealAction(dealId, expectedVersion)` in `src/server/actions/buyer-deal-actions.ts` with `BUYER_ADMIN` session auth, tenant ownership verification, optimistic concurrency guard (`STALE_VERSION_DETECTED`), atomic `db.transaction()` updating `deal_versions` status to 'Buyer Confirmed', updating parent `deals` / `quotations`, and logging immutable audit signature to `negotiation_events` (`actionType: 'BUYER_FINAL_CONFIRMATION'`).
+    - Built `requestDealAmendmentAction(dealId, expectedVersion, reason)` updating status to 'Amendment Required' and logging structured feedback reason into `negotiation_events` (`actionType: 'AMENDMENT_REQUESTED'`).
+    - Built mobile-first `'use client'` sticky action bar `<FinalConfirmationActions />` in `src/components/buyer/deals/final-confirmation-actions.tsx` featuring "Confirm Final Deal" (`#0284C7`, `min-h-[48px]`), "Request Amendment" (outline, `min-h-[48px]`), `<Loader2 />` double-click prevention via `useTransition`, confirmation modal, and amendment feedback modal (`Textarea` with 500-char limiter).
+    - Built Terminal State Guards replacing interactive controls with semantic audit banners when status is `'Buyer Confirmed'`, `'Confirmed'`, or `'Amendment Required'`.
+    - Integrated `<FinalConfirmationActions />` into `/buyer/deals/[id]`.
+    - Authored and verified test suite in `src/server/tests/verify-sprint372-confirmation-engine.ts` (9/9 tests passed, 100%).
+    - Enforced booking isolation architecture guardrail (Buyer confirmation unlocks broker gate without generating booking ID).
+    - Passed `npx tsc --noEmit` with **0 errors**.
+  - [x] **Micro-Sprint 37.3 — Sprint 37 Final Audit, Confirmation Protection & Acceptance Gate:**
+    - **Read-Only Code Health Check Passed:** Verified `<FinalDealReview />` strictly displays commercial snapshot terms without editable inputs; verified Red/Green diff engine renders deltas with precision.
+    - **Concurrency & Immutability Verified:** Verified `confirmFinalDealAction` uses atomic `db.transaction()` with strict `expectedVersion` check (`STALE_VERSION_DETECTED`) and appends immutable audit records to `negotiation_events`.
+    - **Architecture Boundary Decoupling:** Confirmed Buyer confirmation exclusively unlocks the broker finalization gate and logs digital signature without generating physical Booking IDs (Broker retains booking responsibility).
+    - **Mobile 360px & Touch Target Compliance:** Verified zero horizontal scroll (`w-full max-w-full overflow-x-hidden`) and `min-h-[48px]` touch targets across all confirmation action controls and modal dialog footers.
+    - **Verification Test Passes:** 100% pass across verification suites `verify-sprint37-final-deal-review.ts` (19/19) and `verify-sprint372-confirmation-engine.ts` (9/9).
+    - Passed `npx tsc --noEmit` with **0 errors**.
+- **Status & Verification:**
+  - **Buyer Final Deal Confirmation Flow:** 100% operational.
+  - **Visual Diff Engine:** 100% operational.
+  - **Server-Side Digital Signature Capture:** 100% operational.
+- **Next Up:** Sprint 38: Orders, Booking & Delivery.
 
 ---
 
