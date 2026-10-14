@@ -318,19 +318,54 @@ __Phase 6: Enterprise Broker Workspace & Mediation Engine (Sprints 21–30)__
 
 ---
 
-- __Sprint 39: Quality, Documents, Payments & Disputes__ (READY TO START 📋)
+- __Sprint 39: Quality, Documents, Payments & Disputes__ (COMPLETED ✅)
 	- __Goal:__ Provide Buyer visibility into lab test reports, post-deal fulfillment documents, payment milestone tracking, and dispute raising/tracking.
 	- __Key Tasks:__
-		- [ ] __39.1 — Buyer Quality Inspection & Lab Reports:__ Surface verified lab test certificates and inspection results tied to booked lots with zero seller PII leakage.
-		- [ ] __39.2 — Post-Deal Fulfillment Documents Hub:__ Deliver unified document repository for Buyer invoices, weighing slips, and regulatory clearances.
-		- [ ] __39.3 — Payment Milestones & Settlement Tracking:__ Build Buyer payment lifecycle tracking (Advance, Post-Weighment, Final Settlement) with immutable transaction status.
-		- [ ] __39.4 — Buyer Dispute Submission & Escalation Engine:__ Build formal dispute filing interface with quality/weight discrepancy evidence attachments and Broker mediation tracking.
-	- __Technical Deliverables:__ `src/server/actions/buyer-quality-view-actions.ts`, `src/server/actions/buyer-payment-actions.ts`, `src/server/actions/buyer-dispute-actions.ts`, Buyer UI components in `src/components/buyer/*`.
+		- [x] __39.1 — Buyer Transaction Quality & Weighment UI (COMPLETED ✅):__ Built `getBuyerTransactionQualityAction(bookingId)` in `src/server/actions/buyer-quality-tracking-actions.ts` with session validation (`verifyBuyerSession`), strict multi-tenant isolation, master data joins (`bookings` -> `deals` -> `quotations` -> `availabilities` -> `labTests` -> `labTestResults` & `masterQualityParameters`, `dispatches` -> `dispatchDocuments`), and comprehensive development mock fallbacks (`BKG-2026-8812`, `BKG-2026-1042`, `BKG-2026-8790`). Built `getBuyerLabReportSignedUrlAction` and `getBuyerWeighmentSlipSignedUrlAction` with 15-minute expiration and path traversal defenses. Built mobile-first `'use client'` Shadcn `<TransactionQualityCard />` in `src/components/buyer/orders/transaction-quality-card.tsx` with two distinct sections: Scientific Quality (Buyer Target Spec vs. Actual Verified Result parameter matrix with variance chips and "View Certificate of Analysis (COA)" button) and Physical Weighment (Gross Weight, Tare Weight, highlighted Net Weight Loaded in MT, and "View Official Weighbridge Slip" button). Mounted `<TransactionQualityCard />` as Module 5 in the detailed Buyer Order view at `app/(buyer)/buyer/orders/[id]/page.tsx`. Enforced strict read-only boundary (disputes deferred to 39.4), privacy scrubber (zero Seller contact info or pricing leaked), and 360px viewport zero-bleed standard (`flex-col`, `min-h-[48px]` touch targets). Authored automated test suite `src/server/tests/verify-sprint391-buyer-quality.ts` (32/32 tests passed, 100%). Passed `npx tsc --noEmit` with 0 errors.
+		- [x] __39.2 — Buyer Transaction Document Vault (COMPLETED ✅):__ Built `getBuyerDocumentMatrixAction(bookingId)` in `src/server/actions/buyer-document-actions.ts` comparing the Buyer's original checklist (`requirement_documents`) against the files the Seller uploaded (`dispatch_documents`) across normalized document types (COA, LR, Weighment Slip, Commercial Invoice, E-Way Bill, Delivery Challan). Enforced strict state calculation: 'Verified' (file verified by Broker), 'Received' (uploaded, pending audit), 'Missing' (required on dispatched/in-transit order without upload), and 'Required' (future milestone prior to loading). Built `getBuyerDocumentSignedUrlAction` generating 15-minute signed URLs with path traversal security defense. Built mobile-first `'use client'` Shadcn `<TransactionDocumentVault />` component in `src/components/buyer/orders/transaction-document-vault.tsx` rendering fulfillment compliance progress bar, micro stat chips, category icons, high-contrast badges (Green, Blue, Amber/Red, Gray), and `min-h-[48px]` "View Document" preview buttons. Mounted `<TransactionDocumentVault />` as Module 6 in `app/(buyer)/buyer/orders/[id]/page.tsx`. Maintained backwards compatibility with Sprint 34 requirement checklist actions. Authored automated test suite `src/server/tests/verify-sprint392-document-vault.ts` (28/28 tests passed, 100%). Passed `npx tsc --noEmit` with 0 errors.
+		- [x] __39.3 — Buyer Payable Ledger & Component Mounting (COMPLETED ✅):__
+			* Built `getBuyerPayableLedgerAction(bookingId?: string)` in `src/server/actions/buyer-payment-actions.ts` with session authentication (`verifyBuyerSession`), multi-tenant isolation, joins across `bookings`, `deals`, `deal_versions` (extracting locked commercial snapshot terms from `snapshotPayload`), `payments`, and `disputes`.
+			* Implemented server-side math engine: `Base Amount = Final Quantity * Locked Base Rate`, `Gross Payable = Base Amount + Buyer Charges/Taxes`, `Total Paid = sum(confirmed payments)`, `Outstanding Balance = Gross Payable - Total Paid`. Evaluated dynamic payment status ('Pending', 'Part Paid', 'Paid', 'Overdue', 'Disputed').
+			* Enforced Nodal Escrow Model and privacy scrubber: stripped all Seller bank details, account numbers, IFSC, and direct seller contact info. Provided designated platform escrow account ('BrokerBridge Trade Settlement Escrow') and booking virtual account references (`BB-NODAL-${bookingReference}`).
+			* Mounted `<TransactionQualityCard />` (39.1) and `<TransactionDocumentVault />` (39.2) in `app/(buyer)/buyer/orders/[id]/page.tsx` sequentially below `<LogisticsTimeline />` in standard `space-y-4` layout.
+			* Built mobile-first `'use client'` Shadcn `<BuyerPaymentCard />` in `src/components/buyer/orders/buyer-payment-card.tsx` rendering three prominent metric blocks (Total Gross Payable, Total Amount Paid in Emerald, Outstanding Balance in Rose/Amber), status badge, contract formula breakdown, 1-click escrow copy button (`min-h-[48px]`), payment history accordion, and responsive `grid-cols-1 sm:grid-cols-3` wrapping to single column on 360px viewports. Mounted directly below Document Vault in order detail view.
+			* Completely deleted `<SprintPlaceholder>` from `app/(buyer)/buyer/more/page.tsx` and converted route to an Async Server Component fetching `getBuyerPayableLedgerAction()`. Built `<GlobalPayablesHub />` in `src/components/buyer/payments/global-payables-hub.tsx` with 4-KPI summary ribbon, filter tabs, search bar, desktop master `<Table>`, mobile card list with 360px zero bleed, and "View Order" links routing to `/buyer/orders/[bookingId]`. Created route alias at `app/(buyer)/buyer/payments/page.tsx`.
+			* Authored automated test suite `src/server/tests/verify-sprint393-payable-ledger.ts` (44/44 tests passed, 100%).
+			* Passed `npx tsc --noEmit` with 0 errors.
+		- [x] __39.4 — Buyer Dispute Submission & Escalation Engine (COMPLETED ✅):__
+			* Built `createBuyerDisputeAction(payload)` in `src/server/actions/buyer-dispute-actions.ts` with strict session authentication (`verifyBuyerSession`), tenant isolation verifying ownership of `booking_id`, strict category validation ('Quality', 'Quantity', 'Delivery', 'Document', 'Payment', 'Commercial', 'Other'), and 50-character minimum description length guard. Inserts new dispute record into `disputes` table with status 'Open' and initiator flagged as 'Buyer' (Sprint 11 schema preserved without modification).
+			* Built `getBuyerActiveDisputesAction()` in `src/server/actions/buyer-dispute-actions.ts` retrieving all disputes for the Buyer's company. Enforced strict privacy scrubber: stripped all internal Broker notes and Seller identities (zero seller names, companies, phones, emails exposed).
+			* Built `uploadBuyerDisputeEvidenceAction(formData)` supporting secure upload of photo/document evidence slips (JPEG, PNG, WEBP, PDF up to 10MB).
+			* Built mobile-first `'use client'` Shadcn `<RaiseDisputeModal />` in `src/components/buyer/orders/raise-dispute-modal.tsx` with Destructive/Red outline trigger button (`border-rose-300 text-rose-700`), strict category select dropdown, description textarea with live character counter, evidence upload dropzone, and `useTransition` to prevent double-submissions.
+			* Mounted `<RaiseDisputeModal />` into `app/(buyer)/buyer/orders/[id]/page.tsx` as Module 8 directly beneath the Payment Card.
+			* Built dedicated Dispute Tracker route at `app/(buyer)/buyer/more/disputes/page.tsx` as an Async Server Component fetching `getBuyerActiveDisputesAction()`.
+			* Built `<BuyerDisputeCard />` and `<BuyerDisputesFeed />` in `src/components/buyer/disputes/` rendering booking reference, category badge, date raised, description, status ('Open', 'Under Broker Review', 'Resolved'), and evidence document links.
+			* STRICT UX RULE: Read-only tracker with ZERO chat box or direct messaging inputs. All disputes mediated strictly by the Broker Desk under neutral platform fiduciary protocols.
+			* Authored automated test suite `src/server/tests/verify-sprint394-buyer-disputes.ts` (38/38 tests passed, 100%).
+			* Passed `npx tsc --noEmit` with 0 errors.
+		- [x] __39.5 — Sprint 39 Final Audit, DevSecOps Scan & Documentation Update (COMPLETED ✅):__
+			* Read-only DevSecOps security and privacy audit completed across all 4 action layers and UI components.
+			* Verified strict tenant isolation (`company_id === sessionCompanyId`, `BUYER_ADMIN`).
+			* Verified Dispute Firewall: strict routing to `disputes` table for Broker mediation with mathematical zero direct Buyer-Seller chat or identity leakage.
+			* Verified Server-Side Math Engine in `buyer-payment-actions.ts`: pre-calculated Gross Payable, Total Paid, and Outstanding Balance returned as read-only values preventing client DOM/F12 manipulation.
+			* Verified Document Vault Security: 15-minute signed URLs with path traversal defense (`..`, `\`, `\0`) scoped exclusively to authorized `booking_id`.
+			* Verified Mobile Resilience: 360px viewport zero horizontal scroll (`flex-col`, `break-words`, `overflow-x-hidden`, `min-h-[48px]` touch targets).
+			* Automated test suites 100% passed (142/142 tests across 39.1, 39.2, 39.3, and 39.4).
+			* Clean TypeScript compilation confirmed (`npx tsc --noEmit` = 0 errors).
+			* Updated `docs/Sprints.md`, `PROJECTSTATE.MD`, and `ARCHITECTURE.md` (Section 38: Mediation Firewall & Nodal Escrow).
+	- __Technical Deliverables:__ `src/types/buyer-dispute-types.ts`, `src/server/actions/buyer-dispute-actions.ts`, `src/components/buyer/orders/raise-dispute-modal.tsx`, `src/components/buyer/disputes/buyer-dispute-card.tsx`, `src/components/buyer/disputes/buyer-disputes-feed.tsx`, `app/(buyer)/buyer/orders/[id]/page.tsx`, `app/(buyer)/buyer/more/disputes/page.tsx`, `src/server/tests/verify-sprint394-buyer-disputes.ts`, and updated architectural documentation.
 
 ---
 
-### 🚀 **Global Platform Status: SPRINT 38 COMPLETED ✅ — ADVANCING TO SPRINT 39 (QUALITY, DOCUMENTS, PAYMENTS & DISPUTES)**
-Sprint 38 (Orders, Booking & Delivery) is 100% complete, verified, and audited across all micro-sprints (38.1 through 38.5). Zero TypeScript compiler errors (`npx tsc --noEmit`). Codebase is positioned to begin Sprint 39.
+### 🚀 **Global Platform Status: SPRINT 39 COMPLETED ✅ — PROCEEDING TO SPRINT 40: END-TO-END UAT & FINAL POLISH**
+Sprint 39 (Quality, Documents, Payments & Disputes) is 100% complete, verified, and audited. Zero TypeScript compiler errors (`npx tsc --noEmit`). Automated test suites:
+- 39.1 Quality & Weighment: 32/32 passed ✅
+- 39.2 Document Compliance Matrix: 28/28 passed ✅
+- 39.3 Payable Ledger & Escrow Settlement: 44/44 passed ✅
+- 39.4 Dispute Generation & Tracker: 38/38 passed ✅
+All 8 Order Detail modules are sequentially mounted in `app/(buyer)/buyer/orders/[id]/page.tsx`, Global Payables Hub is live at `/buyer/more` and `/buyer/payments`, and the Dispute Tracker is live at `/buyer/more/disputes`. Platform is positioned to proceed to the final Buyer sprint: **Sprint 40: End-to-End UAT & Final Polish**.
+
+
 
 
 

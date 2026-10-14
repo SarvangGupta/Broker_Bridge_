@@ -655,6 +655,55 @@ Sprint 38 implements the Buyer Orders Hub, Partial Fulfillment Math Visualizer, 
   - 3-column math grid uses an `overflow-x-auto min-w-[280px]` wrapper to eliminate horizontal page scroll on small 360px screens.
   - Interactive touch targets across back buttons, order cards, and transit document viewers strictly enforce `min-h-[48px]` for Tier-2 mobile usability.
 
+### 38. Buyer Post-Deal Operations, Nodal Escrow & Mediation Firewall Architecture (Sprint 39)
+Sprint 39 implements the complete Buyer Post-Deal Operational Hub (Scientific Quality Evidence, Fulfillment Document Vault, Payable Ledger, and Dispute Exception Engine) while establishing the core **Mediation Firewall** and **Nodal Escrow** architectural patterns:
+
+- **The "Mediation Firewall" Architectural Pattern (`buyer-dispute-actions.ts`, `raise-dispute-modal.tsx`)**:
+  - **Zero Counterparty Intermediation**: Buyers and Sellers **never** interact directly during exceptions, non-conformances, quality failures, or weight shortages.
+  - **Platform-Escrowed Exception Engine**: When a Buyer raises an exception via `<RaiseDisputeModal />`, the request is validated on the server (requiring strict category categorization and a minimum 50-character detailed explanation) and committed to the `disputes` table with initial status `Open`.
+  - **Strict Routing to Neutral Broker Desk**: All disputes are routed exclusively to the authorized human Broker Desk. The Broker acts as an impartial fiduciary mediator who inspects evidentiary submissions, compares verified lab results and weighbridge certificates, and issues official platform amendments or escrow adjustments.
+  - **Zero Direct Chat / Messaging Invariant**: Mathematically and architecturally, there are zero chat boxes, direct message tables, websocket chat rooms, or communication channels between Buyer and Seller.
+  - **Strict PII & Identity Firewall**: The dispute retrieval layer (`getBuyerActiveDisputesAction`) strictly strips all Seller identities (seller name, seller company, email, and phone) and internal Broker notes (`resolutionNotes`). The Buyer observes only the formal mediation status (`Open` → `Under Broker Review` → `Resolved`).
+
+- **Nodal Escrow Settlement & Server-Side Financial Math Engine (`buyer-payment-actions.ts`, `buyer-payment-card.tsx`)**:
+  - **Server-Side Math Enforcement**: All currency figures and commercial formulas are computed exclusively on the server to prevent floating-point discrepancies and client-side DOM/F12 manipulation:
+    - `Base Amount = Final Quantity * Locked Base Rate`
+    - `Gross Payable = Base Amount + Platform/Statutory Charges & Mandi Cess (2.5%)`
+    - `Total Paid = Sum of confirmed payments in payments table`
+    - `Outstanding Balance = Math.max(0, Gross Payable - Total Paid)`
+  - **Nodal Escrow Model**: The platform operates on a regulated nodal settlement structure. Direct Seller bank credentials (account numbers, IFSC) are completely redacted from client payloads.
+  - **Virtual Nodal Accounts**: Payments are routed exclusively to the regulated platform account (`BrokerBridge Trade Settlement Escrow - HDFC Bank Nodal Account`) via unique virtual account identifiers (`BB-NODAL-${bookingReference}`).
+  - **Fiduciary Disbursement**: Funds are disbursed to the Seller strictly upon mutual confirmation of delivery receipts and weighbridge slips.
+
+- **Scientific Quality Verification & Weighment Evidence (`buyer-quality-tracking-actions.ts`, `transaction-quality-card.tsx`)**:
+  - **Read-Only Verification Layer**: The Buyer inspects verified COA and weighment data uploaded by the Seller and audited by the Broker desk. The Buyer possesses zero mutation paths.
+  - **Parameter Tolerance Matrix**: Structured parameter grid dynamically compares contractual 'Buyer Target Spec' against 'Actual Verified Result' from accredited laboratories (e.g., NABL-certified), rendering visual within-spec chips and delta variance badges.
+  - **Weighment Integrity**: Explicit 3-stage weight breakdown (Gross Weight, Tare Weight, and Net Weight Loaded in MT) with scale location and vehicle stamp.
+  - **15-Minute Signed URLs**: Lab reports and scale slips are delivered via short-lived signed URLs with strict path traversal defenses (`..`, `\`, `\0`).
+
+- **Fulfillment Document Compliance Matrix (`buyer-document-actions.ts`, `transaction-document-vault.tsx`)**:
+  - **Checklist Comparison Matrix**: Evaluates original contract checklist requirements (`requirement_documents`) against Seller fulfillment uploads (`dispatch_documents`) across normalized document types (COA, LR, Weighment Slip, Invoice, E-Way Bill, Challan).
+  - **4-State Compliance Engine**:
+    1. `Verified`: File exists and is audited/approved by the Broker desk.
+    2. `Received`: File uploaded by Seller, pending Broker audit.
+    3. `Missing`: Mandatory checklist item unfulfilled on a dispatched or in-transit consignment.
+    4. `Required`: Future requirement prior to vehicle dispatch.
+  - Visual compliance progress bar and micro status chips provide immediate audit-readiness.
+
+- **Mobile-First Tier-2 Standard & Order Detail Layout (`app/(buyer)/buyer/orders/[id]/page.tsx`)**:
+  - Complete 8-Module sequential order hierarchy:
+    1. `BookingVisibilityCard` (Booking metadata & locked reference)
+    2. `OrderFulfillmentCard` (Partial fulfillment math progress bar)
+    3. `LogisticsTimeline` (Live 6-state dispatch machine with exception handling)
+    4. `DeliveryDetailsCard` (Vehicle, driver, and transit documentation)
+    5. `TransactionQualityCard` (Scientific lab parameter matrix & weighment)
+    6. `TransactionDocumentVault` (Checklist compliance vault)
+    7. `BuyerPaymentCard` (Payable ledger & nodal escrow settlement)
+    8. `RaiseDisputeModal` (Mediation firewall exception modal)
+  - Strict 360px viewport safety (`w-full max-w-full overflow-x-hidden`, `flex-col`, `break-words`).
+  - Thumb-friendly `min-h-[48px]` interactive touch targets across all buttons and inputs.
+
+
 
 
 

@@ -3,10 +3,17 @@ import Link from 'next/link';
 import { Metadata } from 'next';
 import { ArrowLeft, PackageX } from 'lucide-react';
 import { getBuyerBookingVisibilityAction } from '@/src/server/actions/buyer-order-actions';
+import { getBuyerTransactionQualityAction } from '@/src/server/actions/buyer-quality-tracking-actions';
+import { getBuyerDocumentMatrixAction } from '@/src/server/actions/buyer-document-actions';
+import { getBuyerPayableLedgerAction } from '@/src/server/actions/buyer-payment-actions';
 import { BookingVisibilityCard } from '@/src/components/buyer/orders/booking-visibility-card';
 import { OrderFulfillmentCard } from '@/src/components/buyer/orders/order-fulfillment-card';
 import { LogisticsTimeline } from '@/src/components/buyer/orders/logistics-timeline';
 import { DeliveryDetailsCard } from '@/src/components/buyer/orders/delivery-details-card';
+import { TransactionQualityCard } from '@/src/components/buyer/orders/transaction-quality-card';
+import { TransactionDocumentVault } from '@/src/components/buyer/orders/transaction-document-vault';
+import { BuyerPaymentCard } from '@/src/components/buyer/orders/buyer-payment-card';
+import { RaiseDisputeModal } from '@/src/components/buyer/orders/raise-dispute-modal';
 import { BackButton } from '@/src/components/ui/back-button';
 import { EmptyState } from '@/src/components/ui/empty-state';
 
@@ -63,6 +70,15 @@ export default async function BuyerOrderDetailPage({ params }: PageProps) {
   }
 
   const bookingData = res.data;
+
+  // Fetch verified transaction quality & physical weighment data (Micro-Sprint 39.1)
+  const qualityRes = await getBuyerTransactionQualityAction(bookingId);
+
+  // Fetch fulfillment document compliance matrix (Micro-Sprint 39.2)
+  const documentMatrixRes = await getBuyerDocumentMatrixAction(bookingId);
+
+  // Fetch financial payable ledger and escrow status (Micro-Sprint 39.3)
+  const paymentRes = await getBuyerPayableLedgerAction(bookingId);
 
   return (
     <div className="w-full max-w-full overflow-x-hidden min-h-full bg-slate-50/50 pb-20">
@@ -145,6 +161,67 @@ export default async function BuyerOrderDetailPage({ params }: PageProps) {
             bookingId={bookingData.bookingId}
             dispatchDetails={bookingData.dispatchDetails}
           />
+        </section>
+
+        {/* Module 5: Transaction Quality & Weighment Records (Micro-Sprint 39.1) */}
+        <section aria-labelledby="transaction-quality-heading">
+          <h2 id="transaction-quality-heading" className="sr-only">
+            Transaction Quality & Weighment Records
+          </h2>
+          <TransactionQualityCard
+            bookingId={bookingData.bookingId}
+            initialData={qualityRes.success ? qualityRes.data : null}
+          />
+        </section>
+
+        {/* Module 6: Fulfillment Documents & Compliance Vault (Micro-Sprint 39.2) */}
+        <section aria-labelledby="document-vault-heading">
+          <h2 id="document-vault-heading" className="sr-only">
+            Fulfillment Documents & Compliance Vault
+          </h2>
+          <TransactionDocumentVault
+            bookingId={bookingData.bookingId}
+            initialData={documentMatrixRes.success ? documentMatrixRes.data : null}
+          />
+        </section>
+
+        {/* Module 7: Buyer Payable Ledger & Escrow Settlement (Micro-Sprint 39.3) */}
+        <section aria-labelledby="payment-card-heading">
+          <h2 id="payment-card-heading" className="sr-only">
+            Payable Ledger & Escrow Settlement
+          </h2>
+          <BuyerPaymentCard
+            bookingId={bookingData.bookingId}
+            initialData={
+              paymentRes.success && paymentRes.data
+                ? paymentRes.data.singlePayable || paymentRes.data.payables[0] || null
+                : null
+            }
+          />
+        </section>
+
+        {/* Module 8: Dispute & Exception Management (Micro-Sprint 39.4) */}
+        <section aria-labelledby="dispute-section-heading">
+          <h2 id="dispute-section-heading" className="sr-only">
+            Order Discrepancies & Dispute Mediation
+          </h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Fulfillment Exceptions
+              </span>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+                Encountered a Quality, Weight, or Transit Discrepancy?
+              </h3>
+              <p className="text-xs text-slate-500 max-w-lg leading-relaxed">
+                File a formal exception for neutral Broker mediation. Direct seller communications are restricted to preserve fiduciary escrow integrity.
+              </p>
+            </div>
+            <RaiseDisputeModal
+              bookingId={bookingData.bookingId}
+              commodityName={bookingData.commodityName}
+            />
+          </div>
         </section>
       </main>
     </div>
