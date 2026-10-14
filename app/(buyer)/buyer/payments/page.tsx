@@ -1,4 +1,5 @@
-import BuyerMorePage, { metadata, dynamic } from '../more/page';
+import BuyerMorePage, { metadata } from '../more/page';
 
-export { metadata, dynamic };
+export const dynamic = 'force-dynamic';
+export { metadata };
 export default BuyerMorePage;
