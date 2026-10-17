@@ -148,6 +148,17 @@ class MoreScreen extends StatelessWidget {
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(
+                    LucideIcons.indianRupee,
+                    color: AppColors.primary,
+                  ),
+                  title: const Text('Brokerage & Commission Ledger'),
+                  subtitle: const Text('Track earnings, invoicing & payments'),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                  onTap: () => context.push('/commission'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(
                     LucideIcons.shieldCheck,
                     color: AppColors.primary,
                   ),

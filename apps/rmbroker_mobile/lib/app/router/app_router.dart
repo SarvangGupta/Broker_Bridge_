@@ -8,6 +8,7 @@ import '../../features/authentication/presentation/login_screen.dart';
 import '../../features/authentication/presentation/splash_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/dashboard/presentation/navigation_shell.dart';
+import '../../features/commission/presentation/screens/earnings_dashboard_screen.dart';
 import '../../features/deals/presentation/deals_screen.dart';
 import '../../features/deals/presentation/screens/deal_detail_screen.dart';
 import '../../features/directory/presentation/directory_screen.dart';
@@ -95,13 +96,7 @@ class AppRouter {
         path: '/commission',
         name: 'commission',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const ModulePlaceholderScreen(
-          title: 'Brokerage & Commission Ledger',
-          moduleCode: 'RB-FIN-01',
-          description:
-              'Volume-based brokerage settlement calculations, GST invoices, and payout ledgers are scheduled for upcoming micro-sprints per the RMBroker product roadmap.',
-          icon: LucideIcons.indianRupee,
-        ),
+        builder: (context, state) => const EarningsDashboardScreen(),
       ),
       GoRoute(
         path: '/disputes',

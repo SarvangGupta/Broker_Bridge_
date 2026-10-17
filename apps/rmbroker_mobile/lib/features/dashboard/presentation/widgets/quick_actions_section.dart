@@ -12,8 +12,11 @@ class QuickActionsSection extends StatelessWidget {
   const QuickActionsSection({super.key, required this.actions});
 
   void _onActionTap(BuildContext context, BrokerQuickAction action) {
-    if (action.isImplemented) {
-      context.go(action.route);
+    if (action.route == '/commission' ||
+        action.route.startsWith('/deals/') ||
+        action.route == '/orders' ||
+        action.route == '/disputes') {
+      context.push(action.route);
     } else {
       context.go(action.route);
     }

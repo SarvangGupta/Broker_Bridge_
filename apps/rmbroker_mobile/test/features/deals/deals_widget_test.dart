@@ -307,12 +307,14 @@ void main() {
       expect(find.text('Contract Terms & Logistics'), findsOneWidget);
       expect(find.text('FOR Destination Jaipur Mandi'), findsOneWidget);
       expect(find.text('50kg HDPE Bags'), findsOneWidget);
-      expect(find.text('₹50 / ₹/MT'), findsOneWidget);
+      expect(find.text('₹50 / ₹/MT'), findsAtLeast(1));
 
       // Verify Cancel Button and Dialog
       expect(find.text('Cancel Deal Record'), findsOneWidget);
+      await tester.ensureVisible(find.text('Cancel Deal Record'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel Deal Record'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.text('Cancel Deal Contract'), findsOneWidget);
       expect(find.text('Keep Active'), findsOneWidget);

@@ -8,6 +8,8 @@ import '../../../../core/widgets/app_empty_state.dart';
 import '../../domain/deal_model.dart';
 import '../controllers/deal_detail_controller.dart';
 import '../controllers/deals_controller.dart';
+import '../../../commission/domain/commission_model.dart';
+import '../../../commission/presentation/widgets/deal_commission_sheet.dart';
 import '../widgets/finalize_deal_dialog.dart';
 import '../widgets/negotiate_terms_sheet.dart';
 import '../widgets/record_party_confirmation_dialog.dart';
@@ -513,6 +515,113 @@ class DealDetailScreen extends ConsumerWidget {
                 ),
                 if (detail.notes != null && detail.notes!.isNotEmpty)
                   _buildTermRow('Broker Notes', detail.notes!),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Broker Commission & Settlement Ledger Card (Sprint RB-FL-11)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderLight),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(LucideIcons.indianRupee, size: 16, color: AppColors.primary),
+                        SizedBox(width: 8),
+                        Text(
+                          'Brokerage Commission Ledger',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimaryLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        '₹${detail.brokerCommissionRate.toStringAsFixed(0)} / ${detail.commissionBasis}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 20),
+                _buildTermRow(
+                  'Eligible Commission',
+                  '₹${(deal.agreedQuantity * detail.brokerCommissionRate).toStringAsFixed(2)} (Delivery basis)',
+                ),
+                _buildTermRow('Fiduciary Status', 'Authoritative Broker Ledger Active'),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(LucideIcons.fileSpreadsheet, size: 16, color: AppColors.primary),
+                    label: const Text(
+                      'View Commission Breakdown & Payment Ledger',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    onPressed: () {
+                      final record = CommissionRecord(
+                        dealId: deal.id,
+                        dealReference: deal.ref,
+                        bookingReference: deal.bookingReference,
+                        commodityName: deal.commodityName,
+                        gradeName: deal.gradeName,
+                        buyerCompanyName: deal.buyerCompanyName,
+                        sellerCompanyName: deal.sellerCompanyName,
+                        agreedRatePerMT: detail.brokerCommissionRate,
+                        commissionBasis: detail.commissionBasis,
+                        quantities: CommissionQuantityBreakdown(
+                          contractedQuantity: deal.agreedQuantity,
+                          dispatchedQuantity: deal.agreedQuantity,
+                          deliveredQuantity: deal.agreedQuantity,
+                          acceptedQuantity: deal.agreedQuantity,
+                          unitSymbol: deal.unitSymbol,
+                        ),
+                        grossRawMaterialValue: deal.totalValuation,
+                        calculatedCommission: deal.agreedQuantity * detail.brokerCommissionRate,
+                        eligibleCommission: deal.agreedQuantity * detail.brokerCommissionRate,
+                        invoicedAmount: deal.agreedQuantity * detail.brokerCommissionRate,
+                        paidAmount: 0.0,
+                        outstandingAmount: deal.agreedQuantity * detail.brokerCommissionRate,
+                        disputedAmount: 0.0,
+                        status: CommissionStatus.eligible,
+                        createdAt: deal.createdAt,
+                        updatedAt: DateTime.now(),
+                      );
+                      DealCommissionSheet.show(context, record: record);
+                    },
+                  ),
+                ),
               ],
             ),
           ),
