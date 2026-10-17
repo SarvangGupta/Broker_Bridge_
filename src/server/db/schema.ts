@@ -430,3 +430,6 @@ export const bookings = pgTable('bookings', {
   index('bookings_deal_idx').on(table.dealId),
   index('bookings_reference_idx').on(table.bookingReference),
 ]);
+
+// VetKind Animal Health India Schema Extensions
+export * from './vetkind-schema';
