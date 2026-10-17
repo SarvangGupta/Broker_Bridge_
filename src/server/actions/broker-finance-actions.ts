@@ -75,13 +75,19 @@ export async function getBrokerFinancialLedgerAction(
   bookingIdOrRef: string
 ): Promise<LedgerActionResult> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
+    let authUser: any = null;
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (!authError && user) authUser = user;
+    } catch (e) {
+      authUser = null;
+    }
 
-    if (authError || !authUser) {
+    if (!authUser) {
       return { success: false, error: 'Unauthorized: Valid broker session required' };
     }
 
@@ -127,6 +133,24 @@ export async function getBrokerFinancialLedgerAction(
     });
 
     const targetDealId = dealRecord?.id || bookingRecord.dealId;
+
+    const quotationRecord = dealRecord?.quotationId
+      ? await db.query.quotations.findFirst({
+          where: eq(quotations.id, dealRecord.quotationId),
+        })
+      : null;
+
+    const isAuthorizedBroker =
+      role === 'admin' ||
+      dealRecord?.brokerId === authUser.id ||
+      quotationRecord?.brokerId === authUser.id;
+
+    if (!isAuthorizedBroker) {
+      return {
+        success: false,
+        error: 'Forbidden: You do not have permission to view the financial ledger for this booking.',
+      };
+    }
 
     const lockedVersion = await db.query.dealVersions.findFirst({
       where: eq(dealVersions.id, bookingRecord.lockedVersionId),
@@ -339,6 +363,32 @@ export async function logBrokerPaymentAction(
     const role = (dbUser.role || '').toLowerCase();
     if (role !== 'broker' && role !== 'admin') {
       return { success: false, error: 'Forbidden: Broker access privileges required' };
+    }
+
+    // Verify deal ownership
+    const dealRecord = await db.query.deals.findFirst({
+      where: eq(deals.id, data.dealId),
+    });
+    if (!dealRecord) {
+      return { success: false, error: 'Deal record not found' };
+    }
+
+    const quotationRecord = dealRecord.quotationId
+      ? await db.query.quotations.findFirst({
+          where: eq(quotations.id, dealRecord.quotationId),
+        })
+      : null;
+
+    const isAuthorizedBroker =
+      role === 'admin' ||
+      dealRecord.brokerId === authUser.id ||
+      quotationRecord?.brokerId === authUser.id;
+
+    if (!isAuthorizedBroker) {
+      return {
+        success: false,
+        error: 'Forbidden: You do not have permission to log payments on this deal.',
+      };
     }
 
     // Embed direction into reference number string prefix for backwards compatibility

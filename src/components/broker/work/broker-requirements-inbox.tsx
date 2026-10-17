@@ -12,15 +12,35 @@ import {
   Layers,
   ArrowUpDown,
   RefreshCw,
+  Plus,
+  RotateCcw,
+  XCircle,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { RequirementCard } from './requirement-card';
+import { RequirementFormDialog } from './requirement-form-dialog';
+import {
+  cancelBrokerRequirementAction,
+  renewBrokerRequirementAction,
+  type BrokerRequirementItem,
+} from '@/src/server/actions/broker-mandate-actions';
 import type {
   BrokerAssignedRequirement,
   BrokerOperationalStatus,
 } from '@/src/server/actions/broker-work-actions';
+import { useLanguage } from '@/src/lib/i18n/language-context';
+import { toast } from 'sonner';
 
 interface BrokerRequirementsInboxProps {
   initialRequirements: BrokerAssignedRequirement[];
@@ -33,24 +53,41 @@ export function BrokerRequirementsInbox({
   initialRequirements = [],
   error,
 }: BrokerRequirementsInboxProps) {
+  const { t } = useLanguage();
+
+  const [requirementsList, setRequirementsList] = useState<BrokerAssignedRequirement[]>(initialRequirements);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
   const [sortBy, setSortBy] = useState<'NEWEST' | 'URGENT' | 'VOLUME'>('URGENT');
 
+  // Modal states
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<BrokerRequirementItem | null>(null);
+
+  // Cancellation Modal
+  const [cancellingReq, setCancellingReq] = useState<BrokerAssignedRequirement | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Renewal Modal
+  const [renewingReq, setRenewingReq] = useState<BrokerAssignedRequirement | null>(null);
+  const [renewDate, setRenewDate] = useState('');
+  const [isRenewing, setIsRenewing] = useState(false);
+
   // Compute status counts for filter badges
   const counts = useMemo(() => {
     return {
-      all: initialRequirements.length,
-      actionRequired: initialRequirements.filter((r) => r.operationalStatus === 'Action Required').length,
-      newDemand: initialRequirements.filter((r) => r.operationalStatus === 'New Demand').length,
-      sourcing: initialRequirements.filter((r) => r.operationalStatus === 'Sourcing').length,
-      partial: initialRequirements.filter((r) => r.operationalStatus === 'Partially Fulfilled').length,
+      all: requirementsList.length,
+      actionRequired: requirementsList.filter((r) => r.operationalStatus === 'Action Required').length,
+      newDemand: requirementsList.filter((r) => r.operationalStatus === 'New Demand').length,
+      sourcing: requirementsList.filter((r) => r.operationalStatus === 'Sourcing').length,
+      partial: requirementsList.filter((r) => r.operationalStatus === 'Partially Fulfilled').length,
     };
-  }, [initialRequirements]);
+  }, [requirementsList]);
 
   // Filter & Sort requirements
   const filteredRequirements = useMemo(() => {
-    let list = [...initialRequirements];
+    let list = [...requirementsList];
 
     // Filter by Tab
     if (activeFilter === 'ACTION_REQUIRED') {
@@ -81,7 +118,6 @@ export function BrokerRequirementsInbox({
     // Sort
     list.sort((a, b) => {
       if (sortBy === 'URGENT') {
-        // Urgent first, then by earliest target date
         if (a.isUrgent && !b.isUrgent) return -1;
         if (!a.isUrgent && b.isUrgent) return 1;
         return new Date(a.targetDateRaw).getTime() - new Date(b.targetDateRaw).getTime();
@@ -94,7 +130,105 @@ export function BrokerRequirementsInbox({
     });
 
     return list;
-  }, [initialRequirements, activeFilter, searchQuery, sortBy]);
+  }, [requirementsList, activeFilter, searchQuery, sortBy]);
+
+  // Convert BrokerAssignedRequirement to BrokerRequirementItem for Form Dialog
+  const handleEdit = (req: BrokerAssignedRequirement) => {
+    const item: BrokerRequirementItem = {
+      id: req.id,
+      requirementRef: req.requirementRef,
+      buyerCompanyId: '',
+      buyerCompanyName: req.buyerCompanyName,
+      commodityId: req.commodityId,
+      commodityName: req.commodityName,
+      gradeId: req.gradeId,
+      gradeName: req.gradeName,
+      requestedQuantity: req.quantity,
+      allocatedQuantity: req.fulfilledQuantity,
+      remainingQuantity: Math.max(0, req.quantity - req.fulfilledQuantity),
+      fulfillmentPercentage: req.fulfillmentPercentage,
+      unitName: req.unitName,
+      unitSymbol: req.unitSymbol || 'MT',
+      targetPrice: req.targetPrice,
+      deliveryTerms: req.deliveryTerms,
+      targetDate: req.targetDateRaw,
+      targetDateFormatted: req.targetDateFormatted,
+      isUrgent: req.isUrgent,
+      hoursUntilTarget: req.hoursUntilTarget,
+      isExpired: new Date(req.targetDateRaw) < new Date(),
+      status: req.status,
+      createdAt: '',
+      createdAtFormatted: req.createdAtFormatted,
+    };
+    setEditingItem(item);
+    setIsFormOpen(true);
+  };
+
+  // Cancel Handler
+  const handleConfirmCancel = async () => {
+    if (!cancellingReq) return;
+    if (!cancelReason.trim() || cancelReason.trim().length < 3) {
+      toast.error(t('reasonRequired'));
+      return;
+    }
+
+    setIsCancelling(true);
+    try {
+      const res = await cancelBrokerRequirementAction(cancellingReq.id, cancelReason.trim());
+      if (res.success) {
+        toast.success(t('recordCancelledSuccess'));
+        setRequirementsList((prev) =>
+          prev.map((r) => (r.id === cancellingReq.id ? { ...r, status: 'Cancelled' } : r))
+        );
+        setCancellingReq(null);
+        setCancelReason('');
+      } else {
+        toast.error(res.error || 'Failed to cancel requirement');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'An unexpected error occurred');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  // Renew Handler
+  const handleConfirmRenew = async () => {
+    if (!renewingReq || !renewDate) return;
+
+    setIsRenewing(true);
+    try {
+      const res = await renewBrokerRequirementAction(renewingReq.id, new Date(renewDate).toISOString());
+      if (res.success) {
+        toast.success(t('recordRenewedSuccess'));
+        setRequirementsList((prev) =>
+          prev.map((r) =>
+            r.id === renewingReq.id
+              ? {
+                  ...r,
+                  status: 'Open',
+                  targetDateRaw: new Date(renewDate).toISOString(),
+                  targetDateFormatted: new Date(renewDate).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  }),
+                  isUrgent: false,
+                }
+              : r
+          )
+        );
+        setRenewingReq(null);
+        setRenewDate('');
+      } else {
+        toast.error(res.error || 'Failed to renew requirement');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'An unexpected error occurred');
+    } finally {
+      setIsRenewing(false);
+    }
+  };
 
   if (error) {
     return (
@@ -120,6 +254,24 @@ export function BrokerRequirementsInbox({
 
   return (
     <div className="space-y-4 sm:space-y-5">
+      {/* Disclaimer Banner & Action Header */}
+      <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>{t('brokerDisclaimerNotOwner')}</span>
+        </div>
+        <Button
+          onClick={() => {
+            setEditingItem(null);
+            setIsFormOpen(true);
+          }}
+          className="min-h-[44px] h-10 px-3.5 bg-[#0D9488] hover:bg-teal-700 text-white font-bold text-xs rounded-lg shrink-0 flex items-center gap-1.5 shadow-xs"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>{t('actionCreateRequirement')}</span>
+        </Button>
+      </div>
+
       {/* Search & Operational Filter Bar */}
       <div className="flex flex-col gap-3">
         {/* Search Input Box */}
@@ -143,7 +295,7 @@ export function BrokerRequirementsInbox({
           )}
         </div>
 
-        {/* Operational Filter Chips - Scrollable on mobile without page overflow */}
+        {/* Operational Filter Chips */}
         <div className="w-full overflow-x-auto touch-pan-x pb-1 scrollbar-none">
           <div className="flex items-center gap-1.5 min-w-max">
             {/* All */}
@@ -271,7 +423,21 @@ export function BrokerRequirementsInbox({
       {filteredRequirements.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
           {filteredRequirements.map((req) => (
-            <RequirementCard key={req.id} requirement={req} />
+            <RequirementCard
+              key={req.id}
+              requirement={req}
+              onEdit={handleEdit}
+              onCancel={(r) => {
+                setCancellingReq(r);
+                setCancelReason('');
+              }}
+              onRenew={(r) => {
+                setRenewingReq(r);
+                const future = new Date();
+                future.setDate(future.getDate() + 7);
+                setRenewDate(future.toISOString().split('T')[0]);
+              }}
+            />
           ))}
         </div>
       ) : (
@@ -291,21 +457,160 @@ export function BrokerRequirementsInbox({
                   : 'You currently have no requirements assigned to you from the Deal Desk.'}
               </p>
             </div>
-            {(searchQuery || activeFilter !== 'ALL') && (
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+              {(searchQuery || activeFilter !== 'ALL') && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setActiveFilter('ALL');
+                  }}
+                  className="min-h-[48px] h-12 text-xs font-semibold"
+                >
+                  Reset All Filters
+                </Button>
+              )}
               <Button
-                variant="outline"
                 onClick={() => {
-                  setSearchQuery('');
-                  setActiveFilter('ALL');
+                  setEditingItem(null);
+                  setIsFormOpen(true);
                 }}
-                className="min-h-[48px] h-12 text-xs font-semibold"
+                className="min-h-[48px] h-12 bg-[#0D9488] hover:bg-teal-700 text-white font-bold text-xs"
               >
-                Reset All Filters
+                <Plus className="w-4 h-4 mr-1.5" />
+                <span>{t('actionCreateRequirement')}</span>
               </Button>
-            )}
+            </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Form Dialog for Create / Edit Requirement */}
+      <RequirementFormDialog
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        requirement={editingItem}
+        onSuccess={() => {
+          window.location.reload();
+        }}
+      />
+
+      {/* Cancellation Dialog */}
+      <Dialog
+        open={Boolean(cancellingReq)}
+        onOpenChange={(open) => !open && setCancellingReq(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              {t('confirmCancelTitle')}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              {t('confirmCancelPrompt')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+              <span className="font-semibold text-slate-800">
+                {cancellingReq?.buyerCompanyName}
+              </span>
+              <span className="text-slate-500 block">
+                {cancellingReq?.commodityName} • {cancellingReq?.requirementRef}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">
+                Cancellation Reason <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                placeholder="e.g. Buyer procured elsewhere, mill temporarily shut down"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="min-h-[48px] h-12 bg-white text-xs"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCancellingReq(null)}
+              disabled={isCancelling}
+              className="min-h-[48px] h-12 w-full sm:w-auto"
+            >
+              {t('actionCancel')}
+            </Button>
+            <Button
+              onClick={handleConfirmCancel}
+              disabled={isCancelling}
+              className="min-h-[48px] h-12 w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold"
+            >
+              {isCancelling ? 'Processing...' : t('actionConfirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Renewal Dialog */}
+      <Dialog
+        open={Boolean(renewingReq)}
+        onOpenChange={(open) => !open && setRenewingReq(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              {t('actionRenewRequirement')}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Extend required delivery date to reactivate matching for this mandate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+              <span className="font-semibold text-slate-800">
+                {renewingReq?.buyerCompanyName}
+              </span>
+              <span className="text-slate-500 block">
+                {renewingReq?.commodityName} • {renewingReq?.requirementRef}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">
+                New Target Delivery Date <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                type="date"
+                value={renewDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setRenewDate(e.target.value)}
+                className="min-h-[48px] h-12 bg-white"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setRenewingReq(null)}
+              disabled={isRenewing}
+              className="min-h-[48px] h-12 w-full sm:w-auto"
+            >
+              {t('actionCancel')}
+            </Button>
+            <Button
+              onClick={handleConfirmRenew}
+              disabled={isRenewing || !renewDate}
+              className="min-h-[48px] h-12 w-full sm:w-auto bg-[#0D9488] hover:bg-teal-700 text-white font-bold"
+            >
+              {isRenewing ? 'Processing...' : t('actionConfirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

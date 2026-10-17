@@ -353,13 +353,19 @@ export async function resolveDisputeAction(
   input: ResolveDisputeInput
 ): Promise<{ success: boolean; data?: any; error?: string; message?: string }> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
+    let authUser: any = null;
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (!authError && user) authUser = user;
+    } catch (e) {
+      authUser = null;
+    }
 
-    if (authError || !authUser) {
+    if (!authUser) {
       return { success: false, error: 'Unauthorized: Valid broker session required' };
     }
 
@@ -391,6 +397,26 @@ export async function resolveDisputeAction(
       if (!existingDisputes.length) throw new Error('Dispute record not found');
 
       const target = existingDisputes[0];
+
+      // Verify that this dispute's deal belongs to the caller broker
+      const dealRecord = await tx.query.deals.findFirst({
+        where: eq(deals.id, target.dealId),
+      });
+
+      const quotationRecord = dealRecord?.quotationId
+        ? await tx.query.quotations.findFirst({
+            where: eq(quotations.id, dealRecord.quotationId),
+          })
+        : null;
+
+      const isAuthorizedBroker =
+        role === 'admin' ||
+        dealRecord?.brokerId === authUser.id ||
+        quotationRecord?.brokerId === authUser.id;
+
+      if (!isAuthorizedBroker) {
+        throw new Error('Forbidden: You are not authorized to resolve disputes for this deal.');
+      }
 
       // Update dispute record to Resolved
       const [resolved] = await tx

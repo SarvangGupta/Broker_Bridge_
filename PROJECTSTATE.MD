@@ -2,8 +2,8 @@
 
 ## Overview
 Current Phase: **Phase 7: Buyer Workspace Shell & Enterprise Buyer Capabilities (Sprints 31–40)**  
-Global Platform Status: **SPRINT 39 COMPLETED ✅ — PROCEEDING TO SPRINT 40: END-TO-END UAT & FINAL POLISH**  
-Status: **Sprint 39 Completed ✅** (All 5 Micro-Sprints 39.1-39.5 Operational: Quality & Weighment, Document Compliance Vault, Payable Ledger & Escrow Settlement, Dispute Generation & Tracker, and DevSecOps Audit & Architecture Documentation)
+Global Platform Status: **SPRINT 40 IN PROGRESS — SPRINT 40-B UNIFIED BUYER E2E UAT RUNNER COMPLETE (OFFLINE UAT PASSED, LIVE DB VERIFICATION PENDING)**  
+Status: **Sprint 40 In Progress 🟡** (Sprint 40-A Readiness Audit & Sprint 40-B Unified Buyer E2E UAT Runner Implemented; Offline Deterministic UAT Passed 64/64, Live Database Integration Pending)
 
 
 
@@ -863,17 +863,204 @@ Status: **Sprint 39 Completed ✅** (All 5 Micro-Sprints 39.1-39.5 Operational: 
   - **Document Compliance Matrix:** 100% operational (4-state checklist fulfillment engine).
   - **Payable Ledger & Escrow Settlement:** 100% operational (Nodal settlement with server-side math).
   - **Mediation Firewall & Dispute Tracker:** 100% operational (Neutral broker mediation with zero counterparty leakage).
-  - **Next Up:** Sprint 40 — End-to-End UAT & Final Polish (Final Buyer Sprint).
-
 
 ---
 
-## Technical Debt & Future Cleanup
+### 🟡 Sprint 40: End-to-End Buyer UAT & Production Readiness (IN PROGRESS 🟡)
+- **Status:** `IN PROGRESS` 🟡 (Sprint 40-A Readiness Audit & Sprint 40-B Unified Runner Implemented; Offline UAT Passed, Live Database Verification Pending)
+- **Goal:** Consolidate comprehensive verification coverage across all 10 canonical Buyer workflow phases and mobile responsive contracts into a unified, non-destructive test runner (`src/server/tests/verify-buyer-e2e-uat.ts`).
+- **Deliverables:**
+  - [x] **Micro-Sprint 40-A — Readiness Verification & Buyer UAT Audit (COMPLETED ✅):**
+    - Completed non-destructive repository, environment, and code audit documented in `project-audit/deep-intelligence/12_SPRINT40_READINESS_REVALIDATION.md`.
+    - Revalidated clean working tree on `feature/broker-nilesh` (HEAD `54393d08684bbf0eec7bddb41630aa1d064462bb`).
+    - Verified environment variables: `.env` and `.env.local` are absent; confirmed database is not accessible offline without `DATABASE_URL`.
+    - Mapped all 10 canonical Buyer workflow phases, security invariants, and mobile layout constraints across the 8 Order Detail modules.
+  - [x] **Micro-Sprint 40-B — Unified Buyer E2E UAT Runner (IMPLEMENTATION COMPLETE / OFFLINE UAT PASSED ✅ | LIVE DB PENDING ⏳):**
+    - Built unified test runner `src/server/tests/verify-buyer-e2e-uat.ts` supporting dual execution modes:
+      * **Offline Fixture Mode:** Deterministically executes validation guards, state transitions, commercial formulas, privacy scrubbing, and AST component contracts without database dependencies.
+      * **Live Integration Mode:** Designed to verify test database connectivity and execute live PostgreSQL queries without touching production.
+    - Verified all 10 Canonical Buyer Workflow Phases:
+      1. **Phase 1 (Auth & Role Validation):** Enforces flat `BUYER_ADMIN` role invariant, public broker registration invite-only gate, credential validation, and graceful session handling outside request stores.
+      2. **Phase 2 (Dashboard Summary Behavior):** Validates retrieval of all 4 KPI blocks, urgent action items with deep links, recent requirements stream, and active shipments tracker.
+      3. **Phase 3 (Requirement Creation Logic):** Enforces Zod multi-step schema validation, negative quantity rejection, delivery window chronological validation, and private network preferred broker rules.
+      4. **Phase 4 (Dynamic Quality Parameters):** Validates numeric min/max bounds extraction, mandatory parameter checks, and tolerance acceptance.
+      5. **Phase 5 (Proposal Inbox & Privacy Scrubber):** Verifies mathematical shielding of phone numbers, emails, GSTINs, and direct WhatsApp links; blacklists Seller-internal action types (`SELLER_COUNTER`, `SELLER_NOTE`).
+      6. **Phase 6 (Negotiation State Machine):** Validates counter-offer schema, 6-state lifecycle derivation (`Open`, `Waiting for Broker`, `Waiting for Buyer`, `Agreed`, `Closed`, `Expired`), and mutation locks blocking stale submissions.
+      7. **Phase 7 (Buyer Confirmation Engine):** Validates deal version confirmation, reason length guards on amendments, Visual Diff Engine field change tracking, and the architectural invariant that confirmation strictly does NOT issue booking references.
+      8. **Phase 8 (Broker Finalization Gate):** Validates precondition checks, unauthorized execution rejection for buyer roles, and enterprise booking reference format (`BKG-YYYY-XXXX`).
+      9. **Phase 9 (Document Vault & Payable Ledger):** Validates 4-state document compliance lifecycle, signed URL generation, server-side financial math (`Base = Qty * Rate`, `Gross = Base + Charges`, `Outstanding = Gross - Paid`), and platform Nodal Escrow account shielding.
+      10. **Phase 10 (Mediation Firewall & Dispute Tracker):** Enforces strict dispute category validation across 7 allowed types, 50-character minimum description guard, and zero counterparty identity or internal note leakage.
+      11. **Phase 11 (Mobile 360px Contract Checks):** Source-level AST verification confirming sequential mounting of all 8 Order Detail modules, `overflow-x-hidden` container protection, 3-column financial stacking (`grid-cols-1 sm:grid-cols-3`), and `min-h-[48px]` touch targets.
+    - **Test Results:** 73 total assertions: **64 passed (100% of runnable checks)**, **0 failed**, **9 marked UNVERIFIED_DATABASE** (live database queries safely skipped). Exit code: 0.
+    - **TypeScript Compilation:** `npx tsc --noEmit` exits with **0 errors**.
+    - **Regression Stability:** All existing regression test suites rerun and passed 100% (Sprint 39.1: 32/32; Sprint 39.2: 28/28; Sprint 39.3: 44/44; Sprint 39.4: 38/38; Sprint 38.3: 21/21; VetKind: 18/18).
+- **Operational Status:**
+  - **Unified Buyer UAT Runner:** Implementation complete and operational (`src/server/tests/verify-buyer-e2e-uat.ts`).
+  - **Offline Deterministic Verification:** 100% passed (64/64 assertions).
+  - **Live Database Integration:** Pending live test database availability (`DATABASE_URL`).
+  - **Next Up:** Sprint 40-C (Final Polish & Production Deployment Acceptance).
 
-- **Note 1 (Route Scaffolding):** `src/components/ui/sprint-placeholder.tsx` is temporary scaffolding used for secondary Buyer routes (`/requirements`, `/proposals`, `/orders`, `/more`). It must be deleted once Sprints 33, 35, 38, and 39 replace the scaffolded routes with fully functional features.
-- **Note 2 (Dashboard Server Action Data Source):** `src/server/actions/buyer-dashboard-actions.ts` is currently returning structural mock/demo data for smooth zero-wall UI rendering. This MUST be wired to live PostgreSQL queries (`requirements`, `quotations`, `deals`, `dispatches`) once the underlying Buyer database tables are fully populated in upcoming sprints.
+---
 
+## Phase 8: RMBroker Application & Security Foundation
 
+### 🟢 Micro-Sprint RB-00: Repository Audit & Baseline Verification
+- **Status:** `COMPLETED` ✅
+- **Deliverable:** Executive Audit Report (`project-audit/01_EXECUTIVE_REPORT.md`). Baseline verified for Next.js 15, Drizzle ORM, Supabase Auth, and multi-tenant schema.
+
+### 🟢 Micro-Sprint RB-01: Architecture Decisions & Contracts
+- **Status:** `COMPLETED` ✅
+- **Deliverable:** Decision Register (`project-audit/08_DECISION_REGISTER.md`) with 12 approved ADRs establishing hybrid server-authoritative mutations, broker mediation firewalls, and server-side financials.
+
+### 🟢 Micro-Sprint RB-02: Database & Business Data Model Design
+- **Status:** `COMPLETED` ✅
+- **Deliverable:** Database Data Model Design (`rb02_database_data_model_design.md`). Established 15-entity normalized design with ownership, validation invariants, and immutability triggers.
+
+### 🟢 Micro-Sprint RB-03: RMBroker Security & Access Control Foundation
+- **Status:** `COMPLETED` ✅
+- **Goal:** Establish and validate the security foundation ensuring that every broker accesses only their authorized business records and operations.
+- **Key Tasks & Hardening Implemented:**
+  - [x] **Eliminated Privilege Escalation:** Removed dangerous path-based fallback (`if (!role && path.startsWith('/admin')) role = 'admin'`) from `lib/supabase/middleware.ts`.
+  - [x] **Eliminated Unauthenticated Data Leakage:** Replaced mock data return in `broker-dashboard-actions.ts` and `broker-work-actions.ts` with strict unauthorized rejection.
+  - [x] **Enforced Broker Isolation (Read & Write):** Added broker assignment validation to `getBrokerOrderDetailsAction`, `getBrokerDealContextAction`, `generateFinalDealSnapshotAction`, `getBrokerFinancialLedgerAction`, `logBrokerPaymentAction`, and `resolveDisputeAction`.
+  - [x] **Hardened CRM Access & IDOR Defense:** Added DB role checks and contact ownership verification in `logActivityAction`, `createTaskAction`, and `toggleTaskStatusAction`.
+  - [x] **Protected Deal State Machine:** Added quotation status validation to prevent finalizing `Rejected` or `Cancelled` negotiations in `generateFinalDealSnapshotAction`.
+  - [x] **Automated Security Verification:** Created and executed `src/server/tests/verify-rmbroker-security-rb03.ts` covering all 10 required security scenarios (31/31 passed).
+- **Technical Deliverables:**
+  - Automated Security Verification Suite: `src/server/tests/verify-rmbroker-security-rb03.ts` (31/31 tests passed).
+  - Verification Report Artifact: `rb03_security_access_control_report.md`.
+  - Static Analysis: `npx tsc --noEmit` exits with 0 errors.
+
+### 🟢 Micro-Sprint RB-04: RMBroker App Shell, Authentication & Dashboard Foundation
+- **Status:** `COMPLETED` ✅
+- **Goal:** Implement the foundational application experience for RMBroker with responsive app shell, English & Hindi localization, verified auth integration, and authoritative 6-KPI dashboard.
+- **Key Tasks & Deliverables:**
+  - [x] **English & Hindi Localization Subsystem:** Created `src/lib/i18n/languages.ts`, `translations.ts`, and `language-context.tsx`. 94 English and Hindi translation keys in 100% parity. Localized formatters for INR currency, quantities, and dates.
+  - [x] **Language Selector UI:** Built `src/components/ui/language-selector.tsx` with two-way pill and compact variants, persisting preferences to cookies and localStorage.
+  - [x] **Desktop Sidebar & Navigation:** Upgraded `src/components/dashboard/broker-sidebar.tsx` with all 9 primary and financial entry points (Home, Work, Deals, Orders, Directory, Disputes, Commission, Reports, Notifications, More), verified broker identity display, active state highlights, and sign-out trigger.
+  - [x] **Mobile Navigation & Usability:** Upgraded `src/components/dashboard/broker-mobile-nav.tsx` with sticky top header, compact language toggle, live connectivity indicator, and fixed bottom navigation with minimum 48px touch targets.
+  - [x] **Server Layout Auth Guard:** Hardened `app/(broker)/broker/layout.tsx` to wrap the shell in `LanguageProvider`, initialize language from SSR cookies, and enforce unauthenticated redirect to `/login` and role authorization.
+  - [x] **Authoritative 6-KPI Dashboard:** Enhanced `src/server/actions/broker-dashboard-actions.ts` and `src/components/dashboard/broker-dashboard-client.tsx` to calculate and render all 6 authoritative metrics (Active Deals, Open Requirements, Available Offers, Dispatch Due, Monthly Commission, Open Disputes) with zero PII leakage.
+  - [x] **Transparent Placeholder Architecture:** Deployed `src/components/ui/broker-placeholder.tsx` and planned route placeholders for `/broker/directory` (RB-05), `/broker/reports` (RB-07), and `/broker/notifications` (RB-08) with zero fabricated workflows.
+  - [x] **Automated Verification:** Created and executed `src/server/tests/verify-rmbroker-shell-rb04.ts` (24/24 tests passed, 100%).
+  - [x] **Regression & Security Safety:** Re-verified RB-03 security test suite (31/31 tests passed). `npx tsc --noEmit` exits with 0 errors.
+
+### 🟢 Micro-Sprint RB-05: RMBroker Dashboard Completion & Operational Overview
+- **Status:** `COMPLETED` ✅
+- **Goal:** Complete the RMBroker dashboard as a premium, responsive operational overview for brokers with 8 authoritative KPIs, prioritized pending actions, real activity stream, and quick actions.
+- **Key Tasks & Deliverables:**
+  - [x] **8-KPI Authoritative Metrics Ribbon:** Expanded `getBrokerDashboardDataAction` and `BrokerDashboardClient` to define and calculate 8 authoritative metrics: Active Deals, Open Requirements, Partially Allocated Requirements, Available Offers, Deals Awaiting Confirmation, Dispatch Due, Deliveries in Transit, and Monthly Commission & Pending Invoices, strictly scoped to caller's `brokerId`.
+  - [x] **Prioritized Pending Actions Area:** Built comprehensive 6-category action queue covering Unresolved Disputes (P0), Logistics Delays (P0), Terms Confirmation (P1), Expiring Requirements (P2), Partially Allocated Requirements (P2), and Pending Invoices (P2), each featuring concise context and verified deep links.
+  - [x] **Real Authoritative Recent Activity Stream:** Deployed `BrokerRecentActivity` component sourcing real events from notifications, deal status updates, and dispatch logistics logs with localized categories, badges, and relative timestamps.
+  - [x] **Permission-Aware Quick Actions:** Deployed `BrokerQuickActions` component providing 8 direct shortcuts to verified broker operations (Requirements, Offers, Matching, Deals, Logistics, Disputes, Commission, Directory).
+  - [x] **Operational Search & Category Filtering:** Integrated live client search and category filtering chips allowing brokers to instant-filter actions and pipeline deals by reference or commodity without page reload.
+  - [x] **English & Hindi Localization Expansion:** Expanded translation dictionary to 141 unique keys with 100% key parity across English and Hindi, including Indian currency and metric formatters.
+  - [x] **Security & Zero PII Protection:** Maintained strict server-side broker assignment scoping and zero personal buyer/seller contact PII in active pipeline.
+  - [x] **Automated Verification:** Created and executed `src/server/tests/verify-rmbroker-dashboard-rb05.ts` (22/22 tests passed, 100%).
+  - [x] **Regression & Type Safety:** Re-verified RB-04 test suite (24/24 passed), RB-03 security suite (31/31 passed), and `npx tsc --noEmit` (0 errors).
+
+### 🟢 Micro-Sprint RB-06: RMBroker Buyer & Seller Directory
+- **Status:** `COMPLETED` ✅
+- **Goal:** Implement a production-ready Buyer & Seller Directory for RMBroker allowing brokers to add, view, search, and update authorized buyer and seller contacts; validate contact details; prevent accidental duplicates; and navigate from a contact profile to its associated business records without implying commodity ownership.
+- **Key Tasks & Deliverables:**
+  - [x] **Phone Validation & Normalization Utility:** Built `src/lib/phone-utils.ts` supporting Indian mobile number validation (`^[6-9]\d{9}$`), normalization to E.164 (`+919876543210`), formatted display (`+91 98765 43210`), and safe device dialler (`tel:+91...`) and WhatsApp (`https://wa.me/91...`) deep links with graceful fallbacks.
+  - [x] **English & Hindi Localization Expansion:** Expanded translation dictionary to 203 keys in 100% parity across English and Hindi in `src/lib/i18n/translations.ts`, adding directory navigation, 4 summary metrics, form labels, field-level error messages, duplicate warnings, and contact profile tabs.
+  - [x] **Server-Authoritative Directory Actions:** Built `src/server/actions/broker-directory-actions.ts` with strict session auth (`getAuthenticatedBroker()`) ensuring zero cross-broker contact leakage:
+    - `getBrokerDirectoryContactsAction`: Fetches contacts and calculated summary statistics (`totalContacts`, `buyersCount`, `sellersCount`, `activeMandatesCount`) scoped strictly to `crmContacts.brokerId === caller.id`.
+    - `checkContactDuplicateAction`: Identifies exact phone matches and company matches under caller's workspace without exposing private contacts from other brokers.
+    - `createBrokerContactAction`: Atomically validates and inserts records into `companies`, `users`, and `crmContacts` with server-side duplicate prevention.
+    - `updateBrokerContactAction`: Validates ownership and phone uniqueness against other contacts.
+    - `toggleContactStatusAction`: Soft-toggles contact status (`users.status`) without deleting associated business records or history.
+    - `getBrokerContactDetailsAction`: Aggregates 360-degree profile details, linked requirements, offers, deals, and CRM activities with strict privacy controls.
+  - [x] **Validated Add & Edit Contact Modal:** Built `src/components/directory/contact-form-dialog.tsx` with Zod validation, live on-blur duplicate detection, duplicate warning banner with "View Existing Contact" shortcut, bilingual error feedback, and dual role (Buyer & Seller) support.
+  - [x] **360-Degree Contact Profile Drawer:** Built `src/components/directory/contact-profile-drawer.tsx` with 1-tap Call and WhatsApp actions, edit modal trigger, soft status toggle, and 5 authoritative tabs (Overview, Requirements, Offers, Deals, Activity) showing connected records or graceful unconnected states.
+  - [x] **Responsive Directory Container:** Built `src/components/directory/broker-directory-workspace.tsx` with 4 KPI summary cards, role tab selector (`All`, `Buyers`, `Sellers`), live search by name/company/phone/city, status dropdown, responsive cards with $\ge 48\text{px}$ touch targets, and loading/empty/error states.
+  - [x] **Live Directory Route:** Connected `app/(broker)/broker/directory/page.tsx` to server-side data fetching and `BrokerDirectoryWorkspace`, replacing the RB-04/05 placeholder.
+  - [x] **Automated Verification:** Created and executed `src/server/tests/verify-rmbroker-directory-rb06.ts` (22/22 tests passed, 100%).
+  - [x] **Regression & Type Safety:** Re-verified RB-05 test suite (22/22 passed), RB-04 test suite (24/24 passed), RB-03 security suite (31/31 passed), and `npx tsc --noEmit` (0 errors).
+
+### 🟢 Micro-Sprint RB-07: RMBroker Global Search & Communication
+- **Status:** `COMPLETED` ✅
+- **Goal:** Implement a unified, permission-aware global search and broker communication entry point for RMBroker allowing brokers to quickly locate buyers, sellers, materials, grades, requirements, offers, and deals with voice-to-text search, manual typing fallback, and user-initiated phone and WhatsApp actions without direct buyer-to-seller deal negotiation chat.
+- **Key Tasks & Deliverables:**
+  - [x] **Server-Authoritative Global Search Actions (`broker-search-actions.ts`):** Implemented `searchGlobalAction` querying 5 authorized entities (Contacts, Materials, Requirements, Offers, Deals) with input sanitization, parameterized queries, and strict broker session authorization (`crmContacts.brokerId === caller.id`, `requirements.brokerId === caller.id OR visibility = 'global'`). Implemented `getQuickDialContactsAction` for authorized phone/WhatsApp retrieval.
+  - [x] **Voice-to-Text Search Integration (`voice-search-button.tsx`):** Built accessible Web Speech API component featuring browser detection, clean permission-denied / error handling, reviewable/editable transcripts before submission, and reliable manual typing fallback.
+  - [x] **Global Search Workspace (`global-search-workspace.tsx`):** Built responsive search interface with live 300ms debounce, entity category filter chips with result counts, localStorage-based recent searches, and rich cards with direct Call/WhatsApp action links.
+  - [x] **Floating Communication Speed-Dial FAB (`quick-communication-fab.tsx`):** Built floating communication speed-dial button and Quick Broker Dialler modal with contact search, 1-tap Call (`tel:`), 1-tap WhatsApp (`https://wa.me/`) with pre-composed professional broker inquiry template, and prominent fiduciary mediation notice.
+  - [x] **Command Palette Global Search Modal (`global-search-modal.tsx`):** Implemented `Ctrl+K` / `Cmd+K` global keyboard shortcut listener mounted across the entire broker application shell.
+  - [x] **Dedicated Search Page (`app/(broker)/broker/search/page.tsx`):** Mounted `/broker/search` route with pre-populated query and category params.
+  - [x] **Navigation Integration:** Added Global Search to `BROKER_CORE_NAV_ITEMS` in `broker-sidebar.tsx` and mobile top header in `broker-mobile-nav.tsx`.
+  - [x] **Bilingual Localization Expansion (`translations.ts`):** Expanded dictionary to 244 keys with 100% key parity across English and Hindi for search, voice prompts, error messages, and communication disclaimers.
+  - [x] **Automated Verification:** Created and executed `src/server/tests/verify-rmbroker-search-rb07.ts` (22/22 tests passed, 100%).
+### 🟢 Micro-Sprint RB-08: RMBroker Requirements & Seller Offers
+- **Status:** `COMPLETED` ✅
+- **Goal:** Implement the broker-facing workflows for creating, viewing, editing, and managing buyer material requirements and seller material offers with strict quantity/availability integrity, state machine lifecycles, broker isolation, bilingual localization, and fiduciary non-ownership boundaries.
+- **Key Tasks & Deliverables:**
+  - [x] **Database Schema & Preflight Audit:** Verified existing Drizzle schema in `schema.ts`. `requirements` and `availabilities` tables already possess all required attributes (`quantity`, `fulfilledQuantity`, `totalQuantity`, `availableQuantity`, `reservedQuantity`, `soldQuantity`, `askingPrice`, `confidentialMinimumPrice`, `loadingStatus`, `version`, `deliveryTermsId`). No unapproved database migration required.
+  - [x] **Server-Authoritative Mandate Actions (`broker-mandate-actions.ts`):** Built enterprise server actions with strict session derivation (`getAuthenticatedBroker()`) ensuring zero cross-broker data tampering:
+    - `getBrokerTradeFormMasterDataAction`: Fetches active buyer/seller companies from caller's CRM contacts, master commodities, grades, measurement units, warehouse states, and mandi districts.
+    - `getBrokerRequirementsAction`: Queries buyer requirements scoped to caller's `brokerId`, calculates requested vs. allocated vs. remaining quantities (`remaining = max(0, requested - allocated)`), fulfillment percentages, urgency ($\le 48\text{h}$), and authoritative summary metrics.
+    - `createBrokerRequirementAction`: Validates positive quantity and target price, future delivery date, and inserts requirement with `fulfilledQuantity = 0`, `status = 'Open'`, and caller `brokerId`.
+    - `updateBrokerRequirementAction`: Validates ownership, restricts updates on closed mandates, and enforces quantity integrity guard (cannot reduce requested quantity below already allocated `fulfilledQuantity`).
+    - `cancelBrokerRequirementAction`: Validates non-empty cancellation reason ($\ge 3$ characters), sets `status = 'Cancelled'`, and preserves audit history.
+    - `renewBrokerRequirementAction`: Validates future delivery date and reactivates expired or cancelled requirements to `'Open'`.
+    - `getBrokerSellerOffersAction`: Queries material offers scoped to caller's `brokerId`, calculates total offered vs. available vs. reserved vs. sold quantities (`available = total - reserved - sold`), floor prices, loading status, and summary metrics.
+    - `createBrokerSellerOfferAction`: Validates quantity, asking price, confidential floor price ($\le$ asking price), location, dates, and loading readiness; sets `version = 1`, `status = 'Open'`, and caller `brokerId`.
+    - `updateBrokerSellerOfferAction`: Optimistic concurrency control via `expectedVersion`, quantity integrity floor guard (cannot reduce total lot below `reserved + sold`), recalculates `availableQuantity`, and increments `version`.
+    - `cancelBrokerSellerOfferAction`: Validates reason, blocks cancellation if material has active reserved volume (`reservedQuantity > 0`), sets `status = 'Unavailable'`.
+    - `renewBrokerSellerOfferAction`: Validates future validity date and reopens expired offers to `'Open'`.
+  - [x] **Buyer Requirement Form Dialog (`requirement-form-dialog.tsx`):** Built responsive modal with CRM buyer selector, cascading commodity/grade dropdowns, positive quantity and target price validation, delivery terms, future date picker, allocated quantity floor warnings, and bilingual feedback.
+  - [x] **Seller Offer Form Dialog (`offer-form-dialog.tsx`):** Built responsive modal with CRM seller selector, cascading commodity/grade dropdowns, offered quantity, asking price, confidential floor price, warehouse state and district cascading dropdowns, loading readiness status selector (`Ready to Load`, `Not Ready`, `Delayed`, etc.), fiduciary disclaimer, and bilingual feedback.
+  - [x] **Seller Offers Inbox View (`broker-offers-inbox.tsx`):** Built full-featured supply desk interface with 4 KPI summary cards (Total Offers, Total Available Supply MT, Ready to Dispatch Lots, Expiring Soon), multi-status filter chips (`All`, `Available`, `Partial`, `Reserved`, `Expiring`, `Closed`), live search, sort options (Newest, Volume, Price, Expiry), offer cards with loading badges and version tags, and Edit, Cancel (with reason dialog), and Renew actions.
+  - [x] **Broker Work Desk Integration (`broker-work-workspace.tsx` & `broker-requirements-inbox.tsx`):** Added "Seller Offers" tab to main workspace with `Package` icon, updated `RequirementCard` to display allocated and remaining volume with life-cycle Edit, Cancel, and Renew action buttons, and added quick "+ New Requirement" and "+ New Seller Offer" triggers.
+  - [x] **Bilingual Localization Expansion (`translations.ts`):** Expanded dictionary to 292 keys in 100% parity across English and Hindi, adding requirement/offer creation, editing, cancellation, renewal, quantity breakdown (`qtyRequested`, `qtyAllocated`, `qtyRemaining`, `qtyOffered`, `qtyAvailable`, `qtyReserved`, `qtySold`), and broker non-ownership disclaimer.
+  - [x] **Fiduciary Non-Ownership Notice:** Emphasized on both client dialogs and server payloads: "RMBroker is a broker platform and does not own or store physical commodity inventory."
+  - [x] **Automated Verification:** Created and executed `src/server/tests/verify-rmbroker-requirements-offers-rb08.ts` (20/20 tests passed, 100%).
+  - [x] **Regression & Type Safety:** Re-verified RB-07 (22/22 passed), RB-06 (22/22 passed), RB-05 (22/22 passed), RB-04 (24/24 passed), RB-03 (31/31 passed), and `npx tsc --noEmit` (0 errors).
+
+### 🟢 Micro-Sprint RB-09: RMBroker Match Center & Allocation
+- **Status:** `COMPLETED` ✅
+- **Goal:** Implement a broker-facing Match Center that evaluates suitable seller offers for buyer requirements and supports controlled, multi-seller partial allocations with strict concurrency controls, atomic quantity updates, optimistic locking, non-reservation fiduciary safeguards, and 100% bilingual localization.
+- **Key Tasks & Deliverables:**
+  - [x] **Preflight Audit & Explicit Approval:** Identified missing `requirement_allocations` table from live schema. Stopped and requested user approval via `ask_question`. User approved Migration 0035 (`0035_add_requirement_allocations.sql`). Applied migration creating `requirement_allocations` table with all 17 attributes and 4 indexes. Verified Drizzle ORM model in `src/server/db/schema.ts`.
+  - [x] **Matching Rules & Explainability Engine (`match-engine.ts` & `broker-match-actions.ts`):** Evaluates Commodity (35%), Grade (25%), Price Proximity (20%), Location Index (10%), Quantity Coverage (7%), and Delivery Date (3%). Hard filter rejections (commodity mismatch, inactive status, expired validity, or zero availability) return score 0 with explicit risks. Match reasons and consideration drivers provided for full transparency.
+  - [x] **Server-Authoritative Allocation Actions (`broker-allocation-actions.ts`):**
+    - `getRequirementAllocationsAction`: Authoritative listing of allocations with summary (`totalRequested`, `totalAllocated`, `remainingBalance`) strictly scoped to assigned broker.
+    - `proposeAllocationAction`: Validates positive quantity, requirement remaining balance, offer availability, unexpired validity, generates unique `ALC-YYYYMMDD-XXXX` reference, records `PROPOSED` status, and logs audit event.
+    - `confirmAllocationAction`: Concurrency-safe operation executing in `db.transaction()` with optimistic version locking on `availabilities.version` and atomic updates (`availableQuantity = availableQuantity - allocatedQuantity`, `reservedQuantity = reservedQuantity + allocatedQuantity`, `fulfilledQuantity = fulfilledQuantity + allocatedQuantity`) preventing double-allocation and over-allocation.
+    - `cancelAllocationAction`: Validates reason ($\ge 3$ chars), enforces critical Deal Guard (blocks cancellation if `dealId IS NOT NULL`), transactionally restores availability volume and decrements fulfilled quantity, sets status to `RELEASED`, and logs audit event.
+  - [x] **Bilingual Localization Expansion (`translations.ts`):** Expanded translation dictionary to 338 keys with 100% parity across English and Hindi for Match Center, matching explanations, allocation progress, propose/confirm/cancel actions, validation errors, and non-reservation fiduciary disclaimer.
+  - [x] **Allocation UI Components:**
+    - `allocation-dialog.tsx`: Propose and Confirm allocation modal with live balance simulation, max available quick-fill button, price basis selection, and fiduciary warning.
+    - `allocations-list.tsx`: Active multi-seller allocations breakdown table with status badges (`PROPOSED`, `CONFIRMED`, `COMMITTED_TO_DEAL`, `RELEASED`), confirm action, and release modal with required cancellation reason.
+    - `matches-view.tsx`: Upgraded with visual Allocation Progress Bar (Requested, Allocated, Remaining), fiduciary legal disclaimer banner, active allocations list, "Allocate Volume" button on match cards, and location/price filters.
+  - [x] **Fiduciary Non-Reservation Invariant:** Prominently declared on client and server: "Matching is a recommendation only, not a reservation or confirmed deal. An allocation is not a finalized transaction or physical stock verification."
+  - [x] **Automated Verification:** Created and executed `src/server/tests/verify-rmbroker-match-allocation-rb09.ts` (21/21 tests passed, 100%).
+  - [x] **Full Regression & Type Safety:** Re-verified RB-08 (20/20 passed), RB-07 (22/22 passed), RB-06 (22/22 passed), RB-05 (22/22 passed), RB-04 (24/24 passed), RB-03 (31/31 passed), and `npx tsc --noEmit` (0 errors).
+
+### 🟢 Micro-Sprint RB-10: RMBroker Deal Creation & Negotiation
+- **Status:** `COMPLETED` ✅
+- **Goal:** Implement the broker-facing Deal Creation & Negotiation module, using authorized requirement allocations and seller offers to create and manage commercial deals with versioned negotiation, dual counterparty confirmation, pre-flight finalization gate, transactional allocation release, and broker-mediated boundaries.
+- **Key Tasks & Deliverables:**
+  - [x] **Preflight Verification & Database Model:** Inspected existing `deals`, `deal_versions`, `quotations`, `requirement_allocations`, `negotiation_events`, and `bookings` tables. Verified that the approved schema completely supports deal creation, allocation binding (`dealId`), version snapshots (`snapshot_payload`), dual confirmations, audit logs, and bookings. No database migration was required.
+  - [x] **Server-Authoritative Deal Actions (`broker-deal-actions.ts`):**
+    - `createDealFromAllocationAction`: Enforces broker authorization, checks allocation is in `CONFIRMED` status with `dealId IS NULL`, validates requirement and seller offer validity, resolves buyer and seller counterparty IDs, creates `deals` record (`status = 'Draft'`), updates `requirement_allocations` to `COMMITTED_TO_DEAL` with `dealId`, generates immutable Version 1 snapshot, dispatches notifications, and logs `DEAL_CREATED` decision gate audit event.
+    - `updateDealTermsAction`: Implements versioned negotiation with optimistic concurrency control (`expectedVersion`). Computes material differences with `detectMaterialChanges` and `getMaterialDiffList`. On material revisions: creates immutable incremental version (`v1 -> v2`), marks previous versions as `Superseded`, strictly invalidates prior buyer/seller confirmations, transitions deal back to `'Negotiation'`, dispatches notification alerts, and logs `DEAL_TERMS_REVISED`.
+    - `recordPartyConfirmationAction`: Records authorized confirmation for `BUYER` or `SELLER` against the exact latest version number; rejects stale versions (`STALE_VERSION_DETECTED`); updates status to `'Awaiting Buyer Confirmation'`, `'Awaiting Seller Confirmation'`, or `'Ready to Finalize'` when both parties have confirmed.
+    - `finalizeBrokerDealAction`: Enforces Pre-Flight Finalization Gate (strictly blocks finalization unless BOTH Buyer and Seller have confirmed the identical latest version); generates unique booking reference `BKG-YYYY-XXXX` in `bookings` table; locks deal in `'Finalized'` status; dispatches contract booking notifications; and logs `DEAL_FINALIZED`.
+    - `cancelDealAction`: Requires non-empty cancellation reason ($\ge 3$ characters); sets deal status to `'Cancelled'`; and executes transactional allocation rollback (sets linked allocations to `RELEASED`, restores available supply quantity, and decrements requirement fulfilled quantity).
+    - `getBrokerDealsListAction`: Fetches deals scoped to broker desk with summary stats, counterparty names, version numbers, confirmation state, and search/status filters.
+    - `getBrokerDealDetailAction`: Aggregates 360-degree deal context, full version history with visual term diffs, dual confirmation tracker, linked allocation, requirement, availability, booking details, and negotiation events.
+  - [x] **Bilingual Localization Expansion (`translations.ts`):** Added 46 RB-10 keys (`dealsTitle`, `createDeal`, `dealStatusDraft`, `dealStatusNegotiation`, `dealStatusReadyToFinalize`, `dealStatusFinalized`, `valBothConfirmationsRequired`, `valMaterialTermsChanged`, etc.) with 100% key parity between English (383 keys) and Hindi (383 keys).
+  - [x] **Broker Deal UI Components:**
+    - `deal-create-dialog.tsx`: Modal allowing broker to create a deal directly from an eligible confirmed allocation in the Match Center / Allocations list with price, quantity, price basis, and delivery terms.
+    - `allocations-list.tsx`: Enhanced with "Create Deal" button on confirmed allocations and "View Deal" links for committed allocations.
+    - `broker-deals-client.tsx`: Comprehensive deals workspace with live filter tabs (`All`, `Draft`, `Negotiation`, `Awaiting`, `Ready to Finalize`, `Finalized`, `Cancelled`), live search, 4 KPI summary cards, responsive deal cards with confirmation indicators, and valuation summaries.
+    - `deal-negotiation-workspace.tsx`: Rich negotiation view with dual counterparty confirmation card, pre-flight gate status banner, active terms summary, version history timeline with visual term diffs, terms revision dialog, confirmation dialog, and cancellation modal.
+    - `app/(broker)/broker/deals/page.tsx`: Updated to render `BrokerDealsClient`.
+    - `app/(broker)/broker/deals/[id]/page.tsx`: Updated to render `DealNegotiationWorkspace`.
+  - [x] **Automated Verification:** Created and executed `src/server/tests/verify-rmbroker-deal-negotiation-rb10.ts` (23/23 tests passed, 100%).
+  - [x] **Full Regression & Type Safety:** Re-verified RB-09 (21/21 passed), RB-08 (20/20 passed), RB-07 (22/22 passed), RB-06 (22/22 passed), RB-05 (22/22 passed), RB-04 (24/24 passed), RB-03 (31/31 passed), and `npx tsc --noEmit` (0 errors). Total assertions verified: 185/185 passing.
 
 
 

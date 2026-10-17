@@ -22,6 +22,16 @@ export async function getCrmContactsAction() {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { success: false, error: "Unauthorized" };
 
+    const [dbUser] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (!dbUser || (dbUser.role !== 'broker' && dbUser.role !== 'admin')) {
+      return { success: false, error: "Forbidden: Broker role required" };
+    }
+
     const brokerId = user.id;
 
     // Contact map to de-duplicate by ID
@@ -212,6 +222,28 @@ export async function logActivityAction(data: unknown) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { success: false, error: "Unauthorized" };
 
+    const [dbUser] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (!dbUser || (dbUser.role !== 'broker' && dbUser.role !== 'admin')) {
+      return { success: false, error: "Forbidden: Broker role required" };
+    }
+
+    if (dbUser.role !== 'admin') {
+      const contactRecord = await db
+        .select({ id: crmContacts.id, brokerId: crmContacts.brokerId })
+        .from(crmContacts)
+        .where(eq(crmContacts.id, parsedData.contact_id))
+        .limit(1);
+
+      if (contactRecord.length === 0 || contactRecord[0].brokerId !== user.id) {
+        return { success: false, error: "Unauthorized: You do not have permission to manage this contact" };
+      }
+    }
+
     const inserted = await db.insert(crmActivities).values({
       contactId: parsedData.contact_id,
       type: parsedData.type,
@@ -230,6 +262,16 @@ export async function getTasksAction() {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { success: false, error: "Unauthorized" };
+
+    const [dbUser] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (!dbUser || (dbUser.role !== 'broker' && dbUser.role !== 'admin')) {
+      return { success: false, error: "Forbidden: Broker role required" };
+    }
 
     const results = await db
       .select()
@@ -256,6 +298,28 @@ export async function createTaskAction(data: unknown) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { success: false, error: "Unauthorized" };
 
+    const [dbUser] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (!dbUser || (dbUser.role !== 'broker' && dbUser.role !== 'admin')) {
+      return { success: false, error: "Forbidden: Broker role required" };
+    }
+
+    if (parsedData.contact_id && dbUser.role !== 'admin') {
+      const contactRecord = await db
+        .select({ id: crmContacts.id, brokerId: crmContacts.brokerId })
+        .from(crmContacts)
+        .where(eq(crmContacts.id, parsedData.contact_id))
+        .limit(1);
+
+      if (contactRecord.length === 0 || contactRecord[0].brokerId !== user.id) {
+        return { success: false, error: "Unauthorized: You do not have permission to attach tasks to this contact" };
+      }
+    }
+
     const brokerIdToUse = user.id;
 
     const inserted = await db.insert(crmTasks).values({
@@ -278,6 +342,16 @@ export async function toggleTaskStatusAction(taskId: string) {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { success: false, error: "Unauthorized" };
+
+    const [dbUser] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (!dbUser || (dbUser.role !== 'broker' && dbUser.role !== 'admin')) {
+      return { success: false, error: "Forbidden: Broker role required" };
+    }
 
     const existingTasks = await db.select().from(crmTasks).where(
       and(

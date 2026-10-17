@@ -229,6 +229,31 @@ export const labTestResults = pgTable('lab_test_results', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const requirementAllocations = pgTable('requirement_allocations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  allocationReference: text('allocation_reference').notNull().unique(),
+  requirementId: uuid('requirement_id').references(() => requirements.id).notNull(),
+  availabilityId: uuid('availability_id').references(() => availabilities.id).notNull(),
+  brokerId: uuid('broker_id').references(() => users.id).notNull(),
+  dealId: uuid('deal_id').references(() => deals.id),
+  allocatedQuantity: doublePrecision('allocated_quantity').notNull(),
+  unitId: uuid('unit_id').references(() => masterUnits.id).notNull(),
+  priceBasis: text('price_basis').default('FOR_DESTINATION'),
+  allocatedPrice: numeric('allocated_price'),
+  status: text('status').default('PROPOSED').notNull(), // 'PROPOSED', 'CONFIRMED', 'COMMITTED_TO_DEAL', 'RELEASED', 'CANCELLED'
+  notes: text('notes'),
+  releaseReason: text('release_reason'),
+  version: integer('version').default(1).notNull(),
+  allocatedAt: timestamp('allocated_at', { withTimezone: true }).defaultNow().notNull(),
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+  releasedAt: timestamp('released_at', { withTimezone: true }),
+}, (table) => [
+  index('idx_alloc_requirement').on(table.requirementId, table.status),
+  index('idx_alloc_availability').on(table.availabilityId, table.status),
+  index('idx_alloc_broker').on(table.brokerId),
+  index('idx_alloc_deal').on(table.dealId),
+]);
+
 export const quotations = pgTable('quotations', {
   id: uuid('id').defaultRandom().primaryKey(),
   requirementId: uuid('requirement_id').notNull(),

@@ -65,3 +65,17 @@ scratch/
 .vscode/
 *.swp
 *.swo
+
+# flutter & mobile
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+apps/rmbroker_mobile/build/
+apps/rmbroker_mobile/.dart_tool/
+apps/rmbroker_mobile/.flutter-plugins
+apps/rmbroker_mobile/.flutter-plugins-dependencies
+apps/rmbroker_mobile/android/.gradle/
+apps/rmbroker_mobile/android/local.properties
+

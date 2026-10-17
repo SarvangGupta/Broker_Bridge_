@@ -229,7 +229,7 @@ export async function getBrokerActiveOrdersAction(): Promise<{
     }
 
     if (authError || !authUser) {
-      return { success: true, data: DEMO_BROKER_ORDERS };
+      return { success: false, error: 'Unauthorized: Valid broker session required' };
     }
 
     const dbUser = await db.query.users.findFirst({
@@ -240,8 +240,13 @@ export async function getBrokerActiveOrdersAction(): Promise<{
       return { success: false, error: 'User profile not found' };
     }
 
+    const role = (dbUser.role || '').toLowerCase();
+    if (role !== 'broker' && role !== 'admin') {
+      return { success: false, error: 'Forbidden: Broker access privileges required' };
+    }
+
     const userId = authUser.id;
-    const isPlatformAdmin = dbUser.role === 'admin' || dbUser.role === 'ADMIN';
+    const isPlatformAdmin = role === 'admin';
 
     // 1. Fetch bookings joined with deals, quotations, deal_versions, availabilities
     const joinedRows = await db
@@ -454,13 +459,19 @@ export async function getBrokerOrderDetailsAction(
   error?: string;
 }> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
+    let authUser: any = null;
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (!authError && user) authUser = user;
+    } catch (e) {
+      authUser = null;
+    }
 
-    if (authError || !authUser) {
+    if (!authUser) {
       return { success: false, error: 'Unauthorized: Valid broker session required' };
     }
 
@@ -486,6 +497,21 @@ export async function getBrokerOrderDetailsAction(
       return { success: false, error: 'Booking record not found.' };
     }
 
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, authUser.id),
+    });
+
+    if (!dbUser) {
+      return { success: false, error: 'User profile not found.' };
+    }
+
+    const role = (dbUser.role || '').toLowerCase();
+    if (role !== 'broker' && role !== 'admin') {
+      return { success: false, error: 'Forbidden: Broker access privileges required.' };
+    }
+
+    const isPlatformAdmin = role === 'admin';
+
     // 2. Resolve Deal, Version, and Availability
     const dealRecord = await db.query.deals.findFirst({
       where: or(eq(deals.id, bookingRecord.dealId), eq(deals.quotationId, bookingRecord.dealId)),
@@ -496,6 +522,18 @@ export async function getBrokerOrderDetailsAction(
           where: eq(quotations.id, dealRecord.quotationId),
         })
       : null;
+
+    const isAuthorizedBroker =
+      isPlatformAdmin ||
+      dealRecord?.brokerId === authUser.id ||
+      quotationRecord?.brokerId === authUser.id;
+
+    if (!isAuthorizedBroker) {
+      return {
+        success: false,
+        error: 'Forbidden: You do not have permission to view this order.',
+      };
+    }
 
     const lockedVersion = await db.query.dealVersions.findFirst({
       where: eq(dealVersions.id, bookingRecord.lockedVersionId),

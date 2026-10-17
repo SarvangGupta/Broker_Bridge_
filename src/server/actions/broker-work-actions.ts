@@ -180,7 +180,7 @@ export async function getBrokerAssignedRequirementsAction(): Promise<BrokerAssig
     }
 
     if (authError || !authUser) {
-      return { success: true, data: DEMO_BROKER_REQUIREMENTS };
+      return { success: false, error: 'Unauthorized: Valid broker session required' };
     }
 
     // Verify user role & identity in database

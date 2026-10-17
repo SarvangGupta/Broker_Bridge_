@@ -11,8 +11,10 @@ import {
   Handshake,
   ArrowRight,
   Search,
+  Package,
 } from 'lucide-react';
 import { BrokerRequirementsInbox } from './broker-requirements-inbox';
+import { BrokerOffersInbox } from './broker-offers-inbox';
 import { MatchesView } from './matches-view';
 import { BrokerQualityHub } from './broker-quality-hub';
 import { BrokerNegotiationsHub } from '../negotiation/broker-negotiations-hub';
@@ -35,7 +37,7 @@ export function BrokerWorkWorkspace({
   const [selectedReqId, setSelectedReqId] = useState<string | null>(urlReqId || null);
 
   useEffect(() => {
-    if (urlTab && ['requirements', 'matches', 'quality', 'negotiations'].includes(urlTab)) {
+    if (urlTab && ['requirements', 'offers', 'matches', 'quality', 'negotiations'].includes(urlTab)) {
       setActiveTab(urlTab);
     }
     if (urlReqId) {
@@ -59,7 +61,7 @@ export function BrokerWorkWorkspace({
   return (
     <div className="w-full space-y-6">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full space-y-6">
-        {/* MOBILE LOOPHOLE FIX: w-full justify-start overflow-x-auto touch-pan-x flex-nowrap */}
+        {/* MOBILE OVERFLOW COMPLIANT TABS */}
         <div className="w-full overflow-x-auto touch-pan-x pb-1 scrollbar-none">
           <TabsList className="w-full min-w-max justify-start overflow-x-auto touch-pan-x flex-nowrap bg-slate-100/80 p-1 rounded-xl h-12 border border-slate-200/60">
             <TabsTrigger
@@ -67,12 +69,20 @@ export function BrokerWorkWorkspace({
               className="min-h-[40px] px-4 rounded-lg font-semibold text-xs sm:text-sm data-active:bg-white data-active:text-[#0D9488] data-active:shadow-xs transition-all whitespace-nowrap flex items-center gap-1.5"
             >
               <FileText className="w-4 h-4 shrink-0" />
-              <span>Requirements</span>
+              <span>Buyer Requirements</span>
               {initialRequirements.length > 0 && (
                 <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-teal-100 text-teal-800 font-bold ml-0.5">
                   {initialRequirements.length}
                 </span>
               )}
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="offers"
+              className="min-h-[40px] px-4 rounded-lg font-semibold text-xs sm:text-sm data-active:bg-white data-active:text-[#0D9488] data-active:shadow-xs transition-all whitespace-nowrap flex items-center gap-1.5"
+            >
+              <Package className="w-4 h-4 shrink-0" />
+              <span>Seller Offers</span>
             </TabsTrigger>
 
             <TabsTrigger
@@ -101,7 +111,7 @@ export function BrokerWorkWorkspace({
           </TabsList>
         </div>
 
-        {/* Tab Content: Requirements (Micro-Sprint 23.1 LIVE) */}
+        {/* Tab Content: Buyer Requirements */}
         <TabsContent value="requirements" className="mt-0 focus-visible:outline-hidden">
           <BrokerRequirementsInbox
             initialRequirements={initialRequirements}
@@ -109,7 +119,12 @@ export function BrokerWorkWorkspace({
           />
         </TabsContent>
 
-        {/* Tab Content: Matches (Micro-Sprint 24.1 LIVE) */}
+        {/* Tab Content: Seller Offers (RB-08 LIVE) */}
+        <TabsContent value="offers" className="mt-0 focus-visible:outline-hidden">
+          <BrokerOffersInbox />
+        </TabsContent>
+
+        {/* Tab Content: Matches */}
         <TabsContent value="matches" className="mt-0 focus-visible:outline-hidden">
           <MatchesView
             availableRequirements={initialRequirements}
@@ -117,7 +132,7 @@ export function BrokerWorkWorkspace({
           />
         </TabsContent>
 
-        {/* Tab Content: Quality (Micro-Sprint 24.2 LIVE) */}
+        {/* Tab Content: Quality */}
         <TabsContent value="quality" className="mt-0 focus-visible:outline-hidden">
           <BrokerQualityHub
             requirements={initialRequirements}
@@ -125,7 +140,7 @@ export function BrokerWorkWorkspace({
           />
         </TabsContent>
 
-        {/* Tab Content: Negotiations (Micro-Sprint 25.1 LIVE) */}
+        {/* Tab Content: Negotiations */}
         <TabsContent value="negotiations" className="mt-0 focus-visible:outline-hidden">
           <BrokerNegotiationsHub />
         </TabsContent>

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { db } from "@/src/server/db"
 import { 
+  users,
   companies, 
   masterCommodities, 
   masterCategories, 
@@ -20,6 +21,16 @@ export async function getBrokerAssignmentsAction() {
 
     if (authError || !user) {
       return { success: false, error: 'Unauthorized' }
+    }
+
+    const [dbUser] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (!dbUser || (dbUser.role !== 'broker' && dbUser.role !== 'admin')) {
+      return { success: false, error: 'Forbidden: Broker or admin role required' };
     }
 
     // 1. Fetch assigned requirements

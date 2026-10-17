@@ -18,6 +18,9 @@ import {
   ChevronRight,
   Info,
   Loader2,
+  Edit2,
+  XCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,9 +41,18 @@ import { toast } from 'sonner';
 interface RequirementCardProps {
   requirement: BrokerAssignedRequirement;
   onFindSeller?: (requirement: BrokerAssignedRequirement) => void;
+  onEdit?: (requirement: BrokerAssignedRequirement) => void;
+  onCancel?: (requirement: BrokerAssignedRequirement) => void;
+  onRenew?: (requirement: BrokerAssignedRequirement) => void;
 }
 
-export function RequirementCard({ requirement, onFindSeller }: RequirementCardProps) {
+export function RequirementCard({
+  requirement,
+  onFindSeller,
+  onEdit,
+  onCancel,
+  onRenew,
+}: RequirementCardProps) {
   const [isClarifyOpen, setIsClarifyOpen] = useState(false);
   const [clarifyNotes, setClarifyNotes] = useState('');
   const [isSubmittingClarify, setIsSubmittingClarify] = useState(false);
@@ -191,6 +203,10 @@ export function RequirementCard({ requirement, onFindSeller }: RequirementCardPr
                   {formattedUnit}
                 </span>
               </div>
+              <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                <span>Allocated: <strong className="text-slate-800">{requirement.fulfilledQuantity || 0} {formattedUnit}</strong></span>
+                <span>Remaining: <strong className="text-[#0D9488]">{Math.max(0, requirement.quantity - (requirement.fulfilledQuantity || 0))} {formattedUnit}</strong></span>
+              </div>
               {requirement.fulfilledQuantity > 0 && (
                 <div className="mt-1">
                   <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -199,9 +215,6 @@ export function RequirementCard({ requirement, onFindSeller }: RequirementCardPr
                       style={{ width: `${requirement.fulfillmentPercentage}%` }}
                     />
                   </div>
-                  <span className="text-[10px] text-slate-500 font-medium mt-0.5 block">
-                    {requirement.fulfilledQuantity} {formattedUnit} fulfilled ({requirement.fulfillmentPercentage}%)
-                  </span>
                 </div>
               )}
             </div>
@@ -265,32 +278,75 @@ export function RequirementCard({ requirement, onFindSeller }: RequirementCardPr
           )}
         </div>
 
-        {/* Task 3: Primary Actions (The Triad) */}
-        {/* TOUCH TARGET RULE: Both buttons MUST possess min-h-[48px] */}
-        <div className="p-3 sm:p-4 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row gap-2.5">
-          {/* Action 1 (Primary CTA): Prominent "Find Seller" with Electric Teal Accent */}
-          <Link
-            href={`/broker/work/supply?requirementId=${requirement.id}&commodity=${requirement.commodityId}`}
-            onClick={() => {
-              if (onFindSeller) onFindSeller(requirement);
-            }}
-            className="flex-1 min-h-[48px] h-12 bg-[#0D9488] hover:bg-teal-700 text-white font-bold text-sm shadow-xs rounded-lg transition-all flex items-center justify-center gap-2 px-4"
-          >
-            <Search className="w-4 h-4 shrink-0" />
-            <span>Find Seller</span>
-            <ChevronRight className="w-4 h-4 ml-auto sm:ml-0 opacity-70 shrink-0" />
-          </Link>
+        {/* Task 3: Primary Actions (The Triad) + Life-Cycle Actions */}
+        <div className="p-3 sm:p-4 bg-slate-50/60 border-t border-slate-100 flex flex-col gap-2.5">
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            {/* Action 1 (Primary CTA): Prominent "Find Seller" with Electric Teal Accent */}
+            <Link
+              href={`/broker/work/supply?requirementId=${requirement.id}&commodity=${requirement.commodityId}`}
+              onClick={() => {
+                if (onFindSeller) onFindSeller(requirement);
+              }}
+              className="flex-1 min-h-[48px] h-12 bg-[#0D9488] hover:bg-teal-700 text-white font-bold text-sm shadow-xs rounded-lg transition-all flex items-center justify-center gap-2 px-4"
+            >
+              <Search className="w-4 h-4 shrink-0" />
+              <span>Find Seller</span>
+              <ChevronRight className="w-4 h-4 ml-auto sm:ml-0 opacity-70 shrink-0" />
+            </Link>
 
-          {/* Action 2 (Secondary CTA): Outline "Ask Buyer" */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setIsClarifyOpen(true)}
-            className="min-h-[48px] h-12 border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-sm rounded-lg transition-all flex items-center justify-center gap-2 px-4 shrink-0"
-          >
-            <MessageSquare className="w-4 h-4 text-slate-500 shrink-0" />
-            <span>Ask Buyer</span>
-          </Button>
+            {/* Action 2 (Secondary CTA): Outline "Ask Buyer" */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsClarifyOpen(true)}
+              className="min-h-[48px] h-12 border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-sm rounded-lg transition-all flex items-center justify-center gap-2 px-4 shrink-0"
+            >
+              <MessageSquare className="w-4 h-4 text-slate-500 shrink-0" />
+              <span>Ask Buyer</span>
+            </Button>
+          </div>
+
+          {/* Mandate Life-Cycle Actions: Edit, Renew, Cancel */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
+            <div className="flex items-center gap-1.5">
+              {onEdit && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onEdit(requirement)}
+                  className="min-h-[36px] h-9 px-2 text-xs text-slate-600 hover:text-slate-900"
+                >
+                  <Edit2 className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                  <span>Edit Mandate</span>
+                </Button>
+              )}
+              {onRenew && (requirement.isUrgent || requirement.status === 'Expired') && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRenew(requirement)}
+                  className="min-h-[36px] h-9 px-2 text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  <span>Renew</span>
+                </Button>
+              )}
+            </div>
+            {onCancel && requirement.status !== 'Closed' && requirement.status !== 'Cancelled' && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onCancel(requirement)}
+                className="min-h-[36px] h-9 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+              >
+                <XCircle className="w-3.5 h-3.5 mr-1" />
+                <span>Cancel</span>
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
 

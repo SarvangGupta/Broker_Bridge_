@@ -13,21 +13,40 @@ import {
   masterCommodities,
   masterGrades,
   users,
+  availabilities,
+  disputes,
+  invoices,
+  notifications,
 } from '@/src/server/db/schema';
 import { eq, and, notInArray, inArray, desc, sql, aliasedTable, or, lt, ne } from 'drizzle-orm';
 import { formatIndianCurrency } from '@/lib/utils';
-import { format, isToday, isPast } from 'date-fns';
+import { format, isToday, isPast, formatDistanceToNow } from 'date-fns';
 
 export interface BrokerDashboardKpis {
   activeDealsCount: number;
   openRequirementsCount: number;
+  partiallyAllocatedCount: number;
+  availableOffersCount: number;
+  awaitingConfirmationCount: number;
   dispatchDueCount: number;
+  deliveriesAwaitingConfirmationCount: number;
+  openDisputesCount: number;
   commissionThisMonth: string;
+  commissionPendingInvoicesCount: number;
 }
+
+export type PendingActionCategory =
+  | 'requirement_expiring'
+  | 'partial_allocation'
+  | 'terms_confirmation'
+  | 'delivery_review'
+  | 'dispute_unresolved'
+  | 'invoice_followup';
 
 export interface BrokerAlertItem {
   id: string;
-  type: 'danger' | 'warning' | 'teal';
+  category?: PendingActionCategory;
+  type: 'danger' | 'warning' | 'teal' | 'blue';
   badge: string;
   dealRef: string;
   commodity: string;
@@ -35,6 +54,20 @@ export interface BrokerAlertItem {
   description: string;
   dueTime: string;
   actionLabel: string;
+  actionHref: string;
+}
+
+export type BrokerPendingActionItem = BrokerAlertItem;
+
+export interface BrokerRecentActivityItem {
+  id: string;
+  eventType: 'deal_update' | 'dispatch_status' | 'requirement_posted' | 'offer_created' | 'dispute_filed' | 'invoice_issued' | 'system_alert';
+  category: 'deals' | 'logistics' | 'requirements' | 'disputes' | 'finance';
+  title: string;
+  description: string;
+  referenceId: string;
+  timestamp: string;
+  relativeTime: string;
   actionHref: string;
 }
 
@@ -63,6 +96,8 @@ export interface BrokerFollowUpTask {
 export interface BrokerDashboardPayload {
   kpis: BrokerDashboardKpis;
   alerts: BrokerAlertItem[];
+  pendingActions: BrokerPendingActionItem[];
+  recentActivity: BrokerRecentActivityItem[];
   pipeline: BrokerPipelineDeal[];
   tasks: BrokerFollowUpTask[];
 }
@@ -73,141 +108,13 @@ export type BrokerDashboardResponse = {
   error?: string;
 };
 
-const DEMO_BROKER_DASHBOARD_PAYLOAD: BrokerDashboardPayload = {
-  kpis: {
-    activeDealsCount: 8,
-    openRequirementsCount: 14,
-    dispatchDueCount: 3,
-    commissionThisMonth: '₹1,42,500',
-  },
-  alerts: [
-    {
-      id: 'alert-counter-1',
-      type: 'warning',
-      badge: 'Counter Offer',
-      dealRef: '#REQ-4091',
-      commodity: 'Malwa Sharbati Wheat (100 MT)',
-      title: 'Seller Counter Received (Needs Review)',
-      description: 'Rajasthan Agro Trading countered at ₹28,500/MT (Target was ₹28,000/MT). Net margin impact is +₹500/MT. Requires broker review before 4-hour validity expires.',
-      dueTime: 'Expires in 4 hours',
-      actionLabel: 'Review Terms',
-      actionHref: '/broker/work?tab=negotiations',
-    },
-    {
-      id: 'alert-dispatch-2',
-      type: 'danger',
-      badge: 'Logistics Delay',
-      dealRef: '#DL-8812',
-      commodity: 'Feed Grade Yellow Maize (250 MT)',
-      title: 'Vehicle RJ-14-GA-8812 Delayed in Transit',
-      description: 'Vehicle carrying 50 MT partial fulfillment dispatch delayed near Kotputli toll due to highway maintenance. Buyer requested urgent revised ETA update.',
-      dueTime: 'Overdue by 3h',
-      actionLabel: 'Resolve Dispatch',
-      actionHref: '/broker/orders',
-    },
-    {
-      id: 'alert-book-3',
-      type: 'teal',
-      badge: 'Ready to Book',
-      dealRef: '#DL-7041',
-      commodity: 'Non-GMO Soybean Meal (75 MT)',
-      title: 'Buyer & Seller Confirmed Mandate',
-      description: 'Both Apex Cattle Nutrition and Indore Agro Refineries have digitally confirmed Version 2 terms. Pre-flight checks passed. Broker trigger required to lock booking.',
-      dueTime: 'Action required today',
-      actionLabel: 'Finalize Booking',
-      actionHref: '/broker/deals',
-    },
-  ],
-  pipeline: [
-    {
-      id: 'deal-8812',
-      dealRef: '#DL-8812',
-      commodity: 'Malwa Sharbati Wheat (Grade A Milling)',
-      quantity: '100 MT',
-      targetPrice: '₹28,500 / MT',
-      buyer: 'AgrInnovate Flour Mills',
-      seller: 'Rajasthan Agro Trading',
-      status: 'Ready to Book',
-      nextAction: 'Both parties agreed. Ready for Booking Gate execution',
-      href: '/broker/deals',
-    },
-    {
-      id: 'deal-7041',
-      dealRef: '#DL-7041',
-      commodity: 'Feed Grade Yellow Maize (High Starch)',
-      quantity: '250 MT',
-      targetPrice: '₹21,800 / MT',
-      buyer: 'North Dairy Feed Corp',
-      seller: 'Malwa Grain Exporters',
-      status: 'Negotiating',
-      nextAction: 'Waiting on seller acceptance of revised dispatch window',
-      href: '/broker/deals',
-    },
-    {
-      id: 'deal-6029',
-      dealRef: '#DL-6029',
-      commodity: 'Non-GMO Soybean Meal (De-oiled Cake)',
-      quantity: '75 MT',
-      targetPrice: '₹42,500 / MT',
-      buyer: 'Apex Cattle Nutrition',
-      seller: 'Indore Agro Refineries',
-      status: 'Ready to Book',
-      nextAction: 'Ready for Final Deal snapshot generation',
-      href: '/broker/deals',
-    },
-    {
-      id: 'deal-9114',
-      dealRef: '#DL-9114',
-      commodity: 'Chana Dal (Desi Chickpeas Grade 1)',
-      quantity: '50 MT',
-      targetPrice: '₹62,000 / MT',
-      buyer: 'Shubh Food Products',
-      seller: 'Shekhawati Pulse Processors',
-      status: 'Negotiating',
-      nextAction: 'Counter proposal awaiting buyer sign-off',
-      href: '/broker/deals',
-    },
-  ],
-  tasks: [
-    {
-      id: 'task-1',
-      title: 'Call Rajasthan Agro to confirm vehicle dispatch date for Wheat lot',
-      entity: 'Rajasthan Agro Trading',
-      time: 'Due today, 3:30 PM',
-      priority: 'high',
-      completed: false,
-    },
-    {
-      id: 'task-2',
-      title: 'Send revised payment milestone terms to AgrInnovate Accounts',
-      entity: 'AgrInnovate Flour Mills',
-      time: 'Due today, 5:00 PM',
-      priority: 'high',
-      completed: false,
-    },
-    {
-      id: 'task-3',
-      title: 'Follow up with Mandi Quality Lab for COA moisture test report',
-      entity: 'Anand Quality Testing Lab',
-      time: 'Due tomorrow, 11:00 AM',
-      priority: 'medium',
-      completed: false,
-    },
-    {
-      id: 'task-4',
-      title: 'Verify E-Way bill clearance for Dispatch #DSP-4012',
-      entity: 'Jaipur Golden Transport',
-      time: 'Due 18 Oct, 2:00 PM',
-      priority: 'medium',
-      completed: false,
-    },
-  ],
-};
-
 /**
- * Server Action for Micro-Sprint 22.4: Broker Dashboard Live Data Integration
+ * Server Action: Authoritative Broker Operational Overview & Dashboard Data
+ * Micro-Sprint RB-05
+ * 
  * Enforces Strict Assignment Model: broker_id === currentUser.id
- * Strips all Buyer PII to maintain strict data protection.
+ * Strips all Buyer & Seller Personal Contact PII (Zero personal phone, email, WhatsApp leaks)
+ * Prevents N+1 queries via parallel aggregated Drizzle queries.
  */
 export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardResponse> {
   try {
@@ -220,18 +127,17 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
       authUser = res.data.user;
       authError = res.error;
     } catch (_e) {
-      // Supabase unconfigured in local dev
+      // Supabase unconfigured in offline/local mock
     }
 
     if (authError || !authUser) {
-      // In development mode or unauthenticated testing, return realistic demo trading desk data
       return {
-        success: true,
-        data: DEMO_BROKER_DASHBOARD_PAYLOAD,
+        success: false,
+        error: 'Unauthorized: Valid broker session required',
       };
     }
 
-    // Verify user role & identity
+    // Verify user role & identity from database
     const dbUser = await db.query.users.findFirst({
       where: eq(users.id, authUser.id),
     });
@@ -251,17 +157,30 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
     const buyerCompanies = aliasedTable(companies, 'buyer_companies');
     const sellerCompanies = aliasedTable(companies, 'seller_companies');
 
-    // Execute optimized parallel Drizzle queries
+    // Execute optimized parallel Drizzle queries with graceful partial failure resilience
     const [
       activeDealsCountRes,
       openReqsCountRes,
+      partiallyAllocatedCountRes,
+      availableOffersRes,
+      awaitingConfirmationCountRes,
       dispatchDueCountRes,
+      deliveriesAwaitingCountRes,
       commissionSumRes,
+      pendingInvoicesCountRes,
+      openDisputesRes,
       counterQuotationsRes,
       delayedDispatchesRes,
       readyToBookDealsRes,
+      expiringRequirementsRes,
+      partialAllocationsRes,
+      unresolvedDisputesRes,
+      pendingInvoicesRes,
       recentPipelineDealsRes,
       crmTasksRes,
+      recentNotificationsRes,
+      recentDealsStreamRes,
+      recentDispatchesStreamRes,
     ] = await Promise.all([
       // 1. KPI: Active Deals Count
       db
@@ -272,7 +191,8 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
             isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
             notInArray(deals.status, ['Closed', 'Cancelled'])
           )
-        ),
+        )
+        .catch(() => [{ count: 0 }]),
 
       // 2. KPI: Open Requirements Count
       db
@@ -283,9 +203,46 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
             isAdmin ? sql`true` : eq(requirements.brokerId, brokerId),
             inArray(requirements.status, ['Open', 'Partially Fulfilled'])
           )
-        ),
+        )
+        .catch(() => [{ count: 0 }]),
 
-      // 3. KPI: Dispatch Due Count
+      // 3. KPI: Partially Allocated Requirements Count
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(requirements)
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(requirements.brokerId, brokerId),
+            eq(requirements.status, 'Partially Fulfilled')
+          )
+        )
+        .catch(() => [{ count: 0 }]),
+
+      // 4. KPI: Available Seller Offers
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(availabilities)
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(availabilities.brokerId, brokerId),
+            eq(availabilities.status, 'Open')
+          )
+        )
+        .catch(() => [{ count: 0 }]),
+
+      // 5. KPI: Deals Awaiting Confirmation
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(deals)
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
+            inArray(deals.status, ['Draft', 'Proposed', 'Countered', 'Seller Confirmed', 'Buyer Confirmed'])
+          )
+        )
+        .catch(() => [{ count: 0 }]),
+
+      // 6. KPI: Dispatch Due Count
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(deals)
@@ -294,9 +251,23 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
             isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
             inArray(deals.status, ['Dispatch Pending', 'Booking Confirmed'])
           )
-        ),
+        )
+        .catch(() => [{ count: 0 }]),
 
-      // 4. KPI: Commission this month (based on agreed deals volume * ₹50/MT brokerage rate)
+      // 7. KPI: Deliveries In Transit / Awaiting Arrival
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(dispatches)
+        .innerJoin(deals, eq(dispatches.dealId, deals.id))
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
+            inArray(dispatches.status, ['Dispatched', 'Delayed'])
+          )
+        )
+        .catch(() => [{ count: 0 }]),
+
+      // 8. KPI: Commission Volume Earned (Agreed Quantity * ₹50/MT rate)
       db
         .select({
           totalCommission: sql<number>`COALESCE(SUM(${deals.agreedQuantity} * 50), 0)::float`,
@@ -307,9 +278,38 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
             isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
             notInArray(deals.status, ['Cancelled'])
           )
-        ),
+        )
+        .catch(() => [{ totalCommission: 0 }]),
 
-      // 5. P0 Alerts: Countered Quotations / Requests
+      // 9. KPI: Pending Invoices Count
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(invoices)
+        .innerJoin(deals, eq(invoices.dealId, deals.id))
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
+            eq(invoices.status, 'Pending')
+          )
+        )
+        .catch(() => [{ count: 0 }]),
+
+      // 10. KPI: Open Disputes Count (Scoped to Broker's deals)
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(disputes)
+        .innerJoin(deals, eq(disputes.dealId, deals.id))
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
+            eq(disputes.status, 'Open')
+          )
+        )
+        .catch(() => [{ count: 0 }]),
+
+      // --- PENDING ACTIONS CATEGORIES ---
+
+      // Action Cat 1: Countered Quotations / Deals awaiting counter review
       db
         .select({
           quotationId: quotations.id,
@@ -334,9 +334,10 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
             )
           )
         )
-        .limit(3),
+        .limit(2)
+        .catch(() => []),
 
-      // 6. P0 Alerts: Delayed Dispatches
+      // Action Cat 2: Delayed Dispatches
       db
         .select({
           dispatchId: dispatches.id,
@@ -363,9 +364,10 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
             )
           )
         )
-        .limit(2),
+        .limit(2)
+        .catch(() => []),
 
-      // 7. P0 Alerts: Deals Ready for Booking / Finalization
+      // Action Cat 3: Ready to Book Deals
       db
         .select({
           dealId: deals.id,
@@ -383,9 +385,102 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
             inArray(deals.status, ['Seller Confirmed', 'Confirmed', 'Draft'])
           )
         )
-        .limit(2),
+        .limit(2)
+        .catch(() => []),
 
-      // 8. Active Pipeline Deals (Recent active negotiations / pending dispatches)
+      // Action Cat 4: Requirements Expiring Soon (Within 48 hours)
+      db
+        .select({
+          requirementId: requirements.id,
+          commodityName: masterCommodities.name,
+          quantity: requirements.quantity,
+          targetPrice: requirements.targetPrice,
+          targetDate: requirements.targetDate,
+          status: requirements.status,
+        })
+        .from(requirements)
+        .innerJoin(masterCommodities, eq(requirements.commodityId, masterCommodities.id))
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(requirements.brokerId, brokerId),
+            inArray(requirements.status, ['Open', 'Partially Fulfilled']),
+            sql`${requirements.targetDate} <= NOW() + INTERVAL '48 hours'`
+          )
+        )
+        .limit(2)
+        .catch(() => []),
+
+      // Action Cat 5: Partially Allocated Requirements Needing Completion
+      db
+        .select({
+          requirementId: requirements.id,
+          commodityName: masterCommodities.name,
+          quantity: requirements.quantity,
+          fulfilledQuantity: requirements.fulfilledQuantity,
+          targetPrice: requirements.targetPrice,
+          status: requirements.status,
+        })
+        .from(requirements)
+        .innerJoin(masterCommodities, eq(requirements.commodityId, masterCommodities.id))
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(requirements.brokerId, brokerId),
+            eq(requirements.status, 'Partially Fulfilled')
+          )
+        )
+        .limit(2)
+        .catch(() => []),
+
+      // Action Cat 6: Unresolved Disputes on Broker Deals
+      db
+        .select({
+          disputeId: disputes.id,
+          dealId: disputes.dealId,
+          reason: disputes.reason,
+          description: disputes.description,
+          status: disputes.status,
+          createdAt: disputes.createdAt,
+          commodityName: masterCommodities.name,
+          agreedQuantity: deals.agreedQuantity,
+        })
+        .from(disputes)
+        .innerJoin(deals, eq(disputes.dealId, deals.id))
+        .innerJoin(requirements, eq(deals.requirementId, requirements.id))
+        .innerJoin(masterCommodities, eq(requirements.commodityId, masterCommodities.id))
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
+            eq(disputes.status, 'Open')
+          )
+        )
+        .limit(2)
+        .catch(() => []),
+
+      // Action Cat 7: Commission Invoices Awaiting Payment
+      db
+        .select({
+          invoiceId: invoices.id,
+          dealId: invoices.dealId,
+          invoiceNo: invoices.invoiceNo,
+          amount: invoices.amount,
+          status: invoices.status,
+          createdAt: invoices.createdAt,
+          commodityName: masterCommodities.name,
+        })
+        .from(invoices)
+        .innerJoin(deals, eq(invoices.dealId, deals.id))
+        .innerJoin(requirements, eq(deals.requirementId, requirements.id))
+        .innerJoin(masterCommodities, eq(requirements.commodityId, masterCommodities.id))
+        .where(
+          and(
+            isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
+            eq(invoices.status, 'Pending')
+          )
+        )
+        .limit(2)
+        .catch(() => []),
+
+      // Active Pipeline Deals (Recent active negotiations / pending dispatches)
       db
         .select({
           deal: deals,
@@ -407,9 +502,10 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
           )
         )
         .orderBy(desc(deals.createdAt))
-        .limit(3),
+        .limit(4)
+        .catch(() => []),
 
-      // 9. Today's Follow-ups / CRM Tasks
+      // Today's Follow-ups / CRM Tasks
       db
         .select({
           task: crmTasks,
@@ -425,24 +521,117 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
           )
         )
         .orderBy(crmTasks.dueDate)
-        .limit(3),
+        .limit(4)
+        .catch(() => []),
+
+      // Event Stream 1: Recent In-App Notifications for Broker
+      db
+        .select({
+          id: notifications.id,
+          eventType: notifications.eventType,
+          title: notifications.title,
+          message: notifications.message,
+          actionUrl: notifications.actionUrl,
+          createdAt: notifications.createdAt,
+        })
+        .from(notifications)
+        .where(eq(notifications.userId, brokerId))
+        .orderBy(desc(notifications.createdAt))
+        .limit(4)
+        .catch(() => []),
+
+      // Event Stream 2: Recent Deals Status Events
+      db
+        .select({
+          dealId: deals.id,
+          status: deals.status,
+          agreedQuantity: deals.agreedQuantity,
+          commodityName: masterCommodities.name,
+          createdAt: deals.createdAt,
+        })
+        .from(deals)
+        .innerJoin(requirements, eq(deals.requirementId, requirements.id))
+        .innerJoin(masterCommodities, eq(requirements.commodityId, masterCommodities.id))
+        .where(isAdmin ? sql`true` : eq(deals.brokerId, brokerId))
+        .orderBy(desc(deals.createdAt))
+        .limit(4)
+        .catch(() => []),
+
+      // Event Stream 3: Recent Dispatches Events
+      db
+        .select({
+          dispatchId: dispatches.id,
+          dealId: dispatches.dealId,
+          vehicleNumber: dispatches.vehicleNumber,
+          status: dispatches.status,
+          createdAt: dispatches.createdAt,
+        })
+        .from(dispatches)
+        .innerJoin(deals, eq(dispatches.dealId, deals.id))
+        .where(isAdmin ? sql`true` : eq(deals.brokerId, brokerId))
+        .orderBy(desc(dispatches.createdAt))
+        .limit(4)
+        .catch(() => []),
     ]);
 
-    // Build KPIs object
+    // Build Complete 8-KPI Object
     const kpis: BrokerDashboardKpis = {
       activeDealsCount: activeDealsCountRes[0]?.count ?? 0,
       openRequirementsCount: openReqsCountRes[0]?.count ?? 0,
+      partiallyAllocatedCount: partiallyAllocatedCountRes[0]?.count ?? 0,
+      availableOffersCount: availableOffersRes[0]?.count ?? 0,
+      awaitingConfirmationCount: awaitingConfirmationCountRes[0]?.count ?? 0,
       dispatchDueCount: dispatchDueCountRes[0]?.count ?? 0,
+      deliveriesAwaitingConfirmationCount: deliveriesAwaitingCountRes[0]?.count ?? 0,
+      openDisputesCount: openDisputesRes[0]?.count ?? 0,
       commissionThisMonth: formatIndianCurrency(commissionSumRes[0]?.totalCommission ?? 0),
+      commissionPendingInvoicesCount: pendingInvoicesCountRes[0]?.count ?? 0,
     };
 
-    // Construct Unified Alerts Array
-    const alerts: BrokerAlertItem[] = [];
+    // Construct Unified Prioritized Pending Actions Array
+    const pendingActions: BrokerPendingActionItem[] = [];
 
-    // Add Counter Alerts
+    // 1. Unresolved Disputes (P0 Critical)
+    for (const item of unresolvedDisputesRes) {
+      pendingActions.push({
+        id: `action-dispute-${item.disputeId}`,
+        category: 'dispute_unresolved',
+        type: 'danger',
+        badge: 'Active Dispute',
+        dealRef: `#DL-${item.dealId.slice(0, 4).toUpperCase()}`,
+        commodity: `${item.commodityName} (${item.agreedQuantity} MT)`,
+        title: `Dispute Filed: ${item.reason}`,
+        description: item.description
+          ? `Dispute raised on deal terms or quality: "${item.description.slice(0, 90)}...". Immediate broker mediation required.`
+          : 'Trade dispute requires broker arbitration and resolution.',
+        dueTime: 'Immediate action',
+        actionLabel: 'Arbitrate Claim',
+        actionHref: '/broker/more/disputes',
+      });
+    }
+
+    // 2. Delayed Dispatches / Logistics Delay (P0 Critical)
+    for (const item of delayedDispatchesRes) {
+      pendingActions.push({
+        id: `action-dispatch-${item.dispatchId}`,
+        category: 'delivery_review',
+        type: 'danger',
+        badge: 'Logistics Delay',
+        dealRef: `#DL-${item.dealId.slice(0, 4).toUpperCase()}`,
+        commodity: `${item.commodityName} (${item.agreedQuantity} MT)`,
+        title: `Dispatch Delayed for Deal #${item.dealId.slice(0, 4).toUpperCase()}`,
+        description: `Vehicle ${item.vehicleNumber || 'transport'} is delayed beyond expected delivery timeline (${format(new Date(item.expectedDeliveryDate), 'dd MMM')}). Buyer requested urgent ETA update.`,
+        dueTime: 'Overdue',
+        actionLabel: 'Resolve Dispatch',
+        actionHref: '/broker/orders',
+      });
+    }
+
+    // 3. Counter Quotations (P1 Urgency)
     for (const item of counterQuotationsRes) {
-      alerts.push({
-        id: `alert-counter-${item.quotationId}`,
+      pendingActions.push({
+        id: `action-counter-${item.quotationId}`,
+        category: 'terms_confirmation',
         type: 'warning',
         badge: 'Counter Offer',
         dealRef: `#REQ-${item.requirementId.slice(0, 4).toUpperCase()}`,
@@ -457,26 +646,11 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
       });
     }
 
-    // Add Delayed Dispatch Alerts
-    for (const item of delayedDispatchesRes) {
-      alerts.push({
-        id: `alert-dispatch-${item.dispatchId}`,
-        type: 'danger',
-        badge: 'Logistics Delay',
-        dealRef: `#DL-${item.dealId.slice(0, 4).toUpperCase()}`,
-        commodity: `${item.commodityName} (${item.agreedQuantity} MT)`,
-        title: `Dispatch Delayed for Deal #${item.dealId.slice(0, 4).toUpperCase()}`,
-        description: `Vehicle ${item.vehicleNumber || 'transport'} is delayed beyond expected delivery timeline (${format(new Date(item.expectedDeliveryDate), 'dd MMM')}). Buyer requested urgent ETA update.`,
-        dueTime: 'Overdue',
-        actionLabel: 'Resolve Dispatch',
-        actionHref: '/broker/orders',
-      });
-    }
-
-    // Add Ready to Book Alerts
+    // 4. Ready to Book Deals (P1 Action)
     for (const item of readyToBookDealsRes) {
-      alerts.push({
-        id: `alert-book-${item.dealId}`,
+      pendingActions.push({
+        id: `action-book-${item.dealId}`,
+        category: 'terms_confirmation',
         type: 'teal',
         badge: 'Ready to Book',
         dealRef: `#DL-${item.dealId.slice(0, 4).toUpperCase()}`,
@@ -489,7 +663,59 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
       });
     }
 
-    // Construct Active Pipeline Deals (ZERO BUYER PII)
+    // 5. Expiring Requirements (P2 Warning)
+    for (const item of expiringRequirementsRes) {
+      pendingActions.push({
+        id: `action-expiring-${item.requirementId}`,
+        category: 'requirement_expiring',
+        type: 'warning',
+        badge: 'Expiring Soon',
+        dealRef: `#REQ-${item.requirementId.slice(0, 4).toUpperCase()}`,
+        commodity: `${item.commodityName} (${item.quantity} MT)`,
+        title: 'Procurement Mandate Expiring Within 48 Hours',
+        description: `Target delivery date (${format(new Date(item.targetDate), 'dd MMM')}) is approaching. Fast-track allocation or request buyer validity extension.`,
+        dueTime: `Due ${format(new Date(item.targetDate), 'dd MMM')}`,
+        actionLabel: 'Match Lots',
+        actionHref: '/broker/work',
+      });
+    }
+
+    // 6. Partially Allocated Requirements (P2 Optimization)
+    for (const item of partialAllocationsRes) {
+      const remainingQty = Math.max(0, item.quantity - (item.fulfilledQuantity || 0));
+      pendingActions.push({
+        id: `action-partial-${item.requirementId}`,
+        category: 'partial_allocation',
+        type: 'blue',
+        badge: 'Partial Allocation',
+        dealRef: `#REQ-${item.requirementId.slice(0, 4).toUpperCase()}`,
+        commodity: `${item.commodityName} (${item.quantity} MT)`,
+        title: `Partial Fulfillment: ${item.fulfilledQuantity} MT of ${item.quantity} MT Matched`,
+        description: `Remaining balance of ${remainingQty} MT is unallocated. Find matching seller offers to complete mandate.`,
+        dueTime: 'Ongoing allocation',
+        actionLabel: 'Allocate Balance',
+        actionHref: '/broker/work',
+      });
+    }
+
+    // 7. Commission Invoices Awaiting Payment (P2 Financial)
+    for (const item of pendingInvoicesRes) {
+      pendingActions.push({
+        id: `action-invoice-${item.invoiceId}`,
+        category: 'invoice_followup',
+        type: 'warning',
+        badge: 'Invoice Pending',
+        dealRef: `#INV-${item.invoiceNo}`,
+        commodity: `${item.commodityName || 'Trade Lot'}`,
+        title: `Invoice #${item.invoiceNo} Awaiting Settlement`,
+        description: `Brokerage invoice of ₹${Number(item.amount).toLocaleString('en-IN')} for Deal #${item.dealId.slice(0, 4).toUpperCase()} is pending payment clearance.`,
+        dueTime: 'Pending payment',
+        actionLabel: 'View Invoice',
+        actionHref: '/broker/more/commission',
+      });
+    }
+
+    // Construct Active Pipeline Deals (Strictly Verified Company Names - Zero Contact PII)
     const pipeline: BrokerPipelineDeal[] = recentPipelineDealsRes.map((row) => {
       const isReady = row.deal.status === 'Seller Confirmed' || row.deal.status === 'Confirmed';
 
@@ -499,7 +725,6 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
         commodity: row.gradeName ? `${row.commodityName} (${row.gradeName})` : row.commodityName,
         quantity: `${row.deal.agreedQuantity} MT`,
         targetPrice: `₹${Number(row.deal.agreedPrice).toLocaleString('en-IN')}/Qtl`,
-        // Strict: Return verified company names only, no personal buyer identity
         buyer: row.buyerCompanyName || `Verified Buyer #B-${row.deal.buyerId.slice(0, 4).toUpperCase()}`,
         seller: row.sellerCompanyName || 'Verified Seller Partner',
         status: isReady ? 'Ready to Book' : 'Negotiating',
@@ -510,7 +735,7 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
       };
     });
 
-    // Construct Follow-up Tasks Array
+    // Construct CRM Follow-up Tasks Array
     const tasks: BrokerFollowUpTask[] = crmTasksRes.map((row) => {
       const due = new Date(row.task.dueDate);
       const isDueToday = isToday(due);
@@ -533,11 +758,81 @@ export async function getBrokerDashboardDataAction(): Promise<BrokerDashboardRes
       };
     });
 
+    // Construct Real Authoritative Recent Activity Stream
+    const rawEvents: Array<{
+      id: string;
+      date: Date;
+      item: BrokerRecentActivityItem;
+    }> = [];
+
+    // Notification Events
+    for (const n of recentNotificationsRes) {
+      rawEvents.push({
+        id: `act-notif-${n.id}`,
+        date: new Date(n.createdAt),
+        item: {
+          id: `act-notif-${n.id}`,
+          eventType: 'system_alert',
+          category: 'requirements',
+          title: n.title,
+          description: n.message || 'Operational trade notification',
+          referenceId: `#NOTIF-${n.id.slice(0, 4).toUpperCase()}`,
+          timestamp: n.createdAt.toISOString(),
+          relativeTime: formatDistanceToNow(new Date(n.createdAt), { addSuffix: true }),
+          actionHref: n.actionUrl || '/broker',
+        },
+      });
+    }
+
+    // Deal Creation / Transition Events
+    for (const d of recentDealsStreamRes) {
+      rawEvents.push({
+        id: `act-deal-${d.dealId}`,
+        date: new Date(d.createdAt),
+        item: {
+          id: `act-deal-${d.dealId}`,
+          eventType: 'deal_update',
+          category: 'deals',
+          title: `Deal #${d.dealId.slice(0, 4).toUpperCase()} Status: ${d.status}`,
+          description: `${d.agreedQuantity} MT of ${d.commodityName} recorded with status "${d.status}".`,
+          referenceId: `#DL-${d.dealId.slice(0, 4).toUpperCase()}`,
+          timestamp: d.createdAt.toISOString(),
+          relativeTime: formatDistanceToNow(new Date(d.createdAt), { addSuffix: true }),
+          actionHref: '/broker/deals',
+        },
+      });
+    }
+
+    // Dispatch Events
+    for (const d of recentDispatchesStreamRes) {
+      rawEvents.push({
+        id: `act-disp-${d.dispatchId}`,
+        date: new Date(d.createdAt),
+        item: {
+          id: `act-disp-${d.dispatchId}`,
+          eventType: 'dispatch_status',
+          category: 'logistics',
+          title: `Dispatch for Deal #${d.dealId.slice(0, 4).toUpperCase()} (${d.status})`,
+          description: `Vehicle ${d.vehicleNumber} status updated to ${d.status}.`,
+          referenceId: `#DSP-${d.dispatchId.slice(0, 4).toUpperCase()}`,
+          timestamp: d.createdAt.toISOString(),
+          relativeTime: formatDistanceToNow(new Date(d.createdAt), { addSuffix: true }),
+          actionHref: '/broker/orders',
+        },
+      });
+    }
+
+    // Sort combined events by date descending and take top 6
+    rawEvents.sort((a, b) => b.date.getTime() - a.date.getTime());
+    const recentActivity: BrokerRecentActivityItem[] = rawEvents.slice(0, 6).map((e) => e.item);
+
     return {
       success: true,
       data: {
         kpis,
-        alerts,
+        alerts: pendingActions,
+        pendingActions,
+        recentActivity,
         pipeline,
         tasks,
       },

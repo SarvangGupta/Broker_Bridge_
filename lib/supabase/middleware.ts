@@ -92,15 +92,7 @@ export async function updateSession(request: NextRequest) {
       role = role.toLowerCase()
     }
 
-    // Infer role from path if user is authenticated and DB lookup timed out on protected route
-    if (!role && isProtectedPath) {
-      if (path.startsWith('/broker')) role = 'broker'
-      else if (path.startsWith('/buyer')) role = 'buyer'
-      else if (path.startsWith('/seller')) role = 'seller'
-      else if (path.startsWith('/admin')) role = 'admin'
-    }
-
-    // Fail-safe: Only sign out if user is truly missing role and not on a matching path
+    // If user is missing a verified role, reject access to protected routes
     if (!role && isProtectedPath) {
       await supabase.auth.signOut()
       const url = request.nextUrl.clone()
