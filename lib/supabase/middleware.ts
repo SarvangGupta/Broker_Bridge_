@@ -12,9 +12,25 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
+  const path = request.nextUrl.pathname
+  const isProtectedPath = path.startsWith('/admin') || path.startsWith('/broker') || path.startsWith('/buyer') || path.startsWith('/seller')
+  const isAuthPath = path.startsWith('/login') || path.startsWith('/register')
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // In development mode without live Supabase credentials configured, allow public routes and guard protected routes
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (isProtectedPath) {
+      const loginUrl = new URL('/login', request.url)
+      return NextResponse.redirect(loginUrl)
+    }
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -40,11 +56,6 @@ export async function updateSession(request: NextRequest) {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser()
-
-  const path = request.nextUrl.pathname
-
-  const isProtectedPath = path.startsWith('/admin') || path.startsWith('/broker') || path.startsWith('/buyer') || path.startsWith('/seller')
-  const isAuthPath = path.startsWith('/login') || path.startsWith('/register')
 
   // Helper to attach cookies with security flags to redirect responses preserving cookie options
   const createRedirectResponse = (targetUrl: URL) => {
