@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { LogOut, User, HelpCircle, ArrowLeftRight } from "lucide-react"
+import { LogOut, User, HelpCircle, ArrowLeftRight, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -25,6 +25,7 @@ interface BuyerHeaderDropdownProps {
 export function BuyerHeaderDropdown({ profile, fullProfile }: BuyerHeaderDropdownProps) {
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [profileTab, setProfileTab] = useState("profile")
   const [isSupportOpen, setIsSupportOpen] = useState(false)
 
   const handleSignOut = async () => {
@@ -69,15 +70,36 @@ export function BuyerHeaderDropdown({ profile, fullProfile }: BuyerHeaderDropdow
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             className="cursor-pointer py-3" 
-            onClick={() => setIsProfileOpen(true)}
+            onClick={() => {
+              setProfileTab("profile");
+              setIsProfileOpen(true);
+            }}
             onSelect={(e) => {
               e.preventDefault();
+              setProfileTab("profile");
               setIsProfileOpen(true);
             }}
           >
             <User className="mr-2 h-4 w-4" />
             <span className="font-medium">Profile Settings</span>
           </DropdownMenuItem>
+
+          <DropdownMenuItem 
+            className="cursor-pointer py-3 text-blue-700 hover:text-blue-800 focus:bg-blue-50 font-medium" 
+            onClick={() => {
+              setProfileTab("app");
+              setIsProfileOpen(true);
+            }}
+            onSelect={(e) => {
+              e.preventDefault();
+              setProfileTab("app");
+              setIsProfileOpen(true);
+            }}
+          >
+            <Smartphone className="mr-2 h-4 w-4 text-blue-600" />
+            <span className="font-medium">Install Mobile App</span>
+          </DropdownMenuItem>
+
           <DropdownMenuItem 
             className="cursor-pointer py-3 text-slate-700 hover:text-slate-900" 
             onClick={() => setIsSupportOpen(true)}
@@ -97,7 +119,12 @@ export function BuyerHeaderDropdown({ profile, fullProfile }: BuyerHeaderDropdow
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <BuyerProfileDialog open={isProfileOpen} onOpenChange={setIsProfileOpen} initialProfileData={fullProfile} />
+      <BuyerProfileDialog 
+        open={isProfileOpen} 
+        onOpenChange={setIsProfileOpen} 
+        initialProfileData={fullProfile} 
+        defaultTab={profileTab}
+      />
       <SupportDialog open={isSupportOpen} onOpenChange={setIsSupportOpen} />
     </>
   )

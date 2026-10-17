@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { getFullBuyerProfileDetailsAction } from '@/src/server/actions/company-actions';
 import { KycStatusBadge } from '@/src/components/shared/kyc-status-badge';
+import { PwaInstallCard } from '@/src/components/pwa/pwa-install-card';
+
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -289,6 +291,11 @@ export default async function BuyerProfilePage() {
                 Single flat role model strictly enforced (`BUYER_ADMIN`). Protected by server-side session authentication.
               </span>
             </div>
+          </section>
+
+          {/* Section 4: Progressive Web App / Mobile Installation */}
+          <section className="md:col-span-2">
+            <PwaInstallCard role="BUYER" />
           </section>
         </div>
       </main>

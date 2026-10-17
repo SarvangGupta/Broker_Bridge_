@@ -1,0 +1,70 @@
+
+  <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#0F172A" />
+        <stop offset="100%" stop-color="#020617" />
+      </linearGradient>
+      <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#34D399" />
+        <stop offset="50%" stop-color="#10B981" />
+        <stop offset="100%" stop-color="#059669" />
+      </linearGradient>
+      <linearGradient id="glowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#10B981" stop-opacity="0.35" />
+        <stop offset="100%" stop-color="#10B981" stop-opacity="0" />
+      </linearGradient>
+      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.5" />
+      </filter>
+    </defs>
+
+    <!-- Background -->
+    <rect width="512" height="512" rx="112.64" fill="url(#bgGrad)" />
+
+    <!-- Subtle inner border -->
+    <rect x="1" y="1" width="510" height="510" rx="111.64" fill="none" stroke="#334155" stroke-width="2" stroke-opacity="0.4" />
+
+    <!-- Decorative ambient glow -->
+    <circle cx="256" cy="179.2" r="179.2" fill="url(#glowGrad)" />
+
+    <!-- Icon Content: Bold Geometric "BB" Monogram -->
+    <g transform="translate(40.96, 40.96)">
+      <!-- First 'B' (Outer Bridge Arc) -->
+      <path d="
+        M 77.4144 77.4144
+        L 206.43839999999997 77.4144
+        C 275.2512 77.4144, 309.6576 120.42240000000001, 309.6576 180.63359999999997
+        C 309.6576 223.6416, 279.552 240.84480000000002, 240.84480000000002 249.44639999999998
+        C 292.4544 266.64959999999996, 326.8608 309.6576, 326.8608 352.6656
+        L 77.4144 352.6656
+        Z
+      " fill="url(#emeraldGrad)" filter="url(#shadow)" />
+
+      <!-- Inner cutouts of 'B' -->
+      <!-- Top Loop -->
+      <path d="
+        M 146.2272 129.024
+        L 197.8368 129.024
+        C 232.2432 129.024, 249.44639999999998 146.2272, 249.44639999999998 180.63359999999997
+        C 249.44639999999998 206.43839999999997, 232.2432 215.04, 197.8368 215.04
+        L 146.2272 215.04
+        Z
+      " fill="#0F172A" />
+
+      <!-- Bottom Loop -->
+      <path d="
+        M 146.2272 249.44639999999998
+        L 206.43839999999997 249.44639999999998
+        C 249.44639999999998 249.44639999999998, 266.64959999999996 275.2512, 266.64959999999996 301.056
+        C 266.64959999999996 326.8608, 249.44639999999998 335.4624, 206.43839999999997 335.4624
+        L 146.2272 335.4624
+        Z
+      " fill="#0F172A" />
+
+      <!-- Bridge Horizontal Accent Node -->
+      <rect x="292.4544" y="197.8368" width="94.6176" height="34.4064" rx="17.2032" fill="#34D399" />
+      <circle cx="365.568" cy="215.04" r="34.4064" fill="#6EE7B7" />
+    </g>
+  </svg>
+  

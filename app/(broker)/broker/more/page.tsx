@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -13,8 +13,12 @@ import {
   Sparkles,
   LogOut,
   Zap,
+  Smartphone,
 } from 'lucide-react';
 import { signOutAction } from '@/src/server/actions/auth-actions';
+import { BrokerProfileDialog } from '@/src/components/dialogs/broker-profile-dialog';
+import { PwaInstallCard } from '@/src/components/pwa/pwa-install-card';
+
 
 interface ToolItem {
   id: string;
@@ -82,17 +86,25 @@ const MORE_TOOLS: ToolItem[] = [
 ];
 
 export default function BrokerMorePage() {
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState('profile');
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 w-full max-w-7xl mx-auto overflow-x-hidden">
       {/* Page Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-          Additional Tools
+          Additional Tools & Preferences
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Operational utilities, trade records, financial ledger, and personal configuration.
+          Operational utilities, trade records, mobile application, and profile configuration.
         </p>
       </div>
+
+      {/* PWA Mobile Installation Section */}
+      <section>
+        <PwaInstallCard role="BROKER" />
+      </section>
 
       {/* Vertical Navigation Menu (Min 48px touch targets) */}
       <div className="space-y-3">
@@ -134,6 +146,20 @@ export default function BrokerMorePage() {
               </CardContent>
             </Card>
           );
+
+          if (tool.id === 'settings') {
+            return (
+              <div 
+                key={tool.id} 
+                onClick={() => {
+                  setProfileTab('profile');
+                  setIsProfileOpen(true);
+                }}
+              >
+                {content}
+              </div>
+            );
+          }
 
           if (tool.href) {
             return (
@@ -179,6 +205,12 @@ export default function BrokerMorePage() {
           <span className="font-bold">Broker Workstation Architecture:</span> Operating on a flat role model. Advanced CRM contact tracking and dispute arbitration modules are scheduled for automated rollout in Sprints 29 & 30.
         </div>
       </div>
+
+      <BrokerProfileDialog 
+        open={isProfileOpen} 
+        onOpenChange={setIsProfileOpen} 
+        defaultTab={profileTab}
+      />
     </div>
   );
 }

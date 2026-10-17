@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   User,
   MoreVertical,
+  Smartphone,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -26,6 +27,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { signOutAction } from '@/src/server/actions/auth-actions';
+import { BrokerProfileDialog } from '@/src/components/dialogs/broker-profile-dialog';
+
 
 export interface BrokerNavItem {
   id: string;
@@ -88,6 +91,8 @@ export function BrokerSidebar({ user, companyName }: BrokerSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState("profile");
 
   const isActive = (href: string) => {
     if (href === '/broker') {
@@ -216,6 +221,28 @@ export function BrokerSidebar({ user, companyName }: BrokerSidebarProps) {
 
             <DropdownMenuGroup>
               <DropdownMenuItem
+                onClick={() => {
+                  setProfileTab("profile");
+                  setIsProfileOpen(true);
+                }}
+                className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <User className="w-4 h-4 text-slate-500" />
+                <span>Profile Settings</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  setProfileTab("app");
+                  setIsProfileOpen(true);
+                }}
+                className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-teal-800 rounded-lg hover:bg-teal-50 cursor-pointer"
+              >
+                <Smartphone className="w-4 h-4 text-teal-600" />
+                <span>Install Mobile App</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
                 onClick={() => router.push('/broker/more')}
                 className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
@@ -237,6 +264,12 @@ export function BrokerSidebar({ user, companyName }: BrokerSidebarProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <BrokerProfileDialog 
+        open={isProfileOpen} 
+        onOpenChange={setIsProfileOpen} 
+        defaultTab={profileTab}
+      />
     </aside>
   );
 }

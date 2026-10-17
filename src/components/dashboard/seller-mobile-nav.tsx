@@ -20,6 +20,7 @@ import {
   ArrowLeftRight,
   Building2,
   Sparkles,
+  Smartphone,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { NotificationBell } from '@/src/components/layout/notification-bell';
@@ -46,6 +47,7 @@ export function SellerMobileNav({
 
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState("profile");
   const [isSupportOpen, setIsSupportOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState(currentTab || 'dashboard');
@@ -367,12 +369,25 @@ export function SellerMobileNav({
             <button
               onClick={() => {
                 setIsMoreSheetOpen(false);
+                setProfileTab("profile");
                 setIsProfileOpen(true);
               }}
               className="w-full flex items-center gap-3 p-2.5 rounded-xl min-h-[48px] text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left cursor-pointer"
             >
               <User className="w-4 h-4 text-slate-500 shrink-0" />
               <span>Organization & KYC Profile</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsMoreSheetOpen(false);
+                setProfileTab("app");
+                setIsProfileOpen(true);
+              }}
+              className="w-full flex items-center gap-3 p-2.5 rounded-xl min-h-[48px] text-xs font-semibold text-emerald-800 hover:bg-emerald-50 transition-colors text-left cursor-pointer"
+            >
+              <Smartphone className="w-4 h-4 text-[#059669] shrink-0" />
+              <span>Install Mobile App</span>
             </button>
 
             <button
@@ -404,6 +419,7 @@ export function SellerMobileNav({
         open={isProfileOpen}
         onOpenChange={setIsProfileOpen}
         initialProfileData={fullProfile}
+        defaultTab={profileTab}
       />
       <SupportDialog
         open={isSupportOpen}

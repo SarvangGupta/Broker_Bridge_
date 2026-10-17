@@ -22,7 +22,8 @@ import {
   ArrowLeftRight,
   Building2,
   MoreHorizontal,
-  MoreVertical
+  MoreVertical,
+  Smartphone
 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import {
@@ -345,6 +346,7 @@ function SidebarProfileAnchor({
 }: SellerSidebarProps) {
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [profileTab, setProfileTab] = useState("profile")
   const [isSupportOpen, setIsSupportOpen] = useState(false)
 
   const handleSignOut = async () => {
@@ -435,14 +437,34 @@ function SidebarProfileAnchor({
 
           <DropdownMenuItem 
             className="cursor-pointer py-2.5 px-3 text-slate-700 hover:text-slate-900 focus:bg-slate-50 rounded-lg transition-colors" 
-            onClick={() => setIsProfileOpen(true)}
+            onClick={() => {
+              setProfileTab("profile");
+              setIsProfileOpen(true);
+            }}
             onSelect={(e) => {
               e.preventDefault();
+              setProfileTab("profile");
               setIsProfileOpen(true);
             }}
           >
             <User className="mr-2.5 h-4 w-4 text-slate-500" />
             <span className="font-medium text-sm">Organization & KYC Profile</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem 
+            className="cursor-pointer py-2.5 px-3 text-emerald-800 hover:text-emerald-900 focus:bg-emerald-50 focus:text-emerald-900 rounded-lg transition-colors" 
+            onClick={() => {
+              setProfileTab("app");
+              setIsProfileOpen(true);
+            }}
+            onSelect={(e) => {
+              e.preventDefault();
+              setProfileTab("app");
+              setIsProfileOpen(true);
+            }}
+          >
+            <Smartphone className="mr-2.5 h-4 w-4 text-[#059669]" />
+            <span className="font-semibold text-sm">Install Mobile App</span>
           </DropdownMenuItem>
 
           <DropdownMenuItem 
@@ -473,6 +495,7 @@ function SidebarProfileAnchor({
         open={isProfileOpen} 
         onOpenChange={setIsProfileOpen} 
         initialProfileData={fullProfile} 
+        defaultTab={profileTab}
       />
       <SupportDialog 
         open={isSupportOpen} 

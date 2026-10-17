@@ -13,13 +13,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Shield, Loader2, Save, KeyRound } from "lucide-react"
+import { Shield, Loader2, Save, KeyRound, Smartphone } from "lucide-react"
 import { toast } from "sonner"
 import { 
   getAdminProfileDetailsAction, 
   updateAdminProfileAction, 
   updateAdminPasswordAction 
 } from "@/src/server/actions/admin-profile-actions"
+import { PwaInstallCard } from "@/src/components/pwa/pwa-install-card"
+
 
 interface AdminProfileDialogProps {
   open: boolean
@@ -128,6 +130,13 @@ export function AdminProfileDialog({ open, onOpenChange }: AdminProfileDialogPro
                 >
                   Security
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="app" 
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#334155] data-[state=active]:text-[#334155] rounded-none px-0 pb-2 pt-2 text-slate-500 hover:text-slate-700 font-medium flex items-center gap-1.5"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-slate-700" />
+                  <span>Install App</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -235,6 +244,10 @@ export function AdminProfileDialog({ open, onOpenChange }: AdminProfileDialogPro
                   </Button>
                 </div>
               </form>
+            </TabsContent>
+
+            <TabsContent value="app" className="p-6 m-0 outline-none">
+              <PwaInstallCard role="ADMIN" />
             </TabsContent>
           </Tabs>
         )}

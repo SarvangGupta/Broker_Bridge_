@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Building2,
   ShieldCheck,
+  Smartphone,
 } from 'lucide-react';
 import { BUYER_NAV_ITEMS, BuyerNavItem } from './buyer-sidebar';
 import { NotificationBell } from '@/src/components/layout/notification-bell';
@@ -127,6 +128,14 @@ export function BuyerMobileNav({ user, company }: BuyerMobileNavProps) {
               >
                 <User className="w-4 h-4 text-slate-500 shrink-0" />
                 <span>Organization Profile & KYC</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => router.push('/buyer/profile')}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-emerald-800 hover:bg-emerald-50 cursor-pointer flex items-center gap-2 transition-colors"
+              >
+                <Smartphone className="w-4 h-4 text-[#059669] shrink-0" />
+                <span>Install Mobile App</span>
               </DropdownMenuItem>
 
               <DropdownMenuSeparator className="my-1 border-t border-border" />

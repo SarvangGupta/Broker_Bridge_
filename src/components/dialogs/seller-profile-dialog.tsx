@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Save, KeyRound } from "lucide-react"
+import { Loader2, Save, KeyRound, Smartphone } from "lucide-react"
 import { toast } from "sonner"
 import { 
   getFullBuyerProfileDetailsAction, 
@@ -22,17 +22,21 @@ import {
 import { useStates, useDistricts } from "@/src/hooks/use-master-data"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { KycStatusBadge } from "@/src/components/shared/kyc-status-badge"
+import { PwaInstallCard } from "@/src/components/pwa/pwa-install-card"
+
 
 interface SellerProfileDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialProfileData?: any
+  defaultTab?: string
 }
 
-export function SellerProfileDialog({ open, onOpenChange, initialProfileData }: SellerProfileDialogProps) {
-  const [activeTab, setActiveTab] = useState("profile")
+export function SellerProfileDialog({ open, onOpenChange, initialProfileData, defaultTab = "profile" }: SellerProfileDialogProps) {
+  const [activeTab, setActiveTab] = useState(defaultTab)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
 
   // Profile State
   const [personalName, setPersonalName] = useState("")
@@ -57,6 +61,9 @@ export function SellerProfileDialog({ open, onOpenChange, initialProfileData }: 
 
   useEffect(() => {
     if (open) {
+      if (defaultTab) {
+        setActiveTab(defaultTab)
+      }
       if (initialProfileData) {
         populateProfile(initialProfileData)
         setLoading(false)
@@ -64,7 +71,7 @@ export function SellerProfileDialog({ open, onOpenChange, initialProfileData }: 
         loadProfile()
       }
     }
-  }, [open, initialProfileData])
+  }, [open, initialProfileData, defaultTab])
 
   function populateProfile(data: any) {
     if (data.user) {
@@ -160,9 +167,13 @@ export function SellerProfileDialog({ open, onOpenChange, initialProfileData }: 
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="px-6 pt-4">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="profile">Profile Details</TabsTrigger>
                 <TabsTrigger value="security">Security</TabsTrigger>
+                <TabsTrigger value="app" className="flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Install App</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -334,6 +345,10 @@ export function SellerProfileDialog({ open, onOpenChange, initialProfileData }: 
                     </Button>
                   </div>
                 </form>
+              </TabsContent>
+
+              <TabsContent value="app" className="mt-0">
+                <PwaInstallCard role="SELLER" />
               </TabsContent>
             </div>
           </Tabs>

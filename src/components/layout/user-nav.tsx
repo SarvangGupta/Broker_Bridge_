@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { LogOut, User, HelpCircle, ArrowLeftRight } from "lucide-react"
+import { LogOut, User, HelpCircle, ArrowLeftRight, Smartphone } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +26,7 @@ export function UserNav({ profile, fullProfile }: UserNavProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [profileTab, setProfileTab] = useState("profile")
   const [isSupportOpen, setIsSupportOpen] = useState(false)
 
   const isBuyerRoute = pathname?.startsWith("/buyer")
@@ -93,14 +94,34 @@ export function UserNav({ profile, fullProfile }: UserNavProps) {
 
           <DropdownMenuItem 
             className="cursor-pointer py-2.5 px-3 text-slate-700 hover:text-slate-900 focus:bg-slate-50" 
-            onClick={() => setIsProfileOpen(true)}
+            onClick={() => {
+              setProfileTab("profile");
+              setIsProfileOpen(true);
+            }}
             onSelect={(e) => {
               e.preventDefault();
+              setProfileTab("profile");
               setIsProfileOpen(true);
             }}
           >
             <User className="mr-2 h-4 w-4 text-slate-500" />
             <span className="font-medium text-sm">Profile Settings</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem 
+            className="cursor-pointer py-2.5 px-3 text-emerald-800 hover:text-emerald-900 focus:bg-emerald-50 font-medium" 
+            onClick={() => {
+              setProfileTab("app");
+              setIsProfileOpen(true);
+            }}
+            onSelect={(e) => {
+              e.preventDefault();
+              setProfileTab("app");
+              setIsProfileOpen(true);
+            }}
+          >
+            <Smartphone className="mr-2 h-4 w-4 text-[#059669]" />
+            <span className="font-semibold text-sm">Install Mobile App</span>
           </DropdownMenuItem>
 
           <DropdownMenuItem 
@@ -128,9 +149,19 @@ export function UserNav({ profile, fullProfile }: UserNavProps) {
       </DropdownMenu>
 
       {isBuyerRoute ? (
-        <BuyerProfileDialog open={isProfileOpen} onOpenChange={setIsProfileOpen} initialProfileData={fullProfile} />
+        <BuyerProfileDialog 
+          open={isProfileOpen} 
+          onOpenChange={setIsProfileOpen} 
+          initialProfileData={fullProfile} 
+          defaultTab={profileTab}
+        />
       ) : (
-        <SellerProfileDialog open={isProfileOpen} onOpenChange={setIsProfileOpen} initialProfileData={fullProfile} />
+        <SellerProfileDialog 
+          open={isProfileOpen} 
+          onOpenChange={setIsProfileOpen} 
+          initialProfileData={fullProfile} 
+          defaultTab={profileTab}
+        />
       )}
       <SupportDialog open={isSupportOpen} onOpenChange={setIsSupportOpen} />
     </>
