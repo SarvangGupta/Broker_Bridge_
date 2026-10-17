@@ -1,16 +1,9 @@
 import React from 'react';
-import { Metadata } from 'next';
 import { getBuyerPayableLedgerAction } from '@/src/server/actions/buyer-payment-actions';
 import { GlobalPayablesHub } from '@/src/components/buyer/payments/global-payables-hub';
 import { BuyerPayableLedgerData } from '@/src/types/buyer-payment-types';
 
 export const dynamic = 'force-dynamic';
-
-export const metadata: Metadata = {
-  title: 'Payable Ledger & Escrow Settlement | BrokerBridge Buyer',
-  description:
-    'Consolidated commercial payables across active commodity contracts. Monitor RBI-regulated nodal escrow balances, payment records, and contract settlements.',
-};
 
 /**
  * Task 4 (Micro-Sprint 39.3): Global Payables Hub Page.

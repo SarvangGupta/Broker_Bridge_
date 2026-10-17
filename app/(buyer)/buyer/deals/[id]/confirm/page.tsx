@@ -1,6 +1,5 @@
-import BuyerFinalDealReviewPage, { generateMetadata } from '../page';
+import BuyerFinalDealReviewPage from '../page';
 
 export const dynamic = 'force-dynamic';
 
-export { generateMetadata };
 export default BuyerFinalDealReviewPage;

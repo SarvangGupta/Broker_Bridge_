@@ -1,5 +1,4 @@
 import React from 'react';
-import { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, ShieldAlert } from 'lucide-react';
 import { getBuyerActiveDisputesAction } from '@/src/server/actions/buyer-dispute-actions';
@@ -7,12 +6,6 @@ import { BuyerDisputesFeed } from '@/src/components/buyer/disputes/buyer-dispute
 import { BackButton } from '@/src/components/ui/back-button';
 
 export const dynamic = 'force-dynamic';
-
-export const metadata: Metadata = {
-  title: 'Dispute Ledger & Exceptions | BrokerBridge Buyer',
-  description:
-    'Track quality deviations, weight shortages, and transit exceptions submitted for neutral Broker mediation. Zero direct seller communication.',
-};
 
 /**
  * Task 3 (Micro-Sprint 39.4): Buyer Dispute Tracker Page.

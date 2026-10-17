@@ -545,15 +545,6 @@ export async function getBuyerProposalDetailAction(
     }
 
     if (!quoteRow && !dealRow) {
-      // Support demo fallback for testing if ID matches demo format
-      if (
-        proposalId.startsWith('demo-') || 
-        proposalId.startsWith('sample-') || 
-        proposalId.startsWith('mock-') ||
-        proposalId === 'demo'
-      ) {
-        return getDemoProposalDetail(proposalId);
-      }
       return { 
         success: false, 
         error: 'Proposal not found or access restricted under organization isolation rules.' 
@@ -859,88 +850,6 @@ export async function getBuyerProposalDetailAction(
 }
 
 /**
- * Fallback synthesizer for development/demo proposal testing
- */
-function getDemoProposalDetail(proposalId: string): BuyerProposalDetailResponse {
-  const demo: BuyerProposalDetail = {
-    id: proposalId,
-    dealId: null,
-    requirementId: 'req-demo-001',
-    requirementDisplayId: 'REQ-DEMO001',
-    commodityName: 'Yellow Maize / Corn',
-    gradeName: 'Grade-A Poultry Feed',
-    proposedQuantity: 200,
-    unitSymbol: 'MT',
-    basePricePerUnit: 24500,
-    applicableCharges: [
-      {
-        name: 'Brokerage & Facilitation Fee',
-        rate: 35,
-        amount: 7000,
-        type: 'per_unit',
-        description: 'Regulated broker mediation and transaction settlement fee',
-        includedInLandedPrice: true,
-      },
-      {
-        name: 'Mandi Cess & Weighment Handling',
-        rate: 15,
-        amount: 3000,
-        type: 'per_unit',
-        description: 'Certified digital weighbridge slips and loading supervision',
-        includedInLandedPrice: true,
-      },
-      {
-        name: 'Transit Escrow & Quality Assurance Cover',
-        rate: 10,
-        amount: 2000,
-        type: 'per_unit',
-        description: 'Dispute protection and escrow holding until delivery acceptance',
-        includedInLandedPrice: true,
-      },
-    ],
-    totalChargesPerUnit: 60,
-    netLandedPricePerUnit: 24560,
-    totalEstimatedValue: 4912000,
-    status: 'New',
-    rawStatus: 'New',
-    nextAction: 'Review & Respond',
-    versionNumber: 1,
-    brokerId: 'broker-demo-01',
-    brokerName: 'Rajesh Sharma',
-    brokerAgency: 'BrokerBridge Verified Commodity Desk',
-    brokerNotes: 'Verified fresh lot ready for immediate loading. Price includes FOR destination delivery with strict 12% moisture guarantee.',
-    validUntil: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
-    isExpired: false,
-    qualitySpecifications: [
-      { parameterName: 'Moisture Content', targetValue: '12.0', tolerance: 'Max 12.5%', unit: '%', isMandatory: true },
-      { parameterName: 'Foreign Matter', targetValue: '1.0', tolerance: 'Max 1.5%', unit: '%', isMandatory: true },
-      { parameterName: 'Aflatoxin (B1+B2+G1+G2)', targetValue: '20', tolerance: 'Max 20 ppb', unit: 'ppb', isMandatory: true },
-      { parameterName: 'Broken Kernels', targetValue: '2.5', tolerance: 'Max 3.0%', unit: '%', isMandatory: false },
-    ],
-    inspectionRequirements: 'NABL Accredited Third-Party Lab Testing with sealed joint sampling at dispatch point.',
-    deliveryLocation: 'Khanna Industrial Area, Ludhiana, Punjab',
-    deliveryState: 'Punjab',
-    deliveryDistrict: 'Ludhiana',
-    deliveryCity: 'Khanna',
-    deliveryWindowStart: new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString(),
-    deliveryWindowEnd: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
-    freightTerms: 'FOR Destination (Freight Paid by Seller)',
-    deliveryTerms: 'FOR Destination',
-    paymentTerms: '100% Against Delivery & Verified Weighbridge Slip via Escrow',
-    packagingType: '50kg HDPE / PP Laminated Bags',
-    specialConditions: 'Standard FSSAI moisture deductions apply for moisture between 12.0% and 12.5%.',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  return {
-    success: true,
-    proposal: demo,
-    data: demo,
-  };
-}
-
-/**
  * Task 1 (Micro-Sprint 35.3): Retrieves the immutable Proposal Version History & Ledger.
  * 
  * Strict Security Guardrails (PRD 35.5):
@@ -1099,15 +1008,6 @@ export async function getBuyerProposalVersionsAction(
     }
 
     if (!quoteRow && !dealRow) {
-      // Demo fallback if testing with demo proposal IDs
-      if (
-        proposalId.startsWith('demo-') || 
-        proposalId.startsWith('sample-') || 
-        proposalId.startsWith('mock-') ||
-        proposalId === 'demo'
-      ) {
-        return getDemoProposalVersions(proposalId);
-      }
       return { 
         success: false, 
         error: 'Proposal versions not found or access denied under organization isolation rules.' 
@@ -1270,72 +1170,6 @@ export async function getBuyerProposalVersionsAction(
       error: error.message || 'Failed to fetch proposal version history',
     };
   }
-}
-
-/**
- * Fallback synthesizer for development/demo version history testing
- */
-function getDemoProposalVersions(proposalId: string): BuyerProposalVersionsResponse {
-  const versions: BuyerProposalVersionItem[] = [
-    {
-      id: `${proposalId}-v1`,
-      versionNumber: 1,
-      createdAt: new Date(Date.now() - 48 * 3600000).toISOString(),
-      status: 'Superseded',
-      terms: {
-        quantity: 200,
-        unit: 'MT',
-        pricePerUnit: 25200,
-        totalChargesPerUnit: 60,
-        netLandedPricePerUnit: 25260,
-        totalEstimatedValue: 5052000,
-        deliveryLocation: 'Khanna Industrial Area, Ludhiana, Punjab',
-        deliveryWindowStart: new Date(Date.now() - 24 * 3600000).toISOString(),
-        deliveryWindowEnd: new Date(Date.now() + 5 * 86400000).toISOString(),
-        paymentTerms: '100% Against Delivery & Verified Weighbridge Slip via Escrow',
-        packagingType: '50kg HDPE Bags',
-        freightTerms: 'FOR Destination',
-        qualityParameters: [
-          { name: 'Moisture Content', value: '12.5', tolerance: 'Max 12.5%', unit: '%' },
-          { name: 'Foreign Matter', value: '1.2', tolerance: 'Max 1.5%', unit: '%' },
-        ],
-      },
-      brokerNotes: 'Initial offer received from supplier at Rs. 25,200/MT.',
-      originatorRole: 'broker',
-    },
-    {
-      id: `${proposalId}-v2`,
-      versionNumber: 2,
-      createdAt: new Date(Date.now() - 12 * 3600000).toISOString(),
-      status: 'Proposed',
-      terms: {
-        quantity: 200,
-        unit: 'MT',
-        pricePerUnit: 24500,
-        totalChargesPerUnit: 60,
-        netLandedPricePerUnit: 24560,
-        totalEstimatedValue: 4912000,
-        deliveryLocation: 'Khanna Industrial Area, Ludhiana, Punjab',
-        deliveryWindowStart: new Date(Date.now() + 2 * 86400000).toISOString(),
-        deliveryWindowEnd: new Date(Date.now() + 7 * 86400000).toISOString(),
-        paymentTerms: '100% Against Delivery & Verified Weighbridge Slip via Escrow',
-        packagingType: '50kg HDPE / PP Laminated Bags',
-        freightTerms: 'FOR Destination',
-        qualityParameters: [
-          { name: 'Moisture Content', value: '12.0', tolerance: 'Max 12.0%', unit: '%' },
-          { name: 'Foreign Matter', value: '1.0', tolerance: 'Max 1.0%', unit: '%' },
-        ],
-      },
-      brokerNotes: 'Negotiated discount: Supplier reduced rate to Rs. 24,500/MT (savings of Rs. 700/MT) with tighter 12.0% moisture guarantee.',
-      originatorRole: 'broker',
-    },
-  ];
-
-  return {
-    success: true,
-    versions,
-    data: versions,
-  };
 }
 
 /**
@@ -1512,16 +1346,6 @@ export async function acceptBuyerProposalAction(
       return { success: false, error: 'Buyer organization profile not found.' };
     }
 
-    // Demo/Mock ID fallback for development harnesses
-    if (
-      proposalId.startsWith('demo-') ||
-      proposalId.startsWith('sample-') ||
-      proposalId.startsWith('mock-') ||
-      proposalId === 'demo'
-    ) {
-      return { success: true };
-    }
-
     // 2. Resolve proposal and verify tenant ownership
     const resolved = await resolveBuyerProposalAndLatestVersion(proposalId, buyerCompanyId);
     if (!resolved) {
@@ -1675,16 +1499,6 @@ export async function counterBuyerProposalAction(
       return { success: false, error: 'Buyer organization profile not found.' };
     }
 
-    // Demo/Mock ID fallback for development harnesses
-    if (
-      proposalId.startsWith('demo-') ||
-      proposalId.startsWith('sample-') ||
-      proposalId.startsWith('mock-') ||
-      proposalId === 'demo'
-    ) {
-      return { success: true, newVersion: expectedVersionNumber + 1 };
-    }
-
     // 2. Resolve proposal and verify tenant ownership
     const resolved = await resolveBuyerProposalAndLatestVersion(proposalId, buyerCompanyId);
     if (!resolved) {
@@ -1832,16 +1646,6 @@ export async function rejectBuyerProposalAction(
     const { user, companyId: buyerCompanyId } = sessionRes.data;
     if (!buyerCompanyId) {
       return { success: false, error: 'Buyer organization profile not found.' };
-    }
-
-    // Demo/Mock ID fallback for development harnesses
-    if (
-      proposalId.startsWith('demo-') ||
-      proposalId.startsWith('sample-') ||
-      proposalId.startsWith('mock-') ||
-      proposalId === 'demo'
-    ) {
-      return { success: true };
     }
 
     // 2. Resolve proposal and verify tenant ownership

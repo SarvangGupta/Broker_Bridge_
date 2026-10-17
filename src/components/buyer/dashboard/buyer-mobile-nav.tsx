@@ -114,7 +114,7 @@ export function BuyerMobileNav({ user, company }: BuyerMobileNavProps) {
 
               {/* Crucial: Trader Workspace Toggle to /seller */}
               <DropdownMenuItem
-                onClick={() => router.push('/seller')}
+                onClick={() => { window.location.href = '/seller'; }}
                 className="px-3 py-2 rounded-lg text-xs font-semibold text-[#0284C7] hover:bg-[#E0F2FE] cursor-pointer flex items-center gap-2 transition-colors"
               >
                 <ArrowLeftRight className="w-4 h-4 text-[#0284C7] shrink-0" />

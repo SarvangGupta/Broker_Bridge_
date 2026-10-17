@@ -66,7 +66,11 @@ export async function signUpAction(formData: FormData) {
       }
     }
 
-    return { success: "Account created successfully! You can now sign in." }
+    // Explicitly sign out so Supabase session cookies are cleared.
+    // The user must manually log in on the /login page.
+    await supabase.auth.signOut()
+
+    return { success: "Account created successfully! Please sign in with your credentials." }
   } catch (err: any) {
     console.error("signUpAction exception:", err)
     return { error: err.message || "Failed to create account. Please check details and try again." }

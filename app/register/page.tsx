@@ -36,8 +36,8 @@ export default function RegisterPage() {
       setIsLoading(false)
     } else if (result?.success) {
       toast.success(result.success)
-      // Keep isLoading(true) to prevent button clicking again while navigating
-      router.push("/login")
+      // Clean full-page navigation to /login to ensure all session state is reset
+      window.location.href = "/login?registered=true"
     }
   }
 

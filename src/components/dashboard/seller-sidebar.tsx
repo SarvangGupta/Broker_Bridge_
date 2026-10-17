@@ -158,6 +158,30 @@ function SidebarNavContent({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentTab = searchParams?.get('tab')
+  const [activeTab, setActiveTab] = useState(currentTab || 'dashboard')
+
+  useEffect(() => {
+    setActiveTab(currentTab || 'dashboard')
+  }, [currentTab])
+
+  useEffect(() => {
+    const handleCustomTabChange = (e: Event) => {
+      const customEvent = e as CustomEvent<string>
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail)
+      }
+    }
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      setActiveTab(params.get('tab') || 'dashboard')
+    }
+    window.addEventListener('seller-tab-change', handleCustomTabChange)
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('seller-tab-change', handleCustomTabChange)
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
 
   const isSellerAdmin = 
     userRole.toUpperCase().includes("ADMIN") || 
@@ -167,9 +191,9 @@ function SidebarNavContent({
   const isItemActive = (item: NavItem) => {
     if (pathname === '/seller') {
       if (item.id === 'dashboard') {
-        return !currentTab || currentTab === 'dashboard'
+        return !activeTab || activeTab === 'dashboard'
       }
-      return currentTab === item.id
+      return activeTab === item.id
     }
     // Sub-route path matches
     if (item.id === 'reports' && pathname.startsWith('/seller/reports')) return true
@@ -178,6 +202,16 @@ function SidebarNavContent({
     if (item.id === 'payments' && pathname.startsWith('/seller/payments')) return true
     if (item.id === 'dashboard' && pathname.startsWith('/seller/notifications')) return true
     return false
+  }
+
+  const handleNavClick = (e: React.MouseEvent, item: NavItem) => {
+    if (pathname === '/seller') {
+      e.preventDefault()
+      window.history.pushState(null, '', item.href)
+      setActiveTab(item.id)
+      window.dispatchEvent(new CustomEvent('seller-tab-change', { detail: item.id }))
+    }
+    onItemClick?.()
   }
 
   // Filter secondary items by admin role
@@ -211,7 +245,7 @@ function SidebarNavContent({
           <Link
             key={item.id}
             href={item.href}
-            onClick={onItemClick}
+            onClick={(e) => handleNavClick(e, item)}
             className={`
               group flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all duration-150 cursor-pointer min-h-[48px]
               ${isActive 
@@ -279,7 +313,7 @@ function SidebarNavContent({
                 <Link
                   key={item.id}
                   href={item.href}
-                  onClick={onItemClick}
+                  onClick={(e) => handleNavClick(e, item)}
                   className={`
                     group flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs transition-all duration-150 cursor-pointer min-h-[44px]
                     ${isActive 
@@ -453,6 +487,8 @@ export function SellerSidebar({
   fullProfile,
   userRole = "SELLER_ADMIN",
 }: SellerSidebarProps) {
+  const pathname = usePathname()
+
   return (
     <aside 
       className="hidden md:flex flex-col justify-between w-64 border-r border-slate-200 bg-white h-screen sticky top-0 shrink-0 select-none z-30 shadow-[1px_0_3px_rgba(0,0,0,0.02)]"
@@ -463,6 +499,13 @@ export function SellerSidebar({
         {/* Task 1: Wrapped logo block in <Link href="/seller"> with cursor-pointer */}
         <Link 
           href="/seller" 
+          onClick={(e) => {
+            if (pathname === '/seller') {
+              e.preventDefault()
+              window.history.pushState(null, '', '/seller')
+              window.dispatchEvent(new CustomEvent('seller-tab-change', { detail: 'dashboard' }))
+            }
+          }}
           className="p-5 border-b border-slate-100 flex items-center gap-3 shrink-0 cursor-pointer group hover:bg-slate-50/80 transition-colors"
         >
           <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-xs shrink-0 text-white font-black text-sm tracking-tighter">

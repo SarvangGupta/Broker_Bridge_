@@ -1,6 +1,5 @@
 import React from 'react';
 import Link from 'next/link';
-import { Metadata } from 'next';
 import { 
   ArrowLeft, 
   Handshake, 
@@ -25,14 +24,6 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const resolvedParams = await params;
-  return {
-    title: `Proposal ${resolvedParams.id.slice(0, 8).toUpperCase()} | BrokerBridge Buyer`,
-    description: 'Review complete commercial terms, quality parameters, and freight breakdown for this Broker proposal.',
-  };
 }
 
 export default async function BuyerProposalDetailPage({ params }: PageProps) {

@@ -92,8 +92,8 @@ export function SellerHeaderDropdown({ profile, fullProfile, role = "SELLER_ADMI
           <DropdownMenuGroup>
             <DropdownMenuItem 
               className="cursor-pointer py-2.5 px-3 text-emerald-800 hover:text-emerald-900 focus:bg-emerald-50 focus:text-emerald-900 font-semibold rounded-lg transition-colors"
-              onClick={() => router.push('/buyer')}
-              onSelect={() => router.push('/buyer')}
+              onClick={() => { window.location.href = '/buyer'; }}
+              onSelect={() => { window.location.href = '/buyer'; }}
             >
               <ArrowLeftRight className="mr-2.5 h-4 w-4 text-[#059669]" />
               <div className="flex flex-col">

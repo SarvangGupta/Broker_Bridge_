@@ -1,6 +1,5 @@
 import React from 'react';
 import Link from 'next/link';
-import { Metadata } from 'next';
 import { ArrowLeft, Handshake, PackageX } from 'lucide-react';
 import { getFinalDealReviewAction } from '@/src/server/actions/buyer-deal-actions';
 import { FinalDealReview } from '@/src/components/buyer/deals/final-deal-review';
@@ -12,14 +11,6 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const resolvedParams = await params;
-  return {
-    title: `Final Deal Review ${resolvedParams.id.slice(0, 8).toUpperCase()} | BrokerBridge Buyer`,
-    description: 'Review final agreed commercial snapshot and visual diff comparison before official confirmation.',
-  };
 }
 
 export default async function BuyerFinalDealReviewPage({ params }: PageProps) {

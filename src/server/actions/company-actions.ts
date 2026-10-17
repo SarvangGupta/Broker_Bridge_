@@ -47,6 +47,12 @@ export async function createCompanyProfile(data: {
         .where(eq(users.id, user.id))
 
       const updatedCompany = await db.select().from(companies).where(eq(companies.id, companyId))
+      revalidatePath('/seller')
+      revalidatePath('/seller', 'page')
+      revalidatePath('/seller', 'layout')
+      revalidatePath('/buyer')
+      revalidatePath('/buyer', 'page')
+      revalidatePath('/buyer', 'layout')
       revalidatePath('/', 'layout')
       return { success: true, data: updatedCompany[0] }
     }
@@ -87,6 +93,12 @@ export async function createCompanyProfile(data: {
         .where(eq(users.id, user.id))
     }
       
+    revalidatePath('/seller')
+    revalidatePath('/seller', 'page')
+    revalidatePath('/seller', 'layout')
+    revalidatePath('/buyer')
+    revalidatePath('/buyer', 'page')
+    revalidatePath('/buyer', 'layout')
     revalidatePath('/', 'layout')
     return { success: true, data: newCompany[0] }
   } catch (error: any) {
@@ -281,6 +293,13 @@ export async function approveCompanyAction(companyId: string) {
     await db.update(companies).set({ status: true, isVerified: true }).where(eq(companies.id, companyId))
     await db.update(users).set({ status: true }).where(eq(users.companyId, companyId))
 
+    revalidatePath('/seller')
+    revalidatePath('/seller', 'page')
+    revalidatePath('/seller', 'layout')
+    revalidatePath('/buyer')
+    revalidatePath('/buyer', 'page')
+    revalidatePath('/buyer', 'layout')
+    revalidatePath('/admin')
     revalidatePath('/', 'layout')
     return { success: true }
   } catch (error: any) {
@@ -304,6 +323,13 @@ export async function rejectCompanyAction(companyId: string) {
     await db.update(companies).set({ status: false, isVerified: false }).where(eq(companies.id, companyId))
     await db.update(users).set({ status: false }).where(eq(users.companyId, companyId))
 
+    revalidatePath('/seller')
+    revalidatePath('/seller', 'page')
+    revalidatePath('/seller', 'layout')
+    revalidatePath('/buyer')
+    revalidatePath('/buyer', 'page')
+    revalidatePath('/buyer', 'layout')
+    revalidatePath('/admin')
     revalidatePath('/', 'layout')
     return { success: true }
   } catch (error: any) {

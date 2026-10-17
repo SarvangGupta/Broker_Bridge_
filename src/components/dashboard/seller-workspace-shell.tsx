@@ -63,7 +63,7 @@ export function SellerWorkspaceShell({
   // Default to URL tab or Dashboard tab
   const [activeTab, setActiveTab] = useState(tabFromUrl || 'dashboard')
 
-  // Sync tab state when URL searchParams change (e.g. on browser back/forward)
+  // Sync tab state when URL searchParams change (e.g. on server navigation)
   useEffect(() => {
     if (tabFromUrl && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl)
@@ -72,11 +72,32 @@ export function SellerWorkspaceShell({
     }
   }, [tabFromUrl])
 
+  // Instant client-side tab switching via custom events and popstate
+  useEffect(() => {
+    const handleCustomTabChange = (e: Event) => {
+      const customEvent = e as CustomEvent<string>
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail)
+      }
+    }
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      setActiveTab(params.get('tab') || 'dashboard')
+    }
+    window.addEventListener('seller-tab-change', handleCustomTabChange)
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('seller-tab-change', handleCustomTabChange)
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
+
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab)
     if (typeof window !== 'undefined') {
       const url = newTab === 'dashboard' ? '/seller' : `/seller?tab=${newTab}`
-      window.history.replaceState(null, '', url)
+      window.history.pushState(null, '', url)
+      window.dispatchEvent(new CustomEvent('seller-tab-change', { detail: newTab }))
     }
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import {
@@ -48,6 +48,40 @@ export function SellerMobileNav({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
 
+  const [activeTab, setActiveTab] = useState(currentTab || 'dashboard');
+
+  useEffect(() => {
+    setActiveTab(currentTab || 'dashboard');
+  }, [currentTab]);
+
+  useEffect(() => {
+    const handleCustomTabChange = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail);
+      }
+    };
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setActiveTab(params.get('tab') || 'dashboard');
+    };
+    window.addEventListener('seller-tab-change', handleCustomTabChange);
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('seller-tab-change', handleCustomTabChange);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  const handleNavClick = (e: React.MouseEvent, item: { id: string; href: string }) => {
+    if (pathname === '/seller') {
+      e.preventDefault();
+      window.history.pushState(null, '', item.href);
+      setActiveTab(item.id);
+      window.dispatchEvent(new CustomEvent('seller-tab-change', { detail: item.id }));
+    }
+  };
+
   const isSellerAdmin =
     userRole.toUpperCase().includes('ADMIN') ||
     userRole.toUpperCase().includes('SELLER') ||
@@ -62,28 +96,28 @@ export function SellerMobileNav({
       label: 'Dashboard',
       href: '/seller',
       icon: LayoutDashboard,
-      isActive: pathname === '/seller' && (!currentTab || currentTab === 'dashboard'),
+      isActive: pathname === '/seller' && (!activeTab || activeTab === 'dashboard'),
     },
     {
       id: 'inventory',
       label: 'Inventory',
       href: '/seller?tab=inventory',
       icon: Package,
-      isActive: (pathname === '/seller' && currentTab === 'inventory') || pathname.startsWith('/seller/inventory'),
+      isActive: (pathname === '/seller' && activeTab === 'inventory') || pathname.startsWith('/seller/inventory'),
     },
     {
       id: 'deals',
       label: 'Deals',
       href: '/seller?tab=deals',
       icon: Handshake,
-      isActive: (pathname === '/seller' && currentTab === 'deals') || pathname.startsWith('/seller/requests') || pathname.startsWith('/seller/deals'),
+      isActive: (pathname === '/seller' && activeTab === 'deals') || pathname.startsWith('/seller/requests') || pathname.startsWith('/seller/deals'),
     },
     {
       id: 'orders',
       label: 'Orders',
       href: '/seller?tab=orders',
       icon: Truck,
-      isActive: (pathname === '/seller' && currentTab === 'orders') || pathname.startsWith('/seller/dispatch'),
+      isActive: (pathname === '/seller' && activeTab === 'orders') || pathname.startsWith('/seller/dispatch'),
     },
   ];
 
@@ -95,7 +129,7 @@ export function SellerMobileNav({
       href: '/seller?tab=quality',
       icon: FlaskConical,
       description: 'COA certificates & parameters',
-      isActive: pathname === '/seller' && currentTab === 'quality',
+      isActive: pathname === '/seller' && activeTab === 'quality',
     },
     {
       id: 'payments',
@@ -103,7 +137,7 @@ export function SellerMobileNav({
       href: '/seller?tab=payments',
       icon: Wallet,
       description: 'Receivables & payment ledger',
-      isActive: (pathname === '/seller' && currentTab === 'payments') || pathname.startsWith('/seller/payments'),
+      isActive: (pathname === '/seller' && activeTab === 'payments') || pathname.startsWith('/seller/payments'),
     },
     {
       id: 'reports',
@@ -111,7 +145,7 @@ export function SellerMobileNav({
       href: '/seller?tab=reports',
       icon: TrendingUp,
       description: 'Sales trends & inventory state',
-      isActive: (pathname === '/seller' && currentTab === 'reports') || pathname.startsWith('/seller/reports'),
+      isActive: (pathname === '/seller' && activeTab === 'reports') || pathname.startsWith('/seller/reports'),
     },
     {
       id: 'documents',
@@ -119,7 +153,7 @@ export function SellerMobileNav({
       href: '/seller?tab=documents',
       icon: FolderLock,
       description: 'Trade invoices & LR files',
-      isActive: pathname === '/seller' && currentTab === 'documents',
+      isActive: pathname === '/seller' && activeTab === 'documents',
     },
     ...(isSellerAdmin
       ? [
@@ -129,7 +163,7 @@ export function SellerMobileNav({
             href: '/seller?tab=team',
             icon: Users,
             description: 'Manage users & company KYC',
-            isActive: pathname === '/seller' && currentTab === 'team',
+            isActive: pathname === '/seller' && activeTab === 'team',
           },
         ]
       : []),
@@ -146,7 +180,18 @@ export function SellerMobileNav({
       {/* 1. Mobile Slim Top Header (md:hidden) */}
       <header className="flex md:hidden h-16 w-full border-b border-slate-200 items-center justify-between px-4 bg-white sticky top-0 z-40 shadow-2xs select-none">
         {/* Task 1: Top-Left Logo Block wrapped in <Link href="/seller"> with cursor-pointer */}
-        <Link href="/seller" className="flex items-center gap-2.5 cursor-pointer group">
+        <Link 
+          href="/seller" 
+          onClick={(e) => {
+            if (pathname === '/seller') {
+              e.preventDefault();
+              window.history.pushState(null, '', '/seller');
+              setActiveTab('dashboard');
+              window.dispatchEvent(new CustomEvent('seller-tab-change', { detail: 'dashboard' }));
+            }
+          }}
+          className="flex items-center gap-2.5 cursor-pointer group"
+        >
           <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shadow-xs shrink-0 text-white font-black text-xs">
             BB
           </div>
@@ -184,6 +229,7 @@ export function SellerMobileNav({
             <Link
               key={tab.id}
               href={tab.href}
+              onClick={(e) => handleNavClick(e, tab)}
               className={`flex flex-col items-center justify-center min-h-[48px] min-w-[48px] px-1 py-1 flex-1 relative transition-colors touch-manipulation ${
                 tab.isActive
                   ? 'text-[#059669]'
@@ -273,7 +319,10 @@ export function SellerMobileNav({
                 <Link
                   key={item.id}
                   href={item.href}
-                  onClick={() => setIsMoreSheetOpen(false)}
+                  onClick={(e) => {
+                    setIsMoreSheetOpen(false);
+                    handleNavClick(e, item);
+                  }}
                   className={`flex items-center gap-3 p-3 rounded-xl min-h-[48px] transition-all cursor-pointer ${
                     item.isActive
                       ? 'bg-[#ECFDF5] text-[#059669] font-bold border border-emerald-200/80 shadow-2xs'
@@ -307,7 +356,7 @@ export function SellerMobileNav({
             <button
               onClick={() => {
                 setIsMoreSheetOpen(false);
-                router.push('/buyer');
+                window.location.href = '/buyer';
               }}
               className="w-full flex items-center gap-3 p-2.5 rounded-xl min-h-[48px] text-xs font-semibold text-emerald-800 hover:bg-emerald-50 transition-colors text-left cursor-pointer"
             >

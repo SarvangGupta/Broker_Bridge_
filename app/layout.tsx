@@ -7,7 +7,7 @@ import { Providers } from "@/components/providers"
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "BrokerBridge Enterprise",
+  title: "BrokerBridge",
   description: "Advanced Brokerage Management Platform",
 };
 

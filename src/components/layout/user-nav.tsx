@@ -70,8 +70,8 @@ export function UserNav({ profile, fullProfile }: UserNavProps) {
                 {isBuyerRoute ? (
                   <DropdownMenuItem 
                     className="cursor-pointer py-2.5 px-3 text-blue-700 hover:text-blue-800 focus:bg-blue-50 focus:text-blue-800 font-medium"
-                    onClick={() => router.push('/seller')}
-                    onSelect={() => router.push('/seller')}
+                    onClick={() => { window.location.href = '/seller'; }}
+                    onSelect={() => { window.location.href = '/seller'; }}
                   >
                     <ArrowLeftRight className="mr-2 h-4 w-4 text-blue-600" />
                     <span className="text-sm">Switch to Seller Workspace</span>
@@ -79,8 +79,8 @@ export function UserNav({ profile, fullProfile }: UserNavProps) {
                 ) : (
                   <DropdownMenuItem 
                     className="cursor-pointer py-2.5 px-3 text-emerald-700 hover:text-emerald-800 focus:bg-emerald-50 focus:text-emerald-800 font-medium"
-                    onClick={() => router.push('/buyer')}
-                    onSelect={() => router.push('/buyer')}
+                    onClick={() => { window.location.href = '/buyer'; }}
+                    onSelect={() => { window.location.href = '/buyer'; }}
                   >
                     <ArrowLeftRight className="mr-2 h-4 w-4 text-emerald-600" />
                     <span className="text-sm">Switch to Buyer Workspace</span>

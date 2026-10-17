@@ -59,33 +59,26 @@ export async function getBuyerPayableLedgerAction(
 
     const rawInput = bookingIdOrRef ? bookingIdOrRef.trim() : '';
 
-    // 1. Development & Demo Mock Dataset Fallback
-    if (
-      rawInput.startsWith('demo-') ||
-      rawInput.startsWith('sample-') ||
-      rawInput.startsWith('mock-') ||
-      rawInput === 'demo' ||
-      rawInput === 'BKG-2026-1042' ||
-      rawInput === 'BKG-2026-8812' ||
-      rawInput === 'BKG-2026-8790' ||
-      rawInput === 'BKG-DEMO'
-    ) {
-      // In tests/CLI environments without cookie context, return the robust mock dataset
-      const mockResult = getMockPayableLedgerData(rawInput);
-      return {
-        success: true,
-        data: mockResult,
-      };
-    }
-
-    // 2. Authenticate Buyer Session via @supabase/ssr
+    // Authenticate Buyer Session via @supabase/ssr
     const sessionRes = await verifyBuyerSession();
     if (!sessionRes.success || !sessionRes.data?.companyId) {
-      // In development / test CLI harness without active auth cookies, return mock data
-      const mockResult = getMockPayableLedgerData(rawInput);
       return {
         success: true,
-        data: mockResult,
+        data: {
+          singlePayable: null,
+          overview: {
+            totalActiveOrders: 0,
+            totalGrossPayable: 0,
+            formattedTotalGrossPayable: '₹ 0',
+            totalAmountPaid: 0,
+            formattedTotalAmountPaid: '₹ 0',
+            totalOutstandingBalance: 0,
+            formattedTotalOutstandingBalance: '₹ 0',
+            overdueCount: 0,
+          },
+          payables: [],
+          lastUpdated: new Date().toISOString(),
+        },
       };
     }
 
@@ -136,7 +129,21 @@ export async function getBuyerPayableLedgerAction(
       }
       return {
         success: true,
-        data: getMockPayableLedgerData(),
+        data: {
+          singlePayable: null,
+          overview: {
+            totalActiveOrders: 0,
+            totalGrossPayable: 0,
+            formattedTotalGrossPayable: '₹ 0',
+            totalAmountPaid: 0,
+            formattedTotalAmountPaid: '₹ 0',
+            totalOutstandingBalance: 0,
+            formattedTotalOutstandingBalance: '₹ 0',
+            overdueCount: 0,
+          },
+          payables: [],
+          lastUpdated: new Date().toISOString(),
+        },
       };
     }
 
@@ -324,165 +331,4 @@ export async function getBuyerPayableLedgerAction(
   }
 }
 
-/**
- * Generates verified mock financial ledger data for seamless local development,
- * walkthroughs, and CLI automated verification suites.
- */
-function getMockPayableLedgerData(bookingId?: string): BuyerPayableLedgerData {
-  const isWheat = bookingId === 'BKG-2026-8812';
-  const isChana = bookingId === 'BKG-2026-8790';
 
-  const wheatItem: BuyerPayableItem = {
-    bookingId: 'BKG-2026-8812',
-    dealId: 'DEAL-2026-8810',
-    dealReference: 'DEAL-2026-8810',
-    commodityName: 'Malwa Sharbati Wheat',
-    gradeName: 'Premium Milling Grade',
-    finalQuantity: 50,
-    unitSymbol: 'MT',
-    lockedBaseRate: 28500,
-    formattedLockedBaseRate: '₹28,500 / MT',
-    baseAmount: 1425000,
-    formattedBaseAmount: '₹14,25,000',
-    chargesAndTaxes: 35625, // 2.5% statutory charges
-    formattedChargesAndTaxes: '₹35,625',
-    grossPayable: 1460625,
-    formattedGrossPayable: '₹14,60,625',
-    totalPaid: 700000,
-    formattedTotalPaid: '₹7,00,000',
-    outstandingBalance: 760625,
-    formattedOutstandingBalance: '₹7,60,625',
-    paymentStatus: 'Part Paid',
-    dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(),
-    isOverdue: false,
-    paymentRecords: [
-      {
-        id: 'pay-rec-01',
-        referenceNumber: 'CMS-RTGS-8810-ADV',
-        amount: 700000,
-        formattedAmount: '₹7,00,000',
-        status: 'Confirmed',
-        paymentDate: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
-        paymentMethod: 'RTGS Nodal Escrow',
-      },
-    ],
-    nodalAccountName: 'BrokerBridge Trade Settlement Escrow (HDFC Bank Nodal Account)',
-    escrowReference: 'BB-NODAL-BKG20268812',
-    disclaimer:
-      'Payments are held securely in the regulated BrokerBridge Nodal Escrow account and disbursed to the Seller strictly upon physical delivery verification. Do not transfer funds to private seller accounts.',
-  };
-
-  const soyaItem: BuyerPayableItem = {
-    bookingId: 'BKG-2026-1042',
-    dealId: 'DEAL-2026-9921',
-    dealReference: 'DEAL-2026-9921',
-    commodityName: 'Yellow Soya Bean',
-    gradeName: 'Grade A Export Spec',
-    finalQuantity: 36,
-    unitSymbol: 'MT',
-    lockedBaseRate: 48000,
-    formattedLockedBaseRate: '₹48,000 / MT',
-    baseAmount: 1728000,
-    formattedBaseAmount: '₹17,28,000',
-    chargesAndTaxes: 43200,
-    formattedChargesAndTaxes: '₹43,200',
-    grossPayable: 1771200,
-    formattedGrossPayable: '₹17,71,200',
-    totalPaid: 0,
-    formattedTotalPaid: '₹0',
-    outstandingBalance: 1771200,
-    formattedOutstandingBalance: '₹17,71,200',
-    paymentStatus: 'Pending',
-    dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5).toISOString(),
-    isOverdue: false,
-    paymentRecords: [],
-    nodalAccountName: 'BrokerBridge Trade Settlement Escrow (HDFC Bank Nodal Account)',
-    escrowReference: 'BB-NODAL-BKG20261042',
-    disclaimer:
-      'Payments are held securely in the regulated BrokerBridge Nodal Escrow account and disbursed to the Seller strictly upon physical delivery verification. Do not transfer funds to private seller accounts.',
-  };
-
-  const chanaItem: BuyerPayableItem = {
-    bookingId: 'BKG-2026-8790',
-    dealId: 'DEAL-2026-7734',
-    dealReference: 'DEAL-2026-7734',
-    commodityName: 'Desi Chana (Chickpeas)',
-    gradeName: 'Bold Machine Clean',
-    finalQuantity: 30,
-    unitSymbol: 'MT',
-    lockedBaseRate: 64000,
-    formattedLockedBaseRate: '₹64,000 / MT',
-    baseAmount: 1920000,
-    formattedBaseAmount: '₹19,20,000',
-    chargesAndTaxes: 48000,
-    formattedChargesAndTaxes: '₹48,000',
-    grossPayable: 1968000,
-    formattedGrossPayable: '₹19,68,000',
-    totalPaid: 1968000,
-    formattedTotalPaid: '₹19,68,000',
-    outstandingBalance: 0,
-    formattedOutstandingBalance: '₹0',
-    paymentStatus: 'Paid',
-    dueDate: null,
-    isOverdue: false,
-    paymentRecords: [
-      {
-        id: 'pay-rec-chana-01',
-        referenceNumber: 'CMS-RTGS-7734-ADV',
-        amount: 1000000,
-        formattedAmount: '₹10,00,000',
-        status: 'Confirmed',
-        paymentDate: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-        paymentMethod: 'RTGS Nodal Escrow',
-      },
-      {
-        id: 'pay-rec-chana-02',
-        referenceNumber: 'CMS-RTGS-7734-FINAL',
-        amount: 968000,
-        formattedAmount: '₹9,68,000',
-        status: 'Confirmed',
-        paymentDate: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        paymentMethod: 'RTGS Nodal Escrow',
-      },
-    ],
-    nodalAccountName: 'BrokerBridge Trade Settlement Escrow (HDFC Bank Nodal Account)',
-    escrowReference: 'BB-NODAL-BKG20268790',
-    disclaimer:
-      'Payments are held securely in the regulated BrokerBridge Nodal Escrow account and disbursed to the Seller strictly upon physical delivery verification. Do not transfer funds to private seller accounts.',
-  };
-
-  const allItems = [wheatItem, soyaItem, chanaItem];
-
-  let singlePayable: BuyerPayableItem | null = null;
-  if (isWheat) {
-    singlePayable = wheatItem;
-  } else if (isChana) {
-    singlePayable = chanaItem;
-  } else if (bookingId === 'BKG-2026-1042') {
-    singlePayable = soyaItem;
-  } else if (bookingId) {
-    singlePayable = wheatItem;
-  }
-
-  const totalActiveOrders = allItems.length;
-  const totalGrossPayable = allItems.reduce((acc, i) => acc + i.grossPayable, 0);
-  const totalAmountPaid = allItems.reduce((acc, i) => acc + i.totalPaid, 0);
-  const totalOutstandingBalance = allItems.reduce((acc, i) => acc + i.outstandingBalance, 0);
-  const overdueCount = allItems.filter((i) => i.isOverdue).length;
-
-  return {
-    singlePayable,
-    overview: {
-      totalActiveOrders,
-      totalGrossPayable,
-      formattedTotalGrossPayable: formatINR(totalGrossPayable),
-      totalAmountPaid,
-      formattedTotalAmountPaid: formatINR(totalAmountPaid),
-      totalOutstandingBalance,
-      formattedTotalOutstandingBalance: formatINR(totalOutstandingBalance),
-      overdueCount,
-    },
-    payables: allItems,
-    lastUpdated: new Date().toISOString(),
-  };
-}

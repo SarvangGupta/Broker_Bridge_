@@ -1,15 +1,9 @@
 import React from 'react';
-import { Metadata } from 'next';
 import { Truck } from 'lucide-react';
 import { getBuyerOrdersListAction } from '@/src/server/actions/buyer-order-actions';
 import { BuyerOrdersFeed } from '@/src/components/buyer/orders/buyer-orders-feed';
 
 export const dynamic = 'force-dynamic';
-
-export const metadata: Metadata = {
-  title: 'My Orders & Bookings | BrokerBridge Buyer',
-  description: 'Track your confirmed procurement orders, locked physical booking IDs, and live logistics dispatches.',
-};
 
 /**
  * Task 3 (Micro-Sprint 38.2): Buyer "My Orders" Hub Route.

@@ -1,5 +1,4 @@
-import React from 'react';
-import { verifyBuyerSession } from '@/src/server/utils/buyer-auth';
+import { getCompanyProfile } from '@/src/server/actions/company-actions';
 import { BuyerSidebar } from '@/src/components/buyer/dashboard/buyer-sidebar';
 import { BuyerMobileNav } from '@/src/components/buyer/dashboard/buyer-mobile-nav';
 
@@ -11,18 +10,24 @@ export default async function BuyerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const sessionRes = await verifyBuyerSession();
+  const profileRes = await getCompanyProfile();
+  const profile = profileRes.success && profileRes.data ? profileRes.data : null;
+  const dbUser = profileRes.user || null;
+  const onboardingStatus = profileRes.status || 'NONE';
+  const isApproved = onboardingStatus === 'APPROVED' && Boolean(profile?.id);
 
-  // If session verification fails or user is not linked to a valid company, render in basic centered layout
-  if (!sessionRes.success || !sessionRes.data?.company) {
+  // If user does not have a company or is NOT approved yet (NONE / PENDING / REJECTED),
+  // render in focus mode centered layout without sidebar navigation
+  if (!isApproved || !profile || !dbUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 py-12">
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 py-12 w-full overflow-x-hidden">
         {children}
       </div>
     );
   }
 
-  const { user, company } = sessionRes.data;
+  const user = dbUser;
+  const company = profile;
 
   return (
     <div className="fixed inset-0 flex h-dvh overflow-hidden bg-[#F8FAFC] w-full max-w-full">

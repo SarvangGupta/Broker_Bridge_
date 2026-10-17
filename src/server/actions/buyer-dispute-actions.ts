@@ -24,61 +24,6 @@ import {
 } from '@/src/types/buyer-dispute-types';
 
 /**
- * In-memory fallback dispute store for demo and test walkthroughs
- * to verify live creation and immediate reflection in the dispute ledger.
- */
-const mockDisputeStore: BuyerDisputeItem[] = [
-  {
-    id: 'disp-mock-01',
-    bookingId: 'BKG-2026-8812',
-    dealId: 'DEAL-2026-8810',
-    dealReference: 'DEAL-2026-8810',
-    commodityName: 'Malwa Sharbati Wheat',
-    gradeName: 'Premium Milling Grade',
-    category: 'Quality',
-    description:
-      'Destination batch sample showed moisture content at 14.2%, which exceeds the locked contractual maximum threshold of 12.0%. Verified through authorized lab test slip. Requesting Broker desk to review parameter deviation and recommend statutory discount.',
-    status: 'Open',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-    resolvedAt: null,
-    evidenceUrls: ['https://storage.brokerbridge.com/evidence/wheat-moisture-slip.pdf'],
-    initiator: 'Buyer',
-  },
-  {
-    id: 'disp-mock-02',
-    bookingId: 'BKG-2026-1042',
-    dealId: 'DEAL-2026-9921',
-    dealReference: 'DEAL-2026-9921',
-    commodityName: 'Yellow Soya Bean',
-    gradeName: 'Grade A Export Spec',
-    category: 'Delivery',
-    description:
-      'Consignment transit vehicle MH-04-GP-8821 reported mechanical delay near Nashik bypass with no GPS update for 28 hours. Arrival SLA exceeded. Requested Broker intervention to verify transit status with transporter dispatch desk.',
-    status: 'Under Broker Review',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 54).toISOString(),
-    resolvedAt: null,
-    evidenceUrls: [],
-    initiator: 'Buyer',
-  },
-  {
-    id: 'disp-mock-03',
-    bookingId: 'BKG-2026-8790',
-    dealId: 'DEAL-2026-7734',
-    dealReference: 'DEAL-2026-7734',
-    commodityName: 'Desi Chana (Chickpeas)',
-    gradeName: 'Bold Machine Clean',
-    category: 'Quantity',
-    description:
-      'Electronic destination weighbridge recorded net delivery of 176.4 MT against dispatch invoice of 180.0 MT (shortage of 3.6 MT). Weighbridge slip submitted. Broker desk reconciled shortage through escrow payable adjustment.',
-    status: 'Resolved',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 120).toISOString(),
-    resolvedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    evidenceUrls: ['https://storage.brokerbridge.com/evidence/weighbridge-shortage-slip.pdf'],
-    initiator: 'Buyer',
-  },
-];
-
-/**
  * Task 1 (Micro-Sprint 39.4): Create Buyer Dispute Action.
  * 
  * Submits a formal order exception against a specific booking for Broker mediation.
@@ -133,41 +78,7 @@ export async function createBuyerDisputeAction(
     // 2. Authenticate Buyer Session via @supabase/ssr
     const sessionRes = await verifyBuyerSession();
 
-    // Development & Test CLI Fallback (if session is not present or demo booking)
-    const isDemoBooking =
-      normalizedBookingId.startsWith('demo-') ||
-      normalizedBookingId.startsWith('mock-') ||
-      normalizedBookingId === 'BKG-2026-8812' ||
-      normalizedBookingId === 'BKG-2026-1042' ||
-      normalizedBookingId === 'BKG-2026-8790' ||
-      normalizedBookingId === 'BKG-DEMO';
-
     if (!sessionRes.success || !sessionRes.data?.companyId) {
-      if (isDemoBooking || !sessionRes.success) {
-        // Record in in-memory test store
-        const newMockDispute: BuyerDisputeItem = {
-          id: `disp-mock-${Date.now()}`,
-          bookingId: normalizedBookingId,
-          dealId: 'DEAL-2026-8810',
-          dealReference: 'DEAL-2026-8810',
-          commodityName: 'Agricultural Commodity',
-          gradeName: 'Commercial Lot',
-          category,
-          description: trimmedDescription,
-          status: 'Open',
-          createdAt: new Date().toISOString(),
-          resolvedAt: null,
-          evidenceUrls: validatedEvidenceUrls,
-          initiator: 'Buyer',
-        };
-        mockDisputeStore.unshift(newMockDispute);
-
-        return {
-          success: true,
-          disputeId: newMockDispute.id,
-        };
-      }
-
       return {
         success: false,
         error: sessionRes.error || 'Unauthorized: Valid Buyer session required.',
@@ -191,26 +102,6 @@ export async function createBuyerDisputeAction(
     }
 
     if (!bookingRecord) {
-      if (isDemoBooking) {
-        // Handle demo ID
-        const newMockDispute: BuyerDisputeItem = {
-          id: `disp-mock-${Date.now()}`,
-          bookingId: normalizedBookingId,
-          dealId: 'DEAL-2026-8810',
-          dealReference: 'DEAL-2026-8810',
-          commodityName: 'Commodity Contract Lot',
-          category,
-          description: trimmedDescription,
-          status: 'Open',
-          createdAt: new Date().toISOString(),
-          resolvedAt: null,
-          evidenceUrls: validatedEvidenceUrls,
-          initiator: 'Buyer',
-        };
-        mockDisputeStore.unshift(newMockDispute);
-        return { success: true, disputeId: newMockDispute.id };
-      }
-
       return {
         success: false,
         error: 'Booking record not found or access restricted under organization boundary.',
@@ -283,12 +174,11 @@ export async function getBuyerActiveDisputesAction(): Promise<BuyerDisputesResul
     const sessionRes = await verifyBuyerSession();
 
     if (!sessionRes.success || !sessionRes.data?.companyId) {
-      // In development / test CLI harness without active auth cookies, return mock dataset
       return {
         success: true,
         data: {
-          summary: computeDisputeSummary(mockDisputeStore),
-          disputes: mockDisputeStore,
+          summary: { totalDisputes: 0, openCount: 0, underReviewCount: 0, resolvedCount: 0 },
+          disputes: [],
         },
       };
     }
@@ -304,12 +194,11 @@ export async function getBuyerActiveDisputesAction(): Promise<BuyerDisputesResul
     const dealIds = buyerDeals.map((d) => d.id);
 
     if (dealIds.length === 0) {
-      // No active deals in DB; return mock dataset for smooth development walkthrough
       return {
         success: true,
         data: {
-          summary: computeDisputeSummary(mockDisputeStore),
-          disputes: mockDisputeStore,
+          summary: { totalDisputes: 0, openCount: 0, underReviewCount: 0, resolvedCount: 0 },
+          disputes: [],
         },
       };
     }
@@ -324,8 +213,8 @@ export async function getBuyerActiveDisputesAction(): Promise<BuyerDisputesResul
       return {
         success: true,
         data: {
-          summary: computeDisputeSummary(mockDisputeStore),
-          disputes: mockDisputeStore,
+          summary: { totalDisputes: 0, openCount: 0, underReviewCount: 0, resolvedCount: 0 },
+          disputes: [],
         },
       };
     }

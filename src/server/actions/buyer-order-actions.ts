@@ -63,134 +63,7 @@ export async function getBuyerBookingVisibilityAction(
 
     const rawInput = bookingIdOrRef.trim();
 
-    // 1. Demo & Development Mock Harness Fallback
-    if (
-      rawInput.startsWith('demo-') ||
-      rawInput.startsWith('sample-') ||
-      rawInput.startsWith('mock-') ||
-      rawInput === 'demo' ||
-      rawInput === 'BKG-2026-1042' ||
-      rawInput === 'BKG-2026-8812' ||
-      rawInput === 'BKG-2026-8790' ||
-      rawInput === 'BKG-DEMO'
-    ) {
-      const isPending = rawInput.includes('pending') || rawInput === 'demo-pending';
 
-      let commodityName = 'Yellow Soya Bean';
-      let gradeName = 'Grade A Export Spec';
-      let originalQuantity = 500;
-      let bookedQuantity = 250;
-      let unitSymbol = 'MT';
-      let finalRate = 24200;
-      let bookingStatus = 'In Transit';
-      let location = 'Bhiwandi Logistics Hub, Maharashtra';
-      let dealRef = 'DEAL-2026-9921';
-
-      if (rawInput === 'BKG-2026-8812') {
-        commodityName = 'Malwa Sharbati Wheat';
-        gradeName = 'Premium Milling Grade';
-        originalQuantity = 1000;
-        bookedQuantity = 500;
-        finalRate = 28500;
-        bookingStatus = 'Dispatch Planned';
-        location = 'Vashi APMC Mandi, Navi Mumbai';
-        dealRef = 'DEAL-2026-8810';
-      } else if (rawInput === 'BKG-2026-8790') {
-        commodityName = 'Desi Chana (Chickpeas)';
-        gradeName = 'Bold Machine Clean';
-        originalQuantity = 180;
-        bookedQuantity = 180;
-        finalRate = 64000;
-        bookingStatus = 'Delivered';
-        location = 'Lasalgaon Agro Hub, Nashik';
-        dealRef = 'DEAL-2026-7734';
-      }
-
-      const remainingQuantity = Math.max(0, originalQuantity - bookedQuantity);
-      const fulfillmentPercentage = Math.round((bookedQuantity / originalQuantity) * 100);
-
-      // Live Dispatch & Delivery Logistics Mock (Micro-Sprints 38.4 & 38.5)
-      let mockDispatchDetails: BuyerDispatchDetails | null = null;
-      let hasActiveDispatch = false;
-
-      if (!isPending && rawInput !== 'BKG-2026-8812') {
-        hasActiveDispatch = true;
-        const isDelivered = rawInput === 'BKG-2026-8790' || bookingStatus === 'Delivered';
-        mockDispatchDetails = {
-          id: isDelivered ? 'disp-mock-38-deliv' : 'disp-mock-38-transit',
-          dispatchReference: isDelivered ? 'DSP-2026-7710' : 'DSP-2026-9041',
-          dispatchDate: new Date(Date.now() - 1000 * 60 * 60 * (isDelivered ? 72 : 24)).toISOString(),
-          expectedDeliveryDate: new Date(Date.now() + 1000 * 60 * 60 * (isDelivered ? -24 : 18)).toISOString(),
-          dispatchedQuantity: bookedQuantity,
-          unitSymbol,
-          vehicleNumber: isDelivered ? 'MH-12-DE-4410' : 'MH-04-GP-8821',
-          vehicleType: isDelivered ? 'Taurus Multi-Axle (28 FT)' : 'Multi-Axle Heavy Truck (32 FT)',
-          transporterName: isDelivered ? 'Maharashtra Express Translines' : 'Navkar Bulk Agro Logistics Ltd.',
-          driverName: isDelivered ? 'Dilip Gaikwad' : 'Rameshwar Singh',
-          driverMobile: isDelivered ? '+91 97654 32190' : '+91 98210 44812',
-          loadingLocation: isDelivered ? 'Lasalgaon Agro Hub, Nashik' : 'Indore Central Silos & Mandi Hub, MP',
-          destination: location,
-          status: isDelivered ? 'Delivered' : 'In Transit',
-          documents: [
-            {
-              id: 'doc-lr-01',
-              documentType: 'LR',
-              fileName: `Lorry_Receipt_${isDelivered ? 'LR-7710' : 'LR-9041'}.pdf`,
-              filePath: `dispatches/${rawInput}/LR.pdf`,
-              uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * (isDelivered ? 70 : 22)).toISOString(),
-            },
-            {
-              id: 'doc-ewb-01',
-              documentType: 'E-Way Bill',
-              fileName: `EWay_Bill_${isDelivered ? 'EWB-7710' : 'EWB-9041'}.pdf`,
-              filePath: `dispatches/${rawInput}/EWB.pdf`,
-              uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * (isDelivered ? 71 : 23)).toISOString(),
-            },
-          ],
-        };
-      }
-
-      const mockBooking: BuyerBookingVisibilityData = {
-        bookingId: isPending ? '' : (rawInput.startsWith('BKG-') ? rawInput : 'BKG-2026-1042'),
-        bookingUuid: '550e8400-e29b-41d4-a716-446655440000',
-        bookingStatus: isPending ? 'Awaiting Broker Finalization' : bookingStatus,
-        createdAt: new Date().toISOString(),
-        dealId: '2a212ffb-7648-441c-98c9-5d398ac19cca',
-        dealReference: dealRef,
-        requirementId: 'req-demo-38-1',
-        requirementReference: 'REQ-DEMO-SOYA',
-        commodityName,
-        gradeName,
-        finalQuantity: bookedQuantity,
-        unitSymbol,
-        finalRate,
-        totalEstimatedValue: bookedQuantity * finalRate,
-        deliveryTerms: `FOR Destination (${location})`,
-        paymentTerms: '20% Advance, 80% on Certified Delivery',
-        brokerAgency: 'BrokerBridge Verified Commodity Desk',
-        isBrokerFinalized: !isPending,
-        originalQuantity,
-        bookedQuantity,
-        remainingQuantity,
-        fulfillmentPercentage,
-        fulfillmentMath: {
-          originalQuantity,
-          bookedQuantity,
-          remainingQuantity,
-          fulfillmentPercentage,
-          unitSymbol,
-          isPartialFulfillment: remainingQuantity > 0,
-        },
-        dispatchDetails: mockDispatchDetails,
-        hasActiveDispatch,
-      };
-
-      return {
-        success: true,
-        data: mockBooking,
-        isPendingBrokerFinalization: isPending,
-      };
-    }
 
     // 2. Authenticate Buyer Session & Verify Role
     const sessionRes = await verifyBuyerSession();
@@ -552,10 +425,9 @@ export async function getBuyerOrdersListAction(
     // 1. Authenticate Buyer Session & Verify Role
     const sessionRes = await verifyBuyerSession();
     if (!sessionRes.success || !sessionRes.data) {
-      // In development / test harness without active auth session, fallback to rich demo orders
       return {
         success: true,
-        data: getMockBuyerOrders(filters),
+        data: [],
       };
     }
 
@@ -592,11 +464,11 @@ export async function getBuyerOrdersListAction(
       )
       .orderBy(desc(bookings.createdAt));
 
-    // If no active database rows found in current dev environment, provide demo orders
+    // If no active database rows found, return empty array so real empty state is rendered
     if (!rows || rows.length === 0) {
       return {
         success: true,
-        data: getMockBuyerOrders(filters),
+        data: [],
       };
     }
 
@@ -646,74 +518,7 @@ export async function getBuyerOrdersListAction(
   }
 }
 
-/**
- * Rich mock orders fallback for development and testing harnesses.
- */
-function getMockBuyerOrders(filters?: BuyerOrdersListFilters): BuyerOrderItem[] {
-  const mockOrders: BuyerOrderItem[] = [
-    {
-      id: '550e8400-e29b-41d4-a716-446655440001',
-      bookingId: 'BKG-2026-1042',
-      status: 'In Transit',
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-      dealId: '2a212ffb-7648-441c-98c9-5d398ac19cca',
-      dealReference: 'DEAL-2026-9921',
-      commodityName: 'Yellow Soya Bean',
-      gradeName: 'Grade A Export Spec',
-      finalQuantity: 250,
-      unitSymbol: 'MT',
-      finalRate: 24200,
-      totalEstimatedValue: 6050000,
-      deliveryLocation: 'Bhiwandi Logistics Hub, Maharashtra',
-      deliveryTerms: 'FOR Destination Warehouse',
-      paymentTerms: '20% Advance, 80% on Certified Delivery',
-      brokerAgency: 'BrokerBridge Verified Commodity Desk',
-    },
-    {
-      id: '550e8400-e29b-41d4-a716-446655440002',
-      bookingId: 'BKG-2026-8812',
-      status: 'Dispatch Planned',
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // 2 days ago
-      dealId: '2a212ffb-7648-441c-98c9-5d398ac19ccb',
-      dealReference: 'DEAL-2026-8810',
-      commodityName: 'Malwa Sharbati Wheat',
-      gradeName: 'Premium Milling Grade',
-      finalQuantity: 500,
-      unitSymbol: 'MT',
-      finalRate: 28500,
-      totalEstimatedValue: 14250000,
-      deliveryLocation: 'Vashi APMC Mandi, Navi Mumbai',
-      deliveryTerms: 'Ex-Mandi Loading Point',
-      paymentTerms: '100% Escrow on Weighment Slip',
-      brokerAgency: 'BrokerBridge Verified Commodity Desk',
-    },
-    {
-      id: '550e8400-e29b-41d4-a716-446655440003',
-      bookingId: 'BKG-2026-8790',
-      status: 'Delivered',
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 96).toISOString(), // 4 days ago
-      dealId: '2a212ffb-7648-441c-98c9-5d398ac19ccc',
-      dealReference: 'DEAL-2026-7734',
-      commodityName: 'Desi Chana (Chickpeas)',
-      gradeName: 'Bold Machine Clean',
-      finalQuantity: 180,
-      unitSymbol: 'MT',
-      finalRate: 64000,
-      totalEstimatedValue: 11520000,
-      deliveryLocation: 'Lasalgaon Agro Hub, Nashik',
-      deliveryTerms: 'FOR Destination Warehouse',
-      paymentTerms: 'Settled & Closed',
-      brokerAgency: 'BrokerBridge Verified Commodity Desk',
-    },
-  ];
 
-  if (filters?.status && filters.status !== 'All') {
-    const norm = filters.status.toLowerCase().trim();
-    return mockOrders.filter((o) => o.status.toLowerCase().includes(norm));
-  }
-
-  return mockOrders;
-}
 
 /**
  * Task 4 (Micro-Sprint 38.5): Secure Signed URL Fetcher for Transit Documents.

@@ -1,6 +1,5 @@
 import React from 'react';
 import Link from 'next/link';
-import { Metadata } from 'next';
 import { ArrowLeft, PackageX } from 'lucide-react';
 import { getBuyerBookingVisibilityAction } from '@/src/server/actions/buyer-order-actions';
 import { getBuyerTransactionQualityAction } from '@/src/server/actions/buyer-quality-tracking-actions';
@@ -21,14 +20,6 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const resolvedParams = await params;
-  return {
-    title: `Order & Booking ${resolvedParams.id.toUpperCase()} | BrokerBridge Buyer`,
-    description: 'Track locked Booking ID, partial fulfillment allocation, live vehicle details, and transit logistics.',
-  };
 }
 
 /**

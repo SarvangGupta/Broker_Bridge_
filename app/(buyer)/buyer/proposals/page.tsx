@@ -1,15 +1,9 @@
 import React from 'react';
-import { Metadata } from 'next';
 import { getBuyerProposalsInboxAction } from '@/src/server/actions/buyer-proposal-actions';
 import { ProposalsInboxView } from '@/src/components/buyer/proposals/proposals-inbox-view';
 import { Handshake } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
-
-export const metadata: Metadata = {
-  title: 'Broker Proposals | BrokerBridge Buyer',
-  description: 'Review, evaluate, and respond to commercial proposals from your assigned commodity brokers.',
-};
 
 export default async function BuyerProposalsPage() {
   const response = await getBuyerProposalsInboxAction();

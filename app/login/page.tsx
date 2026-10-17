@@ -15,6 +15,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const urlError = searchParams.get("error")
+  const isRegistered = searchParams.get("registered") === "true"
   
   const [error, setError] = useState<string | null>(urlError === "invalid_role" ? "Your account role is invalid or missing. Please contact support." : urlError)
   const [isLoading, setIsLoading] = useState(false)
@@ -51,6 +52,12 @@ function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {isRegistered && !error && (
+          <div className="bg-emerald-50 text-emerald-800 text-sm p-4 rounded-xl border border-emerald-200 font-medium">
+            Account created successfully! Please sign in with your email and password.
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 text-red-600 text-sm p-4 rounded-xl border border-red-100 font-medium">
             {error}

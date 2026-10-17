@@ -59,8 +59,8 @@ export function BuyerHeaderDropdown({ profile, fullProfile }: BuyerHeaderDropdow
           <DropdownMenuGroup>
             <DropdownMenuItem 
               className="cursor-pointer py-3 text-blue-700 hover:text-blue-800 focus:bg-blue-50 focus:text-blue-800 font-medium"
-              onClick={() => router.push('/seller')}
-              onSelect={() => router.push('/seller')}
+              onClick={() => { window.location.href = '/seller'; }}
+              onSelect={() => { window.location.href = '/seller'; }}
             >
               <ArrowLeftRight className="mr-2 h-4 w-4 text-blue-600" />
               <span>Switch to Seller Workspace</span>

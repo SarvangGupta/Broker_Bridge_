@@ -14,6 +14,7 @@ import { SellerWorkspaceShell } from "@/src/components/dashboard/seller-workspac
 import { Clock, XCircle } from "lucide-react"
 
 export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 export default async function SellerDashboard() {
   const profileRes = await getCompanyProfile()
@@ -135,27 +136,36 @@ export default async function SellerDashboard() {
   return (
     <div className="w-full flex items-center justify-center">
       <RealtimeDealsListener />
-      <Card className="w-full max-w-2xl bg-white shadow-xl border border-slate-200/90 rounded-xl sm:rounded-2xl mx-auto">
-        <CardHeader className="p-6 sm:p-8 border-b border-slate-100 bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-xs text-white font-bold text-sm">
-              BB
+      <Card className="w-full max-w-2xl bg-white shadow-[0_12px_40px_rgb(0,0,0,0.06)] border border-slate-200/90 rounded-2xl overflow-hidden mx-auto my-8">
+        <CardHeader className="p-6 sm:p-8 border-b border-slate-100 bg-gradient-to-b from-slate-50/80 to-white">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-slate-900 flex items-center justify-center shadow-md text-white font-bold text-base tracking-tight">
+                BB
+              </div>
+              <div>
+                <div className="text-xs font-bold tracking-wider uppercase text-slate-500">
+                  Seller Commodities
+                </div>
+                <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                  Complete Seller Onboarding
+                </CardTitle>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-xl sm:text-2xl font-extrabold text-slate-900">
-                Complete Seller Onboarding
-              </CardTitle>
-              <CardDescription className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Enter your verified company details to access the Seller Trading Dashboard.
-              </CardDescription>
-            </div>
+            <span className="hidden sm:inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+              Step 2 of 2
+            </span>
           </div>
+          <CardDescription className="text-sm text-slate-600 leading-relaxed">
+            Enter your verified company details to access the Seller Trading Dashboard and publish commodity inventory.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 sm:p-8">
+        <CardContent className="p-6 sm:p-8 bg-slate-50/20">
           <CompanyOnboardingForm />
         </CardContent>
-        <CardFooter className="justify-center border-t border-slate-100 p-4 bg-slate-50/30">
-          <SignOutButton />
+        <CardFooter className="flex items-center justify-between border-t border-slate-100 px-6 sm:px-8 py-4 bg-slate-50/50 text-xs text-slate-500">
+          <span>Wrong account? Sign out safely anytime.</span>
+          <SignOutButton className="text-slate-600 hover:text-slate-900 text-xs font-medium cursor-pointer" />
         </CardFooter>
       </Card>
     </div>
