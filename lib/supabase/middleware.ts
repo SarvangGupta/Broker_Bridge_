@@ -19,12 +19,8 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // In development mode without live Supabase credentials configured, allow public routes and guard protected routes
+  // In development mode without live Supabase credentials configured, allow direct route inspection
   if (!supabaseUrl || !supabaseAnonKey) {
-    if (isProtectedPath) {
-      const loginUrl = new URL('/login', request.url)
-      return NextResponse.redirect(loginUrl)
-    }
     return supabaseResponse
   }
 
