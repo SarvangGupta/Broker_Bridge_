@@ -8,6 +8,7 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../domain/commission_calculator.dart';
 import '../../domain/commission_model.dart';
+import '../../../invoices/presentation/widgets/create_invoice_sheet.dart';
 import '../controllers/commission_controller.dart';
 import 'log_commission_payment_dialog.dart';
 
@@ -482,6 +483,27 @@ class _DealCommissionSheetState extends ConsumerState<DealCommissionSheet> {
                 const SizedBox(height: 8),
                 ...record.adjustments.map((a) => _AdjustmentHistoryItem(adjustment: a, dateFormat: _dateFormat)),
                 const SizedBox(height: 16),
+              ],
+
+              // Invoicing Action
+              if (record.quantities.eligibleDeliveredQuantity > 0) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(LucideIcons.fileSpreadsheet, size: 16),
+                    label: const Text('Generate / Review Commission Invoice', style: TextStyle(fontWeight: FontWeight.w700)),
+                    onPressed: () {
+                      CreateInvoiceSheet.show(context, record: record);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
               ],
 
               // Actions Row

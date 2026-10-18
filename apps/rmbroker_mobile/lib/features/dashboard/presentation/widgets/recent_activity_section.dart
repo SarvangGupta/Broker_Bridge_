@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:rmbroker_mobile/app/theme/app_colors.dart';
@@ -57,8 +58,8 @@ class RecentActivitySection extends StatelessWidget {
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
+          children: [
+            const Text(
               'Recent Activity',
               style: TextStyle(
                 fontSize: 16,
@@ -66,12 +67,25 @@ class RecentActivitySection extends StatelessWidget {
                 color: AppColors.textPrimaryLight,
               ),
             ),
-            Text(
-              'Audit Stream',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textSecondaryLight,
+            InkWell(
+              onTap: () => context.push('/notifications'),
+              borderRadius: BorderRadius.circular(4),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  children: [
+                    Text(
+                      'View All Activity',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    SizedBox(width: 2),
+                    Icon(LucideIcons.chevronRight, size: 14, color: AppColors.primary),
+                  ],
+                ),
               ),
             ),
           ],

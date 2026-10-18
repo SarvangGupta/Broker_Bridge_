@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -6,9 +7,11 @@ import 'package:rmbroker_mobile/app/theme/app_colors.dart';
 import 'package:rmbroker_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:rmbroker_mobile/core/widgets/status_badge.dart';
 import 'package:rmbroker_mobile/features/authentication/domain/broker_user.dart';
+import 'package:rmbroker_mobile/features/notifications/presentation/controllers/notification_controller.dart';
+import 'package:rmbroker_mobile/features/notifications/presentation/widgets/notification_badge.dart';
 
 /// Top branding bar and profile access header for RMBroker Dashboard.
-class DashboardHeader extends StatelessWidget implements PreferredSizeWidget {
+class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
   final BrokerUser? broker;
   final Future<void> Function()? onSignOut;
 
@@ -213,7 +216,9 @@ class DashboardHeader extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadCount = ref.watch(unreadNotificationsCountProvider);
+
     final initials =
         (broker?.fullName.isNotEmpty == true ? broker!.fullName : 'BB')
             .split(' ')
@@ -273,17 +278,13 @@ class DashboardHeader extends StatelessWidget implements PreferredSizeWidget {
           icon: const Icon(LucideIcons.search, size: 20),
           onPressed: () => context.push('/search'),
         ),
-        IconButton(
-          tooltip: 'Desk Notifications',
-          icon: const Icon(LucideIcons.bell, size: 20),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Notifications stream active on broker desk'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
+        NotificationBadge(
+          count: unreadCount,
+          child: IconButton(
+            tooltip: 'Desk Notifications',
+            icon: const Icon(LucideIcons.bell, size: 20),
+            onPressed: () => context.push('/notifications'),
+          ),
         ),
         InkWell(
           borderRadius: BorderRadius.circular(20),

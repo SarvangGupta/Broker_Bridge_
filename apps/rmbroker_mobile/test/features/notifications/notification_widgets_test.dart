@@ -1,0 +1,380 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:rmbroker_mobile/features/authentication/domain/broker_user.dart';
+import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/dashboard_header.dart';
+import 'package:rmbroker_mobile/features/notifications/data/notification_repository.dart';
+import 'package:rmbroker_mobile/features/notifications/domain/notification_category.dart';
+import 'package:rmbroker_mobile/features/notifications/domain/notification_model.dart';
+import 'package:rmbroker_mobile/features/notifications/presentation/controllers/notification_controller.dart';
+import 'package:rmbroker_mobile/features/notifications/presentation/screens/notification_center_screen.dart';
+import 'package:rmbroker_mobile/features/notifications/presentation/widgets/notification_badge.dart';
+import 'package:rmbroker_mobile/features/notifications/presentation/widgets/notification_card.dart';
+import 'package:rmbroker_mobile/features/notifications/presentation/widgets/notification_detail_dialog.dart';
+
+class MockNotificationRepository extends NotificationRepository {
+  final List<BrokerNotification> items;
+
+  MockNotificationRepository({required this.items});
+
+  @override
+  Future<List<BrokerNotification>> fetchNotifications({
+    NotificationCategory? category,
+    bool? unreadOnly,
+  }) async {
+    var result = List<BrokerNotification>.from(items);
+    if (category != null && category != NotificationCategory.all) {
+      result = result.where((n) => n.category == category).toList();
+    }
+    if (unreadOnly == true) {
+      result = result.where((n) => !n.isRead).toList();
+    }
+    result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return result;
+  }
+
+  @override
+  Future<bool> markAsRead(String notificationId) async {
+    final idx = items.indexWhere((n) => n.id == notificationId);
+    if (idx >= 0) {
+      items[idx] = items[idx].copyWith(isRead: true, readAt: DateTime.now());
+    }
+    return true;
+  }
+
+  @override
+  Future<int> markAllAsRead() async {
+    int count = 0;
+    for (int i = 0; i < items.length; i++) {
+      if (!items[i].isRead) {
+        items[i] = items[i].copyWith(isRead: true, readAt: DateTime.now());
+        count++;
+      }
+    }
+    return count;
+  }
+}
+
+void main() {
+  final now = DateTime.now();
+
+  final testNotifications = [
+    BrokerNotification(
+      id: 'test-1',
+      userId: 'broker-1',
+      eventType: 'FINAL_CONFIRMATION_REQUIRED',
+      category: NotificationCategory.dealsAndConfirmations,
+      title: 'Deal Awaiting Confirmation',
+      message: 'Deal DL-2026-0891 (50 MT Mustard Seed) requires review.',
+      contextReason: 'Buyer Sharma Agro Mills Ltd confirmed terms.',
+      actionLabel: 'Review Deal',
+      actionUrl: '/deals/deal-bkg-0042',
+      idempotencyKey: 'idemp-1',
+      isRead: false,
+      createdAt: now.subtract(const Duration(minutes: 10)),
+      payload: {'dealId': 'deal-bkg-0042'},
+    ),
+    BrokerNotification(
+      id: 'test-2',
+      userId: 'broker-1',
+      eventType: 'MATCH_CREATED',
+      category: NotificationCategory.requirementsAndOffers,
+      title: 'High-Score Match (96%)',
+      message: 'Requirement REQ-2026-0104 matches Offer OFF-2026-0219.',
+      contextReason: 'Mustard Seed Grade-A Bold within price range.',
+      actionLabel: 'Inspect Match',
+      actionUrl: '/work',
+      idempotencyKey: 'idemp-2',
+      isRead: false,
+      createdAt: now.subtract(const Duration(hours: 1)),
+      payload: {'requirementId': 'req-2026-0104'},
+    ),
+    BrokerNotification(
+      id: 'test-3',
+      userId: 'broker-1',
+      eventType: 'PAYMENT_RECORDED',
+      category: NotificationCategory.commissionAndInvoices,
+      title: 'Commission Payment Recorded',
+      message: '₹3,000 received for Invoice INV-2026-0042.',
+      contextReason: 'Settled via UTR994827104921.',
+      actionLabel: 'View Invoice',
+      actionUrl: '/invoices/inv-2026-0042',
+      idempotencyKey: 'idemp-3',
+      isRead: true,
+      readAt: now.subtract(const Duration(hours: 2)),
+      createdAt: now.subtract(const Duration(hours: 3)),
+      payload: {'invoiceId': 'inv-2026-0042'},
+    ),
+  ];
+
+  Widget createTestWidget({
+    List<BrokerNotification>? initialItems,
+    Widget child = const NotificationCenterScreen(),
+  }) {
+    final mockRepo = MockNotificationRepository(
+      items: initialItems != null
+          ? List.from(initialItems)
+          : List.from(testNotifications),
+    );
+
+    return ProviderScope(
+      overrides: [
+        notificationRepositoryProvider.overrideWithValue(mockRepo),
+      ],
+      child: MaterialApp(
+        home: child,
+      ),
+    );
+  }
+
+  group('NotificationCenterScreen UI Tests', () {
+    testWidgets('renders AppBar with titles, search bar, filter chips, and notification cards', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Notifications & Activity'), findsOneWidget);
+      expect(find.text('सूचना व गतिविधि केंद्र'), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+
+      // Check category chips
+      expect(find.text('All'), findsOneWidget);
+      expect(find.text('Unread Only'), findsOneWidget);
+
+      // Check cards
+      expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
+      expect(find.text('High-Score Match (96%)'), findsOneWidget);
+      expect(find.text('Commission Payment Recorded'), findsOneWidget);
+    });
+
+    testWidgets('filtering by category displays only items of selected category', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      // Tap on Commission & Invoices chip
+      final commChip = find.widgetWithText(FilterChip, 'Commission & Invoices');
+      await tester.ensureVisible(commChip);
+      await tester.tap(commChip);
+      await tester.pumpAndSettle();
+
+      // Only commission notification should be visible
+      expect(find.text('Commission Payment Recorded'), findsOneWidget);
+      expect(find.text('Deal Awaiting Confirmation'), findsNothing);
+      expect(find.text('High-Score Match (96%)'), findsNothing);
+    });
+
+    testWidgets('toggling Unread Only displays only unread items', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      // Tap Unread Only
+      await tester.tap(find.text('Unread Only'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
+      expect(find.text('High-Score Match (96%)'), findsOneWidget);
+      expect(find.text('Commission Payment Recorded'), findsNothing);
+    });
+
+    testWidgets('searching in search bar filters notifications accurately', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'Mustard Seed');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
+      expect(find.text('Commission Payment Recorded'), findsNothing);
+    });
+
+    testWidgets('empty state displays when no notifications match search query', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'NonExistentCommodityQuery1234');
+      await tester.pumpAndSettle();
+
+      expect(find.text('No matching notifications found'), findsOneWidget);
+      expect(find.text('Reset All Filters'), findsOneWidget);
+
+      // Reset filters button clears query
+      await tester.tap(find.text('Reset All Filters'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
+    });
+
+    testWidgets('mark all as read updates unread notifications', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      // Find mark all as read icon button
+      final markAllBtn = find.byTooltip('Mark All Read');
+      expect(markAllBtn, findsOneWidget);
+
+      await tester.tap(markAllBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('All notifications marked as read'), findsOneWidget);
+      // Mark All Read icon button should disappear when unread count is 0
+      expect(find.byTooltip('Mark All Read'), findsNothing);
+    });
+
+    testWidgets('tapping Mark Read on unread card marks it read', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      // Find 'Mark Read' text buttons
+      final markReadBtns = find.text('Mark Read');
+      expect(markReadBtns, findsNWidgets(2)); // 2 unread items
+
+      await tester.tap(markReadBtns.first);
+      await tester.pumpAndSettle();
+
+      // One less mark read button
+      expect(find.text('Mark Read'), findsNWidgets(1));
+    });
+  });
+
+  group('NotificationCard & Detail Dialog Widget Tests', () {
+    testWidgets('NotificationCard displays category icon, action button, and relative time', (
+      tester,
+    ) async {
+      bool actionTriggered = false;
+      bool tapTriggered = false;
+
+      final notif = testNotifications.first;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NotificationCard(
+              notification: notif,
+              onTap: (_) => tapTriggered = true,
+              onAction: (_) => actionTriggered = true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
+      expect(find.text('Review Deal'), findsOneWidget);
+      expect(find.text('ACTION REQUIRED'), findsOneWidget);
+
+      // Tap action button
+      await tester.tap(find.text('Review Deal'));
+      await tester.pump();
+      expect(actionTriggered, isTrue);
+
+      // Tap whole card
+      await tester.tap(find.byType(NotificationCard));
+      await tester.pump();
+      expect(tapTriggered, isTrue);
+    });
+
+    testWidgets('NotificationDetailDialog renders full audit details and action', (
+      tester,
+    ) async {
+      bool recordOpened = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => ElevatedButton(
+                child: const Text('Open Dialog'),
+                onPressed: () {
+                  NotificationDetailDialog.show(
+                    ctx,
+                    notification: testNotifications.first,
+                    onOpenRecord: () => recordOpened = true,
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Operational Context'), findsOneWidget);
+      expect(find.text('Event Type'), findsOneWidget);
+      expect(find.text('FINAL_CONFIRMATION_REQUIRED'), findsOneWidget);
+      expect(find.text('Deduplication Key'), findsOneWidget);
+      expect(find.text('idemp-1'), findsOneWidget);
+
+      // Tap Open Record
+      await tester.tap(find.text('Review Deal'));
+      await tester.pumpAndSettle();
+      expect(recordOpened, isTrue);
+    });
+  });
+
+  group('NotificationBadge & DashboardHeader Integration Tests', () {
+    testWidgets('NotificationBadge shows count when > 0 and hides when <= 0', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                NotificationBadge(
+                  count: 5,
+                  child: Icon(LucideIcons.bell),
+                ),
+                NotificationBadge(
+                  count: 0,
+                  child: Icon(LucideIcons.mail),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('5'), findsOneWidget);
+      expect(find.text('0'), findsNothing);
+    });
+
+    testWidgets('DashboardHeader displays bell icon with unread badge', (
+      tester,
+    ) async {
+      const broker = BrokerUser(
+        id: 'b-1',
+        email: 'broker@rmbroker.in',
+        fullName: 'Test Broker',
+        role: 'broker',
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(
+          child: const Scaffold(
+            appBar: DashboardHeader(broker: broker),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Desk Notifications'), findsOneWidget);
+      // testNotifications has 2 unread items
+      expect(find.text('2'), findsOneWidget);
+    });
+  });
+}

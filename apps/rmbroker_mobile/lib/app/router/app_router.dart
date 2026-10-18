@@ -9,10 +9,13 @@ import '../../features/authentication/presentation/splash_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/dashboard/presentation/navigation_shell.dart';
 import '../../features/commission/presentation/screens/earnings_dashboard_screen.dart';
+import '../../features/invoices/presentation/screens/invoice_detail_screen.dart';
+import '../../features/invoices/presentation/screens/invoice_list_screen.dart';
 import '../../features/deals/presentation/deals_screen.dart';
 import '../../features/deals/presentation/screens/deal_detail_screen.dart';
 import '../../features/directory/presentation/directory_screen.dart';
 import '../../features/more/presentation/more_screen.dart';
+import '../../features/notifications/presentation/screens/notification_center_screen.dart';
 import '../../features/search/domain/search_result.dart';
 import '../../features/search/presentation/global_search_screen.dart';
 import '../../features/work/presentation/work_screen.dart';
@@ -99,6 +102,21 @@ class AppRouter {
         builder: (context, state) => const EarningsDashboardScreen(),
       ),
       GoRoute(
+        path: '/invoices',
+        name: 'invoices',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const InvoiceListScreen(),
+      ),
+      GoRoute(
+        path: '/invoices/:id',
+        name: 'invoice_detail',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return InvoiceDetailScreen(invoiceId: id);
+        },
+      ),
+      GoRoute(
         path: '/disputes',
         name: 'disputes',
         parentNavigatorKey: rootNavigatorKey,
@@ -109,6 +127,12 @@ class AppRouter {
               'Broker-mediated dispute claims, quality deduction arbitration, and settlement records are scheduled for upcoming micro-sprints per the RMBroker product roadmap.',
           icon: LucideIcons.alertTriangle,
         ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const NotificationCenterScreen(),
       ),
 
       // Core Broker Shell with Persistent Bottom Navigation

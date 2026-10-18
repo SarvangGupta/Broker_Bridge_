@@ -95,6 +95,11 @@ class _EarningsDashboardScreenState extends ConsumerState<EarningsDashboardScree
         title: const Text('Brokerage & Earnings'),
         actions: [
           IconButton(
+            icon: const Icon(LucideIcons.fileSpreadsheet, size: 20),
+            tooltip: 'Invoices & Statements',
+            onPressed: () => context.push('/invoices'),
+          ),
+          IconButton(
             icon: const Icon(LucideIcons.info, size: 20),
             tooltip: 'Fiduciary Principles',
             onPressed: () => _showFiduciaryInfoDialog(context),
@@ -175,6 +180,43 @@ class _EarningsDashboardScreenState extends ConsumerState<EarningsDashboardScree
                     CommissionSummaryHeader(
                       summary: state.summary,
                       onFiduciaryTap: () => _showFiduciaryInfoDialog(context),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Invoices & Statements Center Banner
+                    InkWell(
+                      onTap: () => context.push('/invoices'),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryContainer.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(LucideIcons.fileSpreadsheet, size: 18, color: AppColors.primary),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Commission Invoices & Statements',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
+                                  ),
+                                  Text(
+                                    'Issue invoices, review statements & financial reconciliation',
+                                    style: TextStyle(fontSize: 10.5, color: AppColors.textSecondaryLight),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(LucideIcons.chevronRight, size: 16, color: AppColors.primary),
+                          ],
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
 

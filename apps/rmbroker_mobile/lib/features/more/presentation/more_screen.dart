@@ -159,6 +159,28 @@ class MoreScreen extends StatelessWidget {
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(
+                    LucideIcons.fileSpreadsheet,
+                    color: AppColors.primary,
+                  ),
+                  title: const Text('Commission Invoices & Statements'),
+                  subtitle: const Text('Issue invoices, statements & reconciliation'),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                  onTap: () => context.push('/invoices'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(
+                    LucideIcons.bell,
+                    color: AppColors.primary,
+                  ),
+                  title: const Text('Notifications & Activity Center'),
+                  subtitle: const Text('Operational alerts, mandates, deals & invoices'),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                  onTap: () => context.push('/notifications'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(
                     LucideIcons.shieldCheck,
                     color: AppColors.primary,
                   ),
