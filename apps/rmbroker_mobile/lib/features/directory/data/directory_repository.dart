@@ -140,12 +140,52 @@ class DirectoryRepository {
       if (client != null && session != null && !session.isExpired) {
         final brokerId = session.user.id;
 
+        // Calculate linked mandates in parallel
+        final reqMap = <String, int>{};
+        final availMap = <String, int>{};
+        final dealsMap = <String, int>{};
+
+        try {
+          final results = await Future.wait([
+            client
+                .from('requirements')
+                .select('company_id')
+                .eq('broker_id', brokerId)
+                .inFilter('status', const ['Open', 'Partially Fulfilled']),
+            client
+                .from('availabilities')
+                .select('company_id')
+                .eq('broker_id', brokerId)
+                .eq('status', 'Open'),
+            client
+                .from('deals')
+                .select('buyer_id, seller_id')
+                .eq('broker_id', brokerId)
+                .not('status', 'in', '("Closed","Cancelled")'),
+          ]);
+
+          for (final r in results[0] as List<dynamic>) {
+            final cid = r['company_id']?.toString();
+            if (cid != null) reqMap[cid] = (reqMap[cid] ?? 0) + 1;
+          }
+          for (final a in results[1] as List<dynamic>) {
+            final cid = a['company_id']?.toString();
+            if (cid != null) availMap[cid] = (availMap[cid] ?? 0) + 1;
+          }
+          for (final d in results[2] as List<dynamic>) {
+            final bid = d['buyer_id']?.toString();
+            final sid = d['seller_id']?.toString();
+            if (bid != null) dealsMap[bid] = (dealsMap[bid] ?? 0) + 1;
+            if (sid != null) dealsMap[sid] = (dealsMap[sid] ?? 0) + 1;
+          }
+        } catch (_) {}
+
         // Fetch raw crm_contacts assigned to caller broker
         final response = await client
             .from('crm_contacts')
             .select(
               'id, broker_id, user_id, company_id, last_activity_at, created_at, '
-              'users(id, name, mobile, email, role, status), '
+              'users!user_id(id, name, mobile, email, role, status), '
               'companies(id, name, status, is_verified, trust_score, district_id, state_id)',
             )
             .eq('broker_id', brokerId)
@@ -158,12 +198,13 @@ class DirectoryRepository {
           if (item is Map<String, dynamic>) {
             final u = item['users'] as Map<String, dynamic>? ?? {};
             final c = item['companies'] as Map<String, dynamic>? ?? {};
+            final cid = item['company_id']?.toString() ?? '';
 
             contacts.add(
               DirectoryContact(
                 id: item['id']?.toString() ?? '',
                 userId: item['user_id']?.toString() ?? '',
-                companyId: item['company_id']?.toString() ?? '',
+                companyId: cid,
                 name: u['name']?.toString() ?? 'Unnamed Contact',
                 companyName: c['name']?.toString() ?? 'Individual Counterparty',
                 mobile: u['mobile']?.toString() ?? '',
@@ -174,6 +215,9 @@ class DirectoryRepository {
                 trustScore: (c['trust_score'] as num? ?? 100).toInt(),
                 city: c['district_id']?.toString(),
                 state: c['state_id']?.toString(),
+                openRequirementsCount: reqMap[cid] ?? 0,
+                availableOffersCount: availMap[cid] ?? 0,
+                activeDealsCount: dealsMap[cid] ?? 0,
                 createdAt: item['created_at'] != null
                     ? DateTime.tryParse(item['created_at'].toString()) ?? DateTime.now()
                     : DateTime.now(),
@@ -183,12 +227,34 @@ class DirectoryRepository {
         }
 
         final stats = DirectorySummaryStats.fromContacts(contacts);
+
+        // Apply filters in memory if provided
+        var filteredContacts = contacts;
+        if (role != null && role != 'all') {
+          final filterRole = ContactRole.fromString(role);
+          filteredContacts = filteredContacts.where((c) => c.role == filterRole).toList();
+        }
+        if (status != null && status != 'all') {
+          final isActive = status == 'active';
+          filteredContacts = filteredContacts.where((c) => c.status == isActive).toList();
+        }
+        if (search != null && search.trim().isNotEmpty) {
+          final q = search.trim().toLowerCase();
+          filteredContacts = filteredContacts.where((c) =>
+            c.name.toLowerCase().contains(q) ||
+            c.companyName.toLowerCase().contains(q) ||
+            c.mobile.contains(q) ||
+            (c.email?.toLowerCase().contains(q) ?? false)
+          ).toList();
+        }
+
         return DirectorySuccess(
-          DirectoryListPayload(contacts: contacts, stats: stats),
+          DirectoryListPayload(contacts: filteredContacts, stats: stats),
         );
       }
     } catch (dbErr) {
       debugPrint('Supabase direct directory query notice: $dbErr');
+      return DirectoryError(message: 'Database query failed: $dbErr');
     }
 
     // 3. Honest Unavailable State (when REST route is not mounted and DB is unreachable)
@@ -234,7 +300,7 @@ class DirectoryRepository {
         // Search for existing user with same mobile under this broker
         final existingByMobile = await client
             .from('crm_contacts')
-            .select('id, users!inner(id, name, mobile, role), companies!inner(name)')
+            .select('id, users!user_id!inner(id, name, mobile, role), companies!inner(name)')
             .eq('broker_id', brokerId)
             .or('users.mobile.eq.${phoneRes.normalized},users.mobile.eq.${phoneRes.rawDigits}')
             .limit(1);
@@ -504,7 +570,7 @@ class DirectoryRepository {
       if (client != null) {
         final row = await client
             .from('crm_contacts')
-            .select('user_id, users(status)')
+            .select('user_id, users!user_id(status)')
             .eq('id', contactId)
             .single();
 
@@ -560,7 +626,7 @@ class DirectoryRepository {
             .from('crm_contacts')
             .select(
               'id, broker_id, user_id, company_id, last_activity_at, created_at, '
-              'users(id, name, mobile, email, role, status), '
+              'users!user_id(id, name, mobile, email, role, status), '
               'companies(id, name, status, is_verified, trust_score, district_id, state_id)',
             )
             .eq('id', contactId)

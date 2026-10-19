@@ -128,17 +128,35 @@ type AuthResult =
   | { success: true; brokerId: string; isAdmin: boolean; dbUser: typeof users.$inferSelect }
   | { success: false; error: string };
 
-async function getAuthenticatedBroker(): Promise<AuthResult> {
+export async function getAuthenticatedBroker(authToken?: string): Promise<AuthResult> {
   let authUser = null;
   let authError = null;
 
-  try {
-    const supabase = await createClient();
-    const res = await supabase.auth.getUser();
-    authUser = res.data.user;
-    authError = res.error;
-  } catch (_e) {
-    // Supabase cookies outside request context (e.g. CLI test environment)
+  if (authToken) {
+    try {
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const supabase = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false } }
+      );
+      const res = await supabase.auth.getUser(authToken);
+      authUser = res.data.user;
+      authError = res.error;
+    } catch (err: any) {
+      authError = err;
+    }
+  }
+
+  if (!authUser) {
+    try {
+      const supabase = await createClient();
+      const res = await supabase.auth.getUser();
+      authUser = res.data.user;
+      authError = res.error;
+    } catch (_e) {
+      // Supabase cookies outside request context (e.g. CLI test environment)
+    }
   }
 
   if (authError || !authUser) {
@@ -170,13 +188,16 @@ async function getAuthenticatedBroker(): Promise<AuthResult> {
 // 1. Fetch Authorized Directory Contacts List with Summary Stats
 // ============================================================================
 
-export async function getBrokerDirectoryContactsAction(filter?: {
-  role?: 'all' | 'buyer' | 'seller';
-  search?: string;
-  status?: 'all' | 'active' | 'inactive';
-}): Promise<DirectoryListResponse> {
+export async function getBrokerDirectoryContactsAction(
+  filter?: {
+    role?: 'all' | 'buyer' | 'seller';
+    search?: string;
+    status?: 'all' | 'active' | 'inactive';
+  },
+  authToken?: string
+): Promise<DirectoryListResponse> {
   try {
-    const auth = await getAuthenticatedBroker();
+    const auth = await getAuthenticatedBroker(authToken);
     if (!auth.success) {
       return { success: false, error: auth.error };
     }
@@ -338,12 +359,15 @@ export async function getBrokerDirectoryContactsAction(filter?: {
 // 2. Duplicate Prevention Check Action
 // ============================================================================
 
-export async function checkContactDuplicateAction(data: {
-  mobile: string;
-  companyName: string;
-}): Promise<DuplicateCheckResult> {
+export async function checkContactDuplicateAction(
+  data: {
+    mobile: string;
+    companyName: string;
+  },
+  authToken?: string
+): Promise<DuplicateCheckResult> {
   try {
-    const auth = await getAuthenticatedBroker();
+    const auth = await getAuthenticatedBroker(authToken);
     if (!auth.success) {
       return { isDuplicate: false };
     }
@@ -443,10 +467,11 @@ export async function checkContactDuplicateAction(data: {
 // ============================================================================
 
 export async function createBrokerContactAction(
-  rawInput: CreateContactInput
+  rawInput: CreateContactInput,
+  authToken?: string
 ): Promise<{ success: boolean; contactId?: string; error?: string; isDuplicate?: boolean }> {
   try {
-    const auth = await getAuthenticatedBroker();
+    const auth = await getAuthenticatedBroker(authToken);
     if (!auth.success) {
       return { success: false, error: auth.error };
     }
@@ -542,10 +567,11 @@ export async function createBrokerContactAction(
 
 export async function updateBrokerContactAction(
   contactId: string,
-  rawInput: UpdateContactInput
+  rawInput: UpdateContactInput,
+  authToken?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const auth = await getAuthenticatedBroker();
+    const auth = await getAuthenticatedBroker(authToken);
     if (!auth.success) {
       return { success: false, error: auth.error };
     }
@@ -649,10 +675,11 @@ export async function updateBrokerContactAction(
 // ============================================================================
 
 export async function toggleContactStatusAction(
-  contactId: string
+  contactId: string,
+  authToken?: string
 ): Promise<{ success: boolean; newStatus?: boolean; error?: string }> {
   try {
-    const auth = await getAuthenticatedBroker();
+    const auth = await getAuthenticatedBroker(authToken);
     if (!auth.success) {
       return { success: false, error: auth.error };
     }
@@ -701,10 +728,11 @@ export async function toggleContactStatusAction(
 // ============================================================================
 
 export async function getBrokerContactDetailsAction(
-  contactId: string
+  contactId: string,
+  authToken?: string
 ): Promise<ContactDetailsResponse> {
   try {
-    const auth = await getAuthenticatedBroker();
+    const auth = await getAuthenticatedBroker(authToken);
     if (!auth.success) {
       return { success: false, error: auth.error };
     }

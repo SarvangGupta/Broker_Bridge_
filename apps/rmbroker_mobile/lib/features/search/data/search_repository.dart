@@ -129,7 +129,7 @@ class SearchRepository {
           var queryBuilder = client
               .from('crm_contacts')
               .select(
-                'id, role, users!inner(id, name, mobile, status), companies!inner(id, name, district_id, is_verified)',
+                'id, users!user_id!inner(id, name, mobile, status, role), companies!inner(id, name, district_id, is_verified)',
               );
 
           if (currentBrokerId != null) {
@@ -145,7 +145,7 @@ class SearchRepository {
               userId: user['id']?.toString() ?? '',
               name: user['name']?.toString() ?? 'Unnamed Contact',
               companyName: company['name']?.toString() ?? 'Unnamed Business',
-              role: (row['role']?.toString() ?? 'buyer').toLowerCase() == 'seller' ? 'Seller' : 'Buyer',
+              role: ((user['role'] ?? row['role'])?.toString() ?? 'buyer').toLowerCase() == 'seller' ? 'Seller' : 'Buyer',
               mobile: user['mobile']?.toString() ?? '',
               formattedMobile: user['mobile']?.toString() ?? '',
               city: company['district_id']?.toString(),
@@ -322,7 +322,7 @@ class SearchRepository {
       final currentBrokerId = client.auth.currentUser?.id;
       var query = client
           .from('crm_contacts')
-          .select('id, role, users!inner(name, mobile), companies!inner(name, is_verified)');
+          .select('id, users!user_id!inner(name, mobile, role), companies!inner(name, is_verified)');
       if (currentBrokerId != null) {
         query = query.eq('broker_id', currentBrokerId);
       }
@@ -334,7 +334,7 @@ class SearchRepository {
           id: r['id']?.toString() ?? '',
           name: user['name']?.toString() ?? 'Unnamed Contact',
           companyName: comp['name']?.toString() ?? 'Business Partner',
-          role: (r['role']?.toString() ?? 'buyer').toLowerCase() == 'seller' ? 'Seller' : 'Buyer',
+          role: ((user['role'] ?? r['role'])?.toString() ?? 'buyer').toLowerCase() == 'seller' ? 'Seller' : 'Buyer',
           mobile: user['mobile']?.toString() ?? '',
           formattedMobile: user['mobile']?.toString() ?? '',
           isVerified: comp['is_verified'] is bool ? comp['is_verified'] : false,

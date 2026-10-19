@@ -60,6 +60,22 @@ class DealRepository {
     }
   }
 
+  /// Safely extracts the booking reference from PostgREST embedded relation,
+  /// handling both 1:1 single object (Map) and 1:N array (List) representations.
+  static String? extractBookingReference(dynamic bookingsRaw) {
+    if (bookingsRaw == null) return null;
+    if (bookingsRaw is Map<String, dynamic>) {
+      return bookingsRaw['booking_reference']?.toString();
+    }
+    if (bookingsRaw is List && bookingsRaw.isNotEmpty) {
+      final first = bookingsRaw.first;
+      if (first is Map<String, dynamic>) {
+        return first['booking_reference']?.toString();
+      }
+    }
+    return null;
+  }
+
   // ============================================================================
   // 1. BROKER DEALS LIST & SEARCH
   // ============================================================================
@@ -126,10 +142,7 @@ class DealRepository {
             final gr = req['master_grades'] as Map<String, dynamic>? ?? {};
             final buyer = item['buyer'] as Map<String, dynamic>? ?? {};
             final seller = item['seller'] as Map<String, dynamic>? ?? {};
-            final bookingList = item['bookings'] as List<dynamic>? ?? [];
-            final bookingRef = bookingList.isNotEmpty
-                ? (bookingList.first as Map<String, dynamic>)['booking_reference']?.toString()
-                : null;
+            final bookingRef = extractBookingReference(item['bookings']);
 
             final flat = Map<String, dynamic>.from(item);
             flat['commodity_name'] = comm['name'] ?? 'Agricultural Commodity';
@@ -148,6 +161,7 @@ class DealRepository {
       }
     } catch (supabaseErr) {
       debugPrint('Supabase deals fallback error: $supabaseErr');
+      return DealError(message: 'Supabase deals sync failed: $supabaseErr');
     }
 
     // 3. Fallback notice
@@ -209,10 +223,7 @@ class DealRepository {
           final gr = req['master_grades'] as Map<String, dynamic>? ?? {};
           final buyer = response['buyer'] as Map<String, dynamic>? ?? {};
           final seller = response['seller'] as Map<String, dynamic>? ?? {};
-          final bookingList = response['bookings'] as List<dynamic>? ?? [];
-          final bookingRef = bookingList.isNotEmpty
-              ? (bookingList.first as Map<String, dynamic>)['booking_reference']?.toString()
-              : null;
+          final bookingRef = extractBookingReference(response['bookings']);
 
           final flat = Map<String, dynamic>.from(response);
           flat['commodity_name'] = comm['name'] ?? 'Agricultural Commodity';
@@ -253,6 +264,7 @@ class DealRepository {
       }
     } catch (supabaseErr) {
       debugPrint('Supabase deal detail fallback error: $supabaseErr');
+      return DealError(message: 'Deal detail sync failed: $supabaseErr');
     }
 
     return const DealContractPending(

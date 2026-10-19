@@ -245,12 +245,12 @@ class _DirectorySearchFilterBarState extends State<DirectorySearchFilterBar> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return GestureDetector(
       key: key,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primaryNavy : Colors.white,
           borderRadius: BorderRadius.circular(16),

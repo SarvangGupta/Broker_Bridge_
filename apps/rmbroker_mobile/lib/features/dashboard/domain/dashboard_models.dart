@@ -106,7 +106,7 @@ class BrokerDashboardMetrics {
         icon: Icons.handshake_outlined,
         accentColor: AppColors.primary,
         isAvailable: activeDealsCount != null,
-        route: '/deals',
+        route: '/deals?filter=active',
       ),
       BrokerKpiCard(
         id: 'open_requirements',
@@ -120,7 +120,7 @@ class BrokerDashboardMetrics {
         icon: LucideIcons.layers,
         accentColor: AppColors.secondary,
         isAvailable: openRequirementsCount != null,
-        route: '/work',
+        route: '/work?tab=0&status=open',
       ),
       BrokerKpiCard(
         id: 'partially_allocated',
@@ -134,7 +134,7 @@ class BrokerDashboardMetrics {
         icon: LucideIcons.clock,
         accentColor: AppColors.warning,
         isAvailable: partiallyAllocatedCount != null,
-        route: '/work',
+        route: '/work?tab=0&status=partially_allocated',
       ),
       BrokerKpiCard(
         id: 'available_offers',
@@ -148,7 +148,7 @@ class BrokerDashboardMetrics {
         icon: LucideIcons.package,
         accentColor: AppColors.success,
         isAvailable: availableOffersCount != null,
-        route: '/work',
+        route: '/work?tab=1&status=open',
       ),
       BrokerKpiCard(
         id: 'awaiting_confirmation',
@@ -162,7 +162,7 @@ class BrokerDashboardMetrics {
         icon: LucideIcons.fileCheck,
         accentColor: AppColors.info,
         isAvailable: awaitingConfirmationCount != null,
-        route: '/deals',
+        route: '/deals?filter=signoff',
       ),
       BrokerKpiCard(
         id: 'dispatch_due',
@@ -174,7 +174,7 @@ class BrokerDashboardMetrics {
         icon: LucideIcons.truck,
         accentColor: AppColors.warning,
         isAvailable: dispatchDueCount != null,
-        route: '/orders',
+        route: '/deals?filter=dispatch_due',
       ),
       BrokerKpiCard(
         id: 'commission_ledger',
@@ -196,7 +196,7 @@ class BrokerDashboardMetrics {
         icon: LucideIcons.alertTriangle,
         accentColor: AppColors.error,
         isAvailable: openDisputesCount != null,
-        route: '/disputes',
+        route: '/deals?filter=disputed',
       ),
     ];
   }

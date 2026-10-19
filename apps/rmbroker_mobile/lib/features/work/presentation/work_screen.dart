@@ -25,11 +25,13 @@ import '../../deals/presentation/widgets/create_allocation_sheet.dart';
 class WorkScreen extends ConsumerStatefulWidget {
   final int initialTabIndex;
   final String? initialRequirementId;
+  final String? initialStatusFilter;
 
   const WorkScreen({
     super.key,
     this.initialTabIndex = 0,
     this.initialRequirementId,
+    this.initialStatusFilter,
   });
 
   @override
@@ -50,6 +52,44 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
       vsync: this,
       initialIndex: widget.initialTabIndex.clamp(0, 2),
     );
+    _applyInitialStatusFilter(widget.initialTabIndex, widget.initialStatusFilter);
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTabIndex != oldWidget.initialTabIndex) {
+      _tabController.animateTo(widget.initialTabIndex.clamp(0, 2));
+    }
+    if (widget.initialStatusFilter != oldWidget.initialStatusFilter &&
+        widget.initialStatusFilter != null) {
+      _applyInitialStatusFilter(widget.initialTabIndex, widget.initialStatusFilter);
+    }
+  }
+
+  void _applyInitialStatusFilter(int tabIndex, String? statusFilter) {
+    if (statusFilter != null && statusFilter.isNotEmpty) {
+      Future.microtask(() {
+        final filter = statusFilter.toLowerCase().trim();
+        if (tabIndex == 1 || filter == 'available' || filter == 'offer_open') {
+          if (filter == 'open' || filter == 'available' || filter == 'active') {
+            ref.read(offersProvider.notifier).setStatusFilter(OfferStatus.open);
+          } else if (filter == 'partially_available') {
+            ref.read(offersProvider.notifier).setStatusFilter(OfferStatus.partiallyAvailable);
+          } else if (filter == 'expired') {
+            ref.read(offersProvider.notifier).setStatusFilter(OfferStatus.expired);
+          }
+        } else {
+          if (filter == 'open') {
+            ref.read(requirementsProvider.notifier).setStatusFilter(RequirementStatus.open);
+          } else if (filter == 'partially_allocated' || filter == 'partially_fulfilled') {
+            ref.read(requirementsProvider.notifier).setStatusFilter(RequirementStatus.partiallyAllocated);
+          } else if (filter == 'expired') {
+            ref.read(requirementsProvider.notifier).setStatusFilter(RequirementStatus.expired);
+          }
+        }
+      });
+    }
   }
 
   @override

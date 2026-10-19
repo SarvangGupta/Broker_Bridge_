@@ -12,7 +12,9 @@ import 'widgets/deal_card.dart';
 
 /// Deals & Contract Negotiations Desk.
 class DealsScreen extends ConsumerStatefulWidget {
-  const DealsScreen({super.key});
+  final String? initialFilter;
+
+  const DealsScreen({super.key, this.initialFilter});
 
   @override
   ConsumerState<DealsScreen> createState() => _DealsScreenState();
@@ -20,6 +22,34 @@ class DealsScreen extends ConsumerStatefulWidget {
 
 class _DealsScreenState extends ConsumerState<DealsScreen> {
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _applyInitialFilter(widget.initialFilter);
+  }
+
+  @override
+  void didUpdateWidget(covariant DealsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialFilter != oldWidget.initialFilter && widget.initialFilter != null) {
+      _applyInitialFilter(widget.initialFilter);
+    }
+  }
+
+  void _applyInitialFilter(String? filter) {
+    if (filter != null && filter.isNotEmpty) {
+      Future.microtask(() {
+        final f = filter.toLowerCase().trim();
+        if (f == 'active' || f == 'signoff' || f == 'dispatch_due' || f == 'disputed') {
+          ref.read(dealsProvider.notifier).setPresetFilter(f);
+        } else {
+          final status = DealStatus.fromString(f);
+          ref.read(dealsProvider.notifier).setStatusFilter(status);
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -154,8 +184,28 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                     children: [
                       _buildFilterChip(
                         label: 'All (${state.totalCount})',
-                        isSelected: state.statusFilter == null,
+                        isSelected: state.presetFilter == null && state.statusFilter == null,
                         onTap: () => ref.read(dealsProvider.notifier).setStatusFilter(null),
+                      ),
+                      _buildFilterChip(
+                        label: 'Active (${state.activeCount})',
+                        isSelected: state.presetFilter == 'active',
+                        onTap: () => ref.read(dealsProvider.notifier).setPresetFilter('active'),
+                      ),
+                      _buildFilterChip(
+                        label: 'Awaiting Sign-off (${state.signoffCount})',
+                        isSelected: state.presetFilter == 'signoff',
+                        onTap: () => ref.read(dealsProvider.notifier).setPresetFilter('signoff'),
+                      ),
+                      _buildFilterChip(
+                        label: 'Dispatch Due (${state.dispatchDueCount})',
+                        isSelected: state.presetFilter == 'dispatch_due',
+                        onTap: () => ref.read(dealsProvider.notifier).setPresetFilter('dispatch_due'),
+                      ),
+                      _buildFilterChip(
+                        label: 'Disputed (${state.disputedCount})',
+                        isSelected: state.presetFilter == 'disputed',
+                        onTap: () => ref.read(dealsProvider.notifier).setPresetFilter('disputed'),
                       ),
                       _buildFilterChip(
                         label: 'Draft (${state.deals.where((d) => d.status == DealStatus.draft).length})',

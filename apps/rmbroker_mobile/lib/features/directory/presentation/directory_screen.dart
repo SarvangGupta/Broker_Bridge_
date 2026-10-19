@@ -206,9 +206,14 @@ class DirectoryScreen extends ConsumerWidget {
               icon: LucideIcons.users,
               title: title,
               description: description,
-              actionLabel: state.searchQuery.isNotEmpty ? 'Clear Search' : 'Add Counterparty',
-              onAction: state.searchQuery.isNotEmpty
-                  ? controller.clearSearch
+              actionLabel: (state.searchQuery.isNotEmpty || state.statusFilter != 'all')
+                  ? 'Reset Filters'
+                  : 'Add Counterparty',
+              onAction: (state.searchQuery.isNotEmpty || state.statusFilter != 'all')
+                  ? () {
+                      controller.clearSearch();
+                      controller.setStatusFilter('all');
+                    }
                   : () {
                       ContactFormModal.show(
                         context,

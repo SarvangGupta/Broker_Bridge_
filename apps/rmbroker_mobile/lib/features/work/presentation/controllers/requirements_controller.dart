@@ -72,12 +72,15 @@ class RequirementsState {
   }
 }
 
+final workRepositoryProvider = Provider<WorkRepository>((ref) {
+  return WorkRepository();
+});
+
 class RequirementsNotifier extends Notifier<RequirementsState> {
-  late final WorkRepository _repository;
+  WorkRepository get _repository => ref.read(workRepositoryProvider);
 
   @override
   RequirementsState build() {
-    _repository = WorkRepository();
     // Schedule asynchronous data load on init
     Future.microtask(() => loadRequirements());
     return const RequirementsState(isLoading: true);

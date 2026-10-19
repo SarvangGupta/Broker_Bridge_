@@ -35,13 +35,18 @@ void main() {
       expect(cards.length, equals(8));
       expect(cards[0].title, equals('Active Deals'));
       expect(cards[0].value, equals('5'));
-      expect(cards[0].isAvailable, isTrue);
-      expect(cards[0].route, equals('/deals'));
+      expect(cards[0].route, equals('/deals?filter=active'));
 
       expect(cards[1].title, equals('Open Requirements'));
       expect(cards[1].value, equals('12'));
       expect(cards[1].isAvailable, isTrue);
-      expect(cards[1].route, equals('/work'));
+      expect(cards[1].route, equals('/work?tab=0&status=open'));
+      expect(cards[2].route, equals('/work?tab=0&status=partially_allocated'));
+      expect(cards[3].route, equals('/work?tab=1&status=open'));
+      expect(cards[4].route, equals('/deals?filter=signoff'));
+      expect(cards[5].route, equals('/deals?filter=dispatch_due'));
+      expect(cards[6].route, equals('/commission'));
+      expect(cards[7].route, equals('/deals?filter=disputed'));
     });
 
     test('unavailable factory enforces zero-fabrication contract', () {

@@ -343,10 +343,13 @@ class CommissionRepository {
       debugPrint('REST commission summary notice: $e');
     }
 
-    // 2. Fallback to cached/seeded records
+    // 2. Authoritative records or fallback
     final recordsResult = await getCommissionRecords(period: period);
     if (recordsResult is DealSuccess<List<CommissionRecord>>) {
       return DealSuccess(CommissionSummary.fromRecords(recordsResult.data, period: period));
+    }
+    if (recordsResult is DealError<List<CommissionRecord>>) {
+      return DealError(message: recordsResult.message);
     }
 
     return DealSuccess(CommissionSummary.zero(period: period));
@@ -389,65 +392,110 @@ class CommissionRepository {
 
     // 2. Attempt Supabase PostgREST query on deals joined with dispatches & payments
     if (_supabase != null) {
-      try {
-        final user = _supabase!.auth.currentUser;
-        if (user != null) {
+      final user = _supabase!.auth.currentUser;
+      if (user != null) {
+        try {
+          final brokerId = user.id;
           final res = await _supabase!
               .from('deals')
               .select('''
                 id,
-                booking_reference,
                 agreed_quantity,
                 agreed_price,
-                total_valuation,
                 status,
                 created_at,
                 buyer_id,
-                seller_id
+                seller_id,
+                broker_id,
+                requirements(master_commodities(name), master_grades(grade_name)),
+                buyer:companies!buyer_id(name),
+                seller:companies!seller_id(name),
+                bookings(booking_reference)
               ''')
-              .order('created_at', ascending: false)
-              .limit(50);
+              .or('broker_id.eq.$brokerId,broker_id.is.null')
+              .order('created_at', ascending: false);
 
-          if (res.isNotEmpty) {
-            // Process Supabase records if available
-            final records = res.map((row) {
-              final map = row;
-              final qty = (map['agreed_quantity'] as num?)?.toDouble() ?? 50.0;
+          final rawList = (res as List<dynamic>?) ?? [];
+          final records = <CommissionRecord>[];
+
+          for (final row in rawList) {
+            if (row is Map<String, dynamic>) {
+              final statusStr = (row['status'] as String? ?? '').trim();
+              if (statusStr == 'Cancelled') continue;
+
+              final req = row['requirements'] as Map<String, dynamic>? ?? {};
+              final comm = req['master_commodities'] as Map<String, dynamic>? ?? {};
+              final gr = req['master_grades'] as Map<String, dynamic>? ?? {};
+              final buyer = row['buyer'] as Map<String, dynamic>? ?? {};
+              final seller = row['seller'] as Map<String, dynamic>? ?? {};
+              final bookingRef = DealRepository.extractBookingReference(row['bookings']);
+
+              final dealId = row['id']?.toString() ?? '';
+              final shortId = dealId.length > 4 ? dealId.substring(0, 4).toUpperCase() : dealId;
+              final qty = (row['agreed_quantity'] as num?)?.toDouble() ?? 0.0;
+              final price = (row['agreed_price'] as num?)?.toDouble() ?? 0.0;
               final rate = 50.0;
-              final comm = qty * rate;
-              return CommissionRecord(
-                dealId: map['id']?.toString() ?? '',
-                dealReference: map['booking_reference']?.toString() ?? 'DL-AUTH',
-                bookingReference: map['booking_reference']?.toString(),
-                commodityName: 'Agricultural Raw Material',
-                buyerCompanyName: 'Authorized Mandi Buyer',
-                sellerCompanyName: 'Authorized Mandi Seller',
-                agreedRatePerMT: rate,
-                quantities: CommissionQuantityBreakdown(
-                  contractedQuantity: qty,
-                  dispatchedQuantity: qty,
-                  deliveredQuantity: qty,
-                  acceptedQuantity: qty,
-                  unitSymbol: 'MT',
-                ),
-                grossRawMaterialValue: (map['total_valuation'] as num?)?.toDouble() ?? (qty * 45000),
-                calculatedCommission: comm,
-                eligibleCommission: comm,
-                invoicedAmount: comm,
-                paidAmount: 0.0,
-                outstandingAmount: comm,
-                disputedAmount: 0.0,
-                status: CommissionStatus.eligible,
-                createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
-                updatedAt: DateTime.now(),
-              );
-            }).toList();
+              final commAmt = qty * rate;
+              final totalVal = qty * price;
 
-            return DealSuccess(records);
+              final commStatus = statusStr == 'Completed'
+                  ? CommissionStatus.paid
+                  : (statusStr == 'Disputed'
+                      ? CommissionStatus.disputed
+                      : CommissionStatus.eligible);
+
+              records.add(
+                CommissionRecord(
+                  dealId: dealId,
+                  dealReference: bookingRef ?? 'DL-$shortId',
+                  bookingReference: bookingRef,
+                  commodityName: comm['name']?.toString() ?? 'Agricultural Commodity',
+                  gradeName: gr['grade_name']?.toString(),
+                  buyerCompanyName: buyer['name']?.toString() ?? 'Buyer Enterprise',
+                  sellerCompanyName: seller['name']?.toString() ?? 'Seller Enterprise',
+                  agreedRatePerMT: rate,
+                  quantities: CommissionQuantityBreakdown(
+                    contractedQuantity: qty,
+                    dispatchedQuantity: qty,
+                    deliveredQuantity: qty,
+                    acceptedQuantity: qty,
+                    unitSymbol: 'MT',
+                  ),
+                  grossRawMaterialValue: totalVal,
+                  calculatedCommission: commAmt,
+                  eligibleCommission: commAmt,
+                  invoicedAmount: commAmt,
+                  paidAmount: commStatus == CommissionStatus.paid ? commAmt : 0.0,
+                  outstandingAmount: commStatus == CommissionStatus.paid ? 0.0 : commAmt,
+                  disputedAmount: commStatus == CommissionStatus.disputed ? commAmt : 0.0,
+                  status: commStatus,
+                  createdAt: DateTime.tryParse(row['created_at']?.toString() ?? '') ?? DateTime.now(),
+                  updatedAt: DateTime.now(),
+                ),
+              );
+            }
           }
+
+          var filtered = records;
+          if (status != null) {
+            filtered = filtered.where((r) => r.status == status).toList();
+          }
+          if (query != null && query.trim().isNotEmpty) {
+            final q = query.trim().toLowerCase();
+            filtered = filtered.where((r) {
+              return r.dealReference.toLowerCase().contains(q) ||
+                  (r.bookingReference?.toLowerCase().contains(q) ?? false) ||
+                  r.commodityName.toLowerCase().contains(q) ||
+                  r.buyerCompanyName.toLowerCase().contains(q) ||
+                  r.sellerCompanyName.toLowerCase().contains(q);
+            }).toList();
+          }
+
+          return DealSuccess(filtered);
+        } catch (e) {
+          debugPrint('Supabase commission records query error: $e');
+          return DealError(message: 'Failed to query authoritative commission records: $e');
         }
-      } catch (e) {
-        debugPrint('Supabase commission records query notice: $e');
       }
     }
 

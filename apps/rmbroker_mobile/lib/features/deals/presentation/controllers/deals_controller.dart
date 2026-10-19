@@ -13,6 +13,7 @@ class DealsState {
   final String? contractNotice;
   final List<DealItem> deals;
   final DealStatus? statusFilter;
+  final String? presetFilter;
   final String searchQuery;
 
   const DealsState({
@@ -21,6 +22,7 @@ class DealsState {
     this.contractNotice,
     this.deals = const [],
     this.statusFilter,
+    this.presetFilter,
     this.searchQuery = '',
   });
 
@@ -31,6 +33,8 @@ class DealsState {
     List<DealItem>? deals,
     DealStatus? statusFilter,
     bool clearStatusFilter = false,
+    String? presetFilter,
+    bool clearPresetFilter = false,
     String? searchQuery,
   }) {
     return DealsState(
@@ -39,13 +43,39 @@ class DealsState {
       contractNotice: contractNotice,
       deals: deals ?? this.deals,
       statusFilter: clearStatusFilter ? null : (statusFilter ?? this.statusFilter),
+      presetFilter: clearPresetFilter ? null : (presetFilter ?? this.presetFilter),
       searchQuery: searchQuery ?? this.searchQuery,
     );
   }
 
   List<DealItem> get filteredDeals {
     return deals.where((deal) {
-      if (statusFilter != null && deal.status != statusFilter) {
+      if (presetFilter != null) {
+        switch (presetFilter) {
+          case 'active':
+            if (deal.status == DealStatus.cancelled || deal.status == DealStatus.completed) {
+              return false;
+            }
+            break;
+          case 'signoff':
+            const signoffStatuses = [
+              DealStatus.draft,
+              DealStatus.awaitingBuyerConfirmation,
+              DealStatus.awaitingSellerConfirmation,
+              DealStatus.readyToFinalize,
+            ];
+            if (!signoffStatuses.contains(deal.status)) return false;
+            break;
+          case 'dispatch_due':
+            if (deal.status != DealStatus.finalized && deal.status != DealStatus.inFulfillment) {
+              return false;
+            }
+            break;
+          case 'disputed':
+            if (deal.status != DealStatus.disputed) return false;
+            break;
+        }
+      } else if (statusFilter != null && deal.status != statusFilter) {
         return false;
       }
       if (searchQuery.trim().isNotEmpty) {
@@ -61,7 +91,16 @@ class DealsState {
   }
 
   int get totalCount => deals.length;
-  int get activeCount => deals.where((d) => d.status.isOperational).length;
+  int get activeCount =>
+      deals.where((d) => d.status != DealStatus.cancelled && d.status != DealStatus.completed).length;
+  int get signoffCount => deals.where((d) =>
+      d.status == DealStatus.draft ||
+      d.status == DealStatus.awaitingBuyerConfirmation ||
+      d.status == DealStatus.awaitingSellerConfirmation ||
+      d.status == DealStatus.readyToFinalize).length;
+  int get dispatchDueCount => deals.where((d) =>
+      d.status == DealStatus.finalized || d.status == DealStatus.inFulfillment).length;
+  int get disputedCount => deals.where((d) => d.status == DealStatus.disputed).length;
   int get finalizedCount =>
       deals.where((d) => d.status == DealStatus.finalized || d.status == DealStatus.inFulfillment).length;
   int get completedCount => deals.where((d) => d.status == DealStatus.completed).length;
@@ -114,11 +153,19 @@ class DealsNotifier extends Notifier<DealsState> {
     }
   }
 
+  void setPresetFilter(String? preset) {
+    if (preset == null) {
+      state = state.copyWith(clearPresetFilter: true);
+    } else {
+      state = state.copyWith(presetFilter: preset, clearStatusFilter: true);
+    }
+  }
+
   void setStatusFilter(DealStatus? filter) {
     if (filter == null) {
-      state = state.copyWith(clearStatusFilter: true);
+      state = state.copyWith(clearStatusFilter: true, clearPresetFilter: true);
     } else {
-      state = state.copyWith(statusFilter: filter);
+      state = state.copyWith(statusFilter: filter, clearPresetFilter: true);
     }
   }
 

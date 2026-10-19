@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/work_repository.dart';
 import '../../domain/offer_model.dart';
+import 'requirements_controller.dart';
 
 @immutable
 class OffersState {
@@ -73,11 +74,10 @@ class OffersState {
 }
 
 class OffersNotifier extends Notifier<OffersState> {
-  late final WorkRepository _repository;
+  WorkRepository get _repository => ref.read(workRepositoryProvider);
 
   @override
   OffersState build() {
-    _repository = WorkRepository();
     Future.microtask(() => loadOffers());
     return const OffersState(isLoading: true);
   }

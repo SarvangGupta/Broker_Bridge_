@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rmbroker_mobile/features/deals/data/deal_repository.dart';
 import 'package:rmbroker_mobile/features/deals/domain/deal_model.dart';
 
 void main() {
@@ -183,6 +184,31 @@ void main() {
         deliveryDate: DateTime.now().add(const Duration(days: 5)),
       );
       expect(invalidPriceDto.validate(), contains('Agreed price must be greater than zero'));
+    });
+
+    test('DealRepository.extractBookingReference safely handles Map, List, and null', () {
+      // 1:1 relation from PostgREST returns a single Map
+      expect(
+        DealRepository.extractBookingReference({'booking_reference': 'RBTEST-BKG-2026-0005'}),
+        'RBTEST-BKG-2026-0005',
+      );
+
+      // 1:N relation returns a List of Maps
+      expect(
+        DealRepository.extractBookingReference([
+          {'booking_reference': 'RBTEST-BKG-2026-0007'}
+        ]),
+        'RBTEST-BKG-2026-0007',
+      );
+
+      // Null bookings
+      expect(DealRepository.extractBookingReference(null), isNull);
+
+      // Empty list
+      expect(DealRepository.extractBookingReference([]), isNull);
+
+      // Malformed / unexpected type
+      expect(DealRepository.extractBookingReference('invalid_string'), isNull);
     });
   });
 }

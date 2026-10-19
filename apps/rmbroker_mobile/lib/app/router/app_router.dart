@@ -175,7 +175,11 @@ class AppRouter {
                 builder: (context, state) {
                   final tabStr = state.uri.queryParameters['tab'];
                   final tab = int.tryParse(tabStr ?? '0') ?? 0;
-                  return WorkScreen(initialTabIndex: tab);
+                  final status = state.uri.queryParameters['status'];
+                  return WorkScreen(
+                    initialTabIndex: tab,
+                    initialStatusFilter: status,
+                  );
                 },
               ),
             ],
@@ -185,7 +189,10 @@ class AppRouter {
               GoRoute(
                 path: '/deals',
                 name: 'deals',
-                builder: (context, state) => const DealsScreen(),
+                builder: (context, state) {
+                  final filter = state.uri.queryParameters['filter'];
+                  return DealsScreen(initialFilter: filter);
+                },
               ),
             ],
           ),
