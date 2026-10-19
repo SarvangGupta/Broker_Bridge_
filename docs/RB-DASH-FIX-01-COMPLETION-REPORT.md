@@ -142,14 +142,17 @@ All tests were actually executed using Flutter SDK 3.47.6 (Dart 3.13.5):
 | **Dashboard Feature Tests** | `flutter test test/features/dashboard/` | **PASS (21/21 passed)** | All models, repository, and widget tests green |
 | **Full Mobile Test Suite** | `flutter test` | **PASS (235/235 passed)** | Zero regression across all 11 features |
 | **Flutter Static Analysis** | `flutter analyze` | **PASS (0 issues)** | Clean static analysis across entire project |
-| **Android Debug APK** | `flutter build apk --debug` | **PASS (Built in 47.7s)** | `build\app\outputs\flutter-apk\app-debug.apk` created |
+| **Android Debug APK** | `flutter build apk --debug` | **PASS (Built in 24.6s)** | `build\app\outputs\flutter-apk\app-debug.apk` created |
+| **Physical Device Install** | `adb -s e0d9da95 install -r ...` | **PASS (Success)** | Installed to Redmi Note 5 Pro (`whyred`, Android 9) |
+| **Device Execution Verification** | `adb shell screencap` & `logcat` | **PASS** | UI displays diagnosable error `permission denied for table deals (code: 42501)` instead of placeholder badges; layout overflow resolved |
+| **Git Commit & Push** | `git commit` & `git push` | **PASS** | Commit `1a0885c` pushed to `vetkind/feature/broker-nilesh` |
 
 ---
 
 ## 7. Remaining Unavailable Modules & Remote Database Blockers
 
 In accordance with Section 6 and Section 9 Stop Gate rules:
-1. **Remote Database Grants:** Remote tables `deals`, `requirements`, `availabilities`, `disputes`, `dispatches` require `GRANT SELECT ON public.<table_name> TO authenticated;` executed on the remote database.
+1. **Remote Database Grants:** Remote tables `deals`, `requirements`, `availabilities`, `disputes`, `dispatches` require `GRANT SELECT ON public.<table_name> TO authenticated;` executed on the remote database. The updated mobile app accurately surfaces this exact database error to the broker rather than pretending the feature is an unreleased roadmap item.
 2. **Remote RLS Policies:** RLS policies permitting authenticated brokers to select their own records (`broker_id = auth.uid()`) are not yet applied on remote Supabase.
 3. **Varun Remote Data:** The remote database has 0 operational records. The repeatable seed script `supabase/seed_broker_demo_dataset.sql` has been prepared and validated locally, but remote execution is withheld awaiting administrative approval.
 
@@ -157,4 +160,5 @@ In accordance with Section 6 and Section 9 Stop Gate rules:
 
 ## 8. Final Status
 
-**Sprint Result:** **PASS** (Mobile code, session handling, metric queries, error diagnostics, and regression baseline 100% verified. Remote database deployment remains gated as required).
+**Sprint Result:** **PASS** (Mobile code, session handling, metric queries, error diagnostics, physical device installation, and regression baseline 100% verified. Remote database deployment remains gated under Stop Gate approval).
+
