@@ -18,6 +18,8 @@ import '../../features/more/presentation/more_screen.dart';
 import '../../features/notifications/presentation/screens/notification_center_screen.dart';
 import '../../features/search/domain/search_result.dart';
 import '../../features/search/presentation/global_search_screen.dart';
+import '../../features/tasks/presentation/screens/task_detail_screen.dart';
+import '../../features/tasks/presentation/screens/task_list_screen.dart';
 import '../../features/work/presentation/work_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
@@ -133,6 +135,21 @@ class AppRouter {
         name: 'notifications',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const NotificationCenterScreen(),
+      ),
+      GoRoute(
+        path: '/tasks',
+        name: 'tasks',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const TaskListScreen(),
+      ),
+      GoRoute(
+        path: '/tasks/:id',
+        name: 'task_detail',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return TaskDetailScreen(taskId: id);
+        },
       ),
 
       // Core Broker Shell with Persistent Bottom Navigation

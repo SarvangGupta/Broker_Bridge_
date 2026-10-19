@@ -265,17 +265,14 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 18),
-                      SizedBox(
-                        width: 170,
-                        child: AppButton(
-                          label: 'Retry Connection',
-                          icon: const Icon(
-                            LucideIcons.refreshCw,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          onPressed: () => controller.retry(),
+                      AppButton(
+                        label: 'Retry Connection',
+                        icon: const Icon(
+                          LucideIcons.refreshCw,
+                          size: 18,
+                          color: Colors.white,
                         ),
+                        onPressed: () => controller.retry(),
                       ),
                     ],
                   ),

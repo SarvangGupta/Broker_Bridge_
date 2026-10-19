@@ -157,6 +157,45 @@ void main() {
       expect(find.text('Pending API'), findsWidgets);
     });
 
+    testWidgets('displays error card with retry button when DashboardDataError occurs', (
+      tester,
+    ) async {
+      final repo = MockDashboardRepository(
+        brokerUser: testBroker,
+        resultData: const DashboardDataError(
+          message: 'Database permission denied: 42501',
+          code: '42501',
+        ),
+      );
+
+      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unable to Synchronize Desk Data'), findsOneWidget);
+      expect(find.textContaining('Database permission denied: 42501'), findsOneWidget);
+      expect(find.text('Retry Connection'), findsOneWidget);
+      expect(find.byType(QuickActionsSection), findsOneWidget);
+    });
+
+    testWidgets('displays 0 for legitimate empty counts with no Pending API badges', (
+      tester,
+    ) async {
+      final repo = MockDashboardRepository(
+        brokerUser: testBroker,
+        resultData: DashboardDataSuccess(
+          metrics: BrokerDashboardMetrics.empty(notice: 'Authoritative empty desk'),
+        ),
+      );
+
+      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DashboardKpiGrid), findsOneWidget);
+      expect(find.text('0'), findsWidgets);
+      expect(find.text('Pending API'), findsNothing);
+      expect(find.text('—'), findsNothing);
+    });
+
     testWidgets('renders quick actions with implemented and roadmap items', (
       tester,
     ) async {

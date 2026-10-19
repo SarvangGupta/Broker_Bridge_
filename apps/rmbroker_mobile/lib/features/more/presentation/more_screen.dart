@@ -125,8 +125,10 @@ class MoreScreen extends StatelessWidget {
           // Tools List
           AppCard(
             padding: EdgeInsets.zero,
-            child: Column(
-              children: [
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                children: [
                 ListTile(
                   leading: const Icon(
                     LucideIcons.globe,
@@ -166,6 +168,17 @@ class MoreScreen extends StatelessWidget {
                   subtitle: const Text('Issue invoices, statements & reconciliation'),
                   trailing: const Icon(LucideIcons.chevronRight, size: 18),
                   onTap: () => context.push('/invoices'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(
+                    LucideIcons.checkSquare,
+                    color: AppColors.primary,
+                  ),
+                  title: const Text('Broker Tasks & Follow-ups'),
+                  subtitle: const Text('Track action items, priorities & business follow-ups'),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                  onTap: () => context.push('/tasks'),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -227,7 +240,8 @@ class MoreScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 24),
+        ),
+        const SizedBox(height: 24),
 
           // Logout Button
           ListTile(

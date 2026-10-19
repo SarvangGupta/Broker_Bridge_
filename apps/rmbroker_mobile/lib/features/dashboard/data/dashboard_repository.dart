@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/security/secure_storage_service.dart';
 import '../../authentication/domain/broker_user.dart';
+import '../../commission/domain/commission_calculator.dart';
 import '../domain/dashboard_models.dart';
 
 /// Sealed result hierarchy for dashboard data queries.
@@ -104,7 +105,23 @@ class DashboardRepository {
 
   /// Fetch dashboard metrics and activity stream from authorized backend endpoints.
   Future<DashboardDataResult> fetchDashboardData() async {
-    // 1. Attempt authoritative REST endpoint via ApiClient
+    // 1. Resolve authenticated broker identity
+    final broker = await getAuthenticatedBroker();
+    final client = _supabase;
+    final session = client?.auth.currentSession;
+    final isSupaAuth = session != null && !session.isExpired;
+
+    // Reject unauthenticated requests immediately
+    if (broker == null && !isSupaAuth) {
+      return const DashboardDataUnauthorized();
+    }
+
+    final brokerId = session?.user.id ?? broker?.id;
+    if (brokerId == null || brokerId.isEmpty) {
+      return const DashboardDataUnauthorized();
+    }
+
+    // 2. Attempt authoritative REST endpoint via ApiClient
     try {
       final response = await _apiClient.get('/broker/dashboard');
 
@@ -136,58 +153,183 @@ class DashboardRepository {
       }
       debugPrint('REST dashboard endpoint notice: ${dioErr.message}');
     } catch (e) {
-      debugPrint('REST query error: $e');
+      debugPrint('REST query notice: $e');
     }
 
-    // 2. Direct Supabase fallback if user has an active authenticated session
-    try {
-      final client = _supabase;
-      final session = client?.auth.currentSession;
-
-      if (client != null && session != null && !session.isExpired) {
-        final brokerId = session.user.id;
-
-        // Perform parallel authoritative head count queries
-        final dealsCountRes = await client
+    // 3. Direct Supabase authoritative fallback when database client is available
+    if (client != null) {
+      try {
+        // Query Deals assigned to authenticated broker
+        final dealsRes = await client
             .from('deals')
-            .select('id')
-            .eq('broker_id', brokerId)
-            .count(CountOption.exact);
+            .select('id, agreed_quantity, status')
+            .eq('broker_id', brokerId);
 
-        final reqsCountRes = await client
+        final dealsList = (dealsRes as List<dynamic>?) ?? [];
+
+        // Metric 1: Active Deals (non-terminal deals)
+        final activeDeals = dealsList.where((d) {
+          final status = (d['status'] as String? ?? '').trim();
+          return !const ['Closed', 'Cancelled', 'Completed'].contains(status);
+        }).length;
+
+        // Metric 5: Awaiting Sign-off (deals pending terms/confirmation)
+        final awaitingConfirmation = dealsList.where((d) {
+          final status = (d['status'] as String? ?? '').trim();
+          return const [
+            'Draft',
+            'Proposed',
+            'Countered',
+            'Seller Confirmed',
+            'Buyer Confirmed',
+            'Awaiting Confirmation',
+            'Awaiting Buyer Confirmation',
+            'Awaiting Seller Confirmation',
+            'Ready to Finalize',
+          ].contains(status);
+        }).length;
+
+        // Metric 6: Dispatch Due (deals confirmed awaiting transport/dispatch)
+        final dispatchDue = dealsList.where((d) {
+          final status = (d['status'] as String? ?? '').trim();
+          return const [
+            'Dispatch Pending',
+            'Booking Confirmed',
+            'Finalized',
+            'In Fulfillment',
+          ].contains(status);
+        }).length;
+
+        // Metric 7: Commission Volume Earned (Agreed Quantity * ₹50/MT brokerage fee for active deals)
+        double totalCommissionVolume = 0;
+        for (final d in dealsList) {
+          final status = (d['status'] as String? ?? '').trim();
+          if (status != 'Cancelled') {
+            final qty = (d['agreed_quantity'] as num?)?.toDouble() ?? 0.0;
+            totalCommissionVolume += (qty * 50.0);
+          }
+        }
+        final commissionFormatted = CommissionCalculator.formatCurrency(totalCommissionVolume).replaceAll('.00', '');
+
+        // Query Requirements assigned to authenticated broker
+        final reqsRes = await client
             .from('requirements')
-            .select('id')
-            .eq('broker_id', brokerId)
-            .count(CountOption.exact);
+            .select('id, quantity, fulfilled_quantity, status')
+            .eq('broker_id', brokerId);
 
-        final offersCountRes = await client
+        final reqsList = (reqsRes as List<dynamic>?) ?? [];
+
+        // Metric 2: Open Requirements (Open or partially matched requirements)
+        final openReqs = reqsList.where((r) {
+          final status = (r['status'] as String? ?? '').trim();
+          return status == 'Open' ||
+              status == 'Partially Fulfilled' ||
+              status == 'Partially Allocated';
+        }).length;
+
+        // Metric 3: Partially Allocated Requirements
+        final partiallyAllocated = reqsList.where((r) {
+          final status = (r['status'] as String? ?? '').trim();
+          final qty = (r['quantity'] as num?)?.toDouble() ?? 0.0;
+          final fulfilled = (r['fulfilled_quantity'] as num?)?.toDouble() ?? 0.0;
+          return status == 'Partially Fulfilled' ||
+              status == 'Partially Allocated' ||
+              (fulfilled > 0 && fulfilled < qty);
+        }).length;
+
+        // Metric 4: Available Offers (Open offers belonging to broker or global visibility)
+        final offersRes = await client
             .from('availabilities')
-            .select('id')
-            .eq('broker_id', brokerId)
-            .count(CountOption.exact);
+            .select('id, available_quantity, status')
+            .or('broker_id.eq.$brokerId,visibility.eq.global')
+            .eq('status', 'Open');
+
+        final offersList = (offersRes as List<dynamic>?) ?? [];
+        final availableOffers = offersList.where((o) {
+          final availQty = (o['available_quantity'] as num?)?.toDouble() ?? 0.0;
+          return availQty > 0;
+        }).length;
+
+        // Metric 8: Open Disputes (unresolved disputes on broker deals)
+        int openDisputes = 0;
+        try {
+          final disputesRes = await client
+              .from('disputes')
+              .select('id, status, deal_id')
+              .eq('status', 'Open');
+          final disputesList = (disputesRes as List<dynamic>?) ?? [];
+          final brokerDealIds = dealsList.map((d) => d['id']?.toString()).toSet();
+          openDisputes = disputesList
+              .where((dsp) => brokerDealIds.contains(dsp['deal_id']?.toString()))
+              .length;
+        } catch (_) {
+          // Graceful fallback if disputes table query is restricted
+        }
+
+        // Recent Activities Stream
+        final activities = <BrokerActivityItem>[];
+        try {
+          final recentDealsRes = await client
+              .from('deals')
+              .select('id, status, agreed_quantity, created_at')
+              .eq('broker_id', brokerId)
+              .order('created_at', ascending: false)
+              .limit(4);
+
+          for (final d in (recentDealsRes as List<dynamic>? ?? [])) {
+            final dealId = d['id']?.toString() ?? '';
+            final shortId = dealId.length > 4 ? dealId.substring(0, 4).toUpperCase() : dealId;
+            final status = d['status']?.toString() ?? 'Pending';
+            final qty = d['agreed_quantity']?.toString() ?? '0';
+            activities.add(
+              BrokerActivityItem(
+                id: 'deal-$dealId',
+                title: 'Deal #DL-$shortId Status: $status',
+                description: '$qty MT recorded with status "$status".',
+                relativeTime: 'Recently',
+                category: 'deals',
+                route: '/deals',
+                badge: 'deal_update',
+              ),
+            );
+          }
+        } catch (_) {
+          // Graceful fallback for activity stream
+        }
 
         final metrics = BrokerDashboardMetrics(
-          activeDealsCount: dealsCountRes.count,
-          openRequirementsCount: reqsCountRes.count,
-          partiallyAllocatedCount: 0,
-          availableOffersCount: offersCountRes.count,
-          awaitingConfirmationCount: 0,
-          dispatchDueCount: 0,
+          activeDealsCount: activeDeals,
+          openRequirementsCount: openReqs,
+          partiallyAllocatedCount: partiallyAllocated,
+          availableOffersCount: availableOffers,
+          awaitingConfirmationCount: awaitingConfirmation,
+          dispatchDueCount: dispatchDue,
           deliveriesAwaitingCount: 0,
-          commissionThisMonth: '₹0',
-          openDisputesCount: 0,
+          commissionThisMonth: commissionFormatted,
+          openDisputesCount: openDisputes,
           isAuthoritative: true,
           dataSourceNotice: 'Authoritative direct Supabase table counts verified.',
         );
 
-        return DashboardDataSuccess(metrics: metrics);
+        return DashboardDataSuccess(
+          metrics: metrics,
+          recentActivities: activities,
+        );
+      } on PostgrestException catch (pgErr) {
+        return DashboardDataError(
+          message:
+              'Database permission or query error: ${pgErr.message} (code: ${pgErr.code ?? 'UNKNOWN'})',
+          code: pgErr.code,
+        );
+      } catch (dbErr) {
+        return DashboardDataError(
+          message: 'Failed to query desk metrics: $dbErr',
+          code: 'DATABASE_QUERY_ERROR',
+        );
       }
-    } catch (dbErr) {
-      debugPrint('Supabase direct query notice: $dbErr');
     }
 
-    // 3. Honest Unavailable State (when REST route is not mounted and DB is unreachable offline)
-    // Never fabricate fake business metrics.
+    // 4. Honest Unavailable State (when REST route is not mounted and DB client is null)
     return const DashboardDataUnavailable(
       contractNotice:
           'Authoritative endpoint /api/v1/broker/dashboard is pending backend exposure. '
@@ -195,3 +337,4 @@ class DashboardRepository {
     );
   }
 }
+

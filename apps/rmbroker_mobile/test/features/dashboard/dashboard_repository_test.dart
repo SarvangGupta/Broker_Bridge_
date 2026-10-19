@@ -148,5 +148,46 @@ void main() {
       expect(success.recentActivities.length, equals(1));
       expect(success.recentActivities[0].title, equals('Requirement Posted'));
     });
+
+    test('fetchDashboardData returns DashboardDataUnauthorized when no credentials exist', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final emptyStorage = SecureStorageService();
+      final repository = DashboardRepository(storage: emptyStorage);
+
+      final result = await repository.fetchDashboardData();
+      expect(result, isA<DashboardDataUnauthorized>());
+    });
+
+    test('fetchDashboardData returns DashboardDataError when server returns success false', () async {
+      final dio = Dio();
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': false,
+                  'error': 'Desk permission denied: broker account suspended',
+                },
+              ),
+            );
+          },
+        ),
+      );
+
+      final apiClient = ApiClient(storage: storage, customDio: dio);
+      final repository = DashboardRepository(
+        storage: storage,
+        apiClient: apiClient,
+      );
+
+      final result = await repository.fetchDashboardData();
+      expect(result, isA<DashboardDataError>());
+      final err = result as DashboardDataError;
+      expect(err.message, contains('Desk permission denied'));
+    });
   });
 }
+
