@@ -19,6 +19,7 @@ import 'widgets/offer_card.dart';
 import 'widgets/offer_detail_sheet.dart';
 import 'widgets/requirement_card.dart';
 import 'widgets/requirement_detail_sheet.dart';
+import 'widgets/negotiate_requirement_sheet.dart';
 import '../../deals/presentation/widgets/create_allocation_sheet.dart';
 
 /// Active Work Desk screen hosting Requirements, Seller Offers, and Match Center.
@@ -43,6 +44,103 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
   late TabController _tabController;
   final _reqSearchController = TextEditingController();
   final _offerSearchController = TextEditingController();
+  bool _isOpeningSheet = false;
+  Future<void> _openRequirementDetail(RequirementItem req) async {
+    if (_isOpeningSheet) return;
+    _isOpeningSheet = true;
+    RequirementDetailAction? action;
+    try {
+      action = await RequirementDetailSheet.show(
+        context: context,
+        requirement: req,
+        onFindMatches: () => _onFindMatchesForRequirement(req),
+      );
+    } finally {
+      if (mounted) {
+        _isOpeningSheet = false;
+      }
+    }
+
+    if (!mounted) return;
+
+    if (action == RequirementDetailAction.negotiate) {
+      await _openNegotiateRequirement(req);
+    } else if (action == RequirementDetailAction.findMatches) {
+      _onFindMatchesForRequirement(req);
+    }
+  }
+
+  Future<void> _openNegotiateRequirement(RequirementItem req) async {
+    if (_isOpeningSheet) return;
+    _isOpeningSheet = true;
+    try {
+      await NegotiateRequirementSheet.show(
+        context,
+        requirement: req,
+      );
+    } finally {
+      if (mounted) {
+        _isOpeningSheet = false;
+      }
+    }
+  }
+
+  Future<void> _openOfferDetail(OfferItem offer) async {
+    if (_isOpeningSheet) return;
+    _isOpeningSheet = true;
+    try {
+      await OfferDetailSheet.show(
+        context: context,
+        offer: offer,
+      );
+    } finally {
+      if (mounted) {
+        _isOpeningSheet = false;
+      }
+    }
+  }
+
+  Future<void> _openCreateAllocation(RequirementItem req, OfferItem offer) async {
+    if (_isOpeningSheet) return;
+    _isOpeningSheet = true;
+    try {
+      await CreateAllocationSheet.show(
+        context: context,
+        requirement: req,
+        offer: offer,
+      );
+    } finally {
+      if (mounted) {
+        _isOpeningSheet = false;
+      }
+    }
+  }
+
+  Future<void> _openCreateRequirement() async {
+    if (_isOpeningSheet) return;
+    _isOpeningSheet = true;
+    try {
+      await CreateRequirementSheet.show(context);
+    } finally {
+      if (mounted) {
+        _isOpeningSheet = false;
+      }
+    }
+  }
+
+  Future<void> _openCreateOffer() async {
+    if (_isOpeningSheet) return;
+    _isOpeningSheet = true;
+    try {
+      await CreateOfferSheet.show(context);
+    } finally {
+      if (mounted) {
+        _isOpeningSheet = false;
+      }
+    }
+  }
+
+
 
   @override
   void initState() {
@@ -182,6 +280,8 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
       );
     }
 
+
+
     final filtered = state.filteredRequirements;
 
     return Column(
@@ -275,12 +375,9 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
                       final req = filtered[index];
                       return RequirementCard(
                         requirement: req,
-                        onTap: () => RequirementDetailSheet.show(
-                          context: context,
-                          requirement: req,
-                          onFindMatches: () => _onFindMatchesForRequirement(req),
-                        ),
+                        onTap: () => _openRequirementDetail(req),
                         onFindMatches: () => _onFindMatchesForRequirement(req),
+                        onNegotiate: () => _openNegotiateRequirement(req),
                       );
                     },
                   ),
@@ -457,10 +554,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
                       final offer = filtered[index];
                       return OfferCard(
                         offer: offer,
-                        onTap: () => OfferDetailSheet.show(
-                          context: context,
-                          offer: offer,
-                        ),
+                        onTap: () => _openOfferDetail(offer),
                       );
                     },
                   ),
@@ -644,15 +738,8 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
                   final match = filteredMatches[index];
                   return MatchCard(
                     match: match,
-                    onTap: () => OfferDetailSheet.show(
-                      context: context,
-                      offer: match.offer,
-                    ),
-                    onAllocate: () => CreateAllocationSheet.show(
-                      context: context,
-                      requirement: selectedReq,
-                      offer: match.offer,
-                    ),
+                    onTap: () => _openOfferDetail(match.offer),
+                    onAllocate: () => _openCreateAllocation(selectedReq, match.offer),
                   );
                 },
               ),
@@ -707,6 +794,8 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondaryLight,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: [
             Tab(text: 'Requirements (${reqState.totalCount})'),
             Tab(text: 'Offers (${offerState.totalCount})'),
@@ -732,7 +821,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
               foregroundColor: Colors.white,
               icon: const Icon(LucideIcons.plus, size: 18),
               label: const Text('New Mandate', style: TextStyle(fontWeight: FontWeight.w700)),
-              onPressed: () => CreateRequirementSheet.show(context),
+              onPressed: _openCreateRequirement,
             );
           } else if (tab == 1) {
             return FloatingActionButton.extended(
@@ -740,7 +829,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
               foregroundColor: Colors.white,
               icon: const Icon(LucideIcons.plus, size: 18),
               label: const Text('Post Offer', style: TextStyle(fontWeight: FontWeight.w700)),
-              onPressed: () => CreateOfferSheet.show(context),
+              onPressed: _openCreateOffer,
             );
           }
           return const SizedBox.shrink();

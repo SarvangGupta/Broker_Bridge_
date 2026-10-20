@@ -162,7 +162,10 @@ class BrokerNotification {
           payload!['requirement_id'] != null ||
           payload!['availabilityId'] != null ||
           payload!['offer_id'] != null ||
-          payload!['disputeId'] != null) {
+          payload!['disputeId'] != null ||
+          payload!['dispute_id'] != null ||
+          payload!['taskId'] != null ||
+          payload!['task_id'] != null) {
         return true;
       }
     }
@@ -171,9 +174,75 @@ class BrokerNotification {
 
   /// Returns the target Flutter route path if resolved.
   String? get resolvedRoute {
-    // 1. Direct recognized action URL
+    // 1. Direct recognized action URL - translate web URLs to mobile routes
     if (actionUrl != null && actionUrl!.trim().isNotEmpty && actionUrl != '/seller') {
       final url = actionUrl!.trim();
+
+      if (url.contains('requirement')) {
+        final match = RegExp(r'/requirements?/([a-zA-Z0-9_\-\.]+)', caseSensitive: false).firstMatch(url);
+        final id = match?.group(1);
+        if (id != null && id.isNotEmpty && id.toLowerCase() != 'requirement' && id.toLowerCase() != 'requirements') {
+          return '/work?requirementId=$id';
+        }
+        final payloadReqId = payload?['requirementId'] ?? payload?['requirement_id'];
+        if (payloadReqId != null && payloadReqId.toString().trim().isNotEmpty) {
+          return '/work?requirementId=${payloadReqId.toString().trim()}';
+        }
+        return '/work';
+      }
+
+      if (url.contains('deal')) {
+        // Extract deal ID from URL path segment (e.g. /deals/deal-bkg-0042, /broker/deals/DL-2026-0891, or UUID)
+        final match = RegExp(r'/deals?/([a-zA-Z0-9_\-\.]+)', caseSensitive: false).firstMatch(url);
+        if (match != null) {
+          final id = match.group(1);
+          if (id != null && id.isNotEmpty && id.toLowerCase() != 'deal' && id.toLowerCase() != 'deals') {
+            return '/deals/$id';
+          }
+        }
+        // Fallback to 36-char UUID regex in URL
+        final uuidMatch = RegExp(r'[0-9a-fA-F-]{36}').firstMatch(url);
+        if (uuidMatch != null) {
+          return '/deals/${uuidMatch.group(0)}';
+        }
+        // Check payload before defaulting to generic shell branch /deals
+        final payloadDealId = payload?['dealId'] ?? payload?['deal_id'];
+        if (payloadDealId != null && payloadDealId.toString().trim().isNotEmpty) {
+          return '/deals/${payloadDealId.toString().trim()}';
+        }
+        return '/deals';
+      }
+
+      if (url.contains('invoice')) {
+        final match = RegExp(r'/invoices?/([a-zA-Z0-9_\-\.]+)', caseSensitive: false).firstMatch(url);
+        if (match != null) {
+          final id = match.group(1);
+          if (id != null && id.isNotEmpty && id.toLowerCase() != 'invoice' && id.toLowerCase() != 'invoices') {
+            return '/invoices/$id';
+          }
+        }
+        final payloadInvoiceId = payload?['invoiceId'] ?? payload?['invoice_id'];
+        if (payloadInvoiceId != null && payloadInvoiceId.toString().trim().isNotEmpty) {
+          return '/invoices/${payloadInvoiceId.toString().trim()}';
+        }
+        return '/invoices';
+      }
+
+      if (url.contains('task')) {
+        final match = RegExp(r'/tasks?/([a-zA-Z0-9_\-\.]+)', caseSensitive: false).firstMatch(url);
+        if (match != null) {
+          final id = match.group(1);
+          if (id != null && id.isNotEmpty && id.toLowerCase() != 'task' && id.toLowerCase() != 'tasks') {
+            return '/tasks/$id';
+          }
+        }
+        final payloadTaskId = payload?['taskId'] ?? payload?['task_id'];
+        if (payloadTaskId != null && payloadTaskId.toString().trim().isNotEmpty) {
+          return '/tasks/${payloadTaskId.toString().trim()}';
+        }
+        return '/tasks';
+      }
+
       if (url.startsWith('/')) return url;
       return '/$url';
     }
@@ -181,19 +250,30 @@ class BrokerNotification {
     // 2. Resolve from payload
     if (payload != null) {
       final dealId = payload!['dealId'] ?? payload!['deal_id'];
-      if (dealId != null) return '/deals/$dealId';
+      if (dealId != null && dealId.toString().trim().isNotEmpty) {
+        return '/deals/${dealId.toString().trim()}';
+      }
 
       final invoiceId = payload!['invoiceId'] ?? payload!['invoice_id'];
-      if (invoiceId != null) return '/invoices/$invoiceId';
+      if (invoiceId != null && invoiceId.toString().trim().isNotEmpty) {
+        return '/invoices/${invoiceId.toString().trim()}';
+      }
 
       final requirementId = payload!['requirementId'] ?? payload!['requirement_id'];
-      if (requirementId != null) return '/work';
+      if (requirementId != null && requirementId.toString().trim().isNotEmpty) {
+        return '/work?requirementId=${requirementId.toString().trim()}';
+      }
 
       final offerId = payload!['availabilityId'] ?? payload!['offer_id'];
       if (offerId != null) return '/work';
 
-      final disputeId = payload!['disputeId'];
+      final disputeId = payload!['disputeId'] ?? payload!['dispute_id'];
       if (disputeId != null) return '/disputes';
+
+      final taskId = payload!['taskId'] ?? payload!['task_id'];
+      if (taskId != null && taskId.toString().trim().isNotEmpty) {
+        return '/tasks/${taskId.toString().trim()}';
+      }
     }
 
     // 3. Fallback by category

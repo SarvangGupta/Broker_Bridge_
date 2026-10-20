@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,30 +25,59 @@ class NotificationCenterScreen extends ConsumerStatefulWidget {
 
 class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScreen> {
   final TextEditingController _searchController = TextEditingController();
+  bool _isNavigating = false;
+  Timer? _debounceTimer;
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
   void _handleRecordNavigation(BuildContext context, BrokerNotification notification) {
+    if (_isNavigating) return;
+    _isNavigating = true;
+
     // 1. Mark as read immediately
     ref.read(notificationControllerProvider.notifier).markAsRead(notification.id);
 
     final route = notification.resolvedRoute;
     if (route != null && route.isNotEmpty) {
       try {
-        context.push(route);
+        final uri = Uri.parse(route);
+        // Identify StatefulShellBranch routes that must be switched via go()
+        // rather than pushed into the root navigator to prevent page key assertion conflicts.
+        final isShellBranch = uri.path == '/deals' ||
+            uri.path == '/work' ||
+            uri.path == '/dashboard' ||
+            uri.path == '/directory' ||
+            uri.path == '/more';
+
+        if (isShellBranch) {
+          context.go(route);
+        } else {
+          context.push(route);
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unable to open record: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Unable to open record: $e'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      } finally {
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _isNavigating = false;
+          }
+        });
       }
     } else {
+      _isNavigating = false;
       // Show technical detail dialog if no direct route exists
       NotificationDetailDialog.show(
         context,
@@ -279,6 +310,7 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
       itemBuilder: (context, index) {
         final item = state.filteredNotifications[index];
         return NotificationCard(
+          key: ValueKey('notif_card_${item.id}'),
           notification: item,
           onTap: (notif) => _handleRecordNavigation(context, notif),
           onAction: (notif) => _handleRecordNavigation(context, notif),

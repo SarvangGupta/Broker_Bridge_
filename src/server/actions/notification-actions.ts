@@ -155,8 +155,10 @@ export async function dispatchSellerNotificationAction(
       })
       .returning({ id: notifications.id });
 
-    revalidatePath("/seller");
-    revalidatePath("/seller/notifications");
+    try {
+      revalidatePath("/seller");
+      revalidatePath("/seller/notifications");
+    } catch (_) {}
 
     return {
       success: true,

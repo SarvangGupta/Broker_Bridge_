@@ -35,7 +35,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
       switch (sessionStatus) {
         case SessionStatus.authenticated:
-          context.go('/dashboard');
+          context.go('/work');
         case SessionStatus.accessDenied:
           context.go(
             '/access-denied',

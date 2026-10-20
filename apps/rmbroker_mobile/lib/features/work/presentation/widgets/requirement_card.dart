@@ -8,12 +8,14 @@ class RequirementCard extends StatelessWidget {
   final RequirementItem requirement;
   final VoidCallback onTap;
   final VoidCallback onFindMatches;
+  final VoidCallback? onNegotiate;
 
   const RequirementCard({
     super.key,
     required this.requirement,
     required this.onTap,
     required this.onFindMatches,
+    this.onNegotiate,
   });
 
   Color _getStatusColor(RequirementStatus status) {
@@ -312,7 +314,32 @@ class RequirementCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 10),
+                  if (onNegotiate != null && requirement.status != RequirementStatus.cancelled) ...[
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(LucideIcons.scale, size: 12),
+                      label: Text(
+                        requirement.isProposed ? 'Proposal' : 'Negotiate',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      onPressed: onNegotiate,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   if (requirement.canBeMatched)
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(

@@ -52,35 +52,65 @@ export type BuyerNegotiationDetailsResult = {
  * STRICT PRIVACY LOCK: Seller identity, seller company name, confidential minimum price,
  * and exact warehouse location are MATHEMATICALLY EXCLUDED.
  */
+async function getAuthenticatedBrokerUser(authToken?: string) {
+  let authUser = null;
+  let authError = null;
+
+  if (authToken) {
+    try {
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const supabase = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      );
+      const { data, error } = await supabase.auth.getUser(authToken);
+      authUser = data?.user;
+      authError = error;
+    } catch (e: any) {
+      authError = e;
+    }
+  } else {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase.auth.getUser();
+      authUser = data?.user;
+      authError = error;
+    } catch (e: any) {
+      authError = e;
+    }
+  }
+
+  if (authError || !authUser) {
+    return { success: false as const, error: 'Unauthorized: Valid broker session required' };
+  }
+
+  const dbUser = await db.query.users.findFirst({
+    where: eq(users.id, authUser.id),
+  });
+
+  if (!dbUser) {
+    return { success: false as const, error: 'User profile not found' };
+  }
+
+  const role = (dbUser.role || '').toLowerCase();
+  if (role !== 'broker' && role !== 'admin') {
+    return { success: false as const, error: 'Forbidden: Broker access privileges required' };
+  }
+
+  return { success: true as const, dbUser };
+}
+
 export async function sendProposalToBuyerAction(
-  payload: SendProposalToBuyerPayload
+  payload: SendProposalToBuyerPayload,
+  authToken?: string
 ): Promise<SendBuyerProposalResult> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
-      return { success: false, error: 'Unauthorized: Valid broker session required' };
+    const auth = await getAuthenticatedBrokerUser(authToken);
+    if (!auth.success) {
+      return { success: false, error: auth.error };
     }
 
-    // Authenticate broker role
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, authUser.id),
-    });
-
-    if (!dbUser) {
-      return { success: false, error: 'User profile not found' };
-    }
-
-    const role = (dbUser.role || '').toLowerCase();
-    if (role !== 'broker' && role !== 'admin') {
-      return { success: false, error: 'Forbidden: Broker access privileges required' };
-    }
-
-    const brokerId = dbUser.id;
+    const brokerId = auth.dbUser.id;
 
     // Validate payload with Zod
     const validation = sendProposalToBuyerSchema.safeParse(payload);
@@ -218,6 +248,17 @@ export async function sendProposalToBuyerAction(
         })
         .where(eq(requirements.id, validData.requirement_id));
 
+      if (quotationRow) {
+        await tx
+          .update(quotations)
+          .set({
+            offeredPrice: validData.offered_price.toString(),
+            status: 'Sent',
+            counterNotes: cleanRemarks,
+          })
+          .where(eq(quotations.id, quotationRow.id));
+      }
+
       // 9. Queue Buyer In-App Notification with deep link
       const notifMsg = `Broker proposed ₹${validData.offered_price.toLocaleString('en-IN')}/${unitSymbol} for ${validData.quantity} ${unitSymbol}.`;
       await queueNotificationAction({
@@ -258,11 +299,13 @@ export async function sendProposalToBuyerAction(
       };
     });
 
-    // Revalidate paths
-    revalidatePath('/', 'layout');
-    revalidatePath('/broker/work');
-    revalidatePath('/broker/deals');
-    revalidatePath('/buyer');
+    // Revalidate paths safely
+    try {
+      revalidatePath('/', 'layout');
+      revalidatePath('/broker/work');
+      revalidatePath('/broker/deals');
+      revalidatePath('/buyer');
+    } catch (_) {}
 
     return {
       success: true,
@@ -283,29 +326,17 @@ export async function sendProposalToBuyerAction(
  * Enforces strict PRIVACY LOCK: Seller identity, confidential min price, and exact lot location ARE EXCLUDED.
  */
 export async function getBuyerNegotiationDetailsAction(
-  requirementId: string
+  requirementId: string,
+  authToken?: string
 ): Promise<BuyerNegotiationDetailsResult> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
-      return { success: false, error: 'Unauthorized: Active session required' };
+    const auth = await getAuthenticatedBrokerUser(authToken);
+    if (!auth.success) {
+      return { success: false, error: auth.error };
     }
 
     if (!requirementId) {
       return { success: false, error: 'Requirement ID is required' };
-    }
-
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, authUser.id),
-    });
-
-    if (!dbUser || (dbUser.role !== 'broker' && dbUser.role !== 'admin')) {
-      return { success: false, error: 'Forbidden: Broker access required' };
     }
 
     // Query requirement joined with buyer company and master tables
@@ -406,17 +437,13 @@ export async function getBuyerNegotiationDetailsAction(
  * Excludes all Seller-side events and seller confidential min price / lot location.
  */
 export async function getBuyerNegotiationTimelineAction(
-  requirementId: string
+  requirementId: string,
+  authToken?: string
 ): Promise<{ success: boolean; data?: NegotiationTimelineItem[]; error?: string }> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
-      return { success: false, error: 'Unauthorized: Active session required' };
+    const auth = await getAuthenticatedBrokerUser(authToken);
+    if (!auth.success) {
+      return { success: false, error: auth.error };
     }
 
     if (!requirementId) {

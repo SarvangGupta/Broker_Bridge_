@@ -6,22 +6,27 @@ import '../../../../app/theme/app_colors.dart';
 import '../../domain/requirement_model.dart';
 import '../controllers/requirements_controller.dart';
 
+enum RequirementDetailAction {
+  negotiate,
+  findMatches,
+}
+
 class RequirementDetailSheet extends ConsumerWidget {
   final RequirementItem requirement;
-  final VoidCallback onFindMatches;
+  final VoidCallback? onFindMatches;
 
   const RequirementDetailSheet({
     super.key,
     required this.requirement,
-    required this.onFindMatches,
+    this.onFindMatches,
   });
 
-  static void show({
+  static Future<RequirementDetailAction?> show({
     required BuildContext context,
     required RequirementItem requirement,
-    required VoidCallback onFindMatches,
+    VoidCallback? onFindMatches,
   }) {
-    showModalBottomSheet(
+    return showModalBottomSheet<RequirementDetailAction>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceLight,
@@ -95,7 +100,14 @@ class RequirementDetailSheet extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondaryLight)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondaryLight),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
             '$qty $unit',
             style: TextStyle(
@@ -296,6 +308,31 @@ class RequirementDetailSheet extends ConsumerWidget {
             const SizedBox(height: 20),
 
             // Action Buttons
+            if (requirement.status != RequirementStatus.cancelled && requirement.status != RequirementStatus.fulfilled) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(LucideIcons.scale, size: 18),
+                  label: Text(
+                    requirement.isProposed
+                        ? 'View / Amend Commercial Proposal'
+                        : 'Initiate Negotiation & Submit Proposal',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop(RequirementDetailAction.negotiate);
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             Row(
               children: [
                 if (requirement.status != RequirementStatus.cancelled) ...[
@@ -313,16 +350,23 @@ class RequirementDetailSheet extends ConsumerWidget {
                 Expanded(
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: requirement.status != RequirementStatus.cancelled && requirement.status != RequirementStatus.fulfilled
+                          ? AppColors.surfaceLight
+                          : AppColors.primary,
+                      foregroundColor: requirement.status != RequirementStatus.cancelled && requirement.status != RequirementStatus.fulfilled
+                          ? AppColors.primary
+                          : Colors.white,
+                      side: requirement.status != RequirementStatus.cancelled && requirement.status != RequirementStatus.fulfilled
+                          ? const BorderSide(color: AppColors.primary)
+                          : BorderSide.none,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     icon: const Icon(LucideIcons.sparkles, size: 16),
                     label: const Text('Find Matching Offers', style: TextStyle(fontWeight: FontWeight.w700)),
                     onPressed: () {
-                      Navigator.pop(context);
-                      onFindMatches();
+                      Navigator.of(context).pop(RequirementDetailAction.findMatches);
+                      onFindMatches?.call();
                     },
                   ),
                 ),

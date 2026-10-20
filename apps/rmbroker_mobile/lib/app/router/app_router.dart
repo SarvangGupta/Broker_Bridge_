@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../theme/app_colors.dart';
 import '../../core/widgets/module_placeholder_screen.dart';
 import '../../features/authentication/presentation/access_denied_screen.dart';
 import '../../features/authentication/presentation/login_screen.dart';
@@ -26,6 +27,22 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
+final GlobalKey<NavigatorState> _dashboardNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'dashboardNav',
+);
+final GlobalKey<NavigatorState> _workNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'workNav',
+);
+final GlobalKey<NavigatorState> _dealsNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'dealsNav',
+);
+final GlobalKey<NavigatorState> _directoryNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'directoryNav',
+);
+final GlobalKey<NavigatorState> _moreNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'moreNav',
+);
+
 /// Central GoRouter configuration for RMBroker.
 class AppRouter {
   const AppRouter._();
@@ -34,7 +51,45 @@ class AppRouter {
     navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     debugLogDiagnostics: false,
+    errorBuilder: (context, state) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Broker Desk'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/work'),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(LucideIcons.compass, size: 48, color: AppColors.primary),
+              const SizedBox(height: 12),
+              Text(
+                'Unknown location: ${state.uri.path}',
+                style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => context.go('/work'),
+                icon: const Icon(LucideIcons.layers, size: 16),
+                label: const Text('Return to Work Desk'),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
     routes: [
+      GoRoute(
+        path: '/buyer/requirements',
+        redirect: (context, state) => '/work',
+      ),
+      GoRoute(
+        path: '/buyer/requirements/:id',
+        redirect: (context, state) => '/work',
+      ),
       GoRoute(
         path: '/',
         name: 'splash',
@@ -159,6 +214,7 @@ class AppRouter {
         },
         branches: [
           StatefulShellBranch(
+            navigatorKey: _dashboardNavigatorKey,
             routes: [
               GoRoute(
                 path: '/dashboard',
@@ -168,6 +224,7 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: _workNavigatorKey,
             routes: [
               GoRoute(
                 path: '/work',
@@ -176,15 +233,18 @@ class AppRouter {
                   final tabStr = state.uri.queryParameters['tab'];
                   final tab = int.tryParse(tabStr ?? '0') ?? 0;
                   final status = state.uri.queryParameters['status'];
+                  final reqId = state.uri.queryParameters['requirementId'] ?? state.uri.queryParameters['reqId'];
                   return WorkScreen(
                     initialTabIndex: tab,
                     initialStatusFilter: status,
+                    initialRequirementId: reqId,
                   );
                 },
               ),
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: _dealsNavigatorKey,
             routes: [
               GoRoute(
                 path: '/deals',
@@ -197,6 +257,7 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: _directoryNavigatorKey,
             routes: [
               GoRoute(
                 path: '/directory',
@@ -206,6 +267,7 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: _moreNavigatorKey,
             routes: [
               GoRoute(
                 path: '/more',

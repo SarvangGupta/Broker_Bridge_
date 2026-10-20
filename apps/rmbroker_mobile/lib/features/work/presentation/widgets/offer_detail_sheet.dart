@@ -12,11 +12,11 @@ class OfferDetailSheet extends StatelessWidget {
     required this.offer,
   });
 
-  static void show({
+  static Future<T?> show<T>({
     required BuildContext context,
     required OfferItem offer,
   }) {
-    showModalBottomSheet(
+    return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceLight,
@@ -33,7 +33,14 @@ class OfferDetailSheet extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondaryLight)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondaryLight),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
             '$qty $unit',
             style: TextStyle(

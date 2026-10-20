@@ -172,7 +172,18 @@ class LinkedRecordCard extends StatelessWidget {
                 const Divider(height: 1),
                 const SizedBox(height: 6),
                 InkWell(
-                  onTap: () => context.push(linkedRecord.route!),
+                  onTap: () {
+                    final r = linkedRecord.route!;
+                    if (r.startsWith('/work') ||
+                        (r.startsWith('/deals') && !r.startsWith('/deals/')) ||
+                        r.startsWith('/dashboard') ||
+                        r.startsWith('/directory') ||
+                        r.startsWith('/more')) {
+                      context.go(r);
+                    } else {
+                      context.push(r);
+                    }
+                  },
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [

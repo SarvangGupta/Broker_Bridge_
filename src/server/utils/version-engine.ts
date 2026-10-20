@@ -1,6 +1,6 @@
 import { DealVersionSnapshot } from "@/src/types/deal-version-schema";
-import { dealVersions } from "@/src/server/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { dealVersions, quotations } from "@/src/server/db/schema";
+import { eq, desc, or } from "drizzle-orm";
 
 export interface MaterialFieldDiff {
   field: string;
@@ -250,7 +250,7 @@ export async function createDealVersionInTransaction(
   // If no deal_versions record exists yet, synthesize Version 1 first
   if (!highestVersion) {
     const parentQuotation = await tx.query.quotations?.findFirst({
-      where: eq(dealVersions.requestId, params.requestId),
+      where: or(eq(quotations.id, params.requestId), eq(quotations.requirementId, params.requestId)),
     });
 
     if (parentQuotation) {

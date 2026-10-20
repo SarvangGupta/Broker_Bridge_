@@ -31,6 +31,10 @@ enum RequirementStatus {
         return RequirementStatus.open;
       case 'matching':
       case 'matched':
+      case 'proposed to buyer':
+      case 'proposed':
+      case 'negotiation':
+      case 'under negotiation':
         return RequirementStatus.matching;
       case 'partially allocated':
       case 'partially fulfilled':
@@ -88,6 +92,8 @@ class RequirementItem {
   final int hoursUntilTarget;
   final bool isExpired;
   final RequirementStatus status;
+  final String? rawStatus;
+  final String? brokerId;
   final String? notes;
   final DateTime createdAt;
 
@@ -123,9 +129,20 @@ class RequirementItem {
     required this.hoursUntilTarget,
     required this.isExpired,
     required this.status,
+    this.rawStatus,
+    this.brokerId,
     this.notes,
     required this.createdAt,
   });
+
+  /// True if requirement is actively under broker proposal or negotiation.
+  bool get isProposed =>
+      (rawStatus?.toLowerCase().contains('proposed') ?? false) ||
+      (rawStatus?.toLowerCase().contains('negotiat') ?? false) ||
+      status == RequirementStatus.matching;
+
+  /// Human-friendly display status label.
+  String get displayStatus => rawStatus ?? status.displayLabel;
 
   /// Calculate percentage of requested quantity allocated/fulfilled (0-100%).
   int get fulfillmentPercentage {
@@ -244,6 +261,8 @@ class RequirementItem {
       hoursUntilTarget: hoursDiff,
       isExpired: isExpired,
       status: derivedStatus,
+      rawStatus: rawStatus,
+      brokerId: json['broker_id']?.toString() ?? json['brokerId']?.toString(),
       notes: json['notes']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()

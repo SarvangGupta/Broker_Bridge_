@@ -25,12 +25,12 @@ class CreateAllocationSheet extends ConsumerStatefulWidget {
     required this.offer,
   });
 
-  static void show({
+  static Future<T?> show<T>({
     required BuildContext context,
     required RequirementItem requirement,
     required OfferItem offer,
   }) {
-    showModalBottomSheet(
+    return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceLight,
