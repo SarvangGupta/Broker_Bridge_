@@ -1,0 +1,84 @@
+/// Domain entity representing an authorized commodity broker desk.
+/// Strict Counterparty Shield: Seller identifiers and seller contact information
+/// are mathematically excluded from this model.
+class BrokerModel {
+  final String id;
+  final String name;
+  final String? email;
+  final String? mobile;
+  final String? companyName;
+  final String? companyGst;
+  final String? location;
+  final int trustScore;
+  final bool isVerified;
+  final List<String> commoditiesHandled;
+
+  const BrokerModel({
+    required this.id,
+    required this.name,
+    this.email,
+    this.mobile,
+    this.companyName,
+    this.companyGst,
+    this.location,
+    this.trustScore = 100,
+    this.isVerified = false,
+    this.commoditiesHandled = const [],
+  });
+
+  bool get hasPhone => mobile != null && mobile!.trim().isNotEmpty;
+  bool get hasWhatsApp => mobile != null && mobile!.trim().isNotEmpty;
+
+  factory BrokerModel.fromMap(Map<String, dynamic> map) {
+    // Handle embedded company object if joined
+    final company = map['companies'] as Map<String, dynamic>? ?? {};
+
+    final commoditiesRaw = map['commodities'] ?? map['commodities_handled'];
+    List<String> commodities = [];
+    if (commoditiesRaw is List) {
+      commodities = commoditiesRaw.map((e) => e.toString()).toList();
+    } else if (commoditiesRaw is String && commoditiesRaw.isNotEmpty) {
+      commodities = commoditiesRaw.split(',').map((e) => e.trim()).toList();
+    }
+
+    final trustScoreRaw = company['trust_score'] ?? map['trust_score'];
+    final trustScore = (trustScoreRaw is num) ? trustScoreRaw.toInt() : 100;
+
+    final isVerifiedRaw = company['is_verified'] ?? map['is_verified'];
+    final isVerified = isVerifiedRaw == true;
+
+    return BrokerModel(
+      id: (map['id'] as String?) ?? '',
+      name: (map['name'] as String?) ?? 'Authorized Mandi Broker',
+      email: map['email'] as String?,
+      mobile: map['mobile'] as String?,
+      companyName: (company['name'] as String?) ??
+          (map['company_name'] as String?) ??
+          'Licensed Mandi Broker Desk',
+      companyGst: (company['gst'] as String?) ?? (map['company_gst'] as String?),
+      location: (map['location'] as String?) ??
+          (map['mandi'] as String?) ??
+          'Mandi Trading Floor',
+      trustScore: trustScore,
+      isVerified: isVerified,
+      commoditiesHandled: commodities.isNotEmpty
+          ? commodities
+          : const ['Soybean', 'Chana', 'Wheat', 'Mustard'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'mobile': mobile,
+      'company_name': companyName,
+      'company_gst': companyGst,
+      'location': location,
+      'trust_score': trustScore,
+      'is_verified': isVerified,
+      'commodities': commoditiesHandled,
+    };
+  }
+}
