@@ -1,0 +1,32 @@
+name: rmseller_mobile
+description: "RMSeller Mobile - Enterprise Commodity Seller Portal"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^3.4.3
+  supabase_flutter: ^2.18.3
+  dio: ^5.11.1
+  flutter_secure_storage: ^11.2.0
+  intl: ^0.20.3
+  go_router: ^18.1.0
+  lucide_icons_flutter: ^4.0.0
+  url_launcher: ^6.3.3
+  image_picker: ^1.2.4
+  file_picker: ^13.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
