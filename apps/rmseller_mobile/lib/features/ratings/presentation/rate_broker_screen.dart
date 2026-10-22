@@ -118,7 +118,10 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
           children: [
             const Icon(LucideIcons.star, color: AppColors.secondary, size: 22),
             const SizedBox(width: 8),
-            Text(_isEditing ? 'Confirm Review Update' : 'Confirm Broker Rating', style: AppTypography.titleMedium),
+            Text(
+              _isEditing ? 'Confirm Review Update' : 'Confirm Broker Rating',
+              style: AppTypography.titleMedium,
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -126,10 +129,22 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Broker Desk: ${widget.brokerName}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+              Text(
+                'Broker Desk: ${widget.brokerName}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
               if (widget.dealReference != null) ...[
                 const SizedBox(height: 4),
-                Text('Linked Trade: ${widget.dealReference}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+                Text(
+                  'Linked Trade: ${widget.dealReference}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
+                ),
               ],
               const Divider(height: 18),
               _buildReviewRow('Overall Rating', '$_overallRating / 5 Stars'),
@@ -139,7 +154,10 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
               _buildReviewRow('Communication', '$_communication / 5'),
               if (_feedbackController.text.trim().isNotEmpty) ...[
                 const SizedBox(height: 8),
-                const Text('Written Feedback:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const Text(
+                  'Written Feedback:',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                ),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -150,7 +168,10 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
                   ),
                   child: Text(
                     _feedbackController.text.trim(),
-                    style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
               ],
@@ -188,12 +209,15 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
 
     try {
       final rating = BrokerRating(
-        id: _eligibility?.existingRating?.id ?? 'RAT-${DateTime.now().millisecondsSinceEpoch}',
+        id:
+            _eligibility?.existingRating?.id ??
+            'RAT-${DateTime.now().millisecondsSinceEpoch}',
         brokerId: widget.brokerId,
         brokerName: widget.brokerName,
         sellerId: '', // populated securely by repository from session
         dealId: widget.dealId ?? _eligibility?.eligibleDealId,
-        dealReference: widget.dealReference ?? _eligibility?.eligibleDealReference,
+        dealReference:
+            widget.dealReference ?? _eligibility?.eligibleDealReference,
         rating: _overallRating,
         mandiKnowledgeRating: _mandiKnowledge,
         promptnessRating: _promptness,
@@ -215,7 +239,11 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
       // Show brief success toast
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isEditing ? 'Broker rating updated successfully.' : 'Broker rating submitted successfully.'),
+          content: Text(
+            _isEditing
+                ? 'Broker rating updated successfully.'
+                : 'Broker rating submitted successfully.',
+          ),
           backgroundColor: AppColors.success,
         ),
       );
@@ -246,7 +274,9 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
 
   Widget _buildBody() {
     if (_isCheckingEligibility) {
-      return const AppLoadingIndicator(message: 'Verifying trade rating eligibility...');
+      return const AppLoadingIndicator(
+        message: 'Verifying trade rating eligibility...',
+      );
     }
 
     if (_eligibility != null && !_eligibility!.isEligible) {
@@ -273,8 +303,13 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
                       radius: 20,
                       backgroundColor: AppColors.primaryContainer,
                       child: Text(
-                        widget.brokerName.isNotEmpty ? widget.brokerName[0].toUpperCase() : 'B',
-                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                        widget.brokerName.isNotEmpty
+                            ? widget.brokerName[0].toUpperCase()
+                            : 'B',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -282,23 +317,41 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(widget.brokerName, style: AppTypography.titleMedium),
+                          Text(
+                            widget.brokerName,
+                            style: AppTypography.titleMedium,
+                          ),
                           const SizedBox(height: 2),
-                          const Text('Licensed Mandi Broker Desk', style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+                          const Text(
+                            'Licensed Mandi Broker Desk',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                if (widget.dealReference != null || _eligibility?.eligibleDealReference != null) ...[
+                if (widget.dealReference != null ||
+                    _eligibility?.eligibleDealReference != null) ...[
                   const Divider(height: 20),
                   Row(
                     children: [
-                      const Icon(LucideIcons.fileCheck, size: 14, color: AppColors.success),
+                      const Icon(
+                        LucideIcons.fileCheck,
+                        size: 14,
+                        color: AppColors.success,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Verified Trade: ${widget.dealReference ?? _eligibility?.eligibleDealReference}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.success),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
                       ),
                     ],
                   ),
@@ -313,9 +366,18 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Overall Desk Rating', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const Text(
+                  'Overall Desk Rating',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
                 const SizedBox(height: 4),
-                const Text('Tap a star to rate your overall commercial satisfaction', style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+                const Text(
+                  'Tap a star to rate your overall commercial satisfaction',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Center(
                   child: Row(
@@ -328,7 +390,9 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         icon: Icon(
                           isSelected ? Icons.star : Icons.star_border,
-                          color: isSelected ? Colors.amber.shade600 : Colors.grey.shade400,
+                          color: isSelected
+                              ? Colors.amber.shade600
+                              : Colors.grey.shade400,
                         ),
                         onPressed: () {
                           setState(() => _overallRating = starValue);
@@ -344,7 +408,9 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: _overallRating >= 4 ? Colors.amber.shade800 : AppColors.primary,
+                      color: _overallRating >= 4
+                          ? Colors.amber.shade800
+                          : AppColors.primary,
                     ),
                   ),
                 ),
@@ -358,7 +424,10 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Detailed Trading Criteria', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const Text(
+                  'Detailed Trading Criteria',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
                 const SizedBox(height: 12),
                 _buildCriterionSelector(
                   label: 'Mandi Rate Discovery & Market Knowledge',
@@ -393,11 +462,17 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Written Feedback & Suggestions', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const Text(
+                  'Written Feedback & Suggestions',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
                 const SizedBox(height: 4),
                 const Text(
                   'Share details on mandi arrival coordination, weighing slip accuracy, or dispatch speed (Optional).',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -406,7 +481,9 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
                   maxLength: 500,
                   decoration: InputDecoration(
                     hintText: 'e.g. Accurate weighbridge slips, trucks arrived promptly on loading date...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     contentPadding: const EdgeInsets.all(12),
                   ),
                 ),
@@ -425,12 +502,19 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
             ),
             child: Row(
               children: [
-                Icon(LucideIcons.shieldCheck, size: 16, color: Colors.amber.shade800),
+                Icon(
+                  LucideIcons.shieldCheck,
+                  size: 16,
+                  color: Colors.amber.shade800,
+                ),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'Counterparty Shield: Direct buyer contact and identification are strictly shielded. Reviews are attributed to verified sellers only.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
                   ),
                 ),
               ],
@@ -448,10 +532,20 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(LucideIcons.alertTriangle, size: 16, color: AppColors.error),
+                  const Icon(
+                    LucideIcons.alertTriangle,
+                    size: 16,
+                    color: AppColors.error,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(_errorMessage!, style: const TextStyle(fontSize: 12, color: AppColors.error)),
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.error,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -463,7 +557,9 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
           AppButton(
             label: _isSubmitting
                 ? 'Submitting Rating...'
-                : (_isEditing ? 'Update Broker Rating' : 'Submit Broker Rating'),
+                : (_isEditing
+                      ? 'Update Broker Rating'
+                      : 'Submit Broker Rating'),
             icon: LucideIcons.send,
             isLoading: _isSubmitting,
             onPressed: _isSubmitting ? null : _showConfirmationDialog,
@@ -483,7 +579,10 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 4),
         Row(
           children: List.generate(5, (index) {
@@ -497,7 +596,9 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
                 child: Icon(
                   isFilled ? Icons.star : Icons.star_border,
                   size: 24,
-                  color: isFilled ? Colors.amber.shade600 : Colors.grey.shade400,
+                  color: isFilled
+                      ? Colors.amber.shade600
+                      : Colors.grey.shade400,
                 ),
               ),
             );
@@ -520,7 +621,11 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
                 color: Colors.amber.shade50,
                 shape: BoxShape.circle,
               ),
-              child: Icon(LucideIcons.lock, size: 40, color: Colors.amber.shade800),
+              child: Icon(
+                LucideIcons.lock,
+                size: 40,
+                color: Colors.amber.shade800,
+              ),
             ),
             const SizedBox(height: 18),
             Text('Rating Locked', style: AppTypography.titleLarge),
@@ -528,7 +633,11 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
             Text(
               _eligibility?.reason ?? 'Rating unavailable for this broker.',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight, height: 1.4),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondaryLight,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 24),
             AppButton(
@@ -556,11 +665,17 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
                 color: AppColors.successContainer,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(LucideIcons.checkCheck, size: 48, color: AppColors.success),
+              child: const Icon(
+                LucideIcons.checkCheck,
+                size: 48,
+                color: AppColors.success,
+              ),
             ),
             const SizedBox(height: 20),
             Text(
-              _isEditing ? 'Rating Updated Successfully!' : 'Rating Submitted Successfully!',
+              _isEditing
+                  ? 'Rating Updated Successfully!'
+                  : 'Rating Submitted Successfully!',
               style: AppTypography.titleLarge,
               textAlign: TextAlign.center,
             ),
@@ -568,7 +683,10 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
             const Text(
               'Your verified trade feedback has been persisted and incorporated into the Mandi Broker Trust Layer.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondaryLight,
+              ),
             ),
           ],
         ),
@@ -582,8 +700,17 @@ class _RateBrokerScreenState extends State<RateBrokerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondaryLight,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+          ),
         ],
       ),
     );

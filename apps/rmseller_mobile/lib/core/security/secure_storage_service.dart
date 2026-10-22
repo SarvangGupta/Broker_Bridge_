@@ -6,8 +6,8 @@ class SecureStorageService {
   final FlutterSecureStorage _storage;
 
   // In-memory fallback for testing or non-mobile platforms
-  final Map<String, String> _memoryStorage = {};
-  bool _useMemoryFallback = false;
+  static final Map<String, String> _memoryStorage = {};
+  static bool _useMemoryFallback = false;
 
   static const String _keyToken = 'auth_token';
   static const String _keyRefreshToken = 'auth_refresh_token';
@@ -20,11 +20,14 @@ class SecureStorageService {
   static const String _keyCompanyGst = 'company_gst';
 
   SecureStorageService({FlutterSecureStorage? storage})
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(resetOnError: true),
-              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-            );
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(resetOnError: true),
+            iOptions: IOSOptions(
+              accessibility: KeychainAccessibility.first_unlock,
+            ),
+          );
 
   /// Enable in-memory mode for unit testing
   void enableMemoryFallbackForTesting() {
@@ -90,9 +93,12 @@ class SecureStorageService {
       _storage.write(key: _keyUserRole, value: role),
       _storage.write(key: _keyUserEmail, value: email),
       _storage.write(key: _keyUserFullName, value: fullName),
-      if (companyId != null) _storage.write(key: _keyCompanyId, value: companyId),
-      if (companyName != null) _storage.write(key: _keyCompanyName, value: companyName),
-      if (companyGst != null) _storage.write(key: _keyCompanyGst, value: companyGst),
+      if (companyId != null)
+        _storage.write(key: _keyCompanyId, value: companyId),
+      if (companyName != null)
+        _storage.write(key: _keyCompanyName, value: companyName),
+      if (companyGst != null)
+        _storage.write(key: _keyCompanyGst, value: companyGst),
     ]);
   }
 
@@ -129,6 +135,23 @@ class SecureStorageService {
   Future<String?> getCompanyGst() async {
     if (_useMemoryFallback) return _memoryStorage[_keyCompanyGst];
     return await _storage.read(key: _keyCompanyGst);
+  }
+
+  Future<void> savePreference(String key, String value) async {
+    if (_useMemoryFallback) {
+      _memoryStorage[key] = value;
+      return;
+    }
+    await _storage.write(key: key, value: value);
+  }
+
+  Future<String?> getPreference(String key) async {
+    if (_useMemoryFallback) return _memoryStorage[key];
+    try {
+      return await _storage.read(key: key);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> clearAll() async {

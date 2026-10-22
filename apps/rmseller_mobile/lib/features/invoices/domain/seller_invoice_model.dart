@@ -62,15 +62,21 @@ class SellerInvoice {
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      dueDate: map['due_date'] != null ? DateTime.tryParse(map['due_date'].toString()) : null,
-      paidAt: map['paid_at'] != null ? DateTime.tryParse(map['paid_at'].toString()) : null,
-      commodityName: map['commodity_name'] as String? ?? 'Agricultural Commodity',
+      dueDate: map['due_date'] != null
+          ? DateTime.tryParse(map['due_date'].toString())
+          : null,
+      paidAt: map['paid_at'] != null
+          ? DateTime.tryParse(map['paid_at'].toString())
+          : null,
+      commodityName:
+          map['commodity_name'] as String? ?? 'Agricultural Commodity',
       gradeName: map['grade_name'] as String? ?? 'FAQ Standard',
       quantity: (map['quantity'] as num?)?.toDouble() ?? 0.0,
       unit: map['unit'] as String? ?? 'MT',
       ratePerUnit: (map['rate_per_unit'] as num?)?.toDouble() ?? 0.0,
       gstRate: (map['gst_rate'] as num?)?.toDouble() ?? 0.05,
-      brokerDeskName: map['broker_desk_name'] as String? ?? 'Verified Mandi Broker Desk',
+      brokerDeskName:
+          map['broker_desk_name'] as String? ?? 'Verified Mandi Broker Desk',
       bookingReference: map['booking_reference'] as String?,
       paymentReference: map['payment_reference'] as String?,
     );

@@ -5,11 +5,14 @@ class SecureStorageService {
   final FlutterSecureStorage _storage;
 
   SecureStorageService({FlutterSecureStorage? storage})
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(resetOnError: true),
-              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-            );
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(resetOnError: true),
+            iOptions: IOSOptions(
+              accessibility: KeychainAccessibility.first_unlock,
+            ),
+          );
 
   static const String _keyToken = 'rmbuyer_access_token';
   static const String _keyRefreshToken = 'rmbuyer_refresh_token';
@@ -58,7 +61,36 @@ class SecureStorageService {
   Future<String?> getCompanyId() async => _storage.read(key: _keyCompanyId);
   Future<String?> getCompanyName() async => _storage.read(key: _keyCompanyName);
 
+  // In-memory fallback for testing or non-mobile platforms
+  static final Map<String, String> _memoryStorage = {};
+  static bool _useMemoryFallback = false;
+
+  void enableMemoryFallbackForTesting() {
+    _useMemoryFallback = true;
+  }
+
+  Future<void> savePreference(String key, String value) async {
+    if (_useMemoryFallback) {
+      _memoryStorage[key] = value;
+      return;
+    }
+    await _storage.write(key: key, value: value);
+  }
+
+  Future<String?> getPreference(String key) async {
+    if (_useMemoryFallback) return _memoryStorage[key];
+    try {
+      return await _storage.read(key: key);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> clearAll() async {
+    if (_useMemoryFallback) {
+      _memoryStorage.clear();
+      return;
+    }
     await _storage.deleteAll();
   }
 }

@@ -15,7 +15,8 @@ class SellerNotificationsScreen extends StatefulWidget {
   const SellerNotificationsScreen({super.key});
 
   @override
-  State<SellerNotificationsScreen> createState() => _SellerNotificationsScreenState();
+  State<SellerNotificationsScreen> createState() =>
+      _SellerNotificationsScreenState();
 }
 
 class _SellerNotificationsScreenState extends State<SellerNotificationsScreen> {
@@ -84,7 +85,10 @@ class _SellerNotificationsScreenState extends State<SellerNotificationsScreen> {
                 // Filter Chips Row
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -93,13 +97,19 @@ class _SellerNotificationsScreenState extends State<SellerNotificationsScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: FilterChip(
-                            label: Text(filter == 'ALL' ? 'All Alerts' : filter),
+                            label: Text(
+                              filter == 'ALL' ? 'All Alerts' : filter,
+                            ),
                             selected: isSelected,
                             selectedColor: AppColors.primaryContainer,
                             labelStyle: TextStyle(
                               fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                              color: isSelected ? AppColors.primary : AppColors.textPrimaryLight,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.textPrimaryLight,
                             ),
                             onSelected: (val) {
                               if (val) setState(() => _selectedFilter = filter);
@@ -137,30 +147,41 @@ class _SellerNotificationsScreenState extends State<SellerNotificationsScreen> {
                                       radius: 18,
                                       backgroundColor: notif.isCommissionAlert
                                           ? AppColors.primaryContainer
-                                          : (notif.isMessageAlert ? Colors.blue.shade50 : Colors.grey.shade100),
+                                          : (notif.isMessageAlert
+                                                ? Colors.blue.shade50
+                                                : Colors.grey.shade100),
                                       child: Icon(
                                         notif.isCommissionAlert
                                             ? LucideIcons.scale
-                                            : (notif.isMessageAlert ? LucideIcons.messageSquare : LucideIcons.bell),
+                                            : (notif.isMessageAlert
+                                                  ? LucideIcons.messageSquare
+                                                  : LucideIcons.bell),
                                         size: 18,
                                         color: notif.isCommissionAlert
                                             ? AppColors.primary
-                                            : (notif.isMessageAlert ? Colors.blue.shade700 : AppColors.textSecondaryLight),
+                                            : (notif.isMessageAlert
+                                                  ? Colors.blue.shade700
+                                                  : AppColors
+                                                        .textSecondaryLight),
                                       ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
                                             children: [
                                               Expanded(
                                                 child: Text(
                                                   notif.title,
                                                   style: TextStyle(
-                                                    fontWeight: notif.isRead ? FontWeight.w500 : FontWeight.w700,
+                                                    fontWeight: notif.isRead
+                                                        ? FontWeight.w500
+                                                        : FontWeight.w700,
                                                     fontSize: 13,
                                                   ),
                                                 ),
@@ -169,34 +190,56 @@ class _SellerNotificationsScreenState extends State<SellerNotificationsScreen> {
                                                 Container(
                                                   width: 8,
                                                   height: 8,
-                                                  decoration: const BoxDecoration(
-                                                    color: AppColors.primary,
-                                                    shape: BoxShape.circle,
-                                                  ),
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                        color:
+                                                            AppColors.primary,
+                                                        shape: BoxShape.circle,
+                                                      ),
                                                 ),
                                             ],
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
                                             notif.message,
-                                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color:
+                                                  AppColors.textSecondaryLight,
+                                            ),
                                           ),
                                           const SizedBox(height: 8),
                                           Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
                                             children: [
                                               Text(
-                                                dateFormat.format(notif.createdAt),
-                                                style: const TextStyle(fontSize: 10, color: AppColors.textMutedLight),
+                                                dateFormat.format(
+                                                  notif.createdAt,
+                                                ),
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  color:
+                                                      AppColors.textMutedLight,
+                                                ),
                                               ),
                                               Row(
                                                 children: [
                                                   Text(
                                                     notif.actionLabel,
-                                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: AppColors.primary,
+                                                    ),
                                                   ),
                                                   const SizedBox(width: 2),
-                                                  const Icon(LucideIcons.chevronRight, size: 12, color: AppColors.primary),
+                                                  const Icon(
+                                                    LucideIcons.chevronRight,
+                                                    size: 12,
+                                                    color: AppColors.primary,
+                                                  ),
                                                 ],
                                               ),
                                             ],

@@ -14,10 +14,7 @@ import '../../../app/theme/app_colors.dart';
 class NavigationShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
-  const NavigationShell({
-    super.key,
-    required this.navigationShell,
-  });
+  const NavigationShell({super.key, required this.navigationShell});
 
   void _onTap(int index) {
     navigationShell.goBranch(
@@ -41,37 +38,67 @@ class NavigationShell extends StatelessWidget {
           backgroundColor: Colors.white,
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.textMutedLight,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 10),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 10),
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 10,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w400,
+            fontSize: 10,
+          ),
           items: const [
             BottomNavigationBarItem(
               icon: Icon(LucideIcons.layoutDashboard, size: 20),
-              activeIcon: Icon(LucideIcons.layoutDashboard, size: 20, color: AppColors.primary),
+              activeIcon: Icon(
+                LucideIcons.layoutDashboard,
+                size: 20,
+                color: AppColors.primary,
+              ),
               label: 'Dashboard',
             ),
             BottomNavigationBarItem(
               icon: Icon(LucideIcons.packageCheck, size: 20),
-              activeIcon: Icon(LucideIcons.packageCheck, size: 20, color: AppColors.primary),
+              activeIcon: Icon(
+                LucideIcons.packageCheck,
+                size: 20,
+                color: AppColors.primary,
+              ),
               label: 'Commodities',
             ),
             BottomNavigationBarItem(
               icon: Icon(LucideIcons.users, size: 20),
-              activeIcon: Icon(LucideIcons.users, size: 20, color: AppColors.primary),
+              activeIcon: Icon(
+                LucideIcons.users,
+                size: 20,
+                color: AppColors.primary,
+              ),
               label: 'Brokers',
             ),
             BottomNavigationBarItem(
               icon: Icon(LucideIcons.handshake, size: 20),
-              activeIcon: Icon(LucideIcons.handshake, size: 20, color: AppColors.primary),
+              activeIcon: Icon(
+                LucideIcons.handshake,
+                size: 20,
+                color: AppColors.primary,
+              ),
               label: 'Deals',
             ),
             BottomNavigationBarItem(
               icon: Icon(LucideIcons.barChart3, size: 20),
-              activeIcon: Icon(LucideIcons.barChart3, size: 20, color: AppColors.primary),
+              activeIcon: Icon(
+                LucideIcons.barChart3,
+                size: 20,
+                color: AppColors.primary,
+              ),
               label: 'Reports',
             ),
             BottomNavigationBarItem(
               icon: Icon(LucideIcons.user, size: 20),
-              activeIcon: Icon(LucideIcons.user, size: 20, color: AppColors.primary),
+              activeIcon: Icon(
+                LucideIcons.user,
+                size: 20,
+                color: AppColors.primary,
+              ),
               label: 'Profile',
             ),
           ],

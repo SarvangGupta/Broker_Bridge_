@@ -36,68 +36,80 @@ void main() {
       createdAt: DateTime.now(),
     );
 
-    testWidgets('Renders complete lot details, volumes, pricing, and locations', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: CommodityDetailsScreen(
-            commodityId: testCommodity.id,
-            initialCommodity: testCommodity,
+    testWidgets(
+      'Renders complete lot details, volumes, pricing, and locations',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: CommodityDetailsScreen(
+              commodityId: testCommodity.id,
+              initialCommodity: testCommodity,
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('LOT-CHANA-01'), findsAtLeastNWidgets(1));
-      expect(find.text('Desi Chana (Gram)'), findsOneWidget);
-      expect(find.text('Bold Size FAQ (Count 60-65)'), findsOneWidget);
-      expect(find.text('Ready to Load'), findsOneWidget);
+        expect(find.text('LOT-CHANA-01'), findsAtLeastNWidgets(1));
+        expect(find.text('Desi Chana (Gram)'), findsOneWidget);
+        expect(find.text('Bold Size FAQ (Count 60-65)'), findsOneWidget);
+        expect(find.text('Ready to Load'), findsOneWidget);
 
-      // Inventory Pills
-      expect(find.text('Total Lot'), findsOneWidget);
-      expect(find.text('100 MT'), findsOneWidget);
-      expect(find.text('Available'), findsOneWidget);
-      expect(find.text('75 MT'), findsOneWidget);
+        // Inventory Pills
+        expect(find.text('Total Lot'), findsOneWidget);
+        expect(find.text('100 MT'), findsOneWidget);
+        expect(find.text('Available'), findsOneWidget);
+        expect(find.text('75 MT'), findsOneWidget);
 
-      // Pricing & Terms
-      expect(find.textContaining('5,850'), findsOneWidget);
-      expect(find.text('Payment on Delivery (CAD)'), findsOneWidget);
-      expect(find.text('Krishi Upaj Mandi Yard Warehouse A-4'), findsOneWidget);
-      expect(find.text('Bikaner Commercial Head Office'), findsOneWidget);
-      expect(find.text('AGMARK-RAL-2026-9021'), findsOneWidget);
-    });
+        // Pricing & Terms
+        expect(find.textContaining('5,850'), findsOneWidget);
+        expect(find.text('Payment on Delivery (CAD)'), findsOneWidget);
+        expect(
+          find.text('Krishi Upaj Mandi Yard Warehouse A-4'),
+          findsOneWidget,
+        );
+        expect(find.text('Bikaner Commercial Head Office'), findsOneWidget);
+        expect(find.text('AGMARK-RAL-2026-9021'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Renders assigned broker desk with mediated communication actions', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: CommodityDetailsScreen(
-            commodityId: testCommodity.id,
-            initialCommodity: testCommodity,
+    testWidgets(
+      'Renders assigned broker desk with mediated communication actions',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: CommodityDetailsScreen(
+              commodityId: testCommodity.id,
+              initialCommodity: testCommodity,
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Mandi Broker Desk'), findsOneWidget);
-      expect(find.text('Bikaner Mandi Broker Desk'), findsOneWidget);
-      expect(find.text('Call Broker'), findsOneWidget);
-      expect(find.text('WhatsApp'), findsOneWidget);
-      expect(find.textContaining('Counterparty Shield'), findsOneWidget);
-    });
+        expect(find.text('Mandi Broker Desk'), findsOneWidget);
+        expect(find.text('Bikaner Mandi Broker Desk'), findsOneWidget);
+        expect(find.text('Call Broker'), findsOneWidget);
+        expect(find.text('WhatsApp'), findsOneWidget);
+        expect(find.textContaining('Counterparty Shield'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Active lot displays management actions (Price edit, Fulfill, Cancel)', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: CommodityDetailsScreen(
-            commodityId: testCommodity.id,
-            initialCommodity: testCommodity,
+    testWidgets(
+      'Active lot displays management actions (Price edit, Fulfill, Cancel)',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: CommodityDetailsScreen(
+              commodityId: testCommodity.id,
+              initialCommodity: testCommodity,
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Update Asking Price'), findsOneWidget);
-      expect(find.text('Mark as Fulfilled / Dispatched'), findsOneWidget);
-      expect(find.text('Withdraw / Cancel Lot'), findsOneWidget);
-    });
+        expect(find.text('Update Asking Price'), findsOneWidget);
+        expect(find.text('Mark as Fulfilled / Dispatched'), findsOneWidget);
+        expect(find.text('Withdraw / Cancel Lot'), findsOneWidget);
+      },
+    );
   });
 }

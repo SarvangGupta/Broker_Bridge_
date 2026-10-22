@@ -68,11 +68,7 @@ class MasterState {
   final String name;
   final String code;
 
-  const MasterState({
-    required this.id,
-    required this.name,
-    required this.code,
-  });
+  const MasterState({required this.id, required this.name, required this.code});
 
   factory MasterState.fromMap(Map<String, dynamic> map) {
     return MasterState(

@@ -102,7 +102,9 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        body: AppLoadingIndicator(message: 'Loading verified invoice statement...'),
+        body: AppLoadingIndicator(
+          message: 'Loading verified invoice statement...',
+        ),
       );
     }
 
@@ -113,9 +115,16 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(LucideIcons.receipt, size: 48, color: AppColors.textMutedLight),
+              const Icon(
+                LucideIcons.receipt,
+                size: 48,
+                color: AppColors.textMutedLight,
+              ),
               const SizedBox(height: 12),
-              Text(_errorMessage ?? 'Invoice record not available', style: AppTypography.titleMedium),
+              Text(
+                _errorMessage ?? 'Invoice record not available',
+                style: AppTypography.titleMedium,
+              ),
               const SizedBox(height: 16),
               AppButton(
                 label: 'Retry',
@@ -139,7 +148,8 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
           IconButton(
             icon: const Icon(LucideIcons.download),
             tooltip: 'Download Invoice PDF',
-            onPressed: () => _handleDownload(invoice.fileUrl, '${invoice.invoiceNo}.pdf'),
+            onPressed: () =>
+                _handleDownload(invoice.fileUrl, '${invoice.invoiceNo}.pdf'),
           ),
         ],
       ),
@@ -157,9 +167,18 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('TAX INVOICE', style: AppTypography.labelLarge.copyWith(color: AppColors.primary, letterSpacing: 1.2)),
+                        Text(
+                          'TAX INVOICE',
+                          style: AppTypography.labelLarge.copyWith(
+                            color: AppColors.primary,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
                         const SizedBox(height: 2),
-                        Text(invoice.invoiceNo, style: AppTypography.titleLarge),
+                        Text(
+                          invoice.invoiceNo,
+                          style: AppTypography.titleLarge,
+                        ),
                       ],
                     ),
                     StatusBadge(status: invoice.status),
@@ -167,14 +186,23 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
                 ),
                 const Divider(height: 24),
 
-                _buildDetailRow('Invoice Date:', dateFormat.format(invoice.createdAt)),
+                _buildDetailRow(
+                  'Invoice Date:',
+                  dateFormat.format(invoice.createdAt),
+                ),
                 if (invoice.dueDate != null) ...[
                   const SizedBox(height: 8),
-                  _buildDetailRow('Due Date:', dateFormat.format(invoice.dueDate!)),
+                  _buildDetailRow(
+                    'Due Date:',
+                    dateFormat.format(invoice.dueDate!),
+                  ),
                 ],
                 if (invoice.bookingReference != null) ...[
                   const SizedBox(height: 8),
-                  _buildDetailRow('Deal Booking ID:', invoice.bookingReference!),
+                  _buildDetailRow(
+                    'Deal Booking ID:',
+                    invoice.bookingReference!,
+                  ),
                 ],
                 const SizedBox(height: 8),
                 _buildDetailRow('Deal Reference:', invoice.dealId),
@@ -182,7 +210,10 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
                 _buildDetailRow('Mediating Broker:', invoice.brokerDeskName),
                 if (invoice.paymentReference != null) ...[
                   const SizedBox(height: 8),
-                  _buildDetailRow('Payment UTR / Ref:', invoice.paymentReference!),
+                  _buildDetailRow(
+                    'Payment UTR / Ref:',
+                    invoice.paymentReference!,
+                  ),
                 ],
               ],
             ),
@@ -199,17 +230,59 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
 
                 // Table Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.backgroundLight,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
                     children: const [
-                      Expanded(flex: 4, child: Text('Commodity / Grade', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
-                      Expanded(flex: 2, child: Text('Qty', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
-                      Expanded(flex: 2, child: Text('Rate', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
-                      Expanded(flex: 3, child: Text('Amount (₹)', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
+                      Expanded(
+                        flex: 4,
+                        child: Text(
+                          'Commodity / Grade',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'Qty',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'Rate',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          'Amount (₹)',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -217,7 +290,10 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
 
                 // Row
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
@@ -225,8 +301,20 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(invoice.commodityName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            Text(invoice.gradeName, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
+                            Text(
+                              invoice.commodityName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              invoice.gradeName,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondaryLight,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -251,7 +339,10 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
                         child: Text(
                           '₹${invoice.taxableAmount.toStringAsFixed(0)}',
                           textAlign: TextAlign.right,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -260,11 +351,20 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
                 const Divider(height: 24),
 
                 // Financial Totals
-                _buildSummaryLine('Taxable Gross Amount:', '₹${invoice.taxableAmount.toStringAsFixed(0)}'),
+                _buildSummaryLine(
+                  'Taxable Gross Amount:',
+                  '₹${invoice.taxableAmount.toStringAsFixed(0)}',
+                ),
                 const SizedBox(height: 6),
-                _buildSummaryLine('CGST (${(invoice.gstRate * 50).toStringAsFixed(1)}%):', '₹${(invoice.gstAmount / 2).toStringAsFixed(0)}'),
+                _buildSummaryLine(
+                  'CGST (${(invoice.gstRate * 50).toStringAsFixed(1)}%):',
+                  '₹${(invoice.gstAmount / 2).toStringAsFixed(0)}',
+                ),
                 const SizedBox(height: 6),
-                _buildSummaryLine('SGST (${(invoice.gstRate * 50).toStringAsFixed(1)}%):', '₹${(invoice.gstAmount / 2).toStringAsFixed(0)}'),
+                _buildSummaryLine(
+                  'SGST (${(invoice.gstRate * 50).toStringAsFixed(1)}%):',
+                  '₹${(invoice.gstAmount / 2).toStringAsFixed(0)}',
+                ),
                 const Divider(height: 18),
                 _buildSummaryLine(
                   'Total Invoice Value (Incl. Tax):',
@@ -288,7 +388,11 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(LucideIcons.shieldCheck, size: 20, color: Colors.amber.shade800),
+                Icon(
+                  LucideIcons.shieldCheck,
+                  size: 20,
+                  color: Colors.amber.shade800,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -296,12 +400,19 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
                     children: [
                       Text(
                         'Broker-Mediated Counterparty Shield Active',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.amber.shade900),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: Colors.amber.shade900,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       const Text(
                         'Commercial trade settlement and invoices are routed exclusively through your authorized Mandi Broker Desk. Direct counterparty contacts remain shielded.',
-                        style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondaryLight,
+                        ),
                       ),
                     ],
                   ),
@@ -313,7 +424,10 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
 
           // Supporting Deal Documents Section
           if (_documents.isNotEmpty) ...[
-            Text('Associated Deal & Dispatch Documents', style: AppTypography.titleMedium),
+            Text(
+              'Associated Deal & Dispatch Documents',
+              style: AppTypography.titleMedium,
+            ),
             const SizedBox(height: 10),
             ..._documents.map((doc) {
               return Card(
@@ -326,12 +440,32 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
                 child: ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: AppColors.primaryContainer,
-                    child: Icon(LucideIcons.fileText, size: 18, color: AppColors.primary),
+                    child: Icon(
+                      LucideIcons.fileText,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
                   ),
-                  title: Text(doc.documentType, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  subtitle: Text(doc.fileName, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
+                  title: Text(
+                    doc.documentType,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  subtitle: Text(
+                    doc.fileName,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
                   trailing: IconButton(
-                    icon: const Icon(LucideIcons.externalLink, size: 18, color: AppColors.primary),
+                    icon: const Icon(
+                      LucideIcons.externalLink,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
                     tooltip: 'View Document',
                     onPressed: () => _handleDownload(doc.fileUrl, doc.fileName),
                   ),
@@ -358,13 +492,27 @@ class _InvoiceDetailsScreenState extends State<InvoiceDetailsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondaryLight,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        ),
       ],
     );
   }
 
-  Widget _buildSummaryLine(String label, String value, {bool isBold = false, Color? color}) {
+  Widget _buildSummaryLine(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? color,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

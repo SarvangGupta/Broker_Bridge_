@@ -22,21 +22,25 @@ class SellerUser {
     this.isVerified = false,
   });
 
-  bool get isSellerAdmin => role.toLowerCase() == 'admin' || role.toLowerCase() == 'seller_admin';
+  bool get isSellerAdmin =>
+      role.toLowerCase() == 'admin' || role.toLowerCase() == 'seller_admin';
   bool get hasVerifiedCompany => companyId != null && companyId!.isNotEmpty;
 
   factory SellerUser.fromMap(Map<String, dynamic> map) {
     return SellerUser(
       id: map['id']?.toString() ?? '',
       email: map['email']?.toString() ?? '',
-      fullName: (map['name'] as String?) ??
+      fullName:
+          (map['name'] as String?) ??
           (map['fullName'] as String?) ??
           (map['full_name'] as String?) ??
           'Commodity Seller Lead',
       role: map['role']?.toString().toLowerCase().trim() ?? 'seller',
       companyId: map['company_id']?.toString() ?? map['companyId']?.toString(),
-      companyName: map['company_name']?.toString() ?? map['companyName']?.toString(),
-      companyGst: map['company_gst']?.toString() ?? map['companyGst']?.toString(),
+      companyName:
+          map['company_name']?.toString() ?? map['companyName']?.toString(),
+      companyGst:
+          map['company_gst']?.toString() ?? map['companyGst']?.toString(),
       trustScore: (map['trust_score'] as num?)?.toInt() ?? 100,
       isVerified: map['is_verified'] == true,
     );

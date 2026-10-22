@@ -69,19 +69,57 @@ class SecureStorageService {
     return await _storage.read(key: _keyUserName);
   }
 
+  // In-memory fallback for testing or non-mobile platforms
+  static final Map<String, String> _memoryStorage = {};
+  static bool _useMemoryFallback = false;
+
+  void enableMemoryFallbackForTesting() {
+    _useMemoryFallback = true;
+  }
+
+  Future<void> savePreference(String key, String value) async {
+    if (_useMemoryFallback) {
+      _memoryStorage[key] = value;
+      return;
+    }
+    await _storage.write(key: key, value: value);
+  }
+
+  Future<String?> getPreference(String key) async {
+    if (_useMemoryFallback) return _memoryStorage[key];
+    try {
+      return await _storage.read(key: key);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<String?> read({required String key}) async {
+    if (_useMemoryFallback) return _memoryStorage[key];
     return await _storage.read(key: key);
   }
 
   Future<void> write({required String key, required String value}) async {
+    if (_useMemoryFallback) {
+      _memoryStorage[key] = value;
+      return;
+    }
     await _storage.write(key: key, value: value);
   }
 
   Future<void> delete({required String key}) async {
+    if (_useMemoryFallback) {
+      _memoryStorage.remove(key);
+      return;
+    }
     await _storage.delete(key: key);
   }
 
   Future<void> clearAll() async {
+    if (_useMemoryFallback) {
+      _memoryStorage.clear();
+      return;
+    }
     await _storage.deleteAll();
   }
 }

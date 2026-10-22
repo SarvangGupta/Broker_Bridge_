@@ -11,76 +11,94 @@ void main() {
       repository = SellerRatingsRepository();
     });
 
-    test('Test 1: Evaluates rating eligibility for broker with completed deals', () async {
-      const bikanerBrokerId = 'b354958e-779a-41f2-b7a3-5899eca32e32';
-      final eligibility = await repository.checkRatingEligibility(
-        brokerId: bikanerBrokerId,
-        dealId: 'd354958e-779a-41f2-b7a3-5899eca32e01',
-      );
+    test(
+      'Test 1: Evaluates rating eligibility for broker with completed deals',
+      () async {
+        const bikanerBrokerId = 'b354958e-779a-41f2-b7a3-5899eca32e32';
+        final eligibility = await repository.checkRatingEligibility(
+          brokerId: bikanerBrokerId,
+          dealId: 'd354958e-779a-41f2-b7a3-5899eca32e01',
+        );
 
-      expect(eligibility.isEligible, isTrue);
-      expect(eligibility.eligibleDealId, equals('d354958e-779a-41f2-b7a3-5899eca32e01'));
-      expect(eligibility.eligibleDealReference, contains('BKG'));
-    });
+        expect(eligibility.isEligible, isTrue);
+        expect(
+          eligibility.eligibleDealId,
+          equals('d354958e-779a-41f2-b7a3-5899eca32e01'),
+        );
+        expect(eligibility.eligibleDealReference, contains('BKG'));
+      },
+    );
 
-    test('Test 2: Rejects rating eligibility for broker without completed trades', () async {
-      const unknownBrokerId = 'unknown-broker-id-without-deals';
-      final eligibility = await repository.checkRatingEligibility(
-        brokerId: unknownBrokerId,
-      );
+    test(
+      'Test 2: Rejects rating eligibility for broker without completed trades',
+      () async {
+        const unknownBrokerId = 'unknown-broker-id-without-deals';
+        final eligibility = await repository.checkRatingEligibility(
+          brokerId: unknownBrokerId,
+        );
 
-      expect(eligibility.isEligible, isFalse);
-      expect(eligibility.reason, contains('Rating Unavailable'));
-      expect(eligibility.reason, contains('completed at least one verified trade'));
-    });
+        expect(eligibility.isEligible, isFalse);
+        expect(eligibility.reason, contains('Rating Unavailable'));
+        expect(
+          eligibility.reason,
+          contains('completed at least one verified trade'),
+        );
+      },
+    );
 
-    test('Test 3: Validates star rating bounds (must be between 1 and 5)', () async {
-      final invalidLowRating = BrokerRating(
-        id: 'RAT-INVALID-0',
-        brokerId: 'b354958e-779a-41f2-b7a3-5899eca32e32',
-        brokerName: 'Bikaner Mandi Desk',
-        sellerId: 'test-seller',
-        rating: 0, // Invalid: below 1
-        createdAt: DateTime.now(),
-      );
+    test(
+      'Test 3: Validates star rating bounds (must be between 1 and 5)',
+      () async {
+        final invalidLowRating = BrokerRating(
+          id: 'RAT-INVALID-0',
+          brokerId: 'b354958e-779a-41f2-b7a3-5899eca32e32',
+          brokerName: 'Bikaner Mandi Desk',
+          sellerId: 'test-seller',
+          rating: 0, // Invalid: below 1
+          createdAt: DateTime.now(),
+        );
 
-      expect(
-        () => repository.submitBrokerRating(invalidLowRating),
-        throwsA(isA<ArgumentError>()),
-      );
+        expect(
+          () => repository.submitBrokerRating(invalidLowRating),
+          throwsA(isA<ArgumentError>()),
+        );
 
-      final invalidHighRating = BrokerRating(
-        id: 'RAT-INVALID-6',
-        brokerId: 'b354958e-779a-41f2-b7a3-5899eca32e32',
-        brokerName: 'Bikaner Mandi Desk',
-        sellerId: 'test-seller',
-        rating: 6, // Invalid: above 5
-        createdAt: DateTime.now(),
-      );
+        final invalidHighRating = BrokerRating(
+          id: 'RAT-INVALID-6',
+          brokerId: 'b354958e-779a-41f2-b7a3-5899eca32e32',
+          brokerName: 'Bikaner Mandi Desk',
+          sellerId: 'test-seller',
+          rating: 6, // Invalid: above 5
+          createdAt: DateTime.now(),
+        );
 
-      expect(
-        () => repository.submitBrokerRating(invalidHighRating),
-        throwsA(isA<ArgumentError>()),
-      );
-    });
+        expect(
+          () => repository.submitBrokerRating(invalidHighRating),
+          throwsA(isA<ArgumentError>()),
+        );
+      },
+    );
 
-    test('Test 4: Validates feedback length constraint (maximum 500 characters)', () async {
-      final overlongFeedback = 'A' * 501; // 501 characters
-      final overlongRating = BrokerRating(
-        id: 'RAT-OVERLONG',
-        brokerId: 'b354958e-779a-41f2-b7a3-5899eca32e32',
-        brokerName: 'Bikaner Mandi Desk',
-        sellerId: 'test-seller',
-        rating: 5,
-        feedback: overlongFeedback,
-        createdAt: DateTime.now(),
-      );
+    test(
+      'Test 4: Validates feedback length constraint (maximum 500 characters)',
+      () async {
+        final overlongFeedback = 'A' * 501; // 501 characters
+        final overlongRating = BrokerRating(
+          id: 'RAT-OVERLONG',
+          brokerId: 'b354958e-779a-41f2-b7a3-5899eca32e32',
+          brokerName: 'Bikaner Mandi Desk',
+          sellerId: 'test-seller',
+          rating: 5,
+          feedback: overlongFeedback,
+          createdAt: DateTime.now(),
+        );
 
-      expect(
-        () => repository.submitBrokerRating(overlongRating),
-        throwsA(isA<ArgumentError>()),
-      );
-    });
+        expect(
+          () => repository.submitBrokerRating(overlongRating),
+          throwsA(isA<ArgumentError>()),
+        );
+      },
+    );
 
     test('Test 5: Rating Permission Matrix: Rejects attempts to rate a Buyer (Counterparty Shield)', () async {
       final buyerTargetRating = BrokerRating(
@@ -98,33 +116,49 @@ void main() {
       );
     });
 
-    test('Test 6: Calculates accurate rating summary, distribution, and averages', () async {
-      const bikanerBrokerId = 'b354958e-779a-41f2-b7a3-5899eca32e32';
-      final summary = await repository.getBrokerRatingSummary(bikanerBrokerId);
+    test(
+      'Test 6: Calculates accurate rating summary, distribution, and averages',
+      () async {
+        const bikanerBrokerId = 'b354958e-779a-41f2-b7a3-5899eca32e32';
+        final summary = await repository.getBrokerRatingSummary(
+          bikanerBrokerId,
+        );
 
-      expect(summary.totalReviews, greaterThanOrEqualTo(3));
-      expect(summary.averageRating, inInclusiveRange(4.0, 5.0));
-      expect(summary.isUnrated, isFalse);
-      expect(summary.starDistribution[5], greaterThan(0));
-      expect(summary.criteriaAverages.containsKey('Mandi Knowledge'), isTrue);
-      expect(summary.criteriaAverages.containsKey('Settlement Timeliness'), isTrue);
-    });
+        expect(summary.totalReviews, greaterThanOrEqualTo(3));
+        expect(summary.averageRating, inInclusiveRange(4.0, 5.0));
+        expect(summary.isUnrated, isFalse);
+        expect(summary.starDistribution[5], greaterThan(0));
+        expect(summary.criteriaAverages.containsKey('Mandi Knowledge'), isTrue);
+        expect(
+          summary.criteriaAverages.containsKey('Settlement Timeliness'),
+          isTrue,
+        );
+      },
+    );
 
-    test('Test 7: Clearly distinguishes unrated broker from a low-rated broker', () async {
-      const unratedBrokerId = 'b354958e-779a-41f2-b7a3-5899eca32e35'; // Jaipur desk
-      final summary = await repository.getBrokerRatingSummary(unratedBrokerId);
+    test(
+      'Test 7: Clearly distinguishes unrated broker from a low-rated broker',
+      () async {
+        const unratedBrokerId =
+            'b354958e-779a-41f2-b7a3-5899eca32e35'; // Jaipur desk
+        final summary = await repository.getBrokerRatingSummary(
+          unratedBrokerId,
+        );
 
-      expect(summary.isUnrated, isTrue);
-      expect(summary.totalReviews, equals(0));
-      expect(summary.averageRating, equals(0.0));
-      expect(summary.getPercentage(5), equals(0.0));
-    });
+        expect(summary.isUnrated, isTrue);
+        expect(summary.totalReviews, equals(0));
+        expect(summary.averageRating, equals(0.0));
+        expect(summary.getPercentage(5), equals(0.0));
+      },
+    );
 
     test('Test 8: Updates existing review instead of creating duplicate on re-submission', () async {
       const bikanerBrokerId = 'b354958e-779a-41f2-b7a3-5899eca32e32';
       const dealId = 'd354958e-779a-41f2-b7a3-5899eca32e01';
 
-      final initialSummary = await repository.getBrokerRatingSummary(bikanerBrokerId);
+      final initialSummary = await repository.getBrokerRatingSummary(
+        bikanerBrokerId,
+      );
       final initialCount = initialSummary.totalReviews;
 
       // Submit an updated rating for the same deal
@@ -136,7 +170,8 @@ void main() {
         dealId: dealId,
         dealReference: 'BKG-2026-0881',
         rating: 5,
-        feedback: 'Updated review: Payment settled even faster than previous lot.',
+        feedback:
+            'Updated review: Payment settled even faster than previous lot.',
         createdAt: DateTime.now(),
       );
 
@@ -144,7 +179,9 @@ void main() {
       expect(saved.feedback, contains('Updated review'));
 
       // Check review count did not double count
-      final updatedSummary = await repository.getBrokerRatingSummary(bikanerBrokerId);
+      final updatedSummary = await repository.getBrokerRatingSummary(
+        bikanerBrokerId,
+      );
       expect(updatedSummary.totalReviews, equals(initialCount));
     });
 

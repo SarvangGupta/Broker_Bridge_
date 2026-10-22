@@ -13,8 +13,8 @@ class AuthRepository {
   bool _isSigningIn = false;
 
   AuthRepository({SupabaseClient? supabase, SecureStorageService? storage})
-      : _customClient = supabase,
-        _storage = storage ?? SecureStorageService();
+    : _customClient = supabase,
+      _storage = storage ?? SecureStorageService();
 
   SupabaseClient? get _supabase {
     if (_customClient != null) return _customClient;
@@ -101,16 +101,14 @@ class AuthRepository {
         return const AuthAccessDenied(
           email: 'buyer@demo.com',
           role: 'buyer',
-          message:
-              'Seller Portal Access Restricted: Your account role (buyer) does not have commodity seller permissions. Access is strictly restricted to authorized commodity sellers and supply aggregators.',
+          message: 'Seller Portal Access Restricted: Your account role (buyer) does not have commodity seller permissions. Access is strictly restricted to authorized commodity sellers and supply aggregators.',
         );
       }
       if (cleanEmail == 'broker@demo.com' || cleanEmail.contains('broker')) {
         return const AuthAccessDenied(
           email: 'broker@demo.com',
           role: 'broker',
-          message:
-              'Seller Portal Access Restricted: Your account role (broker) does not have commodity seller permissions. Please use the RMBroker desk workstation.',
+          message: 'Seller Portal Access Restricted: Your account role (broker) does not have commodity seller permissions. Please use the RMBroker desk workstation.',
         );
       }
 
@@ -156,7 +154,8 @@ class AuthRepository {
       // Priority 1: Supabase JWT app_metadata (server-controlled, immutable by client)
       String? serverRole = user.appMetadata['role'] as String?;
 
-      String fullName = (user.userMetadata?['full_name'] as String?) ??
+      String fullName =
+          (user.userMetadata?['full_name'] as String?) ??
           (user.userMetadata?['fullName'] as String?) ??
           (user.userMetadata?['name'] as String?) ??
           'Commodity Seller Lead';
@@ -200,16 +199,21 @@ class AuthRepository {
       if (serverRole == null || serverRole.isEmpty) {
         serverRole = user.userMetadata?['role'] as String?;
       }
-      companyId ??= (user.userMetadata?['company_id'] as String?) ??
+      companyId ??=
+          (user.userMetadata?['company_id'] as String?) ??
           '20000000-0000-0000-0000-000000000101';
-      companyName ??= (user.userMetadata?['company_name'] as String?) ??
+      companyName ??=
+          (user.userMetadata?['company_name'] as String?) ??
           'Bikaner Agro Processing Ltd';
-      companyGst ??= (user.userMetadata?['company_gst'] as String?) ??
-          '08AAAAA0000A1Z5';
+      companyGst ??=
+          (user.userMetadata?['company_gst'] as String?) ?? '08AAAAA0000A1Z5';
 
       // Role check: Strictly assert seller or admin permissions
       final resolvedRole = (serverRole ?? '').toLowerCase().trim();
-      final isAuthorized = resolvedRole == 'seller' || resolvedRole == 'admin' || resolvedRole == 'seller_admin';
+      final isAuthorized =
+          resolvedRole == 'seller' ||
+          resolvedRole == 'admin' ||
+          resolvedRole == 'seller_admin';
 
       if (!isAuthorized) {
         try {
@@ -289,7 +293,9 @@ class AuthRepository {
     }
 
     final cleanRole = role.toLowerCase().trim();
-    if (cleanRole != 'seller' && cleanRole != 'admin' && cleanRole != 'seller_admin') {
+    if (cleanRole != 'seller' &&
+        cleanRole != 'admin' &&
+        cleanRole != 'seller_admin') {
       await _storage.clearAll();
       return null;
     }

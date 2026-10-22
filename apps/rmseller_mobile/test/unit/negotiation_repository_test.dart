@@ -31,12 +31,16 @@ void main() {
       final msg = await repository.sendMessage(
         requestId: testRequestId,
         brokerId: testBrokerId,
-        message: 'Namaste Ji, what is the current buyer inquiry level for this lot?',
+        message:
+            'Namaste Ji, what is the current buyer inquiry level for this lot?',
       );
 
       expect(msg.id, isNotEmpty);
       expect(msg.requestId, testRequestId);
-      expect(msg.messageText, 'Namaste Ji, what is the current buyer inquiry level for this lot?');
+      expect(
+        msg.messageText,
+        'Namaste Ji, what is the current buyer inquiry level for this lot?',
+      );
       expect(msg.senderRole, 'seller');
       expect(msg.isFromSeller, isTrue);
 
@@ -45,26 +49,29 @@ void main() {
       expect(messages.any((m) => m.text == msg.messageText), isTrue);
     });
 
-    test('proposeCommission records proposal and updates commission summary', () async {
-      final event = await repository.proposeCommission(
-        requestId: testRequestId,
-        brokerId: testBrokerId,
-        proposedRate: 35.0,
-        commissionBasis: '₹/MT',
-        note: 'Offering ₹35/MT for quick 3-day dispatch commitment',
-      );
+    test(
+      'proposeCommission records proposal and updates commission summary',
+      () async {
+        final event = await repository.proposeCommission(
+          requestId: testRequestId,
+          brokerId: testBrokerId,
+          proposedRate: 35.0,
+          commissionBasis: '₹/MT',
+          note: 'Offering ₹35/MT for quick 3-day dispatch commitment',
+        );
 
-      expect(event.actionType, NegotiationActionType.commissionProposal);
-      expect(event.payload['proposed_rate'], 35.0);
-      expect(event.payload['commission_basis'], '₹/MT');
-      expect(event.payload['terms_status'], 'PROPOSED');
+        expect(event.actionType, NegotiationActionType.commissionProposal);
+        expect(event.payload['proposed_rate'], 35.0);
+        expect(event.payload['commission_basis'], '₹/MT');
+        expect(event.payload['terms_status'], 'PROPOSED');
 
-      final summary = await repository.getCommissionSummary(testRequestId);
-      expect(summary.status, 'Negotiating');
-      expect(summary.activeProposedRate, 35.0);
-      expect(summary.commissionBasis, '₹/MT');
-      expect(summary.hasAgreedTerms, isFalse);
-    });
+        final summary = await repository.getCommissionSummary(testRequestId);
+        expect(summary.status, 'Negotiating');
+        expect(summary.activeProposedRate, 35.0);
+        expect(summary.commissionBasis, '₹/MT');
+        expect(summary.hasAgreedTerms, isFalse);
+      },
+    );
 
     test('proposeCommission validates positive commission rate', () async {
       expect(
@@ -118,34 +125,40 @@ void main() {
       expect(summary.effectiveTimestamp, isNotNull);
     });
 
-    test('respondToCommission with COUNTER submits revised terms distinctly', () async {
-      // Initial proposal
-      await repository.proposeCommission(
-        requestId: testRequestId,
-        brokerId: testBrokerId,
-        proposedRate: 50.0,
-        commissionBasis: '₹/MT',
-      );
+    test(
+      'respondToCommission with COUNTER submits revised terms distinctly',
+      () async {
+        // Initial proposal
+        await repository.proposeCommission(
+          requestId: testRequestId,
+          brokerId: testBrokerId,
+          proposedRate: 50.0,
+          commissionBasis: '₹/MT',
+        );
 
-      // Counter proposal with lower rate
-      final counterEvent = await repository.respondToCommission(
-        requestId: testRequestId,
-        brokerId: testBrokerId,
-        responseType: NegotiationActionType.commissionCounter,
-        rate: 35.0,
-        commissionBasis: '₹/MT',
-        counterNote: 'Can only afford ₹35/MT due to freight costs',
-      );
+        // Counter proposal with lower rate
+        final counterEvent = await repository.respondToCommission(
+          requestId: testRequestId,
+          brokerId: testBrokerId,
+          responseType: NegotiationActionType.commissionCounter,
+          rate: 35.0,
+          commissionBasis: '₹/MT',
+          counterNote: 'Can only afford ₹35/MT due to freight costs',
+        );
 
-      expect(counterEvent.actionType, NegotiationActionType.commissionCounter);
-      expect(counterEvent.payload['proposed_rate'], 35.0);
-      expect(counterEvent.payload['terms_status'], 'COUNTERED');
+        expect(
+          counterEvent.actionType,
+          NegotiationActionType.commissionCounter,
+        );
+        expect(counterEvent.payload['proposed_rate'], 35.0);
+        expect(counterEvent.payload['terms_status'], 'COUNTERED');
 
-      final summary = await repository.getCommissionSummary(testRequestId);
-      expect(summary.status, 'Negotiating');
-      expect(summary.activeProposedRate, 35.0);
-      expect(summary.hasAgreedTerms, isFalse);
-    });
+        final summary = await repository.getCommissionSummary(testRequestId);
+        expect(summary.status, 'Negotiating');
+        expect(summary.activeProposedRate, 35.0);
+        expect(summary.hasAgreedTerms, isFalse);
+      },
+    );
 
     test('respondToCommission with REJECT marks status as rejected without agreed rate', () async {
       await repository.proposeCommission(
@@ -197,8 +210,18 @@ void main() {
 
       final timeline = await repository.getNegotiationTimeline(testRequestId);
       expect(timeline.length, greaterThanOrEqualTo(2));
-      expect(timeline.any((e) => e.actionType == NegotiationActionType.commissionProposal), isTrue);
-      expect(timeline.any((e) => e.actionType == NegotiationActionType.commissionCounter), isTrue);
+      expect(
+        timeline.any(
+          (e) => e.actionType == NegotiationActionType.commissionProposal,
+        ),
+        isTrue,
+      );
+      expect(
+        timeline.any(
+          (e) => e.actionType == NegotiationActionType.commissionCounter,
+        ),
+        isTrue,
+      );
     });
   });
 }

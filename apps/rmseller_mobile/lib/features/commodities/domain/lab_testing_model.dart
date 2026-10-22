@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../app/theme/app_colors.dart';
 
 /// Represents a single chemical or physical laboratory test parameter.
@@ -19,17 +20,19 @@ class LabTestParameter {
 
   bool get hasFixedPrice => listedCharge != null;
 
-  String get priceLabel => listedCharge != null ? '₹${listedCharge!.toInt()}' : 'Not Specified';
+  String get priceLabel =>
+      listedCharge != null ? '₹${listedCharge!.toInt()}' : 'Not Specified';
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'name': name,
-        'listed_charge': listedCharge,
-        'category': category,
-        'is_custom': isCustom,
-      };
+    'id': id,
+    'name': name,
+    'listed_charge': listedCharge,
+    'category': category,
+    'is_custom': isCustom,
+  };
 
-  factory LabTestParameter.fromMap(Map<String, dynamic> map) => LabTestParameter(
+  factory LabTestParameter.fromMap(Map<String, dynamic> map) =>
+      LabTestParameter(
         id: map['id'] as String,
         name: map['name'] as String,
         listedCharge: (map['listed_charge'] as num?)?.toDouble(),
@@ -46,22 +49,103 @@ class LabTestRateCard {
   static const String upiVpa = 'rs.lab.jaipur@upi';
 
   static const List<LabTestParameter> standardParameters = [
-    LabTestParameter(id: 'PARAM-CP', name: 'Crude Protein', listedCharge: 200, category: 'Proximate'),
-    LabTestParameter(id: 'PARAM-FAT', name: 'Fat / Oil', listedCharge: 150, category: 'Proximate'),
-    LabTestParameter(id: 'PARAM-CF', name: 'Crude Fiber', listedCharge: 200, category: 'Proximate'),
-    LabTestParameter(id: 'PARAM-AIA', name: 'AIA (Acid Insoluble Ash)', listedCharge: 200, category: 'Proximate'),
-    LabTestParameter(id: 'PARAM-MOIST', name: 'Moisture', listedCharge: 100, category: 'Proximate'),
-    LabTestParameter(id: 'PARAM-CALC', name: 'Calcium', listedCharge: 450, category: 'Minerals'),
-    LabTestParameter(id: 'PARAM-SALT', name: 'Salt (NaCl)', listedCharge: 480, category: 'Minerals'),
-    LabTestParameter(id: 'PARAM-UREA', name: 'Urea', listedCharge: 550, category: 'Minerals'),
-    LabTestParameter(id: 'PARAM-STARCH', name: 'Starch', listedCharge: 500, category: 'Minerals'),
-    LabTestParameter(id: 'PARAM-PHOS', name: 'Phosphorus', listedCharge: 500, category: 'Minerals'),
-    LabTestParameter(id: 'PARAM-TE', name: 'Total Energy', listedCharge: 850, category: 'Energy'),
-    LabTestParameter(id: 'PARAM-ME', name: 'Metabolic Energy (ME)', listedCharge: 850, category: 'Energy'),
-    LabTestParameter(id: 'PARAM-TDN', name: 'Total Digestive Nutrients (TDN)', listedCharge: 750, category: 'Energy'),
-    LabTestParameter(id: 'PARAM-ASH', name: 'Total Ash', listedCharge: 150, category: 'Proximate'),
-    LabTestParameter(id: 'PARAM-FFA', name: 'FFA (Free Fatty Acids)', listedCharge: 100, category: 'Proximate'),
-    LabTestParameter(id: 'PARAM-OTHER', name: 'Other (Custom Parameter)', listedCharge: null, category: 'Other', isCustom: true),
+    LabTestParameter(
+      id: 'PARAM-CP',
+      name: 'Crude Protein',
+      listedCharge: 200,
+      category: 'Proximate',
+    ),
+    LabTestParameter(
+      id: 'PARAM-FAT',
+      name: 'Fat / Oil',
+      listedCharge: 150,
+      category: 'Proximate',
+    ),
+    LabTestParameter(
+      id: 'PARAM-CF',
+      name: 'Crude Fiber',
+      listedCharge: 200,
+      category: 'Proximate',
+    ),
+    LabTestParameter(
+      id: 'PARAM-AIA',
+      name: 'AIA (Acid Insoluble Ash)',
+      listedCharge: 200,
+      category: 'Proximate',
+    ),
+    LabTestParameter(
+      id: 'PARAM-MOIST',
+      name: 'Moisture',
+      listedCharge: 100,
+      category: 'Proximate',
+    ),
+    LabTestParameter(
+      id: 'PARAM-CALC',
+      name: 'Calcium',
+      listedCharge: 450,
+      category: 'Minerals',
+    ),
+    LabTestParameter(
+      id: 'PARAM-SALT',
+      name: 'Salt (NaCl)',
+      listedCharge: 480,
+      category: 'Minerals',
+    ),
+    LabTestParameter(
+      id: 'PARAM-UREA',
+      name: 'Urea',
+      listedCharge: 550,
+      category: 'Minerals',
+    ),
+    LabTestParameter(
+      id: 'PARAM-STARCH',
+      name: 'Starch',
+      listedCharge: 500,
+      category: 'Minerals',
+    ),
+    LabTestParameter(
+      id: 'PARAM-PHOS',
+      name: 'Phosphorus',
+      listedCharge: 500,
+      category: 'Minerals',
+    ),
+    LabTestParameter(
+      id: 'PARAM-TE',
+      name: 'Total Energy',
+      listedCharge: 850,
+      category: 'Energy',
+    ),
+    LabTestParameter(
+      id: 'PARAM-ME',
+      name: 'Metabolic Energy (ME)',
+      listedCharge: 850,
+      category: 'Energy',
+    ),
+    LabTestParameter(
+      id: 'PARAM-TDN',
+      name: 'Total Digestive Nutrients (TDN)',
+      listedCharge: 750,
+      category: 'Energy',
+    ),
+    LabTestParameter(
+      id: 'PARAM-ASH',
+      name: 'Total Ash',
+      listedCharge: 150,
+      category: 'Proximate',
+    ),
+    LabTestParameter(
+      id: 'PARAM-FFA',
+      name: 'FFA (Free Fatty Acids)',
+      listedCharge: 100,
+      category: 'Proximate',
+    ),
+    LabTestParameter(
+      id: 'PARAM-OTHER',
+      name: 'Other (Custom Parameter)',
+      listedCharge: null,
+      category: 'Other',
+      isCustom: true,
+    ),
   ];
 
   /// Calculates the estimated total from selected parameters without double-counting.
@@ -176,7 +260,9 @@ class LabTestingRequest {
       paymentStatus == LabPaymentStatus.reportAvailable;
 
   bool get isReportReady =>
-      (paymentStatus == LabPaymentStatus.reportAvailable || reportStatus == 'Verified' || reportStatus == 'Report Uploaded') &&
+      (paymentStatus == LabPaymentStatus.reportAvailable ||
+          reportStatus == 'Verified' ||
+          reportStatus == 'Report Uploaded') &&
       reportUrl != null &&
       reportUrl!.isNotEmpty;
 
@@ -227,29 +313,30 @@ class LabTestingRequest {
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'availability_id': availabilityId,
-        'lot_number': lotNumber,
-        'commodity_name': commodityName,
-        'company_id': companyId,
-        'selected_tests': selectedTests.map((t) => t.toMap()).toList(),
-        'estimated_total': estimatedTotal,
-        'final_payable_amount': finalPayableAmount,
-        'currency': currency,
-        'upi_vpa': upiVpa,
-        'payee_name': payeeName,
-        'transaction_reference': transactionReference,
-        'payment_status': paymentStatus.name,
-        'admin_notified': adminNotified,
-        'admin_notification_id': adminNotificationId,
-        'report_url': reportUrl,
-        'report_status': reportStatus,
-        'created_at': createdAt.toIso8601String(),
-        'verified_at': verifiedAt?.toIso8601String(),
-        'custom_notes': customNotes,
-      };
+    'id': id,
+    'availability_id': availabilityId,
+    'lot_number': lotNumber,
+    'commodity_name': commodityName,
+    'company_id': companyId,
+    'selected_tests': selectedTests.map((t) => t.toMap()).toList(),
+    'estimated_total': estimatedTotal,
+    'final_payable_amount': finalPayableAmount,
+    'currency': currency,
+    'upi_vpa': upiVpa,
+    'payee_name': payeeName,
+    'transaction_reference': transactionReference,
+    'payment_status': paymentStatus.name,
+    'admin_notified': adminNotified,
+    'admin_notification_id': adminNotificationId,
+    'report_url': reportUrl,
+    'report_status': reportStatus,
+    'created_at': createdAt.toIso8601String(),
+    'verified_at': verifiedAt?.toIso8601String(),
+    'custom_notes': customNotes,
+  };
 
-  factory LabTestingRequest.fromMap(Map<String, dynamic> map) => LabTestingRequest(
+  factory LabTestingRequest.fromMap(Map<String, dynamic> map) =>
+      LabTestingRequest(
         id: map['id'] as String,
         availabilityId: map['availability_id'] as String,
         lotNumber: map['lot_number'] as String,
@@ -262,7 +349,8 @@ class LabTestingRequest {
         finalPayableAmount: (map['final_payable_amount'] as num).toDouble(),
         currency: (map['currency'] as String?) ?? 'INR',
         upiVpa: (map['upi_vpa'] as String?) ?? LabTestRateCard.upiVpa,
-        payeeName: (map['payee_name'] as String?) ?? LabTestRateCard.laboratoryName,
+        payeeName:
+            (map['payee_name'] as String?) ?? LabTestRateCard.laboratoryName,
         transactionReference: map['transaction_reference'] as String,
         paymentStatus: LabPaymentStatus.values.firstWhere(
           (s) => s.name == map['payment_status'],
@@ -273,7 +361,9 @@ class LabTestingRequest {
         reportUrl: map['report_url'] as String?,
         reportStatus: (map['report_status'] as String?) ?? 'Sample Pending',
         createdAt: DateTime.parse(map['created_at'] as String),
-        verifiedAt: map['verified_at'] != null ? DateTime.parse(map['verified_at'] as String) : null,
+        verifiedAt: map['verified_at'] != null
+            ? DateTime.parse(map['verified_at'] as String)
+            : null,
         customNotes: map['custom_notes'] as String?,
       );
 }
@@ -287,7 +377,8 @@ class LabReportAttachment {
   final String? remoteStorageUrl;
   final bool isUploaded;
   final String? uploadError;
-  final String? reportReference; // Auto-generated document reference (RB-SELLER-POST-UX-02)
+  final String?
+  reportReference; // Auto-generated document reference (RB-SELLER-POST-UX-02)
 
   const LabReportAttachment({
     required this.fileName,
@@ -306,7 +397,8 @@ class LabReportAttachment {
   String get formattedSize {
     if (fileSizeBytes == null || fileSizeBytes! <= 0) return '';
     if (fileSizeBytes! < 1024) return '$fileSizeBytes B';
-    if (fileSizeBytes! < 1024 * 1024) return '${(fileSizeBytes! / 1024).toStringAsFixed(1)} KB';
+    if (fileSizeBytes! < 1024 * 1024)
+      return '${(fileSizeBytes! / 1024).toStringAsFixed(1)} KB';
     return '${(fileSizeBytes! / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
@@ -333,17 +425,18 @@ class LabReportAttachment {
   }
 
   Map<String, dynamic> toMap() => {
-        'file_name': fileName,
-        'local_file_path': localFilePath,
-        'file_size_bytes': fileSizeBytes,
-        'file_type': fileType,
-        'remote_storage_url': remoteStorageUrl,
-        'is_uploaded': isUploaded,
-        'upload_error': uploadError,
-        'report_reference': reportReference,
-      };
+    'file_name': fileName,
+    'local_file_path': localFilePath,
+    'file_size_bytes': fileSizeBytes,
+    'file_type': fileType,
+    'remote_storage_url': remoteStorageUrl,
+    'is_uploaded': isUploaded,
+    'upload_error': uploadError,
+    'report_reference': reportReference,
+  };
 
-  factory LabReportAttachment.fromMap(Map<String, dynamic> map) => LabReportAttachment(
+  factory LabReportAttachment.fromMap(Map<String, dynamic> map) =>
+      LabReportAttachment(
         fileName: map['file_name'] as String,
         localFilePath: map['local_file_path'] as String?,
         fileSizeBytes: map['file_size_bytes'] as int?,
@@ -354,4 +447,3 @@ class LabReportAttachment {
         reportReference: map['report_reference'] as String?,
       );
 }
-

@@ -17,13 +17,12 @@ class NegotiationRepository {
   static final Map<String, List<NegotiationEvent>> _sessionEventsByRequest = {};
 
   /// Global notifier triggered whenever a new message, proposal, or agreement is appended
-  static final ValueNotifier<int> negotiationUpdatedNotifier = ValueNotifier<int>(0);
+  static final ValueNotifier<int> negotiationUpdatedNotifier =
+      ValueNotifier<int>(0);
 
-  NegotiationRepository({
-    SupabaseClient? client,
-    SecureStorageService? storage,
-  })  : _customClient = client,
-        _storage = storage ?? SecureStorageService();
+  NegotiationRepository({SupabaseClient? client, SecureStorageService? storage})
+    : _customClient = client,
+      _storage = storage ?? SecureStorageService();
 
   SupabaseClient? get _supabase {
     if (_customClient != null) return _customClient;
@@ -50,9 +49,10 @@ class NegotiationRepository {
 
     String? companyId;
     try {
-      companyId = await _storage
-          .getCompanyId()
-          .timeout(const Duration(milliseconds: 500), onTimeout: () => null);
+      companyId = await _storage.getCompanyId().timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () => null,
+      );
     } catch (_) {}
     companyId ??= '20000000-0000-0000-0000-000000000101';
 
@@ -65,7 +65,9 @@ class NegotiationRepository {
       try {
         final data = await client
             .from('negotiation_events')
-            .select('id, request_id, company_id, actor_id, action_type, payload, created_at')
+            .select(
+              'id, request_id, company_id, actor_id, action_type, payload, created_at',
+            )
             .eq('request_id', requestId)
             .eq('company_id', companyId)
             .order('created_at', ascending: true);
@@ -198,9 +200,14 @@ class NegotiationRepository {
   }) async {
     final effectiveRate = rate ?? proposedRate ?? 0.0;
     final effectiveBasis = basis ?? commissionBasis ?? '₹/MT';
-    final effectiveNotes = notes ?? note ?? 'Seller proposed commission rate for this commodity mandate.';
+    final effectiveNotes =
+        notes ??
+        note ??
+        'Seller proposed commission rate for this commodity mandate.';
 
-    if (effectiveRate <= 0 || (proposedRate != null && proposedRate <= 0) || (rate != null && rate <= 0)) {
+    if (effectiveRate <= 0 ||
+        (proposedRate != null && proposedRate <= 0) ||
+        (rate != null && rate <= 0)) {
       throw ArgumentError('Commission rate must be positive');
     }
 
@@ -342,13 +349,16 @@ class NegotiationRepository {
       payload['status'] = 'Countered';
       payload['terms_status'] = 'COUNTERED';
     } else if (normalizedAction == 'ACCEPT' ||
-               normalizedAction == 'COMMISSION_ACCEPT' ||
-               normalizedAction == 'COMMISSIONACCEPT') {
+        normalizedAction == 'COMMISSION_ACCEPT' ||
+        normalizedAction == 'COMMISSIONACCEPT') {
       dbActionType = 'ACCEPT';
       // Find latest proposal to confirm terms
       final summary = await getCommissionSummary(requestId);
-      final agreed = effectiveRate ?? summary.latestProposal?.commissionRate ?? 50.0;
-      final agreedUnit = effectiveBasis.isNotEmpty ? effectiveBasis : (summary.latestProposal?.commissionBasis ?? '₹/MT');
+      final agreed =
+          effectiveRate ?? summary.latestProposal?.commissionRate ?? 50.0;
+      final agreedUnit = effectiveBasis.isNotEmpty
+          ? effectiveBasis
+          : (summary.latestProposal?.commissionBasis ?? '₹/MT');
       payload['rate'] = agreed;
       payload['agreed_rate'] = agreed;
       payload['basis'] = agreedUnit;
@@ -356,8 +366,8 @@ class NegotiationRepository {
       payload['status'] = 'Agreed';
       payload['terms_status'] = 'AGREED';
     } else if (normalizedAction == 'REJECT' ||
-               normalizedAction == 'COMMISSION_REJECT' ||
-               normalizedAction == 'COMMISSIONREJECT') {
+        normalizedAction == 'COMMISSION_REJECT' ||
+        normalizedAction == 'COMMISSIONREJECT') {
       dbActionType = 'REJECT';
       payload['status'] = 'Rejected';
       payload['terms_status'] = 'REJECTED';
@@ -434,12 +444,12 @@ class NegotiationRepository {
         agreedBasis = event.commissionBasis;
         agreedAt = event.createdAt;
       } else if (event.actionType == NegotiationActionType.reject ||
-                 event.actionType == NegotiationActionType.commissionReject) {
+          event.actionType == NegotiationActionType.commissionReject) {
         status = 'Rejected';
       } else if (event.actionType == NegotiationActionType.proposal ||
-                 event.actionType == NegotiationActionType.commissionProposal ||
-                 event.actionType == NegotiationActionType.counter ||
-                 event.actionType == NegotiationActionType.commissionCounter) {
+          event.actionType == NegotiationActionType.commissionProposal ||
+          event.actionType == NegotiationActionType.counter ||
+          event.actionType == NegotiationActionType.commissionCounter) {
         status = 'Negotiating';
         latestProposal = event;
       }
@@ -484,11 +494,14 @@ class NegotiationRepository {
         // Render system activity event in stream
         String activityText = 'Commission event: ${e.actionType.value}';
         if (e.actionType == NegotiationActionType.proposal) {
-          activityText = 'Commission proposed by ${e.senderName}: ₹${e.commissionRate?.toStringAsFixed(0)} (${e.commissionBasis})';
+          activityText =
+              'Commission proposed by ${e.senderName}: ₹${e.commissionRate?.toStringAsFixed(0)} (${e.commissionBasis})';
         } else if (e.actionType == NegotiationActionType.counter) {
-          activityText = 'Counter-proposal submitted: ₹${e.commissionRate?.toStringAsFixed(0)} (${e.commissionBasis})';
+          activityText =
+              'Counter-proposal submitted: ₹${e.commissionRate?.toStringAsFixed(0)} (${e.commissionBasis})';
         } else if (e.actionType == NegotiationActionType.accept) {
-          activityText = 'Commission terms confirmed & agreed: ₹${e.commissionRate?.toStringAsFixed(0)} (${e.commissionBasis})';
+          activityText =
+              'Commission terms confirmed & agreed: ₹${e.commissionRate?.toStringAsFixed(0)} (${e.commissionBasis})';
         } else if (e.actionType == NegotiationActionType.reject) {
           activityText = 'Commission proposal declined.';
         }
@@ -516,7 +529,10 @@ class NegotiationRepository {
   // 5. BASELINE SEED DATA
   // ============================================================================
 
-  List<NegotiationEvent> _generateBaselineEvents(String requestId, String companyId) {
+  List<NegotiationEvent> _generateBaselineEvents(
+    String requestId,
+    String companyId,
+  ) {
     final now = DateTime.now();
     return [
       NegotiationEvent(
@@ -545,7 +561,8 @@ class NegotiationRepository {
           'basis': '₹/MT',
           'commission_basis': '₹/MT',
           'status': 'Proposed',
-          'notes': 'Standard Mandi brokerage rate for FAQ Grade supply matching.',
+          'notes':
+              'Standard Mandi brokerage rate for FAQ Grade supply matching.',
           'author_role': 'broker',
           'author_name': 'Bikaner Mandi Broker Desk',
           'timestamp': now.subtract(const Duration(hours: 3)).toIso8601String(),

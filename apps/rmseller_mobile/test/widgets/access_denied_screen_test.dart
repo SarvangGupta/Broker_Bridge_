@@ -6,32 +6,32 @@ import 'package:rmseller_mobile/features/authentication/presentation/access_deni
 
 void main() {
   group('RB-SELLER-01: AccessDeniedScreen Widget Tests', () {
-    testWidgets('Renders access restricted warning and user email/role details', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: const AccessDeniedScreen(
-            email: 'buyer@demo.com',
-            role: 'buyer',
+    testWidgets(
+      'Renders access restricted warning and user email/role details',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const AccessDeniedScreen(
+              email: 'buyer@demo.com',
+              role: 'buyer',
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Access Restricted'), findsOneWidget);
-      expect(
-        find.textContaining('buyer@demo.com'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('role "buyer"'),
-        findsOneWidget,
-      );
-      expect(find.byIcon(LucideIcons.shieldAlert), findsOneWidget);
-      expect(find.text('Sign Out & Return to Login'), findsOneWidget);
-    });
+        expect(find.text('Access Restricted'), findsOneWidget);
+        expect(find.textContaining('buyer@demo.com'), findsOneWidget);
+        expect(find.textContaining('role "buyer"'), findsOneWidget);
+        expect(find.byIcon(LucideIcons.shieldAlert), findsOneWidget);
+        expect(find.text('Sign Out & Return to Login'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Custom message override is respected when provided', (tester) async {
-      const customMsg = 'Custom Security Restriction: Counterparty access prohibited.';
+    testWidgets('Custom message override is respected when provided', (
+      tester,
+    ) async {
+      const customMsg =
+          'Custom Security Restriction: Counterparty access prohibited.';
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,

@@ -67,13 +67,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   final TextEditingController _lotNumberController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _askingPriceController = TextEditingController();
-  final TextEditingController _confidentialPriceController = TextEditingController();
+  final TextEditingController _confidentialPriceController =
+      TextEditingController();
   final TextEditingController _paymentTermsController = TextEditingController();
-  final TextEditingController _warehouseAddressController = TextEditingController(text: 'Krishi Upaj Mandi Yard Warehouse A-4');
-  final TextEditingController _dispatchFacilityController = TextEditingController(text: 'Krishi Upaj Mandi Yard Warehouse A-4');
-  final TextEditingController _officeLocationController = TextEditingController(text: 'Bikaner Commercial Head Office');
-  final TextEditingController _labReportNumberController = TextEditingController();
-  final TextEditingController _qualityRemarksController = TextEditingController();
+  final TextEditingController _warehouseAddressController =
+      TextEditingController(text: 'Krishi Upaj Mandi Yard Warehouse A-4');
+  final TextEditingController _dispatchFacilityController =
+      TextEditingController(text: 'Krishi Upaj Mandi Yard Warehouse A-4');
+  final TextEditingController _officeLocationController = TextEditingController(
+    text: 'Bikaner Commercial Head Office',
+  );
+  final TextEditingController _labReportNumberController =
+      TextEditingController();
+  final TextEditingController _qualityRemarksController =
+      TextEditingController();
 
   String _loadingStatus = 'Ready to Load';
   String _labReportType = 'NABL Certified Lab Report Available';
@@ -87,8 +94,13 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
   // Optional Lab Testing State (RB-SELLER-LAB-01)
   bool _requestLabTesting = false; // Strictly optional
-  final Set<String> _selectedLabTestIds = {'PARAM-CP', 'PARAM-MOIST', 'PARAM-ASH'};
-  final TextEditingController _customTestParameterController = TextEditingController();
+  final Set<String> _selectedLabTestIds = {
+    'PARAM-CP',
+    'PARAM-MOIST',
+    'PARAM-ASH',
+  };
+  final TextEditingController _customTestParameterController =
+      TextEditingController();
   LabTestingRequest? _currentLabRequest;
   bool _isInitiatingPayment = false;
   bool _isVerifyingPayment = false;
@@ -100,10 +112,13 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   void initState() {
     super.initState();
     _loadMasterData();
-    _lotNumberController.text = 'LOT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    _lotNumberController.text =
+        'LOT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     _paymentTermsController.text = 'Payment on Delivery (CAD)';
-    _labReportNumberController.text = 'AGMARK-RAL-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-    _qualityRemarksController.text = 'FAQ Grade Cleaned, Moisture <= 9.5%, Foreign Matter < 1.0%';
+    _labReportNumberController.text =
+        'AGMARK-RAL-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+    _qualityRemarksController.text =
+        'FAQ Grade Cleaned, Moisture <= 9.5%, Foreign Matter < 1.0%';
   }
 
   @override
@@ -132,10 +147,16 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
       MasterCommodity? initialComm;
       if (widget.initialCommodityId != null) {
-        initialComm = comms.firstWhere((c) => c.id == widget.initialCommodityId, orElse: () => comms.first);
+        initialComm = comms.firstWhere(
+          (c) => c.id == widget.initialCommodityId,
+          orElse: () => comms.first,
+        );
       } else if (widget.initialLot != null) {
         final lot = widget.initialLot!;
-        initialComm = comms.firstWhere((c) => c.id == lot.commodityId, orElse: () => comms.first);
+        initialComm = comms.firstWhere(
+          (c) => c.id == lot.commodityId,
+          orElse: () => comms.first,
+        );
       } else if (comms.isNotEmpty) {
         initialComm = comms.first;
       }
@@ -156,43 +177,68 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         _quantityController.text = lot.totalQuantity.toString();
         _askingPriceController.text = lot.askingPrice.toString();
         if (lot.confidentialMinimumPrice != null) {
-          _confidentialPriceController.text = lot.confidentialMinimumPrice.toString();
+          _confidentialPriceController.text = lot.confidentialMinimumPrice
+              .toString();
         }
         if (lot.paymentTerms != null) _paymentSchedule = lot.paymentTerms!;
-        if (lot.officeLocation != null) _officeLocationController.text = lot.officeLocation!;
-        if (lot.loadingRemarks != null) _dispatchFacilityController.text = lot.loadingRemarks!;
-        if (lot.warehouseName != null) _warehouseAddressController.text = lot.warehouseName!;
+        if (lot.officeLocation != null)
+          _officeLocationController.text = lot.officeLocation!;
+        if (lot.loadingRemarks != null)
+          _dispatchFacilityController.text = lot.loadingRemarks!;
+        if (lot.warehouseName != null)
+          _warehouseAddressController.text = lot.warehouseName!;
         if (lot.loadingStatus.isNotEmpty) _loadingStatus = lot.loadingStatus;
-        if (lot.labReportNumber != null) _labReportNumberController.text = lot.labReportNumber!;
+        if (lot.labReportNumber != null)
+          _labReportNumberController.text = lot.labReportNumber!;
         if (lot.labName != null) {
           _labReportType = lot.labName!;
           if (lot.labName!.toLowerCase().contains('riddhi siddhi')) {
             _requestLabTesting = true;
-            _currentLabRequest = _labTestingRepository.getRequestForAvailability(lot.id);
+            _currentLabRequest = _labTestingRepository
+                .getRequestForAvailability(lot.id);
           }
         }
         _availableFrom = lot.availableFrom;
         _validUntil = lot.validUntil;
 
         if (lot.stateId != null && states.isNotEmpty) {
-          initState = states.firstWhere((s) => s.id == lot.stateId, orElse: () => states.first);
+          initState = states.firstWhere(
+            (s) => s.id == lot.stateId,
+            orElse: () => states.first,
+          );
         } else if (states.isNotEmpty) {
-          initState = states.firstWhere((s) => s.name.toLowerCase() == lot.stateName.toLowerCase(), orElse: () => states.first);
+          initState = states.firstWhere(
+            (s) => s.name.toLowerCase() == lot.stateName.toLowerCase(),
+            orElse: () => states.first,
+          );
         }
 
         if (initState != null) {
-          districts = await _commoditiesRepository.getMasterDistricts(initState.id);
+          districts = await _commoditiesRepository.getMasterDistricts(
+            initState.id,
+          );
           if (lot.districtId != null && districts.isNotEmpty) {
-            initDistrict = districts.firstWhere((d) => d.id == lot.districtId, orElse: () => districts.first);
+            initDistrict = districts.firstWhere(
+              (d) => d.id == lot.districtId,
+              orElse: () => districts.first,
+            );
           } else if (districts.isNotEmpty) {
-            initDistrict = districts.firstWhere((d) => d.name.toLowerCase().contains(lot.districtName.toLowerCase()), orElse: () => districts.first);
+            initDistrict = districts.firstWhere(
+              (d) =>
+                  d.name.toLowerCase().contains(lot.districtName.toLowerCase()),
+              orElse: () => districts.first,
+            );
           }
 
           if (initDistrict != null) {
-            mandis = await _commoditiesRepository.getMasterMandis(initDistrict.id);
+            mandis = await _commoditiesRepository.getMasterMandis(
+              initDistrict.id,
+            );
             if (mandis.isNotEmpty) {
               initMandi = mandis.firstWhere(
-                (m) => lot.mandiName != null && m.name.toLowerCase().contains(lot.mandiName!.toLowerCase()),
+                (m) =>
+                    lot.mandiName != null &&
+                    m.name.toLowerCase().contains(lot.mandiName!.toLowerCase()),
                 orElse: () => mandis.first,
               );
             }
@@ -212,9 +258,15 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
       SellerBrokerModel? initialBroker;
       if (widget.initialBrokerId != null) {
-        initialBroker = brokers.firstWhere((b) => b.id == widget.initialBrokerId, orElse: () => brokers.first);
+        initialBroker = brokers.firstWhere(
+          (b) => b.id == widget.initialBrokerId,
+          orElse: () => brokers.first,
+        );
       } else if (widget.initialLot?.brokerId != null) {
-        initialBroker = brokers.firstWhere((b) => b.id == widget.initialLot!.brokerId, orElse: () => brokers.first);
+        initialBroker = brokers.firstWhere(
+          (b) => b.id == widget.initialLot!.brokerId,
+          orElse: () => brokers.first,
+        );
       }
 
       if (!mounted) return;
@@ -262,7 +314,6 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     });
   }
 
-
   void _openLocationPopup() {
     // Local copy of form state so cancellation preserves original values!
     MasterState? tempState = _selectedState;
@@ -273,12 +324,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     bool isLoadingDistricts = false;
     bool isLoadingMandis = false;
 
-    final tempWarehouseController = TextEditingController(text: _warehouseAddressController.text);
-    final tempDispatchController = TextEditingController(text: _dispatchFacilityController.text);
-    final tempOfficeController = TextEditingController(text: _officeLocationController.text);
+    final tempWarehouseController = TextEditingController(
+      text: _warehouseAddressController.text,
+    );
+    final tempDispatchController = TextEditingController(
+      text: _dispatchFacilityController.text,
+    );
+    final tempOfficeController = TextEditingController(
+      text: _officeLocationController.text,
+    );
     final tempCustomMandiController = TextEditingController();
     bool isCustomMandi = false;
-    bool sameAsWarehouse = tempDispatchController.text.trim() == tempWarehouseController.text.trim();
+    bool sameAsWarehouse =
+        tempDispatchController.text.trim() ==
+        tempWarehouseController.text.trim();
     String? formError;
     final popupFormKey = GlobalKey<FormState>();
 
@@ -294,7 +353,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
           builder: (context, setModalState) {
             void loadMandisForDistrict(String districtId) async {
               setModalState(() => isLoadingMandis = true);
-              final mandis = await _commoditiesRepository.getMasterMandis(districtId);
+              final mandis = await _commoditiesRepository.getMasterMandis(
+                districtId,
+              );
               if (!mounted) return;
               setModalState(() {
                 tempMandis = mandis;
@@ -310,7 +371,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               });
             }
 
-            if (tempDistrict != null && tempMandis.isEmpty && !isLoadingMandis) {
+            if (tempDistrict != null &&
+                tempMandis.isEmpty &&
+                !isLoadingMandis) {
               loadMandisForDistrict(tempDistrict!.id);
             }
 
@@ -346,17 +409,26 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                         ),
                         Row(
                           children: [
-                            const Icon(LucideIcons.truck, color: AppColors.primary),
+                            const Icon(
+                              LucideIcons.truck,
+                              color: AppColors.primary,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Warehouse / Loading Location', style: AppTypography.titleMedium),
+                                  Text(
+                                    'Warehouse / Loading Location',
+                                    style: AppTypography.titleMedium,
+                                  ),
                                   const SizedBox(height: 2),
                                   const Text(
                                     'Specify warehouse, mandi yard & physical truck dispatch site',
-                                    style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondaryLight,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -376,16 +448,26 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.errorBackground,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                              border: Border.all(
+                                color: AppColors.error.withOpacity(0.3),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(LucideIcons.alertTriangle, size: 16, color: AppColors.error),
+                                const Icon(
+                                  LucideIcons.alertTriangle,
+                                  size: 16,
+                                  color: AppColors.error,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     formError!,
-                                    style: const TextStyle(fontSize: 12, color: AppColors.error, fontWeight: FontWeight.w500),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.error,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -395,54 +477,81 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
                         const Text(
                           'Supported Mandi Location Presets',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondaryLight),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondaryLight,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
-                            children: MasterCommodityData.verifiedLocationPresets.map((preset) {
-                              final isSelected = tempState?.id == preset['stateId'] &&
-                                  tempDistrict?.id == preset['districtId'];
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ChoiceChip(
-                                  label: Text(preset['presetName']!, style: const TextStyle(fontSize: 11)),
-                                  selected: isSelected,
-                                  onSelected: (selected) async {
-                                    if (selected) {
-                                      setModalState(() {
-                                        tempState = _states.firstWhere(
-                                          (s) => s.id == preset['stateId'],
-                                          orElse: () => _states.first,
-                                        );
-                                        tempWarehouseController.text = preset['warehouseAddress']!;
-                                        tempDispatchController.text = preset['loadingFacility']!;
-                                      });
-                                      final dists = await _commoditiesRepository.getMasterDistricts(preset['stateId']!);
-                                      final mandis = await _commoditiesRepository.getMasterMandis(preset['districtId']!);
-                                      if (!mounted) return;
-                                      setModalState(() {
-                                        tempDistricts = dists;
-                                        tempDistrict = dists.firstWhere(
-                                          (d) => d.id == preset['districtId'],
-                                          orElse: () => dists.first,
-                                        );
-                                        tempMandis = mandis;
-                                        tempMandi = mandis.isNotEmpty
-                                            ? mandis.firstWhere(
-                                                (m) => m.name.toLowerCase().contains(preset['mandiName']!.toLowerCase()),
-                                                orElse: () => mandis.first,
-                                              )
-                                            : null;
-                                        isCustomMandi = false;
-                                        formError = null;
-                                      });
-                                    }
-                                  },
-                                ),
-                              );
-                            }).toList(),
+                            children: MasterCommodityData
+                                .verifiedLocationPresets
+                                .map((preset) {
+                                  final isSelected =
+                                      tempState?.id == preset['stateId'] &&
+                                      tempDistrict?.id == preset['districtId'];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: ChoiceChip(
+                                      label: Text(
+                                        preset['presetName']!,
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                      selected: isSelected,
+                                      onSelected: (selected) async {
+                                        if (selected) {
+                                          setModalState(() {
+                                            tempState = _states.firstWhere(
+                                              (s) => s.id == preset['stateId'],
+                                              orElse: () => _states.first,
+                                            );
+                                            tempWarehouseController.text =
+                                                preset['warehouseAddress']!;
+                                            tempDispatchController.text =
+                                                preset['loadingFacility']!;
+                                          });
+                                          final dists =
+                                              await _commoditiesRepository
+                                                  .getMasterDistricts(
+                                                    preset['stateId']!,
+                                                  );
+                                          final mandis =
+                                              await _commoditiesRepository
+                                                  .getMasterMandis(
+                                                    preset['districtId']!,
+                                                  );
+                                          if (!mounted) return;
+                                          setModalState(() {
+                                            tempDistricts = dists;
+                                            tempDistrict = dists.firstWhere(
+                                              (d) =>
+                                                  d.id == preset['districtId'],
+                                              orElse: () => dists.first,
+                                            );
+                                            tempMandis = mandis;
+                                            tempMandi = mandis.isNotEmpty
+                                                ? mandis.firstWhere(
+                                                    (m) => m.name
+                                                        .toLowerCase()
+                                                        .contains(
+                                                          preset['mandiName']!
+                                                              .toLowerCase(),
+                                                        ),
+                                                    orElse: () => mandis.first,
+                                                  )
+                                                : null;
+                                            isCustomMandi = false;
+                                            formError = null;
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  );
+                                })
+                                .toList(),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -454,18 +563,31 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Warehouse State *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  const Text(
+                                    'Warehouse State *',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                   const SizedBox(height: 6),
                                   DropdownButtonFormField<MasterState>(
                                     value: tempState,
                                     isExpanded: true,
                                     decoration: const InputDecoration(
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
                                     ),
                                     items: _states.map((s) {
                                       return DropdownMenuItem(
                                         value: s,
-                                        child: Text(s.name, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                                        child: Text(
+                                          s.name,
+                                          style: const TextStyle(fontSize: 13),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       );
                                     }).toList(),
                                     onChanged: (newState) async {
@@ -479,18 +601,22 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                         isLoadingDistricts = true;
                                         formError = null;
                                       });
-                                      final dists = await _commoditiesRepository.getMasterDistricts(newState.id);
+                                      final dists = await _commoditiesRepository
+                                          .getMasterDistricts(newState.id);
                                       if (!mounted) return;
                                       setModalState(() {
                                         tempDistricts = dists;
-                                        tempDistrict = dists.isNotEmpty ? dists.first : null;
+                                        tempDistrict = dists.isNotEmpty
+                                            ? dists.first
+                                            : null;
                                         isLoadingDistricts = false;
                                       });
                                       if (tempDistrict != null) {
                                         loadMandisForDistrict(tempDistrict!.id);
                                       }
                                     },
-                                    validator: (s) => s == null ? 'State required' : null,
+                                    validator: (s) =>
+                                        s == null ? 'State required' : null,
                                   ),
                                 ],
                               ),
@@ -500,19 +626,37 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('District *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  const Text(
+                                    'District *',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                   const SizedBox(height: 6),
                                   DropdownButtonFormField<MasterDistrict>(
                                     value: tempDistrict,
                                     isExpanded: true,
                                     decoration: InputDecoration(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                      hintText: isLoadingDistricts ? 'Loading...' : (tempDistricts.isEmpty ? 'No districts' : 'Select'),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                      hintText: isLoadingDistricts
+                                          ? 'Loading...'
+                                          : (tempDistricts.isEmpty
+                                                ? 'No districts'
+                                                : 'Select'),
                                     ),
                                     items: tempDistricts.map((d) {
                                       return DropdownMenuItem(
                                         value: d,
-                                        child: Text(d.name, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                                        child: Text(
+                                          d.name,
+                                          style: const TextStyle(fontSize: 13),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       );
                                     }).toList(),
                                     onChanged: (newDist) {
@@ -525,7 +669,8 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                       });
                                       loadMandisForDistrict(newDist.id);
                                     },
-                                    validator: (d) => d == null ? 'District required' : null,
+                                    validator: (d) =>
+                                        d == null ? 'District required' : null,
                                   ),
                                 ],
                               ),
@@ -540,7 +685,13 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Mandi Yard / APMC Market Hub *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                const Text(
+                                  'Mandi Yard / APMC Market Hub *',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                                 InkWell(
                                   onTap: () {
                                     setModalState(() {
@@ -548,8 +699,14 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                     });
                                   },
                                   child: Text(
-                                    isCustomMandi ? 'Choose from List' : '+ Other / Custom Mandi',
-                                    style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                                    isCustomMandi
+                                        ? 'Choose from List'
+                                        : '+ Other / Custom Mandi',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -560,8 +717,15 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                 value: tempMandi,
                                 isExpanded: true,
                                 decoration: InputDecoration(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  hintText: isLoadingMandis ? 'Loading Mandis...' : (tempMandis.isEmpty ? 'No mandis found' : 'Select Mandi Hub'),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  hintText: isLoadingMandis
+                                      ? 'Loading Mandis...'
+                                      : (tempMandis.isEmpty
+                                            ? 'No mandis found'
+                                            : 'Select Mandi Hub'),
                                 ),
                                 items: tempMandis.map((m) {
                                   return DropdownMenuItem(
@@ -573,15 +737,22 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                     ),
                                   );
                                 }).toList(),
-                                onChanged: (m) => setModalState(() => tempMandi = m),
-                                validator: (m) => (!isCustomMandi && m == null) ? 'Mandi hub required' : null,
+                                onChanged: (m) =>
+                                    setModalState(() => tempMandi = m),
+                                validator: (m) => (!isCustomMandi && m == null)
+                                    ? 'Mandi hub required'
+                                    : null,
                               )
                             else
                               AppTextField(
                                 controller: tempCustomMandiController,
                                 label: 'Custom Mandi / Trade Yard Name *',
                                 hint: 'e.g. Suratgarh Private Trade Yard',
-                                validator: (v) => (isCustomMandi && (v == null || v.trim().isEmpty)) ? 'Mandi name required' : null,
+                                validator: (v) =>
+                                    (isCustomMandi &&
+                                        (v == null || v.trim().isEmpty))
+                                    ? 'Mandi name required'
+                                    : null,
                               ),
                           ],
                         ),
@@ -591,10 +762,14 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                           controller: tempWarehouseController,
                           label: 'Registered Warehouse / Storage Facility Address *',
                           hint: 'e.g. Warehouse A-4, Krishi Upaj Mandi Yard, Industrial Area',
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Warehouse address required' : null,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Warehouse address required'
+                              : null,
                           onChanged: (val) {
                             if (sameAsWarehouse) {
-                              setModalState(() => tempDispatchController.text = val);
+                              setModalState(
+                                () => tempDispatchController.text = val,
+                              );
                             }
                           },
                         ),
@@ -612,18 +787,28 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(LucideIcons.truck, size: 16, color: AppColors.primary),
+                                  const Icon(
+                                    LucideIcons.truck,
+                                    size: 16,
+                                    color: AppColors.primary,
+                                  ),
                                   const SizedBox(width: 8),
                                   const Text(
                                     'Actual Physical Loading / Dispatch Facility *',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 4),
                               const Text(
                                 'Identify the exact physical gate, shed, or platform where transport trucks will be weighed and loaded.',
-                                style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondaryLight,
+                                ),
                               ),
                               const SizedBox(height: 8),
                               Row(
@@ -635,7 +820,8 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                       setModalState(() {
                                         sameAsWarehouse = val ?? false;
                                         if (sameAsWarehouse) {
-                                          tempDispatchController.text = tempWarehouseController.text;
+                                          tempDispatchController.text =
+                                              tempWarehouseController.text;
                                         }
                                       });
                                     },
@@ -652,7 +838,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                 controller: tempDispatchController,
                                 label: 'Physical Loading Platform / Gate Details *',
                                 hint: 'e.g. Krishi Upaj Mandi Yard Shed 4, Gate 2 Platform',
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Loading facility required' : null,
+                                validator: (v) => v == null || v.trim().isEmpty
+                                    ? 'Loading facility required'
+                                    : null,
                               ),
                             ],
                           ),
@@ -671,25 +859,37 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(LucideIcons.building2, size: 16, color: AppColors.textSecondaryLight),
+                                  const Icon(
+                                    LucideIcons.building2,
+                                    size: 16,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
                                   const SizedBox(width: 8),
                                   const Text(
                                     'Enterprise Office Location (Registered HQ)',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 4),
                               const Text(
                                 'Maintained from Seller Enterprise Profile; distinct from physical commodity loading and warehouse storage.',
-                                style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondaryLight,
+                                ),
                               ),
                               const SizedBox(height: 8),
                               AppTextField(
                                 controller: tempOfficeController,
                                 label: 'Registered Enterprise Office HQ *',
                                 hint: 'e.g. Bikaner Commercial Head Office',
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Enterprise office required' : null,
+                                validator: (v) => v == null || v.trim().isEmpty
+                                    ? 'Enterprise office required'
+                                    : null,
                               ),
                             ],
                           ),
@@ -720,7 +920,8 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                     return;
                                   }
 
-                                  if (tempState == null || tempDistrict == null) {
+                                  if (tempState == null ||
+                                      tempDistrict == null) {
                                     setModalState(() {
                                       formError = 'Please select warehouse state and district.';
                                     });
@@ -731,27 +932,36 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                     _selectedState = tempState;
                                     _selectedDistrict = tempDistrict;
                                     _districts = tempDistricts;
-                                    if (isCustomMandi && tempCustomMandiController.text.trim().isNotEmpty) {
+                                    if (isCustomMandi &&
+                                        tempCustomMandiController.text
+                                            .trim()
+                                            .isNotEmpty) {
                                       _selectedMandi = MasterMandi(
                                         id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
                                         districtId: tempDistrict!.id,
                                         stateId: tempState!.id,
-                                        name: tempCustomMandiController.text.trim(),
+                                        name: tempCustomMandiController.text
+                                            .trim(),
                                       );
                                     } else {
                                       _selectedMandi = tempMandi;
                                     }
                                     _mandis = tempMandis;
-                                    _warehouseAddressController.text = tempWarehouseController.text.trim();
-                                    _dispatchFacilityController.text = tempDispatchController.text.trim();
-                                    _officeLocationController.text = tempOfficeController.text.trim();
+                                    _warehouseAddressController.text =
+                                        tempWarehouseController.text.trim();
+                                    _dispatchFacilityController.text =
+                                        tempDispatchController.text.trim();
+                                    _officeLocationController.text =
+                                        tempOfficeController.text.trim();
                                   });
 
                                   Navigator.pop(context);
 
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Warehouse & loading location saved successfully.'),
+                                      content: Text(
+                                        'Warehouse & loading location saved successfully.',
+                                      ),
                                       backgroundColor: AppColors.success,
                                       duration: Duration(seconds: 2),
                                     ),
@@ -790,15 +1000,25 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 child: Row(
                   children: [
-                    const Icon(LucideIcons.paperclip, color: AppColors.primary, size: 20),
+                    const Icon(
+                      LucideIcons.paperclip,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
                         'Attach Existing Lab Report',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -812,10 +1032,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: AppColors.primaryContainer,
-                  child: Icon(LucideIcons.image, color: AppColors.primary, size: 20),
+                  child: Icon(
+                    LucideIcons.image,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Choose Image', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('Select certificate image from device gallery (JPG, PNG)', style: TextStyle(fontSize: 12)),
+                title: const Text(
+                  'Choose Image',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Select certificate image from device gallery (JPG, PNG)',
+                  style: TextStyle(fontSize: 12),
+                ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _pickImageFromGallery();
@@ -824,10 +1054,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: AppColors.primaryContainer,
-                  child: Icon(LucideIcons.fileText, color: AppColors.primary, size: 20),
+                  child: Icon(
+                    LucideIcons.fileText,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Choose Document', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('Select a supported document, such as PDF', style: TextStyle(fontSize: 12)),
+                title: const Text(
+                  'Choose Document',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Select a supported document, such as PDF',
+                  style: TextStyle(fontSize: 12),
+                ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _pickDocumentFile();
@@ -836,10 +1076,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: AppColors.primaryContainer,
-                  child: Icon(LucideIcons.camera, color: AppColors.primary, size: 20),
+                  child: Icon(
+                    LucideIcons.camera,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('Capture certificate photo using device camera', style: TextStyle(fontSize: 12)),
+                title: const Text(
+                  'Take Photo',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Capture certificate photo using device camera',
+                  style: TextStyle(fontSize: 12),
+                ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _capturePhotoWithCamera();
@@ -849,9 +1099,16 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: AppColors.borderLight,
-                  child: Icon(LucideIcons.x, color: AppColors.textPrimaryLight, size: 20),
+                  child: Icon(
+                    LucideIcons.x,
+                    color: AppColors.textPrimaryLight,
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                title: const Text(
+                  'Cancel',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
                 onTap: () => Navigator.pop(sheetContext),
               ),
               const SizedBox(height: 8),
@@ -865,21 +1122,30 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   String _generateReportReference(String fileName) {
     final lot = _lotNumberController.text.trim();
     final lotSegment = lot.isNotEmpty ? lot : 'LOT';
-    final hashSegment = fileName.hashCode.abs().toString().padLeft(6, '0').substring(0, 6);
+    final hashSegment = fileName.hashCode
+        .abs()
+        .toString()
+        .padLeft(6, '0')
+        .substring(0, 6);
     return 'DOC-REF-$lotSegment-$hashSegment';
   }
 
   Future<void> _pickImageFromGallery() async {
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
       if (picked != null) {
         final file = File(picked.path);
         int bytes = 0;
         try {
           bytes = await file.length();
         } catch (_) {}
-        final name = picked.name.isNotEmpty ? picked.name : 'lab_certificate_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final name = picked.name.isNotEmpty
+            ? picked.name
+            : 'lab_certificate_${DateTime.now().millisecondsSinceEpoch}.jpg';
         setState(() {
           _labAttachment = LabReportAttachment(
             fileName: name,
@@ -896,7 +1162,8 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       debugPrint('Gallery picker notice: $e');
     }
     if (mounted && _labAttachment == null) {
-      final name = 'lab_certificate_gallery_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}.jpg';
+      final name =
+          'lab_certificate_gallery_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}.jpg';
       setState(() {
         _labAttachment = LabReportAttachment(
           fileName: name,
@@ -934,7 +1201,8 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       debugPrint('Document picker notice: $e');
     }
     if (mounted && _labAttachment == null) {
-      final name = 'assay_report_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}.pdf';
+      final name =
+          'assay_report_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}.pdf';
       setState(() {
         _labAttachment = LabReportAttachment(
           fileName: name,
@@ -951,14 +1219,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   Future<void> _capturePhotoWithCamera() async {
     try {
       final picker = ImagePicker();
-      final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+      final photo = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
       if (photo != null) {
         final file = File(photo.path);
         int bytes = 0;
         try {
           bytes = await file.length();
         } catch (_) {}
-        final name = photo.name.isNotEmpty ? photo.name : 'camera_capture_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final name = photo.name.isNotEmpty
+            ? photo.name
+            : 'camera_capture_${DateTime.now().millisecondsSinceEpoch}.jpg';
         setState(() {
           _labAttachment = LabReportAttachment(
             fileName: name,
@@ -975,11 +1248,13 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       debugPrint('Camera capture notice: $e');
     }
     if (mounted && _labAttachment == null) {
-      final name = 'camera_capture_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}.jpg';
+      final name =
+          'camera_capture_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}.jpg';
       setState(() {
         _labAttachment = LabReportAttachment(
           fileName: name,
-          localFilePath: '/storage/emulated/0/DCIM/Camera/certificate_capture.jpg',
+          localFilePath:
+              '/storage/emulated/0/DCIM/Camera/certificate_capture.jpg',
           fileSizeBytes: 310000,
           fileType: 'image',
           isUploaded: true,
@@ -1002,7 +1277,11 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         children: [
           Row(
             children: [
-              const Icon(LucideIcons.fileCheck, size: 18, color: AppColors.primary),
+              const Icon(
+                LucideIcons.fileCheck,
+                size: 18,
+                color: AppColors.primary,
+              ),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -1012,14 +1291,21 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               ),
               if (_labAttachment != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.successContainer,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
                     'Attached',
-                    style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
             ],
@@ -1034,12 +1320,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
             OutlinedButton.icon(
               onPressed: _openAttachmentActionSheet,
               icon: const Icon(LucideIcons.paperclip, size: 16),
-              label: const Text('Add Lab Report', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              label: const Text(
+                'Add Lab Report',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ] else ...[
@@ -1061,7 +1355,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     ),
                     alignment: Alignment.center,
                     child: Icon(
-                      _labAttachment!.isImage ? LucideIcons.image : LucideIcons.fileText,
+                      _labAttachment!.isImage
+                          ? LucideIcons.image
+                          : LucideIcons.fileText,
                       color: AppColors.primary,
                       size: 22,
                     ),
@@ -1073,14 +1369,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                       children: [
                         Text(
                           _labAttachment!.fileName,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '${_labAttachment!.isImage ? "Image Certificate" : "Quality Document"}${_labAttachment!.formattedSize.isNotEmpty ? " • ${_labAttachment!.formattedSize}" : ""}',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondaryLight,
+                          ),
                         ),
                         if (_labAttachment!.reportReference != null) ...[
                           const SizedBox(height: 3),
@@ -1098,10 +1400,17 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                   ),
                   TextButton(
                     onPressed: _openAttachmentActionSheet,
-                    child: const Text('Replace', style: TextStyle(fontSize: 11)),
+                    child: const Text(
+                      'Replace',
+                      style: TextStyle(fontSize: 11),
+                    ),
                   ),
                   IconButton(
-                    icon: const Icon(LucideIcons.trash2, size: 16, color: AppColors.error),
+                    icon: const Icon(
+                      LucideIcons.trash2,
+                      size: 16,
+                      color: AppColors.error,
+                    ),
                     onPressed: () {
                       setState(() {
                         _labAttachment = null;
@@ -1136,12 +1445,16 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
             final commName = _selectedCommodity?.name ?? '';
             final matchingBrokers = _brokers.where((b) {
               if (!_filterBrokersByCommodity || commName.isEmpty) return true;
-              return b.commoditiesHandled.any((c) =>
-                  c.toLowerCase().contains(commName.toLowerCase()) ||
-                  commName.toLowerCase().contains(c.toLowerCase()));
+              return b.commoditiesHandled.any(
+                (c) =>
+                    c.toLowerCase().contains(commName.toLowerCase()) ||
+                    commName.toLowerCase().contains(c.toLowerCase()),
+              );
             }).toList();
 
-            final displayList = matchingBrokers.isNotEmpty ? matchingBrokers : _brokers;
+            final displayList = matchingBrokers.isNotEmpty
+                ? matchingBrokers
+                : _brokers;
 
             return DraggableScrollableSheet(
               expand: false,
@@ -1157,9 +1470,15 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(LucideIcons.briefcase, color: AppColors.primary),
+                              const Icon(
+                                LucideIcons.briefcase,
+                                color: AppColors.primary,
+                              ),
                               const SizedBox(width: 10),
-                              Text('Select Broker(s)', style: AppTypography.titleMedium),
+                              Text(
+                                'Select Broker(s)',
+                                style: AppTypography.titleMedium,
+                              ),
                               const Spacer(),
                               IconButton(
                                 icon: const Icon(LucideIcons.x),
@@ -1175,15 +1494,22 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                               Expanded(
                                 child: Text(
                                   'Filter by commodity: ${commName.isNotEmpty ? commName : "All"}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
                                 ),
                               ),
                               FilterChip(
                                 label: Text(
-                                  _filterBrokersByCommodity ? 'Commodity Matched' : 'All Brokers',
+                                  _filterBrokersByCommodity
+                                      ? 'Commodity Matched'
+                                      : 'All Brokers',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: _filterBrokersByCommodity ? AppColors.primary : AppColors.textSecondaryLight,
+                                    color: _filterBrokersByCommodity
+                                        ? AppColors.primary
+                                        : AppColors.textSecondaryLight,
                                   ),
                                 ),
                                 selected: _filterBrokersByCommodity,
@@ -1206,15 +1532,25 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     Expanded(
                       child: ListView.builder(
                         controller: scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         itemCount: displayList.length,
                         itemBuilder: (context, index) {
                           final broker = displayList[index];
                           final isSelected = _selectedBroker?.id == broker.id;
-                          final matches = commName.isNotEmpty &&
-                              broker.commoditiesHandled.any((c) =>
-                                  c.toLowerCase().contains(commName.toLowerCase()) ||
-                                  commName.toLowerCase().contains(c.toLowerCase()));
+                          final matches =
+                              commName.isNotEmpty &&
+                              broker.commoditiesHandled.any(
+                                (c) =>
+                                    c.toLowerCase().contains(
+                                      commName.toLowerCase(),
+                                    ) ||
+                                    commName.toLowerCase().contains(
+                                      c.toLowerCase(),
+                                    ),
+                              );
 
                           return Card(
                             elevation: 0,
@@ -1222,7 +1558,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                               side: BorderSide(
-                                color: isSelected ? AppColors.primary : AppColors.borderLight,
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.borderLight,
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
@@ -1230,18 +1568,30 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                               title: Row(
                                 children: [
                                   Expanded(
-                                    child: Text(broker.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    child: Text(
+                                      broker.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                   if (matches)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: AppColors.successContainer,
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: const Text(
                                         'Specialist',
-                                        style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.w600),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: AppColors.success,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                 ],
@@ -1258,24 +1608,38 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                   if (broker.hasRatings)
                                     Row(
                                       children: [
-                                        const Icon(LucideIcons.star, size: 12, color: Colors.amber),
+                                        const Icon(
+                                          LucideIcons.star,
+                                          size: 12,
+                                          color: Colors.amber,
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '${broker.averageRating!.toStringAsFixed(1)} (${broker.reviewCount} reviews) • Trust: ${broker.trustScore}%',
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.brown),
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.brown,
+                                          ),
                                         ),
                                       ],
                                     )
                                   else
                                     Text(
                                       'Trust Score: ${broker.trustScore}% • Mandi Phone: ${broker.mobile}',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondaryLight,
+                                      ),
                                     ),
                                 ],
                               ),
                               isThreeLine: true,
                               trailing: isSelected
-                                  ? const Icon(LucideIcons.checkCircle2, color: AppColors.primary)
+                                  ? const Icon(
+                                      LucideIcons.checkCircle2,
+                                      color: AppColors.primary,
+                                    )
                                   : null,
                               onTap: () {
                                 setState(() {
@@ -1315,14 +1679,21 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               ),
               if (_selectedBroker != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primaryContainer,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
                     '1 Selected',
-                    style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
             ],
@@ -1346,7 +1717,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               decoration: BoxDecoration(
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1356,7 +1729,11 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                       const CircleAvatar(
                         radius: 18,
                         backgroundColor: AppColors.primaryContainer,
-                        child: Icon(LucideIcons.userCheck, color: AppColors.primary, size: 18),
+                        child: Icon(
+                          LucideIcons.userCheck,
+                          color: AppColors.primary,
+                          size: 18,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -1368,24 +1745,41 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                                 Expanded(
                                   child: Text(
                                     _selectedBroker!.name,
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 if (_selectedCommodity != null &&
-                                    _selectedBroker!.commoditiesHandled.any((c) =>
-                                        c.toLowerCase().contains(_selectedCommodity!.name.toLowerCase()) ||
-                                        _selectedCommodity!.name.toLowerCase().contains(c.toLowerCase())))
+                                    _selectedBroker!.commoditiesHandled.any(
+                                      (c) =>
+                                          c.toLowerCase().contains(
+                                            _selectedCommodity!.name
+                                                .toLowerCase(),
+                                          ) ||
+                                          _selectedCommodity!.name
+                                              .toLowerCase()
+                                              .contains(c.toLowerCase()),
+                                    ))
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: AppColors.successContainer,
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: const Text(
                                       'Specialist',
-                                      style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.w700),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: AppColors.success,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                               ],
@@ -1393,7 +1787,10 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                             const SizedBox(height: 2),
                             Text(
                               '${_selectedBroker!.companyName ?? ""} • ${_selectedBroker!.location ?? ""}',
-                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondaryLight,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1401,11 +1798,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                               const SizedBox(height: 2),
                               Row(
                                 children: [
-                                  const Icon(LucideIcons.star, size: 12, color: Colors.amber),
+                                  const Icon(
+                                    LucideIcons.star,
+                                    size: 12,
+                                    color: Colors.amber,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     '${_selectedBroker!.averageRating!.toStringAsFixed(1)} (${_selectedBroker!.reviewCount} reviews) • Trust: ${_selectedBroker!.trustScore}%',
-                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.brown),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.brown,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1413,7 +1818,10 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 'Trust Score: ${_selectedBroker!.trustScore}%',
-                                style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.textSecondaryLight,
+                                ),
                               ),
                             ],
                           ],
@@ -1427,13 +1835,26 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     children: [
                       TextButton.icon(
                         icon: const Icon(LucideIcons.repeat, size: 14),
-                        label: const Text('Change Broker', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Change Broker',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         onPressed: _openBrokerPicker,
                       ),
                       const SizedBox(width: 8),
                       TextButton.icon(
-                        icon: const Icon(LucideIcons.x, size: 14, color: AppColors.textMutedLight),
-                        label: const Text('Remove', style: TextStyle(fontSize: 12, color: AppColors.textMutedLight)),
+                        icon: const Icon(
+                          LucideIcons.x,
+                          size: 14,
+                          color: AppColors.textMutedLight,
+                        ),
+                        label: const Text(
+                          'Remove',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMutedLight,
+                          ),
+                        ),
                         onPressed: () {
                           setState(() {
                             _selectedBroker = null;
@@ -1451,36 +1872,44 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     );
   }
 
-
   Future<void> _handleSubmit() async {
     // Duplicate submission guard: prevent concurrent submissions
     if (_isSubmitting) return;
 
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedCommodity == null || _selectedGrade == null || _selectedUnit == null) {
+    if (_selectedCommodity == null ||
+        _selectedGrade == null ||
+        _selectedUnit == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select commodity, grade, and unit')),
+        const SnackBar(
+          content: Text('Please select commodity, grade, and unit'),
+        ),
       );
       return;
     }
 
     if (_selectedState == null || _selectedDistrict == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select state and district warehouse location')),
+        const SnackBar(
+          content: Text('Please select state and district warehouse location'),
+        ),
       );
       return;
     }
 
     final totalQty = double.tryParse(_quantityController.text.trim()) ?? 0;
-    final askingPrice = double.tryParse(_askingPriceController.text.trim()) ?? 0;
+    final askingPrice =
+        double.tryParse(_askingPriceController.text.trim()) ?? 0;
     final confPrice = _confidentialPriceController.text.trim().isNotEmpty
         ? double.tryParse(_confidentialPriceController.text.trim())
         : widget.initialLot?.confidentialMinimumPrice;
 
     if (totalQty <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Total quantity must be greater than zero')),
+        const SnackBar(
+          content: Text('Total quantity must be greater than zero'),
+        ),
       );
       return;
     }
@@ -1513,7 +1942,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         stateName: _selectedState!.name,
         districtId: _selectedDistrict!.id,
         districtName: _selectedDistrict!.name,
-        warehouseName: _warehouseAddressController.text.trim().isNotEmpty ? _warehouseAddressController.text.trim() : null,
+        warehouseName: _warehouseAddressController.text.trim().isNotEmpty
+            ? _warehouseAddressController.text.trim()
+            : null,
         mandiName: _selectedMandi?.name,
         loadingStatus: _loadingStatus,
         availableFrom: _availableFrom,
@@ -1527,17 +1958,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         officeLocation: _officeLocationController.text.trim(),
         loadingRemarks: _dispatchFacilityController.text.trim(),
         labReportNumber: _requestLabTesting
-            ? (_currentLabRequest?.id ?? 'LAB-REQ-${_lotNumberController.text.trim().isNotEmpty ? _lotNumberController.text.trim() : "DRAFT"}')
+            ? (_currentLabRequest?.id ??
+                  'LAB-REQ-${_lotNumberController.text.trim().isNotEmpty ? _lotNumberController.text.trim() : "DRAFT"}')
             : (_labAttachment != null
-                ? (_labAttachment!.reportReference ?? 'DOC-REF-${_lotNumberController.text.trim().isNotEmpty ? _lotNumberController.text.trim() : "LOT"}')
-                : null),
+                  ? (_labAttachment!.reportReference ??
+                        'DOC-REF-${_lotNumberController.text.trim().isNotEmpty ? _lotNumberController.text.trim() : "LOT"}')
+                  : null),
         labName: _requestLabTesting
             ? 'Riddhi Siddhi Laboratory (${_currentLabRequest?.paymentStatus.label ?? "Lab Testing Requested"})'
             : (_labAttachment != null
-                ? 'Attached: ${_labAttachment!.fileName}'
-                : 'No Lab Report Attached'),
+                  ? 'Attached: ${_labAttachment!.fileName}'
+                  : 'No Lab Report Attached'),
         labReportFileName: _labAttachment?.fileName,
-        labReportFileUrl: _labAttachment?.remoteStorageUrl ?? _labAttachment?.localFilePath,
+        labReportFileUrl:
+            _labAttachment?.remoteStorageUrl ?? _labAttachment?.localFilePath,
       );
 
       final created = await _commoditiesRepository.createCommodity(dto);
@@ -1564,7 +1998,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Commodity Lot ${created.lotNumber} listed successfully on Mandi Network!'),
+          content: Text(
+            'Commodity Lot ${created.lotNumber} listed successfully on Mandi Network!',
+          ),
           backgroundColor: AppColors.success,
         ),
       );
@@ -1657,14 +2093,18 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       if (verified.isPaid) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Payment confirmed by backend! Testing request submitted.'),
+            content: Text(
+              'Payment confirmed by backend! Testing request submitted.',
+            ),
             backgroundColor: AppColors.success,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Payment verification still pending at banking backend.'),
+            content: Text(
+              'Payment verification still pending at banking backend.',
+            ),
             backgroundColor: Colors.orange,
           ),
         );
@@ -1679,7 +2119,11 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     }
   }
 
-  Widget _buildPaymentActionCard(double estimatedTotal, bool isPaid, LabPaymentStatus paymentStatus) {
+  Widget _buildPaymentActionCard(
+    double estimatedTotal,
+    bool isPaid,
+    LabPaymentStatus paymentStatus,
+  ) {
     if (isPaid) {
       return Container(
         padding: const EdgeInsets.all(12),
@@ -1690,21 +2134,38 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         ),
         child: Row(
           children: [
-            const Icon(LucideIcons.checkCircle2, color: AppColors.success, size: 24),
+            const Icon(
+              LucideIcons.checkCircle2,
+              color: AppColors.success,
+              size: 24,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Paid — Payment Verified',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.success)),
+                  const Text(
+                    'Paid — Payment Verified',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: AppColors.success,
+                    ),
+                  ),
                   Text(
                     'Amount: ₹${estimatedTotal.toInt()} • Ref: ${_currentLabRequest?.transactionReference ?? "VERIFIED"}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
                   ),
                   const Text(
                     'Testing request submitted to Riddhi Siddhi Laboratory. Administrator notified.',
-                    style: TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -1732,17 +2193,28 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                 const Expanded(
                   child: Text(
                     'Payment Verification Pending',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.orange),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: Colors.orange,
+                    ),
                   ),
                 ),
                 if (_isVerifyingPayment)
-                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
               ],
             ),
             const SizedBox(height: 6),
             const Text(
               'UPI payment was initiated. Verification is performed by the trusted backend. Status is checked automatically.',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondaryLight,
+              ),
             ),
             const SizedBox(height: 10),
             Row(
@@ -1753,7 +2225,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     icon: LucideIcons.refreshCw,
                     variant: ButtonVariant.primary,
                     isLoading: _isVerifyingPayment,
-                    onPressed: _isVerifyingPayment ? null : _handleVerifyUpiPayment,
+                    onPressed: _isVerifyingPayment
+                        ? null
+                        : _handleVerifyUpiPayment,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1762,7 +2236,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     label: 'Re-open UPI',
                     icon: LucideIcons.smartphone,
                     variant: ButtonVariant.outline,
-                    onPressed: _isInitiatingPayment ? null : _handleInitiateUpiPayment,
+                    onPressed: _isInitiatingPayment
+                        ? null
+                        : _handleInitiateUpiPayment,
                   ),
                 ),
               ],
@@ -1778,12 +2254,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       children: [
         Row(
           children: [
-            const Icon(LucideIcons.shieldCheck, size: 14, color: AppColors.primary),
+            const Icon(
+              LucideIcons.shieldCheck,
+              size: 14,
+              color: AppColors.primary,
+            ),
             const SizedBox(width: 6),
             const Expanded(
               child: Text(
                 'Payment Method: UPI Only (GPay, PhonePe, Paytm, BHIM)',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimaryLight,
+                ),
               ),
             ),
           ],
@@ -1793,7 +2277,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
           label: 'Pay via UPI — ₹${estimatedTotal.toInt()}',
           icon: LucideIcons.qrCode,
           isLoading: _isInitiatingPayment,
-          onPressed: (_isInitiatingPayment || estimatedTotal <= 0) ? null : _handleInitiateUpiPayment,
+          onPressed: (_isInitiatingPayment || estimatedTotal <= 0)
+              ? null
+              : _handleInitiateUpiPayment,
         ),
       ],
     );
@@ -1801,10 +2287,13 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
   Widget _buildLabTestingSection() {
     final allParams = _labTestingRepository.getRateCard();
-    final selectedParams = allParams.where((p) => _selectedLabTestIds.contains(p.id)).toList();
+    final selectedParams = allParams
+        .where((p) => _selectedLabTestIds.contains(p.id))
+        .toList();
     final estimatedTotal = LabTestRateCard.calculateTotal(selectedParams);
     final isPaid = _currentLabRequest?.isPaid == true;
-    final paymentStatus = _currentLabRequest?.paymentStatus ?? LabPaymentStatus.awaitingPayment;
+    final paymentStatus =
+        _currentLabRequest?.paymentStatus ?? LabPaymentStatus.awaitingPayment;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1812,10 +2301,14 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         // Optional toggle switch card
         Container(
           decoration: BoxDecoration(
-            color: _requestLabTesting ? AppColors.primaryContainer.withValues(alpha: 0.25) : Colors.grey.shade50,
+            color: _requestLabTesting
+                ? AppColors.primaryContainer.withValues(alpha: 0.25)
+                : Colors.grey.shade50,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: _requestLabTesting ? AppColors.primary : Colors.grey.shade300,
+              color: _requestLabTesting
+                  ? AppColors.primary
+                  : Colors.grey.shade300,
               width: _requestLabTesting ? 1.5 : 1.0,
             ),
           ),
@@ -1824,7 +2317,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
             children: [
               Icon(
                 LucideIcons.flaskConical,
-                color: _requestLabTesting ? AppColors.primary : AppColors.textSecondaryLight,
+                color: _requestLabTesting
+                    ? AppColors.primary
+                    : AppColors.textSecondaryLight,
                 size: 24,
               ),
               const SizedBox(width: 12),
@@ -1834,13 +2329,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                   children: [
                     const Text(
                       'Request Certified Lab Testing (Optional)',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
                     ),
                     Text(
                       'Partner: ${LabTestRateCard.laboratoryName}, Jaipur',
                       style: TextStyle(
-                          fontSize: 11,
-                          color: _requestLabTesting ? AppColors.primary : AppColors.textSecondaryLight),
+                        fontSize: 11,
+                        color: _requestLabTesting
+                            ? AppColors.primary
+                            : AppColors.textSecondaryLight,
+                      ),
                     ),
                   ],
                 ),
@@ -1852,7 +2353,11 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                   setState(() {
                     _requestLabTesting = val;
                     if (val && _selectedLabTestIds.isEmpty) {
-                      _selectedLabTestIds.addAll(['PARAM-CP', 'PARAM-MOIST', 'PARAM-ASH']);
+                      _selectedLabTestIds.addAll([
+                        'PARAM-CP',
+                        'PARAM-MOIST',
+                        'PARAM-ASH',
+                      ]);
                     }
                   });
                 },
@@ -1869,11 +2374,17 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
             decoration: BoxDecoration(
               color: AppColors.primaryContainer.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.4),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(LucideIcons.fileKey2, size: 16, color: AppColors.primary),
+                const Icon(
+                  LucideIcons.fileKey2,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -1881,12 +2392,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     children: [
                       const Text(
                         'Testing Request Reference (Auto-Generated)',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primary),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
                       ),
                       Text(
                         _currentLabRequest?.id ??
                             'LAB-REQ-${_lotNumberController.text.trim().isNotEmpty ? _lotNumberController.text.trim() : "DRAFT"}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -1905,7 +2423,11 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               ),
               Text(
                 '${_selectedLabTestIds.length} Selected',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
               ),
             ],
           ),
@@ -1923,20 +2445,34 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6),
                   side: BorderSide(
-                    color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                    color: isSelected
+                        ? AppColors.primary
+                        : Colors.grey.shade300,
                     width: isSelected ? 1.5 : 1.0,
                   ),
                 ),
                 label: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(param.name,
-                        style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500)),
+                    Text(
+                      param.name,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(width: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : Colors.grey.shade200,
+                        color: isSelected
+                            ? AppColors.primary
+                            : Colors.grey.shade200,
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: Text(
@@ -1961,7 +2497,11 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                               _selectedLabTestIds.remove(param.id);
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('At least one lab test must be selected.')),
+                                const SnackBar(
+                                  content: Text(
+                                    'At least one lab test must be selected.',
+                                  ),
+                                ),
                               );
                             }
                           }
@@ -1981,7 +2521,11 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
             const SizedBox(height: 4),
             const Text(
               'Notice: "Other" is subject to separate laboratory quotation; not billed upfront via UPI.',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight, fontStyle: FontStyle.italic),
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondaryLight,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
           const SizedBox(height: 14),
@@ -1999,31 +2543,65 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               children: [
                 const Row(
                   children: [
-                    Icon(LucideIcons.calculator, size: 16, color: AppColors.primary),
+                    Icon(
+                      LucideIcons.calculator,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                     SizedBox(width: 6),
-                    Text('Lab Charges Breakdown', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                    Text(
+                      'Lab Charges Breakdown',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
                 const Divider(height: 14),
-                ...selectedParams.where((p) => p.hasFixedPrice).map((p) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('• ${p.name}', style: const TextStyle(fontSize: 12)),
-                          Text(p.priceLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                        ],
+                ...selectedParams
+                    .where((p) => p.hasFixedPrice)
+                    .map(
+                      (p) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '• ${p.name}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            Text(
+                              p.priceLabel,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    )),
+                    ),
                 if (selectedParams.any((p) => !p.hasFixedPrice))
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 2),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('• Other (Custom Parameter)', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
-                        Text('Separate Lab Quote',
-                            style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
+                        Text(
+                          '• Other (Custom Parameter)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                        Text(
+                          'Separate Lab Quote',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondaryLight,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -2031,9 +2609,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Estimated Total', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    Text('₹${estimatedTotal.toInt()}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    const Text(
+                      'Estimated Total',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '₹${estimatedTotal.toInt()}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -2042,11 +2631,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                   children: [
                     const Text(
                       'Final Payable Amount (UPI)',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
                     ),
                     Text(
                       '₹${estimatedTotal.toInt()}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ],
                 ),
@@ -2063,12 +2660,20 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(LucideIcons.mapPin, size: 14, color: Colors.brown),
+                          Icon(
+                            LucideIcons.mapPin,
+                            size: 14,
+                            color: Colors.brown,
+                          ),
                           SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               'Laboratory Address & Submission Instructions:',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.brown),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.brown,
+                              ),
                             ),
                           ),
                         ],
@@ -2076,7 +2681,10 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         '${LabTestRateCard.laboratoryName}\n${LabTestRateCard.laboratoryAddress}',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       const Text(
@@ -2102,20 +2710,21 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   Widget build(BuildContext context) {
     if (_isLoadingMasterData) {
       return const Scaffold(
-        body: AppLoadingIndicator(message: 'Loading verified master trading catalogs...'),
+        body: AppLoadingIndicator(
+          message: 'Loading verified master trading catalogs...',
+        ),
       );
     }
 
     final dateFormat = DateFormat('dd MMM yyyy');
     final totalQty = double.tryParse(_quantityController.text.trim()) ?? 0;
-    final askingPrice = double.tryParse(_askingPriceController.text.trim()) ?? 0;
+    final askingPrice =
+        double.tryParse(_askingPriceController.text.trim()) ?? 0;
     final totalVal = totalQty * askingPrice;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(
-        title: const Text('Post Commodity Lot'),
-      ),
+      appBar: AppBar(title: const Text('Post Commodity Lot')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -2131,142 +2740,37 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(LucideIcons.triangleAlert, size: 20, color: AppColors.error),
+                    const Icon(
+                      LucideIcons.triangleAlert,
+                      size: 20,
+                      color: AppColors.error,
+                    ),
                     const SizedBox(width: 10),
-                    Expanded(child: Text(_errorMessage!, style: const TextStyle(color: AppColors.error))),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
             ],
 
-            // Section 1: Commodity & Quality Grade
-            _buildSectionHeader('1. Commodity & Specification', LucideIcons.package),
-            const SizedBox(height: 12),
-            AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppTextField(
-                    controller: _lotNumberController,
-                    label: 'Lot / Batch Number *',
-                    hint: 'e.g. LOT-SOY-001',
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Lot number is required' : null,
-                  ),
-                  const SizedBox(height: 14),
-
-                  const Text('Commodity *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<MasterCommodity>(
-                    value: _selectedCommodity,
-                    decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
-                    items: _commodities.map((c) {
-                      return DropdownMenuItem(value: c, child: Text(c.name));
-                    }).toList(),
-                    onChanged: _onCommodityChanged,
-                  ),
-                  const SizedBox(height: 14),
-
-                  const Text('Quality Grade *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<MasterGrade>(
-                    value: _selectedGrade,
-                    decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
-                    items: _grades.map((g) {
-                      return DropdownMenuItem(value: g, child: Text(g.gradeName, style: const TextStyle(fontSize: 13)));
-                    }).toList(),
-                    onChanged: (g) => setState(() => _selectedGrade = g),
-                  ),
-                ],
-              ),
-            ),
+            // Section 1: Commodity & Specification (RB-SELLER-POST-UX-04 Redesign)
+            _buildSection1(),
             const SizedBox(height: 20),
 
-            // Section 2: Quantity & Commercial Terms
-            _buildSectionHeader('2. Quantity & Commercial Pricing', LucideIcons.indianRupee),
-            const SizedBox(height: 12),
-            AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: AppTextField(
-                          controller: _quantityController,
-                          label: 'Total Quantity *',
-                          hint: '100',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          onChanged: (_) => setState(() {}),
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Required';
-                            final n = double.tryParse(val);
-                            if (n == null || n <= 0) return 'Must be > 0';
-                            return null;
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Unit *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                            const SizedBox(height: 6),
-                            DropdownButtonFormField<MasterUnit>(
-                              value: _selectedUnit,
-                              decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-                              items: _units.map((u) {
-                                return DropdownMenuItem(value: u, child: Text(u.symbol));
-                              }).toList(),
-                              onChanged: (u) => setState(() => _selectedUnit = u),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  AppTextField(
-                    controller: _askingPriceController,
-                    label: 'Asking Price per Unit (₹) *',
-                    hint: '4800',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (_) => setState(() {}),
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) return 'Required';
-                      final p = double.tryParse(val);
-                      if (p == null || p <= 0) return 'Must be positive';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  const Text('Commercial Payment Terms *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    value: _paymentSchedule,
-                    decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
-                    items: const [
-                      DropdownMenuItem(value: 'Payment on Delivery (CAD)', child: Text('Payment on Delivery (CAD)')),
-                      DropdownMenuItem(value: 'Advance RTGS (50% Advance / 50% on B/L)', child: Text('Advance RTGS (50/50)')),
-                      DropdownMenuItem(value: 'Immediate RTGS on Weighbridge Slip', child: Text('Immediate RTGS on Weighbridge')),
-                      DropdownMenuItem(value: 'Letter of Credit (LC at Sight)', child: Text('Letter of Credit (LC)')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) setState(() => _paymentSchedule = val);
-                    },
-                  ),
-                ],
-              ),
-            ),
+            // Section 2: Quantity & Commercial Pricing (RB-SELLER-POST-UX-04 Redesign)
+            _buildSection2(totalVal),
             const SizedBox(height: 20),
 
             // Section 3: Warehouse Location & Loading
-            _buildSectionHeader('3. Warehouse Location & Loading', LucideIcons.truck),
+            _buildSectionHeader(
+              '3. Warehouse Location & Loading',
+              LucideIcons.truck,
+            ),
             const SizedBox(height: 12),
             AppCard(
               child: Column(
@@ -2277,13 +2781,23 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(LucideIcons.mapPin, size: 18, color: AppColors.primary),
+                          const Icon(
+                            LucideIcons.mapPin,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
                           const SizedBox(width: 8),
-                          Text('Warehouse / Loading Location', style: AppTypography.titleMedium),
+                          Text(
+                            'Warehouse / Loading Location',
+                            style: AppTypography.titleMedium,
+                          ),
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: _selectedDistrict != null
                               ? AppColors.successBackground
@@ -2296,7 +2810,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                           ),
                         ),
                         child: Text(
-                          _selectedDistrict != null ? 'Configured' : 'Required *',
+                          _selectedDistrict != null
+                              ? 'Configured'
+                              : 'Required *',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -2327,12 +2843,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(LucideIcons.store, size: 15, color: AppColors.primary),
+                              const Icon(
+                                LucideIcons.store,
+                                size: 15,
+                                color: AppColors.primary,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   '${_selectedMandi?.name ?? "Mandi Yard"}, ${_selectedDistrict?.name ?? "District"}, ${_selectedState?.name ?? "State"}',
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -2341,12 +2864,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              const Icon(LucideIcons.warehouse, size: 14, color: AppColors.textSecondaryLight),
+                              const Icon(
+                                LucideIcons.warehouse,
+                                size: 14,
+                                color: AppColors.textSecondaryLight,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Warehouse: ${_warehouseAddressController.text.trim().isNotEmpty ? _warehouseAddressController.text.trim() : "Krishi Upaj Mandi Yard Warehouse A-4"}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -2355,12 +2885,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              const Icon(LucideIcons.truck, size: 14, color: AppColors.textSecondaryLight),
+                              const Icon(
+                                LucideIcons.truck,
+                                size: 14,
+                                color: AppColors.textSecondaryLight,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Loading Platform: ${_dispatchFacilityController.text.trim().isNotEmpty ? _dispatchFacilityController.text.trim() : "Krishi Upaj Mandi Yard Warehouse A-4"}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -2369,12 +2906,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              const Icon(LucideIcons.building2, size: 14, color: AppColors.textSecondaryLight),
+                              const Icon(
+                                LucideIcons.building2,
+                                size: 14,
+                                color: AppColors.textSecondaryLight,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Office HQ: ${_officeLocationController.text.trim()}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -2396,11 +2940,19 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                   const Divider(),
                   const SizedBox(height: 10),
 
-                  const Text('Physical Loading Readiness *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  const Text(
+                    'Physical Loading Readiness *',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
                     value: _loadingStatus,
-                    decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                    ),
                     items: MasterCommodityData.verifiedLoadingStatuses.map((s) {
                       return DropdownMenuItem(value: s, child: Text(s));
                     }).toList(),
@@ -2418,14 +2970,24 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                             final picked = await showDatePicker(
                               context: context,
                               initialDate: _availableFrom,
-                              firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                              lastDate: DateTime.now().add(const Duration(days: 90)),
+                              firstDate: DateTime.now().subtract(
+                                const Duration(days: 30),
+                              ),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 90),
+                              ),
                             );
-                            if (picked != null) setState(() => _availableFrom = picked);
+                            if (picked != null)
+                              setState(() => _availableFrom = picked);
                           },
                           child: InputDecorator(
-                            decoration: const InputDecoration(labelText: 'Available From'),
-                            child: Text(dateFormat.format(_availableFrom), style: const TextStyle(fontSize: 13)),
+                            decoration: const InputDecoration(
+                              labelText: 'Available From',
+                            ),
+                            child: Text(
+                              dateFormat.format(_availableFrom),
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           ),
                         ),
                       ),
@@ -2437,13 +2999,21 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                               context: context,
                               initialDate: _validUntil,
                               firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 90)),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 90),
+                              ),
                             );
-                            if (picked != null) setState(() => _validUntil = picked);
+                            if (picked != null)
+                              setState(() => _validUntil = picked);
                           },
                           child: InputDecorator(
-                            decoration: const InputDecoration(labelText: 'Valid Until *'),
-                            child: Text(dateFormat.format(_validUntil), style: const TextStyle(fontSize: 13)),
+                            decoration: const InputDecoration(
+                              labelText: 'Valid Until *',
+                            ),
+                            child: Text(
+                              dateFormat.format(_validUntil),
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           ),
                         ),
                       ),
@@ -2466,7 +3036,10 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
             const SizedBox(height: 20),
 
             // Section 5: Review Listing & Broker Summary
-            _buildSectionHeader('5. Review Listing & Broker Summary', LucideIcons.fileCheck2),
+            _buildSectionHeader(
+              '5. Review Listing & Broker Summary',
+              LucideIcons.fileCheck2,
+            ),
             const SizedBox(height: 12),
             _buildReviewSummaryCard(totalVal, dateFormat),
             const SizedBox(height: 28),
@@ -2491,6 +3064,417 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     );
   }
 
+  Widget _buildFormFieldWrapper({
+    required String label,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimaryLight,
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+
+  Widget _buildSection1() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section 1 Header with compact Batch/Lot No. secondary label
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 420;
+            final header = _buildSectionHeader(
+              '1. Commodity & Specification',
+              LucideIcons.package,
+            );
+            final lotBadge = _lotNumberController.text.trim().isNotEmpty
+                ? Semantics(
+                    label:
+                        'Batch and Lot Number ${_lotNumberController.text.trim()}',
+                    child: Container(
+                      key: const Key('section1_batch_lot_label'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer.withValues(
+                          alpha: 0.5,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'BATCH / LOT NO.  ',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
+                          Text(
+                            _lotNumberController.text.trim(),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : null;
+
+            if (isNarrow || lotBadge == null) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  header,
+                  if (lotBadge != null) ...[
+                    const SizedBox(height: 6),
+                    lotBadge,
+                  ],
+                ],
+              );
+            }
+
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: header),
+                const SizedBox(width: 8),
+                lotBadge,
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        AppCard(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 520;
+              final commodityDropdown = _buildFormFieldWrapper(
+                label: 'Commodity *',
+                child: DropdownButtonFormField<MasterCommodity>(
+                  key: const Key('commodity_dropdown'),
+                  value: _selectedCommodity,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: _commodities.map((c) {
+                    return DropdownMenuItem(
+                      value: c,
+                      child: Text(c.name, overflow: TextOverflow.ellipsis),
+                    );
+                  }).toList(),
+                  onChanged: _onCommodityChanged,
+                ),
+              );
+
+              final gradeDropdown = _buildFormFieldWrapper(
+                label: 'Quality Grade *',
+                child: DropdownButtonFormField<MasterGrade>(
+                  key: const Key('grade_dropdown'),
+                  value: _selectedGrade,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: _grades.map((g) {
+                    return DropdownMenuItem(
+                      value: g,
+                      child: Text(
+                        g.gradeName,
+                        style: const TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (g) => setState(() => _selectedGrade = g),
+                ),
+              );
+
+              if (isWide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: commodityDropdown),
+                    const SizedBox(width: 14),
+                    Expanded(child: gradeDropdown),
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  commodityDropdown,
+                  const SizedBox(height: 14),
+                  gradeDropdown,
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSection2(double totalVal) {
+    final currencyFormat = NumberFormat('#,##,###');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          '2. Quantity & Commercial Pricing',
+          LucideIcons.indianRupee,
+        ),
+        const SizedBox(height: 12),
+        AppCard(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 600;
+
+              // Quantity field
+              final quantityField = _buildFormFieldWrapper(
+                label: 'Total Quantity *',
+                child: TextFormField(
+                  key: const Key('quantity_field'),
+                  controller: _quantityController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '100',
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Required';
+                    final n = double.tryParse(val);
+                    if (n == null || n <= 0) return 'Must be > 0';
+                    return null;
+                  },
+                ),
+              );
+
+              // Unit field
+              final unitField = _buildFormFieldWrapper(
+                label: 'Unit *',
+                child: DropdownButtonFormField<MasterUnit>(
+                  key: const Key('unit_dropdown'),
+                  value: _selectedUnit,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: _units.map((u) {
+                    return DropdownMenuItem(value: u, child: Text(u.symbol));
+                  }).toList(),
+                  onChanged: (u) => setState(() => _selectedUnit = u),
+                ),
+              );
+
+              // Asking Price field
+              final askingPriceField = _buildFormFieldWrapper(
+                label: 'Asking Price per Unit (₹) *',
+                child: TextFormField(
+                  key: const Key('asking_price_field'),
+                  controller: _askingPriceController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '4800',
+                    prefixIcon: Icon(
+                      LucideIcons.indianRupee,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Required';
+                    final p = double.tryParse(val);
+                    if (p == null || p <= 0) return 'Must be positive';
+                    return null;
+                  },
+                ),
+              );
+
+              // Payment Terms field
+              final paymentTermsField = _buildFormFieldWrapper(
+                label: 'Commercial Payment Terms *',
+                child: DropdownButtonFormField<String>(
+                  key: const Key('payment_terms_dropdown'),
+                  value: _paymentSchedule,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Payment on Delivery (CAD)',
+                      child: Text(
+                        'Payment on Delivery (CAD)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Advance RTGS (50% Advance / 50% on B/L)',
+                      child: Text(
+                        'Advance RTGS (50/50)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Immediate RTGS on Weighbridge Slip',
+                      child: Text(
+                        'Immediate RTGS on Weighbridge',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Letter of Credit (LC at Sight)',
+                      child: Text(
+                        'Letter of Credit (LC)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _paymentSchedule = val);
+                  },
+                ),
+              );
+
+              // Live Valuation Card (Section 2)
+              final valuationWidget = totalVal > 0
+                  ? Container(
+                      key: const Key('section2_live_valuation'),
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(top: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer.withValues(
+                          alpha: 0.5,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Estimated Gross Lot Value',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
+                          Text(
+                            'Est. Value: ₹${currencyFormat.format(totalVal)}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink();
+
+              if (isWide) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: quantityField),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 2, child: unitField),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 3, child: askingPriceField),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    paymentTermsField,
+                    valuationWidget,
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 3, child: quantityField),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 2, child: unitField),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  askingPriceField,
+                  const SizedBox(height: 14),
+                  paymentTermsField,
+                  valuationWidget,
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildReviewSummaryCard(double totalVal, DateFormat dateFormat) {
     final currencyFormat = NumberFormat('#,##,###');
     return AppCard(
@@ -2502,26 +3486,53 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
             children: [
               Text(
                 _selectedCommodity?.name ?? 'Commodity Lot',
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: AppColors.primary),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: AppColors.primary,
+                ),
               ),
               Text(
                 _lotNumberController.text.trim(),
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.textSecondaryLight),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: AppColors.textSecondaryLight,
+                ),
               ),
             ],
           ),
           Text(
             _selectedGrade?.gradeName ?? 'Standard FAQ',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondaryLight,
+            ),
           ),
           const Divider(height: 20),
 
-          _buildReviewRow('Supply Quantity', '${_quantityController.text.trim().isEmpty ? "0" : _quantityController.text.trim()} ${_selectedUnit?.symbol ?? "MT"}'),
-          _buildReviewRow('Asking Price', '₹${_askingPriceController.text.trim().isEmpty ? "0" : _askingPriceController.text.trim()} per ${_selectedUnit?.symbol ?? "MT"}'),
+          _buildReviewRow(
+            'Supply Quantity',
+            '${_quantityController.text.trim().isEmpty ? "0" : _quantityController.text.trim()} ${_selectedUnit?.symbol ?? "MT"}',
+          ),
+          _buildReviewRow(
+            'Asking Price',
+            '₹${_askingPriceController.text.trim().isEmpty ? "0" : _askingPriceController.text.trim()} per ${_selectedUnit?.symbol ?? "MT"}',
+          ),
           if (totalVal > 0)
-            _buildReviewRow('Estimated Gross Value', '₹${currencyFormat.format(totalVal)}', isHighlight: true),
-          _buildReviewRow('Warehouse & Mandi', '${_selectedMandi?.name ?? ""}, ${_warehouseAddressController.text.trim().isNotEmpty ? _warehouseAddressController.text.trim() : "Mandi Yard"}'),
-          _buildReviewRow('Loading Facility', '${_selectedDistrict?.name ?? ""}, ${_selectedState?.name ?? ""} ($_loadingStatus)'),
+            _buildReviewRow(
+              'Estimated Gross Value',
+              '₹${currencyFormat.format(totalVal)}',
+              isHighlight: true,
+            ),
+          _buildReviewRow(
+            'Warehouse & Mandi',
+            '${_selectedMandi?.name ?? ""}, ${_warehouseAddressController.text.trim().isNotEmpty ? _warehouseAddressController.text.trim() : "Mandi Yard"}',
+          ),
+          _buildReviewRow(
+            'Loading Facility',
+            '${_selectedDistrict?.name ?? ""}, ${_selectedState?.name ?? ""} ($_loadingStatus)',
+          ),
           _buildReviewRow('Office HQ', _officeLocationController.text.trim()),
           _buildReviewRow('Commercial Terms', _paymentSchedule),
           if (_requestLabTesting) ...[
@@ -2570,14 +3581,24 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     );
   }
 
-  Widget _buildReviewRow(String label, String value, {bool isHighlight = false}) {
+  Widget _buildReviewRow(
+    String label,
+    String value, {
+    bool isHighlight = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondaryLight,
+            ),
+          ),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
@@ -2586,7 +3607,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
-                color: isHighlight ? AppColors.primary : AppColors.textPrimaryLight,
+                color: isHighlight
+                    ? AppColors.primary
+                    : AppColors.textPrimaryLight,
               ),
             ),
           ),
@@ -2600,7 +3623,7 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       children: [
         Icon(icon, size: 18, color: AppColors.primary),
         const SizedBox(width: 8),
-        Text(title, style: AppTypography.titleMedium),
+        Expanded(child: Text(title, style: AppTypography.titleMedium)),
       ],
     );
   }

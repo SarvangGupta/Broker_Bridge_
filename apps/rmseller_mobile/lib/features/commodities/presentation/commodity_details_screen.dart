@@ -37,7 +37,8 @@ class CommodityDetailsScreen extends StatefulWidget {
 class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
   final CommoditiesRepository _repository = CommoditiesRepository();
   final SellerBrokerRepository _brokerRepository = SellerBrokerRepository();
-  final ContactLauncherService _contactLauncher = const ContactLauncherService();
+  final ContactLauncherService _contactLauncher =
+      const ContactLauncherService();
   final LabTestingRepository _labTestingRepository = LabTestingRepository();
 
   SellerCommodity? _commodity;
@@ -76,8 +77,12 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
 
   Future<void> _loadLabDetails() async {
     try {
-      final req = _labTestingRepository.getRequestForAvailability(widget.commodityId);
-      final details = await _labTestingRepository.getLabReportDetails(widget.commodityId);
+      final req = _labTestingRepository.getRequestForAvailability(
+        widget.commodityId,
+      );
+      final details = await _labTestingRepository.getLabReportDetails(
+        widget.commodityId,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -94,7 +99,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
 
   Future<void> _showUpdatePriceDialog() async {
     if (_commodity == null) return;
-    final priceController = TextEditingController(text: _commodity!.askingPrice.toStringAsFixed(0));
+    final priceController = TextEditingController(
+      text: _commodity!.askingPrice.toStringAsFixed(0),
+    );
 
     final updated = await showDialog<bool>(
       context: context,
@@ -107,14 +114,19 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
             children: [
               Text(
                 'Current Asking Price: ₹${_commodity!.askingPrice.toStringAsFixed(0)} / ${_commodity!.unit}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondaryLight,
+                ),
               ),
               const SizedBox(height: 14),
               AppTextField(
                 controller: priceController,
                 label: 'New Asking Price (₹) *',
                 hint: 'e.g. 5200',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
               ),
             ],
           ),
@@ -124,9 +136,14 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Save Price', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Save Price',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -145,7 +162,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Asking price updated to ₹${newPrice.toStringAsFixed(0)} successfully!'),
+            content: Text(
+              'Asking price updated to ₹${newPrice.toStringAsFixed(0)} successfully!',
+            ),
             backgroundColor: AppColors.success,
           ),
         );
@@ -153,7 +172,10 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
     }
   }
 
-  Future<void> _confirmStatusUpdate(String newStatus, String actionLabel) async {
+  Future<void> _confirmStatusUpdate(
+    String newStatus,
+    String actionLabel,
+  ) async {
     if (_commodity == null) return;
 
     final confirmed = await showDialog<bool>(
@@ -171,10 +193,15 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: newStatus == 'Cancelled' ? AppColors.error : AppColors.primary,
+                backgroundColor: newStatus == 'Cancelled'
+                    ? AppColors.error
+                    : AppColors.primary,
               ),
               onPressed: () => Navigator.pop(context, true),
-              child: Text(actionLabel, style: const TextStyle(color: Colors.white)),
+              child: Text(
+                actionLabel,
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -236,9 +263,15 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(LucideIcons.repeat, color: AppColors.primary),
+                              const Icon(
+                                LucideIcons.repeat,
+                                color: AppColors.primary,
+                              ),
                               const SizedBox(width: 10),
-                              Text('Change Mandi Broker', style: AppTypography.titleMedium),
+                              Text(
+                                'Change Mandi Broker',
+                                style: AppTypography.titleMedium,
+                              ),
                               const Spacer(),
                               IconButton(
                                 icon: const Icon(LucideIcons.x),
@@ -250,17 +283,27 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryContainer.withValues(alpha: 0.5),
+                              color: AppColors.primaryContainer.withValues(
+                                alpha: 0.5,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               children: [
-                                const Icon(LucideIcons.userCheck, size: 16, color: AppColors.primary),
+                                const Icon(
+                                  LucideIcons.userCheck,
+                                  size: 16,
+                                  color: AppColors.primary,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Currently Assigned: ${lot.brokerName ?? "Open Mandi Pool"}',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -271,7 +314,10 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                           const SizedBox(height: 10),
                           const Text(
                             'Select a licensed broker from the verified registry below:',
-                            style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryLight,
+                            ),
                           ),
                         ],
                       ),
@@ -280,12 +326,16 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                     Expanded(
                       child: ListView.builder(
                         controller: scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         itemCount: brokers.length,
                         itemBuilder: (context, index) {
                           final broker = brokers[index];
                           final isCurrentlyAssigned = lot.brokerId == broker.id;
-                          final isNewlySelected = selectedBroker?.id == broker.id;
+                          final isNewlySelected =
+                              selectedBroker?.id == broker.id;
 
                           return Card(
                             elevation: 0,
@@ -295,38 +345,61 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                               side: BorderSide(
                                 color: isNewlySelected
                                     ? AppColors.primary
-                                    : (isCurrentlyAssigned ? AppColors.success : AppColors.borderLight),
-                                width: isNewlySelected || isCurrentlyAssigned ? 2 : 1,
+                                    : (isCurrentlyAssigned
+                                          ? AppColors.success
+                                          : AppColors.borderLight),
+                                width: isNewlySelected || isCurrentlyAssigned
+                                    ? 2
+                                    : 1,
                               ),
                             ),
                             child: ListTile(
                               title: Row(
                                 children: [
                                   Expanded(
-                                    child: Text(broker.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    child: Text(
+                                      broker.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                   if (isCurrentlyAssigned)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: AppColors.successContainer,
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: const Text(
                                         'Current',
-                                        style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.w700),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: AppColors.success,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     )
                                   else if (isNewlySelected)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: AppColors.primaryContainer,
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: const Text(
                                         'New Selection',
-                                        style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w700),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     ),
                                 ],
@@ -343,32 +416,51 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                                   if (broker.hasRatings)
                                     Row(
                                       children: [
-                                        const Icon(LucideIcons.star, size: 12, color: Colors.amber),
+                                        const Icon(
+                                          LucideIcons.star,
+                                          size: 12,
+                                          color: Colors.amber,
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '${broker.averageRating!.toStringAsFixed(1)} (${broker.reviewCount} reviews) • Trust: ${broker.trustScore}%',
-                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.brown),
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.brown,
+                                          ),
                                         ),
                                       ],
                                     )
                                   else
                                     Text(
                                       'Trust Score: ${broker.trustScore}% • Mandi Phone: ${broker.mobile}',
-                                      style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: AppColors.textSecondaryLight,
+                                      ),
                                     ),
                                 ],
                               ),
                               isThreeLine: true,
                               trailing: isNewlySelected
-                                  ? const Icon(LucideIcons.checkCircle2, color: AppColors.primary)
+                                  ? const Icon(
+                                      LucideIcons.checkCircle2,
+                                      color: AppColors.primary,
+                                    )
                                   : (isCurrentlyAssigned
-                                      ? const Icon(LucideIcons.badgeCheck, color: AppColors.success)
-                                      : null),
+                                        ? const Icon(
+                                            LucideIcons.badgeCheck,
+                                            color: AppColors.success,
+                                          )
+                                        : null),
                               onTap: isCurrentlyAssigned
                                   ? null
                                   : () {
                                       setSheetState(() {
-                                        selectedBroker = isNewlySelected ? null : broker;
+                                        selectedBroker = isNewlySelected
+                                            ? null
+                                            : broker;
                                       });
                                     },
                             ),
@@ -379,7 +471,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: AppButton(
-                        label: selectedBroker != null ? 'Review & Confirm Change' : 'Select a Broker Above',
+                        label: selectedBroker != null
+                            ? 'Review & Confirm Change'
+                            : 'Select a Broker Above',
                         onPressed: selectedBroker != null
                             ? () => Navigator.pop(context, selectedBroker)
                             : null,
@@ -430,9 +524,21 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Previous: ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                        const Text(
+                          'Previous: ',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
                         Expanded(
-                          child: Text(lot.brokerName ?? 'Open Mandi Pool', style: const TextStyle(fontSize: 12, color: AppColors.error)),
+                          child: Text(
+                            lot.brokerName ?? 'Open Mandi Pool',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.error,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -440,9 +546,22 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('New: ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                        const Text(
+                          'New: ',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
                         Expanded(
-                          child: Text('${confirmedBroker.name} (${confirmedBroker.location})', style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w700)),
+                          child: Text(
+                            '${confirmedBroker.name} (${confirmedBroker.location})',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -452,7 +571,10 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
               const SizedBox(height: 10),
               const Text(
                 'All future trading discussions and counterparty bids will be routed exclusively to the new broker.',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondaryLight,
+                ),
               ),
             ],
           ),
@@ -462,9 +584,14 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Confirm Change', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Confirm Change',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -500,7 +627,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Mandi broker desk changed to ${confirmedBroker.name} successfully!'),
+            content: Text(
+              'Mandi broker desk changed to ${confirmedBroker.name} successfully!',
+            ),
             backgroundColor: AppColors.success,
           ),
         );
@@ -508,7 +637,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
         setState(() => _isActionInProgress = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to update broker assignment. Existing broker assignment preserved.'),
+            content: Text(
+              'Failed to update broker assignment. Existing broker assignment preserved.',
+            ),
             backgroundColor: AppColors.error,
           ),
         );
@@ -518,7 +649,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
       setState(() => _isActionInProgress = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error updating broker: $e. Existing assignment preserved.'),
+          content: Text(
+            'Error updating broker: $e. Existing assignment preserved.',
+          ),
           backgroundColor: AppColors.error,
         ),
       );
@@ -580,20 +713,33 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   lot.gradeName,
-                  style: const TextStyle(fontSize: 14, color: AppColors.textSecondaryLight),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Icon(LucideIcons.mapPin, size: 14, color: AppColors.textSecondaryLight),
+                    const Icon(
+                      LucideIcons.mapPin,
+                      size: 14,
+                      color: AppColors.textSecondaryLight,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '${lot.districtName}, ${lot.stateName}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondaryLight,
+                      ),
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primaryContainer,
                         borderRadius: BorderRadius.circular(6),
@@ -619,25 +765,50 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Inventory & Pricing Breakdown', style: AppTypography.titleMedium),
+                Text(
+                  'Inventory & Pricing Breakdown',
+                  style: AppTypography.titleMedium,
+                ),
                 const SizedBox(height: 14),
 
                 // Volume Progress Indicators
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildVolumePill('Total Lot', '${lot.totalQuantity.toInt()} ${lot.unit}', AppColors.primary),
-                    _buildVolumePill('Available', '${lot.availableQuantity.toInt()} ${lot.unit}', AppColors.success),
-                    _buildVolumePill('Reserved', '${lot.reservedQuantity.toInt()} ${lot.unit}', AppColors.warning),
-                    _buildVolumePill('Sold', '${lot.soldQuantity.toInt()} ${lot.unit}', AppColors.textMutedLight),
+                    _buildVolumePill(
+                      'Total Lot',
+                      '${lot.totalQuantity.toInt()} ${lot.unit}',
+                      AppColors.primary,
+                    ),
+                    _buildVolumePill(
+                      'Available',
+                      '${lot.availableQuantity.toInt()} ${lot.unit}',
+                      AppColors.success,
+                    ),
+                    _buildVolumePill(
+                      'Reserved',
+                      '${lot.reservedQuantity.toInt()} ${lot.unit}',
+                      AppColors.warning,
+                    ),
+                    _buildVolumePill(
+                      'Sold',
+                      '${lot.soldQuantity.toInt()} ${lot.unit}',
+                      AppColors.textMutedLight,
+                    ),
                   ],
                 ),
                 const Divider(height: 24),
 
                 // Price Rows
-                _buildInfoRow('Asking Price', '₹${currencyFormat.format(lot.askingPrice)} / ${lot.unit}'),
+                _buildInfoRow(
+                  'Asking Price',
+                  '₹${currencyFormat.format(lot.askingPrice)} / ${lot.unit}',
+                ),
                 const SizedBox(height: 8),
-                _buildInfoRow('Estimated Gross Value', '₹${currencyFormat.format(lot.totalEstimatedValue)}'),
+                _buildInfoRow(
+                  'Estimated Gross Value',
+                  '₹${currencyFormat.format(lot.totalEstimatedValue)}',
+                ),
                 if (lot.confidentialMinimumPrice != null) ...[
                   const SizedBox(height: 8),
                   _buildInfoRow(
@@ -646,7 +817,10 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                _buildInfoRow('Payment Terms', lot.paymentTerms ?? 'Payment on Delivery (CAD)'),
+                _buildInfoRow(
+                  'Payment Terms',
+                  lot.paymentTerms ?? 'Payment on Delivery (CAD)',
+                ),
               ],
             ),
           ),
@@ -657,9 +831,13 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Dispatch & Warehouse Location', style: AppTypography.titleMedium),
+                Text(
+                  'Dispatch & Warehouse Location',
+                  style: AppTypography.titleMedium,
+                ),
                 const SizedBox(height: 12),
-                if (lot.warehouseName != null && lot.warehouseName!.isNotEmpty) ...[
+                if (lot.warehouseName != null &&
+                    lot.warehouseName!.isNotEmpty) ...[
                   _buildInfoRow('Warehouse Address', lot.warehouseName!),
                   const SizedBox(height: 8),
                 ],
@@ -667,17 +845,35 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                   _buildInfoRow('Mandi Hub', lot.mandiName!),
                   const SizedBox(height: 8),
                 ],
-                _buildInfoRow('Loading Facility', lot.loadingRemarks ?? 'Krishi Upaj Mandi Yard Warehouse A-4'),
+                _buildInfoRow(
+                  'Loading Facility',
+                  lot.loadingRemarks ?? 'Krishi Upaj Mandi Yard Warehouse A-4',
+                ),
                 const SizedBox(height: 8),
-                _buildInfoRow('Mandi District', '${lot.districtName}, ${lot.stateName}'),
+                _buildInfoRow(
+                  'Mandi District',
+                  '${lot.districtName}, ${lot.stateName}',
+                ),
                 const SizedBox(height: 8),
-                _buildInfoRow('Registered Office HQ', lot.officeLocation ?? 'Bikaner Commercial Head Office'),
+                _buildInfoRow(
+                  'Registered Office HQ',
+                  lot.officeLocation ?? 'Bikaner Commercial Head Office',
+                ),
                 const SizedBox(height: 8),
-                _buildInfoRow('Ready From', dateFormat.format(lot.availableFrom)),
+                _buildInfoRow(
+                  'Ready From',
+                  dateFormat.format(lot.availableFrom),
+                ),
                 const SizedBox(height: 8),
-                _buildInfoRow('Offer Valid Until', dateFormat.format(lot.validUntil)),
+                _buildInfoRow(
+                  'Offer Valid Until',
+                  dateFormat.format(lot.validUntil),
+                ),
                 const SizedBox(height: 8),
-                _buildInfoRow('Lab Certificate', lot.labReportNumber ?? 'AGMARK-RAL-2026-9021'),
+                _buildInfoRow(
+                  'Lab Certificate',
+                  lot.labReportNumber ?? 'AGMARK-RAL-2026-9021',
+                ),
               ],
             ),
           ),
@@ -697,14 +893,21 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                   children: [
                     Text('My Trusted Broker', style: AppTypography.titleMedium),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.successContainer,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
                         'Licensed Broker',
-                        style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -712,23 +915,33 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                 const SizedBox(height: 10),
                 Text(
                   lot.brokerName ?? 'Regional Mandi Broadcast Desk',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
                 ),
                 Text(
                   lot.brokerLocation ?? 'Krishi Upaj Mandi Yard B-Block',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 const Text(
                   'Counterparty Shield: All buyer negotiations and trade contracts are strictly broker-mediated. Direct buyer access is prohibited.',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => _contactLauncher.launchPhone(effectiveBrokerPhone),
+                        onPressed: () =>
+                            _contactLauncher.launchPhone(effectiveBrokerPhone),
                         icon: const Icon(LucideIcons.phone, size: 16),
                         label: const Text('Call Broker'),
                         style: OutlinedButton.styleFrom(
@@ -740,7 +953,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => _contactLauncher.launchWhatsApp(effectiveBrokerPhone),
+                        onPressed: () => _contactLauncher.launchWhatsApp(
+                          effectiveBrokerPhone,
+                        ),
                         icon: const Icon(LucideIcons.messageCircle, size: 16),
                         label: const Text('WhatsApp'),
                         style: OutlinedButton.styleFrom(
@@ -754,7 +969,10 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                 const SizedBox(height: 12),
                 AppButton(
                   label: 'Broker Chat & Commission Desk',
-                  onPressed: () => context.push('/commodities/${lot.id}/negotiate', extra: lot),
+                  onPressed: () => context.push(
+                    '/commodities/${lot.id}/negotiate',
+                    extra: lot,
+                  ),
                   variant: ButtonVariant.primary,
                   icon: LucideIcons.messageSquare,
                 ),
@@ -762,7 +980,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                   const SizedBox(height: 10),
                   AppButton(
                     label: 'Change Brokers',
-                    onPressed: _isActionInProgress ? null : () => _openChangeBrokersSheet(lot),
+                    onPressed: _isActionInProgress
+                        ? null
+                        : () => _openChangeBrokersSheet(lot),
                     variant: ButtonVariant.outline,
                     icon: LucideIcons.repeat,
                   ),
@@ -783,14 +1003,18 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
             const SizedBox(height: 12),
             AppButton(
               label: 'Mark as Fulfilled / Dispatched',
-              onPressed: _isActionInProgress ? null : () => _confirmStatusUpdate('Fulfilled', 'Fulfill'),
+              onPressed: _isActionInProgress
+                  ? null
+                  : () => _confirmStatusUpdate('Fulfilled', 'Fulfill'),
               variant: ButtonVariant.outline,
               icon: LucideIcons.checkCheck,
             ),
             const SizedBox(height: 12),
             AppButton(
               label: 'Withdraw / Cancel Lot',
-              onPressed: _isActionInProgress ? null : () => _confirmStatusUpdate('Cancelled', 'Cancel'),
+              onPressed: _isActionInProgress
+                  ? null
+                  : () => _confirmStatusUpdate('Cancelled', 'Cancel'),
               variant: ButtonVariant.outline,
               icon: LucideIcons.trash2,
             ),
@@ -803,7 +1027,10 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
               ),
               child: Text(
                 'This lot is currently "${lot.status}". Status changes and price edits are closed.',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondaryLight,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -820,19 +1047,34 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
             const SizedBox(width: 4),
-            Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondaryLight,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 2),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+        ),
       ],
     );
   }
 
   Widget _buildLabTestingCard(SellerCommodity lot) {
-    final hasLabTesting = (lot.labName != null && lot.labName!.toLowerCase().contains('riddhi siddhi')) ||
+    final hasLabTesting =
+        (lot.labName != null &&
+            lot.labName!.toLowerCase().contains('riddhi siddhi')) ||
         _labRequest != null ||
         _isReportAvailable;
 
@@ -844,20 +1086,32 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Quality & Assay Document', style: AppTypography.titleMedium),
+                Text(
+                  'Quality & Assay Document',
+                  style: AppTypography.titleMedium,
+                ),
                 const StatusBadge(status: 'Self-Declared'),
               ],
             ),
             const SizedBox(height: 10),
-            _buildInfoRow('Document Type', lot.labName ?? 'Visual Mandi Inspection'),
+            _buildInfoRow(
+              'Document Type',
+              lot.labName ?? 'Visual Mandi Inspection',
+            ),
             const SizedBox(height: 6),
-            _buildInfoRow('Certificate Reference', lot.labReportNumber ?? 'None'),
+            _buildInfoRow(
+              'Certificate Reference',
+              lot.labReportNumber ?? 'None',
+            ),
           ],
         ),
       );
     }
 
-    final isPaid = _labRequest?.isPaid == true || _labStatus == 'Testing In Progress' || _isReportAvailable;
+    final isPaid =
+        _labRequest?.isPaid == true ||
+        _labStatus == 'Testing In Progress' ||
+        _isReportAvailable;
 
     return AppCard(
       child: Column(
@@ -868,16 +1122,24 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(LucideIcons.flaskConical, color: AppColors.primary, size: 20),
+                  const Icon(
+                    LucideIcons.flaskConical,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
-                  Text('Laboratory Testing & Report', style: AppTypography.titleMedium),
+                  Text(
+                    'Laboratory Testing & Report',
+                    style: AppTypography.titleMedium,
+                  ),
                 ],
               ),
               if (_isReportAvailable)
                 const StatusBadge(status: 'Report Available')
               else if (isPaid)
                 const StatusBadge(status: 'Testing In Progress')
-              else if (_labRequest?.paymentStatus == LabPaymentStatus.paymentPending)
+              else if (_labRequest?.paymentStatus ==
+                  LabPaymentStatus.paymentPending)
                 const StatusBadge(status: 'Pending')
               else
                 const StatusBadge(status: 'Draft'),
@@ -919,12 +1181,20 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(LucideIcons.fileCheck, color: AppColors.success, size: 20),
+                      const Icon(
+                        LucideIcons.fileCheck,
+                        color: AppColors.success,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Verified Lab Certificate: ${_labReportNumber ?? "RSL-REPORT-VERIFIED"}',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.success),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: AppColors.success,
+                          ),
                         ),
                       ),
                     ],
@@ -932,7 +1202,10 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                   const SizedBox(height: 6),
                   const Text(
                     'The certified laboratory assay report has been uploaded and authorized by Riddhi Siddhi Laboratory.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   AppButton(
@@ -940,20 +1213,30 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                     icon: LucideIcons.download,
                     variant: ButtonVariant.primary,
                     onPressed: () async {
-                      if (_signedReportUrl != null && _signedReportUrl!.isNotEmpty) {
+                      if (_signedReportUrl != null &&
+                          _signedReportUrl!.isNotEmpty) {
                         final uri = Uri.parse(_signedReportUrl!);
                         if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
                         } else {
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Opening report in browser...')),
+                            const SnackBar(
+                              content: Text('Opening report in browser...'),
+                            ),
                           );
                         }
                       } else {
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Report file URL is currently being signed by backend.')),
+                          const SnackBar(
+                            content: Text(
+                              'Report file URL is currently being signed by backend.',
+                            ),
+                          ),
                         );
                       }
                     },
@@ -979,7 +1262,11 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                       SizedBox(width: 6),
                       Text(
                         'Report Status: Testing in progress (Estimated 24-48 hrs)',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.brown),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.brown,
+                        ),
                       ),
                     ],
                   ),
@@ -1001,7 +1288,13 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondaryLight,
+          ),
+        ),
         const SizedBox(width: 8),
         Flexible(
           child: Text(
@@ -1010,7 +1303,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
             style: TextStyle(
               fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w600,
               fontSize: 12,
-              color: isHighlight ? AppColors.primary : AppColors.textPrimaryLight,
+              color: isHighlight
+                  ? AppColors.primary
+                  : AppColors.textPrimaryLight,
             ),
           ),
         ),

@@ -36,30 +36,42 @@ void main() {
       expect(paidInvoices, isNotEmpty);
       expect(paidInvoices.every((i) => i.isPaid), isTrue);
 
-      final pendingInvoices = await repository.getInvoices(statusFilter: 'Pending');
+      final pendingInvoices = await repository.getInvoices(
+        statusFilter: 'Pending',
+      );
       expect(pendingInvoices, isNotEmpty);
       expect(pendingInvoices.every((i) => !i.isPaid), isTrue);
     });
 
-    test('getInvoiceById returns exact invoice record with line item details', () async {
-      final invoice = await repository.getInvoiceById('INV-2026-0042');
-      expect(invoice, isNotNull);
-      expect(invoice!.invoiceNo, 'INV-2026-0042');
-      expect(invoice.dealId, 'DEAL-2026-052');
-      expect(invoice.amount, 224000.0);
-      expect(invoice.isPaid, isTrue);
-      expect(invoice.paymentReference, isNotNull);
-      expect(invoice.quantity, 40.0);
-      expect(invoice.ratePerUnit, 5600.0);
-      expect(invoice.taxableAmount, 224000.0);
-      expect(invoice.gstAmount, greaterThan(0));
-    });
+    test(
+      'getInvoiceById returns exact invoice record with line item details',
+      () async {
+        final invoice = await repository.getInvoiceById('INV-2026-0042');
+        expect(invoice, isNotNull);
+        expect(invoice!.invoiceNo, 'INV-2026-0042');
+        expect(invoice.dealId, 'DEAL-2026-052');
+        expect(invoice.amount, 224000.0);
+        expect(invoice.isPaid, isTrue);
+        expect(invoice.paymentReference, isNotNull);
+        expect(invoice.quantity, 40.0);
+        expect(invoice.ratePerUnit, 5600.0);
+        expect(invoice.taxableAmount, 224000.0);
+        expect(invoice.gstAmount, greaterThan(0));
+      },
+    );
 
     test('getDocumentsForDeal returns Tax Invoices, Lorry Receipts, and E-Way bills', () async {
       final documents = await repository.getDocumentsForDeal('DEAL-2026-052');
       expect(documents, isNotEmpty);
       expect(documents.any((d) => d.documentType.contains('Invoice')), isTrue);
-      expect(documents.any((d) => d.documentType.contains('Lorry') || d.documentType.contains('Bilty')), isTrue);
+      expect(
+        documents.any(
+          (d) =>
+              d.documentType.contains('Lorry') ||
+              d.documentType.contains('Bilty'),
+        ),
+        isTrue,
+      );
       expect(documents.any((d) => d.documentType.contains('E-Way')), isTrue);
       expect(documents.every((d) => d.fileUrl.isNotEmpty), isTrue);
     });

@@ -31,8 +31,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   SalesReportSummary? _summary;
   List<SalesTransactionItem> _transactions = [];
 
-  final List<String> _timeframes = ['Weekly', 'Monthly', 'Quarterly', 'Yearly', 'Custom'];
-  final List<String> _statusFilters = ['ALL', 'Completed', 'Active', 'Cancelled'];
+  final List<String> _timeframes = [
+    'Weekly',
+    'Monthly',
+    'Quarterly',
+    'Yearly',
+    'Custom',
+  ];
+  final List<String> _statusFilters = [
+    'ALL',
+    'Completed',
+    'Active',
+    'Cancelled',
+  ];
 
   @override
   void initState() {
@@ -105,23 +116,41 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Reporting Period: ${summary.period}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                'Reporting Period: ${summary.period}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               Text(
                 'Range: ${dateFormat.format(summary.startDate)} - ${dateFormat.format(summary.endDate)}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondaryLight,
+                ),
               ),
               const Divider(height: 16),
               Text('Total Volume Sold: ${summary.totalSoldVolumeMT} MT'),
-              Text('Gross Sales Value: ₹${summary.grossSalesValue.toStringAsFixed(0)}'),
-              Text('Total Agreed Commission: ₹${summary.totalAgreedCommission.toStringAsFixed(0)}'),
-              Text('Outstanding Commission: ₹${summary.totalCommissionOutstanding.toStringAsFixed(0)}'),
+              Text(
+                'Gross Sales Value: ₹${summary.grossSalesValue.toStringAsFixed(0)}',
+              ),
+              Text(
+                'Total Agreed Commission: ₹${summary.totalAgreedCommission.toStringAsFixed(0)}',
+              ),
+              Text(
+                'Outstanding Commission: ₹${summary.totalCommissionOutstanding.toStringAsFixed(0)}',
+              ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(6)),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                ),
                 child: const Text(
                   'Counterparty Shield Notice: In accordance with Mandi trade privacy regulations, exports exclude Buyer contact details.',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondaryLight,
+                  ),
                 ),
               ),
             ],
@@ -132,7 +161,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               child: const Text('Close'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
               onPressed: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -142,7 +173,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ),
                 );
               },
-              child: const Text('Download PDF Statement', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Download PDF Statement',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -172,7 +206,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         ],
       ),
       body: _isLoading
-          ? const AppLoadingIndicator(message: 'Compiling sales & settlement metrics...')
+          ? const AppLoadingIndicator(
+              message: 'Compiling sales & settlement metrics...',
+            )
           : RefreshIndicator(
               onRefresh: _loadReportData,
               color: AppColors.primary,
@@ -191,12 +227,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                               return Padding(
                                 padding: const EdgeInsets.only(right: 8),
                                 child: FilterChip(
-                                  label: Text(tf == 'Custom' && _customStartDate != null ? 'Custom Period' : tf),
+                                  label: Text(
+                                    tf == 'Custom' && _customStartDate != null
+                                        ? 'Custom Period'
+                                        : tf,
+                                  ),
                                   selected: isSelected,
                                   selectedColor: AppColors.primaryContainer,
                                   labelStyle: TextStyle(
-                                    color: isSelected ? AppColors.primary : AppColors.textPrimaryLight,
-                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.textPrimaryLight,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
                                     fontSize: 12,
                                   ),
                                   onSelected: (val) {
@@ -230,14 +274,27 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             children: [
                               const Text(
                                 'Gross Sales Revenue (Completed)',
-                                style: TextStyle(color: Colors.white70, fontSize: 13),
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(4)),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white24,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
                                 child: Text(
                                   _summary!.period,
-                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
@@ -245,7 +302,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           const SizedBox(height: 6),
                           Text(
                             '₹${_summary!.grossSalesValue.toStringAsFixed(0)}',
-                            style: AppTypography.displayLarge.copyWith(color: Colors.white),
+                            style: AppTypography.displayLarge.copyWith(
+                              color: Colors.white,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           Row(
@@ -253,11 +312,18 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             children: [
                               Text(
                                 'Total Sold Volume: ${_summary!.totalSoldVolumeMT} MT',
-                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               Text(
                                 '${_summary!.completedDealsCount} Completed Deals',
-                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ),
@@ -274,11 +340,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Settled Receivables', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
+                                const Text(
+                                  'Settled Receivables',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textMutedLight,
+                                  ),
+                                ),
                                 const SizedBox(height: 4),
                                 Text(
                                   '₹${_summary!.settledAmount.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: AppColors.success),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                    color: AppColors.success,
+                                  ),
                                 ),
                               ],
                             ),
@@ -290,11 +366,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Pending Invoices', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
+                                const Text(
+                                  'Pending Invoices',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textMutedLight,
+                                  ),
+                                ),
                                 const SizedBox(height: 4),
                                 Text(
                                   '₹${_summary!.pendingAmount.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: AppColors.warning),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                    color: AppColors.warning,
+                                  ),
                                 ),
                               ],
                             ),
@@ -312,10 +398,16 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Broker Commission Breakdown', style: AppTypography.titleSmall),
+                              Text(
+                                'Broker Commission Breakdown',
+                                style: AppTypography.titleSmall,
+                              ),
                               Text(
                                 '${_summary!.period} Summary',
-                                style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textMutedLight,
+                                ),
                               ),
                             ],
                           ),
@@ -323,9 +415,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              _buildMetricColumn('Total Agreed Comm.', '₹${_summary!.totalAgreedCommission.toStringAsFixed(0)}'),
-                              _buildMetricColumn('Commission Paid', '₹${_summary!.totalCommissionPaid.toStringAsFixed(0)}', color: AppColors.success),
-                              _buildMetricColumn('Outstanding Comm.', '₹${_summary!.totalCommissionOutstanding.toStringAsFixed(0)}', color: AppColors.warning),
+                              _buildMetricColumn(
+                                'Total Agreed Comm.',
+                                '₹${_summary!.totalAgreedCommission.toStringAsFixed(0)}',
+                              ),
+                              _buildMetricColumn(
+                                'Commission Paid',
+                                '₹${_summary!.totalCommissionPaid.toStringAsFixed(0)}',
+                                color: AppColors.success,
+                              ),
+                              _buildMetricColumn(
+                                'Outstanding Comm.',
+                                '₹${_summary!.totalCommissionOutstanding.toStringAsFixed(0)}',
+                                color: AppColors.warning,
+                              ),
                             ],
                           ),
                         ],
@@ -347,8 +450,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             selected: isSelected,
                             selectedColor: AppColors.primaryContainer,
                             labelStyle: TextStyle(
-                              color: isSelected ? AppColors.primary : AppColors.textPrimaryLight,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.textPrimaryLight,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
                               fontSize: 12,
                             ),
                             onSelected: (val) {
@@ -368,7 +475,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   if (_transactions.isEmpty) ...[
                     AppEmptyState(
                       title: 'No Transactions In Period',
-                      message: 'No commercial sales records found matching the $_selectedTimeframe timeframe and $_selectedStatus filter.',
+                      message:
+                          'No commercial sales records found matching the $_selectedTimeframe timeframe and $_selectedStatus filter.',
                     ),
                   ] else ...[
                     ..._transactions.map((tx) {
@@ -382,10 +490,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
-                                    child: Text(tx.commodityName, style: AppTypography.titleSmall),
+                                    child: Text(
+                                      tx.commodityName,
+                                      style: AppTypography.titleSmall,
+                                    ),
                                   ),
                                   StatusBadge(status: tx.status),
                                 ],
@@ -393,12 +505,16 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 '${tx.bookingReference} • ${dateFormat.format(tx.date)}',
-                                style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondaryLight,
+                                ),
                               ),
                               const Divider(height: 18),
 
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     '${tx.quantityMT} MT @ ₹${tx.ratePerMT.toStringAsFixed(0)} / MT',
@@ -406,7 +522,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                   ),
                                   Text(
                                     '₹${tx.grossAmount.toStringAsFixed(0)}',
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primary),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -417,21 +537,36 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                 children: [
                                   if (tx.invoiceNo != null) ...[
                                     InkWell(
-                                      onTap: () => context.push('/invoices/${tx.invoiceId ?? tx.invoiceNo!}'),
+                                      onTap: () => context.push(
+                                        '/invoices/${tx.invoiceId ?? tx.invoiceNo!}',
+                                      ),
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: AppColors.primaryContainer,
-                                          borderRadius: BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(LucideIcons.receipt, size: 10, color: AppColors.primary),
+                                            const Icon(
+                                              LucideIcons.receipt,
+                                              size: 10,
+                                              color: AppColors.primary,
+                                            ),
                                             const SizedBox(width: 4),
                                             Text(
                                               tx.invoiceNo!,
-                                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.primary,
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -441,15 +576,24 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                   ],
                                   if (tx.commissionAmount > 0) ...[
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.amber.shade50,
                                         borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: Colors.amber.shade200),
+                                        border: Border.all(
+                                          color: Colors.amber.shade200,
+                                        ),
                                       ),
                                       child: Text(
                                         'Comm: ₹${tx.commissionAmount.toStringAsFixed(0)} (${tx.commissionPaid >= tx.commissionAmount ? "Paid" : "Pending"})',
-                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.amber.shade900),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.amber.shade900,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -459,16 +603,27 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
                               Row(
                                 children: [
-                                  const Icon(LucideIcons.briefcase, size: 12, color: AppColors.secondary),
+                                  const Icon(
+                                    LucideIcons.briefcase,
+                                    size: 12,
+                                    color: AppColors.secondary,
+                                  ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
                                       tx.brokerDeskName,
-                                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondaryLight,
+                                      ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  const Icon(LucideIcons.chevronRight, size: 14, color: AppColors.textMutedLight),
+                                  const Icon(
+                                    LucideIcons.chevronRight,
+                                    size: 14,
+                                    color: AppColors.textMutedLight,
+                                  ),
                                 ],
                               ),
                             ],
@@ -488,11 +643,18 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textMutedLight)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: AppColors.textMutedLight),
+        ),
         const SizedBox(height: 2),
         Text(
           value,
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: color ?? AppColors.textPrimaryLight),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            color: color ?? AppColors.textPrimaryLight,
+          ),
         ),
       ],
     );

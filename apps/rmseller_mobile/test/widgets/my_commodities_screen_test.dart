@@ -6,7 +6,9 @@ import 'package:rmseller_mobile/features/commodities/presentation/my_commodities
 
 void main() {
   group('RB-SELLER-01: MyCommoditiesScreen Widget Tests', () {
-    testWidgets('Renders app bar title and Post Commodity action button', (tester) async {
+    testWidgets('Renders app bar title and Post Commodity action button', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,

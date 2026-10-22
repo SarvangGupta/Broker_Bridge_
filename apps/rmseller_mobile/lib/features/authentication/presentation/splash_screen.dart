@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../app/router/app_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
@@ -75,7 +76,9 @@ class _SplashScreenState extends State<SplashScreen> {
               width: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.secondaryLight),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.secondaryLight,
+                ),
               ),
             ),
           ],

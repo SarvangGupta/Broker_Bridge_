@@ -1,6 +1,8 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../domain/broker_rating_model.dart';
 
 /// Repository managing Broker Ratings, Seller Feedback, and Role-Based Rating Security.
@@ -104,7 +106,8 @@ class SellerRatingsRepository {
       ),
     ];
 
-    _dealRatingsCache['d354958e-779a-41f2-b7a3-5899eca32e01'] = _brokerReviewsCache[bikanerBrokerId]![0];
+    _dealRatingsCache['d354958e-779a-41f2-b7a3-5899eca32e01'] =
+        _brokerReviewsCache[bikanerBrokerId]![0];
 
     _brokerReviewsCache[indoreBrokerId] = [
       BrokerRating(
@@ -154,7 +157,8 @@ class SellerRatingsRepository {
         promptnessRating: 5,
         settlementRating: 5,
         communicationRating: 5,
-        feedback: 'Excellent logistics handling for Hadoti coriander and wheat lots.',
+        feedback:
+            'Excellent logistics handling for Hadoti coriander and wheat lots.',
         createdAt: DateTime.now().subtract(const Duration(days: 45)),
         isVerifiedTrade: true,
       ),
@@ -186,8 +190,14 @@ class SellerRatingsRepository {
     }
 
     // Check if user already rated this broker
-    final userBrokerReviews = _brokerReviewsCache[brokerId]?.where((r) => r.sellerId == currentUserId).toList() ?? [];
-    final existingBrokerRating = userBrokerReviews.isNotEmpty ? userBrokerReviews.first : null;
+    final userBrokerReviews =
+        _brokerReviewsCache[brokerId]
+            ?.where((r) => r.sellerId == currentUserId)
+            .toList() ??
+        [];
+    final existingBrokerRating = userBrokerReviews.isNotEmpty
+        ? userBrokerReviews.first
+        : null;
 
     if (client != null) {
       try {
@@ -218,7 +228,9 @@ class SellerRatingsRepository {
             return RatingEligibility.eligible(
               dealId: dId,
               dealReference: 'BKG-DEAL-${dId.substring(0, 8).toUpperCase()}',
-              completedDealIds: eligibleDeals.map((d) => d['id'] as String).toList(),
+              completedDealIds: eligibleDeals
+                  .map((d) => d['id'] as String)
+                  .toList(),
               existingRating: _dealRatingsCache[dId] ?? existingBrokerRating,
             );
           } else {
@@ -240,7 +252,8 @@ class SellerRatingsRepository {
         dealId: defaultDealId,
         dealReference: 'BKG-2026-0881',
         completedDealIds: [defaultDealId],
-        existingRating: _dealRatingsCache[defaultDealId] ?? existingBrokerRating,
+        existingRating:
+            _dealRatingsCache[defaultDealId] ?? existingBrokerRating,
       );
     }
 
@@ -273,7 +286,9 @@ class SellerRatingsRepository {
       try {
         final brokerRow = await client
             .from('users')
-            .select('company_id, companies!users_company_id_companies_id_fk(trust_score)')
+            .select(
+              'company_id, companies!users_company_id_companies_id_fk(trust_score)',
+            )
             .eq('id', brokerId)
             .maybeSingle();
 
@@ -331,7 +346,8 @@ class SellerRatingsRepository {
       trustScore: trustScore,
       starDistribution: distribution,
       criteriaAverages: criteriaAverages,
-      recentReviews: List.from(reviews)..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
+      recentReviews: List.from(reviews)
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
       userReview: userReview,
     );
   }
@@ -356,7 +372,9 @@ class SellerRatingsRepository {
 
     // Validation 3: Target Role Verification (Cannot rate a Buyer)
     if (rating.brokerId.toLowerCase().contains('buyer')) {
-      throw StateError('Security Violation: Ratings cannot be submitted for Buyers. Counterparty Shield active.');
+      throw StateError(
+        'Security Violation: Ratings cannot be submitted for Buyers. Counterparty Shield active.',
+      );
     }
 
     final currentUserId = _currentUserId;
@@ -401,7 +419,11 @@ class SellerRatingsRepository {
 
     // Update in-memory registry
     final list = _brokerReviewsCache[finalRating.brokerId] ?? [];
-    final existingIndex = list.indexWhere((r) => r.sellerId == currentUserId || (finalRating.dealId != null && r.dealId == finalRating.dealId));
+    final existingIndex = list.indexWhere(
+      (r) =>
+          r.sellerId == currentUserId ||
+          (finalRating.dealId != null && r.dealId == finalRating.dealId),
+    );
 
     if (existingIndex >= 0) {
       list[existingIndex] = finalRating;

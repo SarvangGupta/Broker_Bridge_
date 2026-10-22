@@ -1,12 +1,8 @@
 import 'package:flutter/foundation.dart';
+
 import '../../domain/seller_user.dart';
 
-enum AuthStatus {
-  initial,
-  unauthenticated,
-  authenticated,
-  accessDenied,
-}
+enum AuthStatus { initial, unauthenticated, authenticated, accessDenied }
 
 /// Shared Notifier managing authentication state and route guarding for RMSeller.
 class AuthNotifier extends ChangeNotifier {

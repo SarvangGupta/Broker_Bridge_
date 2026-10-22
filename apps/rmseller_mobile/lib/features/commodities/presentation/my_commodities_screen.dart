@@ -27,18 +27,30 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
   String? _errorMessage;
   List<SellerCommodity> _commodities = [];
 
-  final List<String> _filters = ['ALL', 'Open', 'Active', 'Reserved', 'Fulfilled', 'Cancelled', 'Expired'];
+  final List<String> _filters = [
+    'ALL',
+    'Open',
+    'Active',
+    'Reserved',
+    'Fulfilled',
+    'Cancelled',
+    'Expired',
+  ];
 
   @override
   void initState() {
     super.initState();
     _fetchCommodities();
-    CommoditiesRepository.commoditiesUpdatedNotifier.addListener(_onListUpdated);
+    CommoditiesRepository.commoditiesUpdatedNotifier.addListener(
+      _onListUpdated,
+    );
   }
 
   @override
   void dispose() {
-    CommoditiesRepository.commoditiesUpdatedNotifier.removeListener(_onListUpdated);
+    CommoditiesRepository.commoditiesUpdatedNotifier.removeListener(
+      _onListUpdated,
+    );
     super.dispose();
   }
 
@@ -77,11 +89,15 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
     var filtered = _commodities;
     if (_searchQuery.trim().isNotEmpty) {
       final q = _searchQuery.trim().toLowerCase();
-      filtered = filtered.where((c) =>
-          c.commodityName.toLowerCase().contains(q) ||
-          c.lotNumber.toLowerCase().contains(q) ||
-          c.gradeName.toLowerCase().contains(q) ||
-          c.districtName.toLowerCase().contains(q)).toList();
+      filtered = filtered
+          .where(
+            (c) =>
+                c.commodityName.toLowerCase().contains(q) ||
+                c.lotNumber.toLowerCase().contains(q) ||
+                c.gradeName.toLowerCase().contains(q) ||
+                c.districtName.toLowerCase().contains(q),
+          )
+          .toList();
     }
 
     return Scaffold(
@@ -126,8 +142,12 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
                       selectedColor: AppColors.primaryContainer,
                       labelStyle: TextStyle(
                         fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected ? AppColors.primary : AppColors.textPrimaryLight,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textPrimaryLight,
                       ),
                       onSelected: (val) {
                         if (val) {
@@ -148,31 +168,34 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
           // Main Listing Content
           Expanded(
             child: _isLoading
-                ? const AppLoadingIndicator(message: 'Loading commodity listings...')
+                ? const AppLoadingIndicator(
+                    message: 'Loading commodity listings...',
+                  )
                 : _errorMessage != null
-                    ? AppErrorState(
-                        message: _errorMessage!,
-                        onRetry: _fetchCommodities,
-                      )
-                    : filtered.isEmpty
-                        ? AppEmptyState(
-                            title: 'No Commodities Listed',
-                            message: 'You have not listed any lots under "$_selectedFilter". Post a new commodity lot to make it discoverable by licensed brokers.',
-                            actionLabel: '+ Post Commodity',
-                            onAction: () => context.push('/commodities/new'),
-                          )
-                        : RefreshIndicator(
-                            onRefresh: _fetchCommodities,
-                            color: AppColors.primary,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                              itemCount: filtered.length,
-                              itemBuilder: (context, index) {
-                                final lot = filtered[index];
-                                return _buildLotCard(context, lot);
-                              },
-                            ),
-                          ),
+                ? AppErrorState(
+                    message: _errorMessage!,
+                    onRetry: _fetchCommodities,
+                  )
+                : filtered.isEmpty
+                ? AppEmptyState(
+                    title: 'No Commodities Listed',
+                    message:
+                        'You have not listed any lots under "$_selectedFilter". Post a new commodity lot to make it discoverable by licensed brokers.',
+                    actionLabel: '+ Post Commodity',
+                    onAction: () => context.push('/commodities/new'),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _fetchCommodities,
+                    color: AppColors.primary,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final lot = filtered[index];
+                        return _buildLotCard(context, lot);
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -197,7 +220,10 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primaryContainer,
                               borderRadius: BorderRadius.circular(4),
@@ -221,7 +247,10 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
                       const SizedBox(height: 4),
                       Text(
                         lot.gradeName,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondaryLight,
+                        ),
                       ),
                     ],
                   ),
@@ -238,10 +267,19 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Available / Total', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
+                    const Text(
+                      'Available / Total',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMutedLight,
+                      ),
+                    ),
                     Text(
                       '${lot.availableQuantity} / ${lot.totalQuantity} ${lot.unit}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
@@ -249,20 +287,40 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const Text('Reserved', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
+                      const Text(
+                        'Reserved',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMutedLight,
+                        ),
+                      ),
                       Text(
                         '${lot.reservedQuantity} ${lot.unit}',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.warning),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: AppColors.warning,
+                        ),
                       ),
                     ],
                   ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text('Asking Price', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
+                    const Text(
+                      'Asking Price',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMutedLight,
+                      ),
+                    ),
                     Text(
                       '₹${lot.askingPrice.toStringAsFixed(0)} / ${lot.unit}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primary),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ],
                 ),
@@ -273,15 +331,25 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
             // Location, Loading & Broker Footer
             Row(
               children: [
-                const Icon(LucideIcons.mapPin, size: 14, color: AppColors.textMutedLight),
+                const Icon(
+                  LucideIcons.mapPin,
+                  size: 14,
+                  color: AppColors.textMutedLight,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   '${lot.districtName}, ${lot.stateName}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: lot.loadingStatus == 'Ready to Load'
                         ? AppColors.successBackground
@@ -305,12 +373,20 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(LucideIcons.briefcase, size: 13, color: AppColors.secondary),
+                  const Icon(
+                    LucideIcons.briefcase,
+                    size: 13,
+                    color: AppColors.secondary,
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       'Assigned: ${lot.brokerName}',
-                      style: const TextStyle(fontSize: 11, color: AppColors.secondaryDark, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.secondaryDark,
+                        fontWeight: FontWeight.w500,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

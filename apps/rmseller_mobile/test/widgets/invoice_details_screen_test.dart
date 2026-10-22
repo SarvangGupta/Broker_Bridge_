@@ -36,19 +36,24 @@ void main() {
       );
     }
 
-    testWidgets('Renders invoice numbers, status, and broker mediation context', (tester) async {
-      await tester.pumpWidget(createScreen());
-      await tester.pump();
+    testWidgets(
+      'Renders invoice numbers, status, and broker mediation context',
+      (tester) async {
+        await tester.pumpWidget(createScreen());
+        await tester.pump();
 
-      expect(find.text('INV-2026-0042'), findsAtLeastNWidgets(1));
-      expect(find.text('TAX INVOICE'), findsOneWidget);
-      expect(find.text('Paid'), findsOneWidget);
-      expect(find.text('Kota Agro Brokerage'), findsOneWidget);
-      expect(find.text('BKG-2026-0520'), findsOneWidget);
-      expect(find.text('UTR-HDFC-90218820'), findsOneWidget);
-    });
+        expect(find.text('INV-2026-0042'), findsAtLeastNWidgets(1));
+        expect(find.text('TAX INVOICE'), findsOneWidget);
+        expect(find.text('Paid'), findsOneWidget);
+        expect(find.text('Kota Agro Brokerage'), findsOneWidget);
+        expect(find.text('BKG-2026-0520'), findsOneWidget);
+        expect(find.text('UTR-HDFC-90218820'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Renders line items, volume, rate, and tax calculation', (tester) async {
+    testWidgets('Renders line items, volume, rate, and tax calculation', (
+      tester,
+    ) async {
       await tester.pumpWidget(createScreen());
       await tester.pump();
 
@@ -60,12 +65,15 @@ void main() {
       expect(find.textContaining('SGST'), findsOneWidget);
     });
 
-    testWidgets('Renders Counterparty Shield notice and document action buttons', (tester) async {
-      await tester.pumpWidget(createScreen());
-      await tester.pump();
+    testWidgets(
+      'Renders Counterparty Shield notice and document action buttons',
+      (tester) async {
+        await tester.pumpWidget(createScreen());
+        await tester.pump();
 
-      expect(find.textContaining('Counterparty Shield'), findsOneWidget);
-      expect(find.text('View Linked Deal Contract'), findsOneWidget);
-    });
+        expect(find.textContaining('Counterparty Shield'), findsOneWidget);
+        expect(find.text('View Linked Deal Contract'), findsOneWidget);
+      },
+    );
   });
 }

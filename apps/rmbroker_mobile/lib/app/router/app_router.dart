@@ -27,18 +27,16 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
-final GlobalKey<NavigatorState> _dashboardNavigatorKey = GlobalKey<NavigatorState>(
-  debugLabel: 'dashboardNav',
-);
+final GlobalKey<NavigatorState> _dashboardNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'dashboardNav');
 final GlobalKey<NavigatorState> _workNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'workNav',
 );
 final GlobalKey<NavigatorState> _dealsNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'dealsNav',
 );
-final GlobalKey<NavigatorState> _directoryNavigatorKey = GlobalKey<NavigatorState>(
-  debugLabel: 'directoryNav',
-);
+final GlobalKey<NavigatorState> _directoryNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'directoryNav');
 final GlobalKey<NavigatorState> _moreNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'moreNav',
 );
@@ -64,11 +62,18 @@ class AppRouter {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(LucideIcons.compass, size: 48, color: AppColors.primary),
+              const Icon(
+                LucideIcons.compass,
+                size: 48,
+                color: AppColors.primary,
+              ),
               const SizedBox(height: 12),
               Text(
                 'Unknown location: ${state.uri.path}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondaryLight,
+                ),
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
@@ -134,7 +139,9 @@ class AppRouter {
           final entity = state.uri.queryParameters['entity'];
           return GlobalSearchScreen(
             initialQuery: query,
-            initialFilter: entity != null ? SearchEntityType.fromString(entity) : null,
+            initialFilter: entity != null
+                ? SearchEntityType.fromString(entity)
+                : null,
           );
         },
       ),
@@ -147,8 +154,7 @@ class AppRouter {
         builder: (context, state) => const ModulePlaceholderScreen(
           title: 'Logistics & Dispatch Tracking',
           moduleCode: 'RB-LOG-01',
-          description:
-              'Real-time vehicle dispatches, e-way bills, and delivery acknowledgements are scheduled for upcoming micro-sprints per the RMBroker product roadmap.',
+          description: 'Real-time vehicle dispatches, e-way bills, and delivery acknowledgements are scheduled for upcoming micro-sprints per the RMBroker product roadmap.',
           icon: LucideIcons.truck,
         ),
       ),
@@ -180,8 +186,7 @@ class AppRouter {
         builder: (context, state) => const ModulePlaceholderScreen(
           title: 'Arbitration & Dispute Resolution',
           moduleCode: 'RB-DIS-01',
-          description:
-              'Broker-mediated dispute claims, quality deduction arbitration, and settlement records are scheduled for upcoming micro-sprints per the RMBroker product roadmap.',
+          description: 'Broker-mediated dispute claims, quality deduction arbitration, and settlement records are scheduled for upcoming micro-sprints per the RMBroker product roadmap.',
           icon: LucideIcons.alertTriangle,
         ),
       ),
@@ -205,6 +210,14 @@ class AppRouter {
           final id = state.pathParameters['id'] ?? '';
           return TaskDetailScreen(taskId: id);
         },
+      ),
+
+      // Application Settings Route (Protected)
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const MoreScreen(),
       ),
 
       // Core Broker Shell with Persistent Bottom Navigation
@@ -233,7 +246,9 @@ class AppRouter {
                   final tabStr = state.uri.queryParameters['tab'];
                   final tab = int.tryParse(tabStr ?? '0') ?? 0;
                   final status = state.uri.queryParameters['status'];
-                  final reqId = state.uri.queryParameters['requirementId'] ?? state.uri.queryParameters['reqId'];
+                  final reqId =
+                      state.uri.queryParameters['requirementId'] ??
+                      state.uri.queryParameters['reqId'];
                   return WorkScreen(
                     initialTabIndex: tab,
                     initialStatusFilter: status,

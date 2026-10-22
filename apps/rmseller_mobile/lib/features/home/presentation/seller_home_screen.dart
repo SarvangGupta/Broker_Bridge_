@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../app/router/app_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
+import '../../authentication/data/auth_repository.dart';
 import '../../../core/security/secure_storage_service.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_empty_state.dart';
@@ -16,16 +18,25 @@ import '../../deals/data/seller_deals_repository.dart';
 import '../../deals/domain/seller_deal_model.dart';
 
 class SellerHomeScreen extends StatefulWidget {
-  const SellerHomeScreen({super.key});
+  final CommoditiesRepository? commoditiesRepository;
+  final SellerDealsRepository? dealsRepository;
+  final SecureStorageService? storageService;
+
+  const SellerHomeScreen({
+    super.key,
+    this.commoditiesRepository,
+    this.dealsRepository,
+    this.storageService,
+  });
 
   @override
   State<SellerHomeScreen> createState() => _SellerHomeScreenState();
 }
 
 class _SellerHomeScreenState extends State<SellerHomeScreen> {
-  final CommoditiesRepository _commoditiesRepository = CommoditiesRepository();
-  final SellerDealsRepository _dealsRepository = SellerDealsRepository();
-  final SecureStorageService _storage = SecureStorageService();
+  late final CommoditiesRepository _commoditiesRepository;
+  late final SellerDealsRepository _dealsRepository;
+  late final SecureStorageService _storage;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -38,13 +49,21 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
   @override
   void initState() {
     super.initState();
+    _commoditiesRepository =
+        widget.commoditiesRepository ?? CommoditiesRepository();
+    _dealsRepository = widget.dealsRepository ?? SellerDealsRepository();
+    _storage = widget.storageService ?? SecureStorageService();
     _loadDashboardData();
-    CommoditiesRepository.commoditiesUpdatedNotifier.addListener(_onCommoditiesUpdated);
+    CommoditiesRepository.commoditiesUpdatedNotifier.addListener(
+      _onCommoditiesUpdated,
+    );
   }
 
   @override
   void dispose() {
-    CommoditiesRepository.commoditiesUpdatedNotifier.removeListener(_onCommoditiesUpdated);
+    CommoditiesRepository.commoditiesUpdatedNotifier.removeListener(
+      _onCommoditiesUpdated,
+    );
     super.dispose();
   }
 
@@ -102,9 +121,13 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     }
 
     final activeLotsCount = _activeLots.where((l) => l.isActive).length;
-    final inNegotiationCount = _activeDeals.where((d) => d.status.toLowerCase().contains('negotiation')).length;
+    final inNegotiationCount = _activeDeals
+        .where((d) => d.status.toLowerCase().contains('negotiation'))
+        .length;
     final bookedDealsCount = _activeDeals.length;
-    final readyLotsCount = _activeLots.where((l) => l.loadingStatus == 'Ready to Load').length;
+    final readyLotsCount = _activeLots
+        .where((l) => l.loadingStatus == 'Ready to Load')
+        .length;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -112,21 +135,145 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_companyName, style: AppTypography.titleMedium),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    _companyName,
+                    style: AppTypography.titleMedium,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  key: const Key('mediation_info_button'),
+                  icon: const Icon(LucideIcons.info, size: 16),
+                  tooltip: 'Mediation information',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  splashRadius: 16,
+                  color: AppColors.primary,
+                  onPressed: () => _showMediationDisclaimerDialog(context),
+                ),
+              ],
+            ),
             Text(
               'Seller Desk • $_sellerName',
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondaryLight,
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.bell),
+            tooltip: 'Notifications',
             onPressed: () => context.push('/notifications'),
           ),
           IconButton(
             icon: const Icon(LucideIcons.search),
+            tooltip: 'Search',
             onPressed: () => context.push('/search'),
+          ),
+          PopupMenuButton<String>(
+            key: const Key('dashboard_overflow_menu_button'),
+            icon: const Icon(LucideIcons.ellipsisVertical),
+            tooltip: 'More options',
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 4,
+            onSelected: (value) => _handleOverflowMenuAction(context, value),
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                key: Key('menu_item_profile'),
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.user, size: 18, color: AppColors.primary),
+                    SizedBox(width: 12),
+                    Text(
+                      'My Profile',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                key: Key('menu_item_settings'),
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.settings,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Settings',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                key: Key('menu_item_help'),
+                value: 'help',
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.helpCircle,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Help & Support',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                key: Key('menu_item_notifications'),
+                value: 'notifications',
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.bell, size: 18, color: AppColors.primary),
+                    SizedBox(width: 12),
+                    Text(
+                      'Notifications',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                key: Key('menu_item_logout'),
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.logOut, size: 18, color: AppColors.error),
+                    SizedBox(width: 12),
+                    Text(
+                      'Logout',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -136,10 +283,6 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           children: [
-            // P0 Action Required Banner / Fiduciary Alert
-            _buildActionCenterCard(context),
-            const SizedBox(height: 16),
-
             // 4 Authoritative Metric Cards
             Row(
               children: [
@@ -224,7 +367,13 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Active Commodity Lots', style: AppTypography.titleMedium),
+                Expanded(
+                  child: Text(
+                    'Active Commodity Lots',
+                    style: AppTypography.titleMedium,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 TextButton(
                   onPressed: () => context.go('/commodities'),
                   child: const Text('View All'),
@@ -239,7 +388,9 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                 message: 'Post your first agricultural commodity lot to receive broker match proposals.',
               )
             else
-              ..._activeLots.take(3).map((lot) => _buildCommodityLotCard(context, lot)),
+              ..._activeLots
+                  .take(3)
+                  .map((lot) => _buildCommodityLotCard(context, lot)),
 
             const SizedBox(height: 20),
 
@@ -247,7 +398,13 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Recent Booked Contracts', style: AppTypography.titleMedium),
+                Expanded(
+                  child: Text(
+                    'Recent Booked Contracts',
+                    style: AppTypography.titleMedium,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 TextButton(
                   onPressed: () => context.go('/deals'),
                   child: const Text('View All'),
@@ -262,7 +419,9 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                 message: 'Deals will appear here when brokers match buyer demand with your supply lots.',
               )
             else
-              ..._activeDeals.take(2).map((deal) => _buildDealCard(context, deal)),
+              ..._activeDeals
+                  .take(2)
+                  .map((deal) => _buildDealCard(context, deal)),
 
             const SizedBox(height: 24),
           ],
@@ -271,44 +430,140 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     );
   }
 
-  Widget _buildActionCenterCard(BuildContext context) {
-    return AppCard(
-      backgroundColor: AppColors.primaryContainer.withOpacity(0.5),
-      borderColor: AppColors.primary.withOpacity(0.3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(LucideIcons.shieldCheck, size: 20, color: Colors.white),
+  void _handleOverflowMenuAction(BuildContext context, String action) {
+    switch (action) {
+      case 'profile':
+        context.go('/profile');
+        break;
+      case 'settings':
+        context.push('/settings');
+        break;
+      case 'help':
+        context.push('/help');
+        break;
+      case 'notifications':
+        context.push('/notifications');
+        break;
+      case 'logout':
+        _showSignOutDialog(context);
+        break;
+    }
+  }
+
+  Future<void> _showSignOutDialog(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Sign Out'),
+        content: const Text(
+          'Are you sure you want to sign out of the RMSeller desk?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Mandi Mediation Active',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'All commodity negotiations and bookings are mediated through authorized mandi brokers. Buyer identities are shielded.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
-                ),
-              ],
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Sign Out',
+              style: TextStyle(color: Colors.white),
             ),
           ),
         ],
       ),
+    );
+
+    if (confirmed == true) {
+      await AuthRepository().signOut();
+      AppRouter.authNotifier.setUnauthenticated();
+    }
+  }
+
+  void _showMediationDisclaimerDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: isDark
+              ? AppColors.surfaceDark
+              : AppColors.surfaceLight,
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.primaryContainer.withValues(alpha: 0.2)
+                      : AppColors.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  LucideIcons.shieldCheck,
+                  size: 20,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Mandi Mediation Active',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                Text(
+                  'All commodity negotiations and bookings are mediated through authorized mandi brokers. Buyer identities are shielded.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -331,26 +586,36 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondaryLight,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                const SizedBox(width: 4),
                 Icon(icon, size: 18, color: color),
               ],
             ),
             const SizedBox(height: 8),
             Text(
               value,
-              style: AppTypography.displayLarge.copyWith(fontSize: 26, color: color),
+              style: AppTypography.displayLarge.copyWith(
+                fontSize: 26,
+                color: color,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textMutedLight,
+              ),
             ),
           ],
         ),
@@ -367,10 +632,17 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     return OutlinedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 18, color: color),
-      label: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
+      label: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+      ),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        side: BorderSide(color: color.withOpacity(0.5)),
+        side: BorderSide(color: color.withValues(alpha: 0.5)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
@@ -392,7 +664,13 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(lot.commodityName, style: AppTypography.titleSmall),
-                      Text(lot.gradeName, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+                      Text(
+                        lot.gradeName,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -403,42 +681,87 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Available Supply', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
-                    Text(
-                      '${lot.availableQuantity} / ${lot.totalQuantity} ${lot.unit}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Available Supply',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMutedLight,
+                        ),
+                      ),
+                      Text(
+                        '${lot.availableQuantity} / ${lot.totalQuantity} ${lot.unit}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('Asking Price', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
-                    Text(
-                      '₹${lot.askingPrice.toStringAsFixed(0)} / ${lot.unit}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primary),
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'Asking Price',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMutedLight,
+                        ),
+                      ),
+                      Text(
+                        '₹${lot.askingPrice.toStringAsFixed(0)} / ${lot.unit}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(LucideIcons.mapPin, size: 13, color: AppColors.textMutedLight),
+                const Icon(
+                  LucideIcons.mapPin,
+                  size: 13,
+                  color: AppColors.textMutedLight,
+                ),
                 const SizedBox(width: 4),
-                Text('${lot.districtName}, ${lot.stateName}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
-                const Spacer(),
+                Expanded(
+                  child: Text(
+                    '${lot.districtName}, ${lot.stateName}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text(lot.loadingStatus, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500)),
+                  child: Text(
+                    lot.loadingStatus,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -458,10 +781,14 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.primaryContainer.withOpacity(0.5),
+                color: AppColors.primaryContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(LucideIcons.fileCheck2, size: 24, color: AppColors.primary),
+              child: const Icon(
+                LucideIcons.fileCheck2,
+                size: 24,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -471,7 +798,10 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                   Text(deal.commodityName, style: AppTypography.titleSmall),
                   Text(
                     '${deal.agreedQuantity} ${deal.unit} @ ₹${deal.agreedPrice.toStringAsFixed(0)} • ${deal.brokerDeskName}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
                   ),
                 ],
               ),

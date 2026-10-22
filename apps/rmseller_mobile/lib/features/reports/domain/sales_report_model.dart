@@ -32,7 +32,8 @@ class SalesReportSummary {
     required this.totalCommissionOutstanding,
   });
 
-  int get totalDealsCount => completedDealsCount + activeDealsCount + cancelledDealsCount;
+  int get totalDealsCount =>
+      completedDealsCount + activeDealsCount + cancelledDealsCount;
 
   double get settlementPercentage =>
       grossSalesValue > 0 ? (settledAmount / grossSalesValue) * 100 : 0.0;
@@ -53,7 +54,8 @@ class SalesTransactionItem {
   final String? invoiceId;
   final String? invoiceStatus; // 'Paid', 'Pending'
   final String brokerDeskName;
-  final String status; // 'Settled', 'In Transit', 'Dispatch Pending', 'Cancelled'
+  final String
+  status; // 'Settled', 'In Transit', 'Dispatch Pending', 'Cancelled'
   final DateTime date;
   final double? commissionRate;
   final String commissionBasis;
@@ -88,8 +90,7 @@ class SalesTransactionItem {
       status.toLowerCase() == 'settled';
 
   bool get isCancelled =>
-      status.toLowerCase() == 'cancelled' ||
-      status.toLowerCase() == 'rejected';
+      status.toLowerCase() == 'cancelled' || status.toLowerCase() == 'rejected';
 
   bool get isActive => !isCompleted && !isCancelled;
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_typography.dart';
 import 'app_button.dart';
@@ -37,7 +38,11 @@ class AppEmptyState extends StatelessWidget {
               child: Icon(icon, size: 48, color: AppColors.primary),
             ),
             const SizedBox(height: 20),
-            Text(title, style: AppTypography.titleMedium, textAlign: TextAlign.center),
+            Text(
+              title,
+              style: AppTypography.titleMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 8),
             Text(
               message,
@@ -46,11 +51,7 @@ class AppEmptyState extends StatelessWidget {
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 24),
-              AppButton(
-                label: actionLabel!,
-                onPressed: onAction,
-                width: 200,
-              ),
+              AppButton(label: actionLabel!, onPressed: onAction, width: 200),
             ],
           ],
         ),

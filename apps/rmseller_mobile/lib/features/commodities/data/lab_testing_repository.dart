@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -23,11 +24,9 @@ class LabTestingRepository {
   // In production, this matches bank/merchant webhook settlement records
   static final Map<String, bool> _trustedTransactionLedger = {};
 
-  LabTestingRepository({
-    SupabaseClient? client,
-    SecureStorageService? storage,
-  })  : _customClient = client,
-        _storage = storage ?? SecureStorageService();
+  LabTestingRepository({SupabaseClient? client, SecureStorageService? storage})
+    : _customClient = client,
+      _storage = storage ?? SecureStorageService();
 
   SupabaseClient? get _supabase {
     if (_customClient != null) return _customClient;
@@ -77,7 +76,8 @@ class LabTestingRepository {
     final deduplicated = uniqueTests.values.toList();
 
     final estimatedTotal = LabTestRateCard.calculateTotal(deduplicated);
-    final finalPayableAmount = estimatedTotal; // No unverified surcharges or taxes
+    final finalPayableAmount =
+        estimatedTotal; // No unverified surcharges or taxes
 
     String companyId = '';
     try {
@@ -90,8 +90,10 @@ class LabTestingRepository {
       return existing; // Cannot overwrite already paid request
     }
 
-    final requestId = 'LAB-REQ-${DateTime.now().millisecondsSinceEpoch}-${availabilityId.substring(0, availabilityId.length > 8 ? 8 : availabilityId.length)}';
-    final transactionRef = 'LAB-TXN-$availabilityId-${DateTime.now().millisecondsSinceEpoch}';
+    final requestId =
+        'LAB-REQ-${DateTime.now().millisecondsSinceEpoch}-${availabilityId.substring(0, availabilityId.length > 8 ? 8 : availabilityId.length)}';
+    final transactionRef =
+        'LAB-TXN-$availabilityId-${DateTime.now().millisecondsSinceEpoch}';
 
     final request = LabTestingRequest(
       id: requestId,
@@ -155,11 +157,16 @@ class LabTestingRepository {
 
     try {
       if (await canLaunchUrl(uri)) {
-        final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
         return launched;
       } else {
         // Fallback: browser or generic intent if specific upi:// handler isn't registered
-        debugPrint('Direct UPI app handler not found, launching generic URL: $uri');
+        debugPrint(
+          'Direct UPI app handler not found, launching generic URL: $uri',
+        );
         return await launchUrl(uri);
       }
     } catch (e) {
@@ -192,19 +199,24 @@ class LabTestingRepository {
   }) async {
     final current = _requestRegistry[availabilityId];
     if (current == null) {
-      throw StateError('No lab testing request found for availability: $availabilityId');
+      throw StateError(
+        'No lab testing request found for availability: $availabilityId',
+      );
     }
 
     // Idempotency check: Already verified
     if (current.isPaid) {
-      debugPrint('Payment already verified for request ${current.id}. Returning existing record.');
+      debugPrint(
+        'Payment already verified for request ${current.id}. Returning existing record.',
+      );
       return current;
     }
 
     // Verify against trusted backend ledger
     bool backendConfirmed = false;
     if (_trustedTransactionLedger.containsKey(transactionReference)) {
-      backendConfirmed = _trustedTransactionLedger[transactionReference] == true;
+      backendConfirmed =
+          _trustedTransactionLedger[transactionReference] == true;
     } else if (simulateSandboxVerification) {
       // In sandbox/testing mode when explicitly permitted
       backendConfirmed = true;
@@ -250,28 +262,37 @@ class LabTestingRepository {
           .maybeSingle();
 
       if (existing != null) {
-        await client.from('lab_tests').update({
-          'laboratory_name': LabTestRateCard.laboratoryName,
-          'laboratory_location': LabTestRateCard.laboratoryAddress,
-          'status': 'Testing In Progress',
-          'verification_notes': 'UPI Payment Verified: Ref ${request.transactionReference}, Amount ₹${request.finalPayableAmount}',
-          'updated_at': DateTime.now().toIso8601String(),
-        }).eq('id', existing['id']);
+        await client
+            .from('lab_tests')
+            .update({
+              'laboratory_name': LabTestRateCard.laboratoryName,
+              'laboratory_location': LabTestRateCard.laboratoryAddress,
+              'status': 'Testing In Progress',
+              'verification_notes':
+                  'UPI Payment Verified: Ref ${request.transactionReference}, Amount ₹${request.finalPayableAmount}',
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', existing['id']);
       } else {
         await client.from('lab_tests').insert({
           'availability_id': request.availabilityId,
-          'company_id': request.companyId.isNotEmpty ? request.companyId : '00000000-0000-0000-0000-000000000001',
+          'company_id': request.companyId.isNotEmpty
+              ? request.companyId
+              : '00000000-0000-0000-0000-000000000001',
           'laboratory_name': LabTestRateCard.laboratoryName,
           'laboratory_location': LabTestRateCard.laboratoryAddress,
           'test_date': DateTime.now().toIso8601String(),
           'report_number': 'PENDING-${request.lotNumber}',
           'report_date': DateTime.now().toIso8601String(),
           'status': 'Testing In Progress',
-          'verification_notes': 'UPI Payment Verified: Ref ${request.transactionReference}, Amount ₹${request.finalPayableAmount}',
+          'verification_notes':
+              'UPI Payment Verified: Ref ${request.transactionReference}, Amount ₹${request.finalPayableAmount}',
         });
       }
     } catch (e) {
-      debugPrint('Notice: Error syncing lab_tests record to remote Supabase (handled locally): $e');
+      debugPrint(
+        'Notice: Error syncing lab_tests record to remote Supabase (handled locally): $e',
+      );
     }
   }
 
@@ -284,22 +305,30 @@ class LabTestingRepository {
   /// 1. Triggered ONLY after trusted payment confirmation.
   /// 2. Idempotent key deduplication (prevents repeated alerts).
   /// 3. Minimal required information (request reference, seller lot, tests, verified amount, transaction ref).
-  Future<bool> notifyAdministratorAfterPayment(LabTestingRequest request) async {
+  Future<bool> notifyAdministratorAfterPayment(
+    LabTestingRequest request,
+  ) async {
     if (!request.isPaid) {
-      debugPrint('Cannot dispatch admin notification: Payment is not verified.');
+      debugPrint(
+        'Cannot dispatch admin notification: Payment is not verified.',
+      );
       return false;
     }
 
-    final idempotencyKey = 'LAB-ADMIN-NOTIF-${request.id}-${request.transactionReference}';
+    final idempotencyKey =
+        'LAB-ADMIN-NOTIF-${request.id}-${request.transactionReference}';
 
     // Idempotency check: Don't dispatch duplicate alerts
     if (_processedNotificationKeys.contains(idempotencyKey)) {
-      debugPrint('Admin notification already processed for key $idempotencyKey. Suppressing duplicate.');
+      debugPrint(
+        'Admin notification already processed for key $idempotencyKey. Suppressing duplicate.',
+      );
       return true;
     }
 
     final testNames = request.selectedTests.map((t) => t.name).join(', ');
-    final notificationTitle = 'Paid Lab Testing Request: Lot ${request.lotNumber}';
+    final notificationTitle =
+        'Paid Lab Testing Request: Lot ${request.lotNumber}';
     final notificationMessage =
         'Seller paid ₹${request.finalPayableAmount.toInt()} via UPI for tests: $testNames. Partner Lab: ${LabTestRateCard.laboratoryName}. Transaction Ref: ${request.transactionReference}';
 
@@ -316,7 +345,9 @@ class LabTestingRepository {
             .limit(1)
             .maybeSingle();
 
-        final targetUserId = adminUser != null ? adminUser['id'].toString() : null;
+        final targetUserId = adminUser != null
+            ? adminUser['id'].toString()
+            : null;
 
         if (targetUserId != null) {
           await client.from('notifications').insert({
@@ -325,7 +356,8 @@ class LabTestingRepository {
             'event_type': 'LAB_UPDATE',
             'title': notificationTitle,
             'message': notificationMessage,
-            'context_reason': 'Paid lab testing coordination required for Mandi lot.',
+            'context_reason':
+                'Paid lab testing coordination required for Mandi lot.',
             'action_label': 'Coordinate Lab Process',
             'action_url': '/admin/lab-tests/${request.availabilityId}',
             'idempotency_key': idempotencyKey,
@@ -343,7 +375,9 @@ class LabTestingRepository {
             'sent_at': DateTime.now().toIso8601String(),
           });
           notificationDelivered = true;
-          debugPrint('Admin notification successfully dispatched to $targetUserId');
+          debugPrint(
+            'Admin notification successfully dispatched to $targetUserId',
+          );
         }
       } catch (e) {
         debugPrint('Remote admin notification notice: $e');
@@ -351,7 +385,9 @@ class LabTestingRepository {
     }
 
     if (!notificationDelivered) {
-      debugPrint('Admin notification recorded locally under idempotency key $idempotencyKey');
+      debugPrint(
+        'Admin notification recorded locally under idempotency key $idempotencyKey',
+      );
     }
 
     // Always record idempotency key locally to ensure local idempotency
@@ -363,7 +399,9 @@ class LabTestingRepository {
     );
     _requestRegistry[request.availabilityId] = updatedRequest;
 
-    debugPrint('Admin notified successfully for request ${request.id}. Key: $idempotencyKey');
+    debugPrint(
+      'Admin notified successfully for request ${request.id}. Key: $idempotencyKey',
+    );
     return true;
   }
 
@@ -376,8 +414,10 @@ class LabTestingRepository {
   /// 1. Strict Tenant Isolation: User's company must match lot company.
   /// 2. Returns time-limited signed URL only if report is officially uploaded.
   /// 3. Returns pending status if report has not yet been attached.
-  Future<({bool isAvailable, String? reportUrl, String status, String? reportNumber})>
-      getLabReportDetails(String availabilityId) async {
+  Future<
+    ({bool isAvailable, String? reportUrl, String status, String? reportNumber})
+  >
+  getLabReportDetails(String availabilityId) async {
     final current = _requestRegistry[availabilityId];
     final client = _supabase;
 
@@ -402,7 +442,9 @@ class LabTestingRepository {
           if (currentCompanyId.isNotEmpty &&
               rowCompanyId != null &&
               rowCompanyId != currentCompanyId) {
-            debugPrint('Tenant isolation violation: Seller $currentCompanyId attempted access to report belonging to $rowCompanyId');
+            debugPrint(
+              'Tenant isolation violation: Seller $currentCompanyId attempted access to report belonging to $rowCompanyId',
+            );
             return (
               isAvailable: false,
               reportUrl: null,
@@ -415,7 +457,8 @@ class LabTestingRepository {
           final fileUrl = labTestRow['file_url'] as String?;
           final reportNumber = labTestRow['report_number'] as String?;
 
-          final isReportReady = (status == 'Report Uploaded' || status == 'Verified') &&
+          final isReportReady =
+              (status == 'Report Uploaded' || status == 'Verified') &&
               fileUrl != null &&
               fileUrl.isNotEmpty;
 
@@ -471,13 +514,16 @@ class LabTestingRepository {
     final client = _supabase;
     if (client != null) {
       try {
-        await client.from('lab_tests').update({
-          'report_number': reportNumber,
-          'file_url': fileUrl,
-          'status': 'Verified',
-          'verified_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
-        }).eq('availability_id', availabilityId);
+        await client
+            .from('lab_tests')
+            .update({
+              'report_number': reportNumber,
+              'file_url': fileUrl,
+              'status': 'Verified',
+              'verified_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('availability_id', availabilityId);
       } catch (e) {
         debugPrint('Admin report attach remote notice: $e');
       }

@@ -5,24 +5,30 @@ import 'package:rmseller_mobile/features/commodities/presentation/post_commodity
 
 void main() {
   group('RB-SELLER-02: PostCommodityScreen Widget Tests', () {
-    testWidgets('Renders all 5 trading workflow sections including review summary after master catalog load', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: const PostCommodityScreen(),
-        ),
-      );
+    testWidgets(
+      'Renders all 5 trading workflow sections including review summary after master catalog load',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const PostCommodityScreen(),
+          ),
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      expect(find.text('Post Commodity Lot'), findsOneWidget);
-      expect(find.text('1. Commodity & Specification'), findsOneWidget);
-      expect(find.text('2. Quantity & Commercial Pricing'), findsOneWidget);
-      expect(find.text('3. Warehouse Location & Loading'), findsOneWidget);
-      expect(find.text('4. Broker Mandate Assignment'), findsOneWidget);
-      expect(find.text('5. Review Mandate & Listing Summary'), findsOneWidget);
-      expect(find.text('List Commodity on Desk'), findsOneWidget);
-    });
+        expect(find.text('Post Commodity Lot'), findsOneWidget);
+        expect(find.text('1. Commodity & Specification'), findsOneWidget);
+        expect(find.text('2. Quantity & Commercial Pricing'), findsOneWidget);
+        expect(find.text('3. Warehouse Location & Loading'), findsOneWidget);
+        expect(find.text('4. Broker Mandate Assignment'), findsOneWidget);
+        expect(
+          find.text('5. Review Mandate & Listing Summary'),
+          findsOneWidget,
+        );
+        expect(find.text('List Commodity on Desk'), findsOneWidget);
+      },
+    );
 
     testWidgets('Renders dedicated review summary card fields', (tester) async {
       await tester.pumpWidget(
@@ -41,7 +47,9 @@ void main() {
       expect(find.text('Mandate Routing'), findsOneWidget);
     });
 
-    testWidgets('Form validation catches empty quantity submission', (tester) async {
+    testWidgets('Form validation catches empty quantity submission', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,

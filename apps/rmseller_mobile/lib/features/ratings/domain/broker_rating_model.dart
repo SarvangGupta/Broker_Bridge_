@@ -50,10 +50,14 @@ class BrokerRating {
       dealId: map['deal_id'] as String?,
       dealReference: map['deal_reference'] as String?,
       rating: ((map['rating'] as num?)?.toInt() ?? 5).clamp(1, 5),
-      mandiKnowledgeRating: ((map['mandi_knowledge_rating'] as num?)?.toInt() ?? 5).clamp(1, 5),
-      promptnessRating: ((map['promptness_rating'] as num?)?.toInt() ?? 5).clamp(1, 5),
-      settlementRating: ((map['settlement_rating'] as num?)?.toInt() ?? 5).clamp(1, 5),
-      communicationRating: ((map['communication_rating'] as num?)?.toInt() ?? 5).clamp(1, 5),
+      mandiKnowledgeRating:
+          ((map['mandi_knowledge_rating'] as num?)?.toInt() ?? 5).clamp(1, 5),
+      promptnessRating: ((map['promptness_rating'] as num?)?.toInt() ?? 5)
+          .clamp(1, 5),
+      settlementRating: ((map['settlement_rating'] as num?)?.toInt() ?? 5)
+          .clamp(1, 5),
+      communicationRating: ((map['communication_rating'] as num?)?.toInt() ?? 5)
+          .clamp(1, 5),
       feedback: (map['feedback'] as String?) ?? '',
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()

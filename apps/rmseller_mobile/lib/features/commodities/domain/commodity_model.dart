@@ -14,7 +14,8 @@ class SellerCommodity {
   final String stateName;
   final String districtName;
   final String loadingStatus;
-  final String status; // 'Open', 'Active', 'Reserved', 'Fulfilled', 'Expired', 'Cancelled'
+  final String
+  status; // 'Open', 'Active', 'Reserved', 'Fulfilled', 'Expired', 'Cancelled'
   final DateTime availableFrom;
   final DateTime validUntil;
   final String? brokerId;
@@ -78,8 +79,10 @@ class SellerCommodity {
     required this.createdAt,
   });
 
-  bool get isActive => status.toLowerCase() == 'open' || status.toLowerCase() == 'active';
-  bool get isExpired => DateTime.now().isAfter(validUntil) || status.toLowerCase() == 'expired';
+  bool get isActive =>
+      status.toLowerCase() == 'open' || status.toLowerCase() == 'active';
+  bool get isExpired =>
+      DateTime.now().isAfter(validUntil) || status.toLowerCase() == 'expired';
   bool get isDirectBrokerMandate => brokerId != null && brokerId!.isNotEmpty;
   double get totalEstimatedValue => totalQuantity * askingPrice;
   double get availableEstimatedValue => availableQuantity * askingPrice;
@@ -93,38 +96,49 @@ class SellerCommodity {
   factory SellerCommodity.fromMap(Map<String, dynamic> map) {
     return SellerCommodity(
       id: map['id']?.toString() ?? '',
-      lotNumber: map['lot_number'] as String? ?? 'LOT-${(map['id']?.toString() ?? '000').substring(0, 5).toUpperCase()}',
-      commodityName: (map['commodity_name'] as String?) ??
+      lotNumber:
+          map['lot_number'] as String? ??
+          'LOT-${(map['id']?.toString() ?? '000').substring(0, 5).toUpperCase()}',
+      commodityName:
+          (map['commodity_name'] as String?) ??
           (map['commodityName'] as String?) ??
           'Agricultural Commodity',
-      gradeName: (map['grade_name'] as String?) ??
+      gradeName:
+          (map['grade_name'] as String?) ??
           (map['gradeName'] as String?) ??
           'Standard Grade FAQ',
-      totalQuantity: (map['total_quantity'] as num?)?.toDouble() ??
+      totalQuantity:
+          (map['total_quantity'] as num?)?.toDouble() ??
           (map['quantity'] as num?)?.toDouble() ??
           0.0,
-      availableQuantity: (map['available_quantity'] as num?)?.toDouble() ??
+      availableQuantity:
+          (map['available_quantity'] as num?)?.toDouble() ??
           (map['quantity'] as num?)?.toDouble() ??
           0.0,
       reservedQuantity: (map['reserved_quantity'] as num?)?.toDouble() ?? 0.0,
       soldQuantity: (map['sold_quantity'] as num?)?.toDouble() ?? 0.0,
       unit: (map['unit'] as String?) ?? 'MT',
-      askingPrice: (map['asking_price'] as num?)?.toDouble() ??
+      askingPrice:
+          (map['asking_price'] as num?)?.toDouble() ??
           (map['price'] as num?)?.toDouble() ??
           0.0,
-      confidentialMinimumPrice: (map['confidential_minimum_price'] as num?)?.toDouble(),
+      confidentialMinimumPrice: (map['confidential_minimum_price'] as num?)
+          ?.toDouble(),
       stateName: (map['state_name'] as String?) ?? 'Rajasthan',
       districtName: (map['district_name'] as String?) ?? 'Bikaner',
       loadingStatus: (map['loading_status'] as String?) ?? 'Ready to Load',
       status: map['status'] as String? ?? 'Open',
       availableFrom: map['available_from'] != null
-          ? DateTime.tryParse(map['available_from'].toString()) ?? DateTime.now()
+          ? DateTime.tryParse(map['available_from'].toString()) ??
+                DateTime.now()
           : DateTime.now(),
       validUntil: map['valid_until'] != null
-          ? DateTime.tryParse(map['valid_until'].toString()) ?? DateTime.now().add(const Duration(days: 7))
+          ? DateTime.tryParse(map['valid_until'].toString()) ??
+                DateTime.now().add(const Duration(days: 7))
           : DateTime.now().add(const Duration(days: 7)),
       brokerId: map['broker_id'] as String?,
-      brokerName: map['broker_name'] as String? ??
+      brokerName:
+          map['broker_name'] as String? ??
           (map['broker_id'] != null ? 'Assigned Mandi Broker Desk' : null),
       brokerPhone: map['broker_phone'] as String?,
       brokerLocation: map['broker_location'] as String?,
@@ -133,10 +147,16 @@ class SellerCommodity {
       unitId: map['unit_id'] as String?,
       stateId: map['state_id'] as String?,
       districtId: map['district_id'] as String?,
-      paymentTerms: map['payment_terms'] as String? ?? 'Payment on Delivery (CAD)',
-      officeLocation: map['office_location'] as String? ?? 'Bikaner Commercial Head Office',
-      warehouseName: map['warehouse_name'] as String? ?? 'Krishi Upaj Mandi Yard Warehouse A-4',
-      mandiName: map['mandi_name'] as String? ?? 'Bikaner Krishi Upaj Mandi (Grain Market)',
+      paymentTerms:
+          map['payment_terms'] as String? ?? 'Payment on Delivery (CAD)',
+      officeLocation:
+          map['office_location'] as String? ?? 'Bikaner Commercial Head Office',
+      warehouseName:
+          map['warehouse_name'] as String? ??
+          'Krishi Upaj Mandi Yard Warehouse A-4',
+      mandiName:
+          map['mandi_name'] as String? ??
+          'Bikaner Krishi Upaj Mandi (Grain Market)',
       loadingRemarks: map['loading_remarks'] as String?,
       labReportNumber: map['lab_report_number'] as String?,
       labName: map['lab_name'] as String?,
@@ -236,7 +256,8 @@ class SellerCommodity {
       soldQuantity: soldQuantity ?? this.soldQuantity,
       unit: unit ?? this.unit,
       askingPrice: askingPrice ?? this.askingPrice,
-      confidentialMinimumPrice: confidentialMinimumPrice ?? this.confidentialMinimumPrice,
+      confidentialMinimumPrice:
+          confidentialMinimumPrice ?? this.confidentialMinimumPrice,
       stateName: stateName ?? this.stateName,
       districtName: districtName ?? this.districtName,
       loadingStatus: loadingStatus ?? this.loadingStatus,
@@ -347,10 +368,12 @@ class CreateCommodityDto {
   }
 
   Map<String, dynamic> toSupabaseInsert(String companyId) {
-    final effectiveBrokerId = brokerId ??
+    final effectiveBrokerId =
+        brokerId ??
         (selectedBrokerIds.isNotEmpty ? selectedBrokerIds.first : null);
 
-    final cleanBrokerId = (effectiveBrokerId != null && isValidUuid(effectiveBrokerId))
+    final cleanBrokerId =
+        (effectiveBrokerId != null && isValidUuid(effectiveBrokerId))
         ? effectiveBrokerId.trim()
         : null;
 

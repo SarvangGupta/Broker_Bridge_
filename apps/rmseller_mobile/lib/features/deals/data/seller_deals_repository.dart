@@ -10,11 +10,9 @@ class SellerDealsRepository {
   final SupabaseClient? _customClient;
   final SecureStorageService _storage;
 
-  SellerDealsRepository({
-    SupabaseClient? client,
-    SecureStorageService? storage,
-  })  : _customClient = client,
-        _storage = storage ?? SecureStorageService();
+  SellerDealsRepository({SupabaseClient? client, SecureStorageService? storage})
+    : _customClient = client,
+      _storage = storage ?? SecureStorageService();
 
   SupabaseClient? get _supabase {
     if (_customClient != null) return _customClient;
@@ -36,7 +34,9 @@ class SellerDealsRepository {
       try {
         final companyId = await _storage.getCompanyId();
 
-        var query = client.from('deals').select(
+        var query = client
+            .from('deals')
+            .select(
               'id, requirement_id, quotation_id, broker_id, agreed_price, agreed_quantity, status, created_at, closed_at, '
               'requirements(master_commodities(name), master_grades(grade_name), master_units(symbol)), '
               'invoices(id, invoice_no, amount, status), '
@@ -59,7 +59,9 @@ class SellerDealsRepository {
           query = query.lte('created_at', endDate.toIso8601String());
         }
 
-        final data = await query.order('created_at', ascending: false).limit(50);
+        final data = await query
+            .order('created_at', ascending: false)
+            .limit(50);
 
         final list = <SellerDealModel>[];
         for (final item in data) {
@@ -87,7 +89,8 @@ class SellerDealsRepository {
           // Standard benchmark rate ₹40/MT if not negotiated separately
           const double commRate = 40.0;
           final double commTotal = commRate * qty;
-          final bool isSettled = dealStatus.toLowerCase() == 'completed' ||
+          final bool isSettled =
+              dealStatus.toLowerCase() == 'completed' ||
               dealStatus.toLowerCase() == 'settled' ||
               dealStatus.toLowerCase() == 'delivered';
           final double commPaid = isSettled ? commTotal : 0.0;
@@ -97,8 +100,10 @@ class SellerDealsRepository {
               id: item['id'] as String,
               requirementId: item['requirement_id'] as String,
               quotationId: item['quotation_id'] as String,
-              commodityName: comm?['name'] as String? ?? 'Agricultural Commodity',
-              gradeName: grade?['grade_name'] as String? ?? 'Standard Grade FAQ',
+              commodityName:
+                  comm?['name'] as String? ?? 'Agricultural Commodity',
+              gradeName:
+                  grade?['grade_name'] as String? ?? 'Standard Grade FAQ',
               agreedQuantity: qty,
               unit: unit?['symbol'] as String? ?? 'MT',
               agreedPrice: price,
@@ -106,26 +111,37 @@ class SellerDealsRepository {
               brokerDeskName: 'Verified Mandi Broker Desk',
               brokerId: item['broker_id']?.toString(),
               createdAt: item['created_at'] != null
-                  ? DateTime.tryParse(item['created_at'].toString()) ?? DateTime.now()
+                  ? DateTime.tryParse(item['created_at'].toString()) ??
+                        DateTime.now()
                   : DateTime.now(),
               closedAt: item['closed_at'] != null
                   ? DateTime.tryParse(item['closed_at'].toString())
                   : null,
               invoiceNo: latestInvoice?['invoice_no'] as String?,
               invoiceId: latestInvoice?['id'] as String?,
-              invoiceAmount: (latestInvoice?['amount'] as num?)?.toDouble() ?? (qty * price),
-              invoiceStatus: latestInvoice?['status'] as String? ?? (isSettled ? 'Paid' : 'Pending'),
-              documentsCount: (invoices?.length ?? 0) + (dispatches?.length ?? 0),
+              invoiceAmount:
+                  (latestInvoice?['amount'] as num?)?.toDouble() ??
+                  (qty * price),
+              invoiceStatus:
+                  latestInvoice?['status'] as String? ??
+                  (isSettled ? 'Paid' : 'Pending'),
+              documentsCount:
+                  (invoices?.length ?? 0) + (dispatches?.length ?? 0),
               vehicleNumber: latestDispatch?['vehicle_number'] as String?,
               dispatchDate: latestDispatch?['dispatch_date'] != null
-                  ? DateTime.tryParse(latestDispatch!['dispatch_date'].toString())
+                  ? DateTime.tryParse(
+                      latestDispatch!['dispatch_date'].toString(),
+                    )
                   : null,
               commissionRate: commRate,
               commissionBasis: '₹/MT',
               commissionStatus: 'Agreed',
               commissionAmount: commTotal,
               commissionPaid: commPaid,
-              commissionOutstanding: (commTotal - commPaid).clamp(0.0, double.infinity),
+              commissionOutstanding: (commTotal - commPaid).clamp(
+                0.0,
+                double.infinity,
+              ),
             ),
           );
         }
@@ -144,10 +160,14 @@ class SellerDealsRepository {
           .toList();
     }
     if (startDate != null) {
-      fallbacks = fallbacks.where((d) => d.createdAt.isAfter(startDate)).toList();
+      fallbacks = fallbacks
+          .where((d) => d.createdAt.isAfter(startDate))
+          .toList();
     }
     if (endDate != null) {
-      fallbacks = fallbacks.where((d) => d.createdAt.isBefore(endDate)).toList();
+      fallbacks = fallbacks
+          .where((d) => d.createdAt.isBefore(endDate))
+          .toList();
     }
     return fallbacks;
   }

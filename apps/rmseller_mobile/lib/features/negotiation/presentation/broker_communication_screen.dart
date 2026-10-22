@@ -38,14 +38,16 @@ class BrokerCommunicationScreen extends StatefulWidget {
   });
 
   @override
-  State<BrokerCommunicationScreen> createState() => _BrokerCommunicationScreenState();
+  State<BrokerCommunicationScreen> createState() =>
+      _BrokerCommunicationScreenState();
 }
 
 class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final NegotiationRepository _repository = NegotiationRepository();
-  final ContactLauncherService _contactLauncher = const ContactLauncherService();
+  final ContactLauncherService _contactLauncher =
+      const ContactLauncherService();
 
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _chatScrollController = ScrollController();
@@ -62,12 +64,16 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadData();
-    NegotiationRepository.negotiationUpdatedNotifier.addListener(_onDataUpdated);
+    NegotiationRepository.negotiationUpdatedNotifier.addListener(
+      _onDataUpdated,
+    );
   }
 
   @override
   void dispose() {
-    NegotiationRepository.negotiationUpdatedNotifier.removeListener(_onDataUpdated);
+    NegotiationRepository.negotiationUpdatedNotifier.removeListener(
+      _onDataUpdated,
+    );
     _tabController.dispose();
     _messageController.dispose();
     _chatScrollController.dispose();
@@ -128,7 +134,10 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send message: $e'), backgroundColor: AppColors.error),
+        SnackBar(
+          content: Text('Failed to send message: $e'),
+          backgroundColor: AppColors.error,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -140,8 +149,10 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
     final notesController = TextEditingController();
     String selectedBasis = '₹/MT';
 
-    if (isCounter && _commissionSummary?.latestProposal?.commissionRate != null) {
-      rateController.text = _commissionSummary!.latestProposal!.commissionRate!.toStringAsFixed(0);
+    if (isCounter &&
+        _commissionSummary?.latestProposal?.commissionRate != null) {
+      rateController.text = _commissionSummary!.latestProposal!.commissionRate!
+          .toStringAsFixed(0);
       selectedBasis = _commissionSummary!.latestProposal!.commissionBasis;
     }
 
@@ -171,7 +182,9 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                       const Icon(LucideIcons.scale, color: AppColors.primary),
                       const SizedBox(width: 8),
                       Text(
-                        isCounter ? 'Counter Commission Proposal' : 'Propose Commission Rate',
+                        isCounter
+                            ? 'Counter Commission Proposal'
+                            : 'Propose Commission Rate',
                         style: AppTypography.titleMedium,
                       ),
                       const Spacer(),
@@ -184,7 +197,10 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                   const Divider(height: 16),
                   Text(
                     'Specify the transparent brokerage compensation for matching this commodity supply lot.',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondaryLight,
+                    ),
                   ),
                   const SizedBox(height: 16),
 
@@ -196,7 +212,9 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                           controller: rateController,
                           label: 'Proposed Commission Rate *',
                           hint: 'e.g. 50',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -205,20 +223,56 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Commission Calculation Basis *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                            const Text(
+                              'Commission Calculation Basis *',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
                               value: selectedBasis,
                               isExpanded: true,
-                              decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12)),
+                              decoration: const InputDecoration(
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 12,
+                                ),
+                              ),
                               items: const [
-                                DropdownMenuItem(value: '₹/MT', child: Text('₹/MT (Per Metric Ton)', style: TextStyle(fontSize: 12))),
-                                DropdownMenuItem(value: '₹/QTL', child: Text('₹/QTL (Per Quintal)', style: TextStyle(fontSize: 12))),
-                                DropdownMenuItem(value: '₹/Bag', child: Text('₹/Bag (Per 50kg Bag)', style: TextStyle(fontSize: 12))),
-                                DropdownMenuItem(value: '% of Invoice', child: Text('% of Invoice', style: TextStyle(fontSize: 12))),
+                                DropdownMenuItem(
+                                  value: '₹/MT',
+                                  child: Text(
+                                    '₹/MT (Per Metric Ton)',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: '₹/QTL',
+                                  child: Text(
+                                    '₹/QTL (Per Quintal)',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: '₹/Bag',
+                                  child: Text(
+                                    '₹/Bag (Per 50kg Bag)',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: '% of Invoice',
+                                  child: Text(
+                                    '% of Invoice',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
                               ],
                               onChanged: (val) {
-                                if (val != null) setSheetState(() => selectedBasis = val);
+                                if (val != null)
+                                  setSheetState(() => selectedBasis = val);
                               },
                             ),
                           ],
@@ -236,12 +290,18 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                   const SizedBox(height: 20),
 
                   AppButton(
-                    label: isCounter ? 'Submit Counter-Proposal' : 'Submit Proposal to Broker',
+                    label: isCounter
+                        ? 'Submit Counter-Proposal'
+                        : 'Submit Proposal to Broker',
                     onPressed: () {
                       final r = double.tryParse(rateController.text.trim());
                       if (r == null || r <= 0) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please enter a valid positive commission rate')),
+                          const SnackBar(
+                            content: Text(
+                              'Please enter a valid positive commission rate',
+                            ),
+                          ),
                         );
                         return;
                       }
@@ -283,14 +343,19 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
         await _loadData();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Commission proposal of ₹$rate ($selectedBasis) submitted to Mandi Broker.'),
+            content: Text(
+              'Commission proposal of ₹$rate ($selectedBasis) submitted to Mandi Broker.',
+            ),
             backgroundColor: AppColors.success,
           ),
         );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Proposal error: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Proposal error: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       } finally {
         if (mounted) setState(() => _isLoading = false);
@@ -314,9 +379,14 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success,
+              ),
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Accept Terms', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Accept Terms',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -335,14 +405,19 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
         await _loadData();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Commission terms successfully accepted and confirmed!'),
+            content: Text(
+              'Commission terms successfully accepted and confirmed!',
+            ),
             backgroundColor: AppColors.success,
           ),
         );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to accept: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Failed to accept: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       } finally {
         if (mounted) setState(() => _isLoading = false);
@@ -352,7 +427,8 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBrokerName = widget.brokerName ?? 'Bikaner Mandi Broker Desk';
+    final effectiveBrokerName =
+        widget.brokerName ?? 'Bikaner Mandi Broker Desk';
     final effectivePhone = widget.brokerPhone ?? '+919829012345';
     final effectiveLocation = widget.brokerLocation ?? 'Krishi Upaj Mandi Yard';
     final trust = widget.trustScore ?? 98;
@@ -366,7 +442,10 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
             Text(effectiveBrokerName, style: AppTypography.titleMedium),
             Text(
               '$effectiveLocation • Trust $trust%',
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondaryLight,
+              ),
             ),
           ],
         ),
@@ -388,30 +467,49 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
           unselectedLabelColor: AppColors.textSecondaryLight,
           indicatorColor: AppColors.primary,
           tabs: const [
-            Tab(icon: Icon(LucideIcons.messageSquare, size: 16), text: 'Broker Chat'),
-            Tab(icon: Icon(LucideIcons.scale, size: 16), text: 'Commission Terms'),
+            Tab(
+              icon: Icon(LucideIcons.messageSquare, size: 16),
+              text: 'Broker Chat',
+            ),
+            Tab(
+              icon: Icon(LucideIcons.scale, size: 16),
+              text: 'Commission Terms',
+            ),
           ],
         ),
       ),
       body: _isLoading
-          ? const AppLoadingIndicator(message: 'Loading Mandi Broker communication desk...')
+          ? const AppLoadingIndicator(
+              message: 'Loading Mandi Broker communication desk...',
+            )
           : Column(
               children: [
                 // Commodity Context & Privacy Shield Bar
                 Container(
                   width: double.infinity,
                   color: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
-                      const Icon(LucideIcons.shieldCheck, size: 16, color: AppColors.success),
+                      const Icon(
+                        LucideIcons.shieldCheck,
+                        size: 16,
+                        color: AppColors.success,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           widget.commodityContext != null
                               ? '${widget.commodityContext} • Counterparty Shield Active (Broker-mediated)'
                               : 'Commodity Mandate • Counterparty Shield Active (Broker-mediated)',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimaryLight,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -452,7 +550,10 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
               ? const Center(
                   child: Text(
                     'No messages yet. Send a message to initiate discussion with your Mandi Broker.',
-                    style: TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondaryLight,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -467,7 +568,10 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                       return Center(
                         child: Container(
                           margin: const EdgeInsets.symmetric(vertical: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.amber.shade50,
                             borderRadius: BorderRadius.circular(12),
@@ -475,18 +579,29 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                           ),
                           child: Text(
                             msg.text,
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.amber.shade900),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.amber.shade900,
+                            ),
                           ),
                         ),
                       );
                     }
 
                     return Align(
-                      alignment: msg.isMine ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: msg.isMine
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 10),
-                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.78,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: msg.isMine ? AppColors.primary : Colors.white,
                           borderRadius: BorderRadius.only(
@@ -496,18 +611,26 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                             bottomRight: Radius.circular(msg.isMine ? 2 : 12),
                           ),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2)),
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
                           ],
                         ),
                         child: Column(
-                          crossAxisAlignment: msg.isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          crossAxisAlignment: msg.isMine
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
                           children: [
                             Text(
                               msg.senderName,
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: msg.isMine ? Colors.white70 : AppColors.primary,
+                                color: msg.isMine
+                                    ? Colors.white70
+                                    : AppColors.primary,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -515,7 +638,9 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                               msg.text,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: msg.isMine ? Colors.white : AppColors.textPrimaryLight,
+                                color: msg.isMine
+                                    ? Colors.white
+                                    : AppColors.textPrimaryLight,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -523,7 +648,9 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                               timeFormat.format(msg.timestamp),
                               style: TextStyle(
                                 fontSize: 9,
-                                color: msg.isMine ? Colors.white60 : AppColors.textMutedLight,
+                                color: msg.isMine
+                                    ? Colors.white60
+                                    : AppColors.textMutedLight,
                               ),
                             ),
                           ],
@@ -547,9 +674,20 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                     textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
                       hintText: 'Type a message to broker...',
-                      hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: AppColors.borderLight)),
+                      hintStyle: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondaryLight,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: const BorderSide(
+                          color: AppColors.borderLight,
+                        ),
+                      ),
                       filled: true,
                       fillColor: AppColors.backgroundLight,
                     ),
@@ -560,7 +698,11 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                 IconButton(
                   onPressed: _isSending ? null : _handleSendMessage,
                   icon: _isSending
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Icon(LucideIcons.send, color: AppColors.primary),
                 ),
               ],
@@ -588,18 +730,34 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isAgreed ? AppColors.successContainer : (hasActiveProposal ? Colors.amber.shade50 : Colors.grey.shade100),
+            color: isAgreed
+                ? AppColors.successContainer
+                : (hasActiveProposal
+                      ? Colors.amber.shade50
+                      : Colors.grey.shade100),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isAgreed ? AppColors.success : (hasActiveProposal ? Colors.amber.shade400 : AppColors.borderLight),
+              color: isAgreed
+                  ? AppColors.success
+                  : (hasActiveProposal
+                        ? Colors.amber.shade400
+                        : AppColors.borderLight),
             ),
           ),
           child: Row(
             children: [
               Icon(
-                isAgreed ? LucideIcons.checkCircle2 : (hasActiveProposal ? LucideIcons.scale : LucideIcons.helpCircle),
+                isAgreed
+                    ? LucideIcons.checkCircle2
+                    : (hasActiveProposal
+                          ? LucideIcons.scale
+                          : LucideIcons.helpCircle),
                 size: 28,
-                color: isAgreed ? AppColors.success : (hasActiveProposal ? Colors.amber.shade800 : AppColors.textSecondaryLight),
+                color: isAgreed
+                    ? AppColors.success
+                    : (hasActiveProposal
+                          ? Colors.amber.shade800
+                          : AppColors.textSecondaryLight),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -607,19 +765,32 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isAgreed ? 'Commission Agreed & Confirmed' : (hasActiveProposal ? 'Negotiation in Progress' : 'No Commission Agreement Yet'),
+                      isAgreed
+                          ? 'Commission Agreed & Confirmed'
+                          : (hasActiveProposal
+                                ? 'Negotiation in Progress'
+                                : 'No Commission Agreement Yet'),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: isAgreed ? AppColors.success : (hasActiveProposal ? Colors.amber.shade900 : AppColors.textPrimaryLight),
+                        color: isAgreed
+                            ? AppColors.success
+                            : (hasActiveProposal
+                                  ? Colors.amber.shade900
+                                  : AppColors.textPrimaryLight),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       isAgreed
                           ? 'Agreed Rate: ₹${summary!.agreedRate!.toStringAsFixed(0)} (${summary.agreedBasis})'
-                          : (hasActiveProposal ? 'Active terms proposal awaiting party acceptance' : 'Propose commission terms below to align broker mandate.'),
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                          : (hasActiveProposal
+                                ? 'Active terms proposal awaiting party acceptance'
+                                : 'Propose commission terms below to align broker mandate.'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondaryLight,
+                      ),
                     ),
                   ],
                 ),
@@ -638,25 +809,39 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Current Active Proposal', style: AppTypography.titleMedium),
+                    Text(
+                      'Current Active Proposal',
+                      style: AppTypography.titleMedium,
+                    ),
                     StatusBadge(status: summary!.latestProposal!.status),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Text(
                   '₹${summary.latestProposal!.commissionRate?.toStringAsFixed(0)} ${summary.latestProposal!.commissionBasis}',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.primary),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Proposed by: ${summary.latestProposal!.senderName} (${summary.latestProposal!.senderRole.toUpperCase()})',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
                 ),
-                if (summary.latestProposal!.notes != null && summary.latestProposal!.notes!.isNotEmpty) ...[
+                if (summary.latestProposal!.notes != null &&
+                    summary.latestProposal!.notes!.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
                     'Notes: "${summary.latestProposal!.notes}"',
-                    style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -670,16 +855,23 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                           onPressed: _handleAcceptProposal,
                           icon: const Icon(LucideIcons.check, size: 16),
                           label: const Text('Accept Terms'),
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => _openProposeCommissionDialog(isCounter: true),
+                          onPressed: () =>
+                              _openProposeCommissionDialog(isCounter: true),
                           icon: const Icon(LucideIcons.rotateCcw, size: 16),
                           label: const Text('Counter'),
-                          style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.primary),
+                          ),
                         ),
                       ),
                     ],
@@ -688,10 +880,16 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(6)),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                     child: const Text(
                       'Your proposal is pending Mandi Broker review. You will receive an alert once accepted or countered.',
-                      style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondaryLight,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -705,7 +903,9 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
         // Propose New Terms Button
         if (!isAgreed) ...[
           AppButton(
-            label: hasActiveProposal ? 'Submit Revised Proposal' : 'Propose Commission Rate',
+            label: hasActiveProposal
+                ? 'Submit Revised Proposal'
+                : 'Propose Commission Rate',
             onPressed: () => _openProposeCommissionDialog(isCounter: false),
             variant: ButtonVariant.primary,
             icon: LucideIcons.plus,
@@ -714,13 +914,21 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
         ],
 
         // Negotiation History Timeline
-        Text('Negotiation History & Audit Trail', style: AppTypography.titleMedium),
+        Text(
+          'Negotiation History & Audit Trail',
+          style: AppTypography.titleMedium,
+        ),
         const SizedBox(height: 10),
 
         if (summary?.history.isEmpty ?? true)
-          const Text('No prior negotiation events.', style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight))
+          const Text(
+            'No prior negotiation events.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+          )
         else
-          ...summary!.history.map((event) => _buildTimelineItem(event, dateFormat)),
+          ...summary!.history.map(
+            (event) => _buildTimelineItem(event, dateFormat),
+          ),
         const SizedBox(height: 32),
       ],
     );
@@ -741,18 +949,22 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
           children: [
             CircleAvatar(
               radius: 14,
-              backgroundColor: event.actionType == NegotiationActionType.accept ||
+              backgroundColor:
+                  event.actionType == NegotiationActionType.accept ||
                       event.actionType == NegotiationActionType.commissionAccept
                   ? AppColors.successContainer
                   : AppColors.primaryContainer,
               child: Icon(
                 event.actionType == NegotiationActionType.accept ||
-                        event.actionType == NegotiationActionType.commissionAccept
+                        event.actionType ==
+                            NegotiationActionType.commissionAccept
                     ? LucideIcons.check
                     : LucideIcons.scale,
                 size: 14,
-                color: event.actionType == NegotiationActionType.accept ||
-                        event.actionType == NegotiationActionType.commissionAccept
+                color:
+                    event.actionType == NegotiationActionType.accept ||
+                        event.actionType ==
+                            NegotiationActionType.commissionAccept
                     ? AppColors.success
                     : AppColors.primary,
               ),
@@ -767,11 +979,17 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                     children: [
                       Text(
                         '${event.actionType.value} • ${event.senderName}',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
                       ),
                       Text(
                         dateFormat.format(event.createdAt),
-                        style: const TextStyle(fontSize: 10, color: AppColors.textMutedLight),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textMutedLight,
+                        ),
                       ),
                     ],
                   ),
@@ -779,12 +997,19 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                   if (event.commissionRate != null)
                     Text(
                       'Rate: ₹${event.commissionRate?.toStringAsFixed(0)} (${event.commissionBasis})',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
                     ),
                   if (event.notes != null && event.notes!.isNotEmpty)
                     Text(
                       event.notes!,
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondaryLight,
+                      ),
                     ),
                 ],
               ),

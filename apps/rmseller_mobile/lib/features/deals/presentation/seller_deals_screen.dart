@@ -97,8 +97,12 @@ class _SellerDealsScreenState extends State<SellerDealsScreen> {
                       selectedColor: AppColors.primaryContainer,
                       labelStyle: TextStyle(
                         fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected ? AppColors.primary : AppColors.textPrimaryLight,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textPrimaryLight,
                       ),
                       onSelected: (val) {
                         if (val) {
@@ -116,26 +120,29 @@ class _SellerDealsScreenState extends State<SellerDealsScreen> {
 
           Expanded(
             child: _isLoading
-                ? const AppLoadingIndicator(message: 'Loading verified deal contracts...')
+                ? const AppLoadingIndicator(
+                    message: 'Loading verified deal contracts...',
+                  )
                 : _errorMessage != null
-                    ? AppErrorState(message: _errorMessage!, onRetry: _fetchDeals)
-                    : _deals.isEmpty
-                        ? AppEmptyState(
-                            title: 'No Contracts Found',
-                            message: 'No commercial deals matching "$_selectedFilter" under your seller enterprise.',
-                          )
-                        : RefreshIndicator(
-                            onRefresh: _fetchDeals,
-                            color: AppColors.primary,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: _deals.length,
-                              itemBuilder: (context, index) {
-                                final deal = _deals[index];
-                                return _buildDealCard(context, deal);
-                              },
-                            ),
-                          ),
+                ? AppErrorState(message: _errorMessage!, onRetry: _fetchDeals)
+                : _deals.isEmpty
+                ? AppEmptyState(
+                    title: 'No Contracts Found',
+                    message:
+                        'No commercial deals matching "$_selectedFilter" under your seller enterprise.',
+                  )
+                : RefreshIndicator(
+                    onRefresh: _fetchDeals,
+                    color: AppColors.primary,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _deals.length,
+                      itemBuilder: (context, index) {
+                        final deal = _deals[index];
+                        return _buildDealCard(context, deal);
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -161,7 +168,10 @@ class _SellerDealsScreenState extends State<SellerDealsScreen> {
                         children: [
                           if (deal.bookingReference != null) ...[
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.secondaryContainer,
                                 borderRadius: BorderRadius.circular(4),
@@ -187,7 +197,13 @@ class _SellerDealsScreenState extends State<SellerDealsScreen> {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(deal.gradeName, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+                      Text(
+                        deal.gradeName,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -202,30 +218,58 @@ class _SellerDealsScreenState extends State<SellerDealsScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Agreed Volume', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
+                    const Text(
+                      'Agreed Volume',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMutedLight,
+                      ),
+                    ),
                     Text(
                       '${deal.agreedQuantity} ${deal.unit}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text('Agreed Rate', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
+                    const Text(
+                      'Agreed Rate',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMutedLight,
+                      ),
+                    ),
                     Text(
                       '₹${deal.agreedPrice.toStringAsFixed(0)} / ${deal.unit}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primary),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ],
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text('Total Value', style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
+                    const Text(
+                      'Total Value',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMutedLight,
+                      ),
+                    ),
                     Text(
                       '₹${deal.totalDealValue.toStringAsFixed(0)}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -238,7 +282,10 @@ class _SellerDealsScreenState extends State<SellerDealsScreen> {
               children: [
                 if (deal.invoiceNo != null) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primaryContainer,
                       borderRadius: BorderRadius.circular(4),
@@ -246,20 +293,32 @@ class _SellerDealsScreenState extends State<SellerDealsScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(LucideIcons.receipt, size: 10, color: AppColors.primary),
+                        const Icon(
+                          LucideIcons.receipt,
+                          size: 10,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           deal.invoiceNo!,
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
                 ],
-                if (deal.commissionAmount != null && deal.commissionAmount! > 0) ...[
+                if (deal.commissionAmount != null &&
+                    deal.commissionAmount! > 0) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(4),
@@ -267,7 +326,11 @@ class _SellerDealsScreenState extends State<SellerDealsScreen> {
                     ),
                     child: Text(
                       'Comm: ₹${deal.commissionAmount!.toStringAsFixed(0)} (${deal.commissionPaid >= deal.commissionAmount! ? "Paid" : "Pending"})',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.amber.shade900),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.amber.shade900,
+                      ),
                     ),
                   ),
                 ],
@@ -277,16 +340,27 @@ class _SellerDealsScreenState extends State<SellerDealsScreen> {
 
             Row(
               children: [
-                const Icon(LucideIcons.briefcase, size: 14, color: AppColors.secondary),
+                const Icon(
+                  LucideIcons.briefcase,
+                  size: 14,
+                  color: AppColors.secondary,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     deal.brokerDeskName,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondaryLight,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.textMutedLight),
+                const Icon(
+                  LucideIcons.chevronRight,
+                  size: 16,
+                  color: AppColors.textMutedLight,
+                ),
               ],
             ),
           ],

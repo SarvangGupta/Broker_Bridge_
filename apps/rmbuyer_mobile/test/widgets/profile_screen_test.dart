@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rmbuyer_mobile/app/theme/app_theme.dart';
 import 'package:rmbuyer_mobile/features/authentication/domain/buyer_user.dart';
@@ -11,16 +12,18 @@ void main() {
     addTearDown(() => tester.view.resetPhysicalSize());
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: const BuyerProfileScreen(
-          user: BuyerUser(
-            id: 'u-1',
-            email: 'buyer@apexprocurement.com',
-            fullName: 'Rajesh Singhal',
-            role: 'buyer',
-            companyName: 'Apex Grain Processors Pvt Ltd',
-            companyGst: '08AABCA1234F1Z8',
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: BuyerProfileScreen(
+            user: BuyerUser(
+              id: 'u-1',
+              email: 'buyer@apexprocurement.com',
+              fullName: 'Rajesh Singhal',
+              role: 'buyer',
+              companyName: 'Apex Grain Processors Pvt Ltd',
+              companyGst: '08AABCA1234F1Z8',
+            ),
           ),
         ),
       ),

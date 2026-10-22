@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/widgets/module_placeholder_screen.dart';
 import '../../features/authentication/presentation/access_denied_screen.dart';
 import '../../features/authentication/presentation/controllers/auth_notifier.dart';
 export '../../features/authentication/presentation/controllers/auth_notifier.dart';
@@ -23,7 +22,9 @@ import '../../features/invoices/domain/seller_invoice_model.dart';
 import '../../features/invoices/presentation/invoice_details_screen.dart';
 import '../../features/negotiation/presentation/broker_communication_screen.dart';
 import '../../features/notifications/presentation/seller_notifications_screen.dart';
+import '../../features/help/presentation/seller_help_support_screen.dart';
 import '../../features/profile/presentation/seller_profile_screen.dart';
+import '../../features/profile/presentation/seller_settings_screen.dart';
 import '../../features/ratings/presentation/rate_broker_screen.dart';
 import '../../features/reports/presentation/sales_history_screen.dart';
 
@@ -102,7 +103,10 @@ class AppRouter {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return AccessDeniedScreen(
             email: extra['email'] as String? ?? authNotifier.deniedEmail ?? '',
-            role: extra['role'] as String? ?? authNotifier.deniedRole ?? 'unauthorized',
+            role:
+                extra['role'] as String? ??
+                authNotifier.deniedRole ??
+                'unauthorized',
             message: extra['message'] as String? ?? authNotifier.deniedMessage,
           );
         },
@@ -157,9 +161,13 @@ class AppRouter {
           final id = state.pathParameters['id'] ?? '';
           final extra = state.extra as Map<String, dynamic>? ?? {};
           final queryParams = state.uri.queryParameters;
-          final brokerName = extra['brokerName'] as String? ?? queryParams['brokerName'] ?? 'Authorized Broker Desk';
+          final brokerName =
+              extra['brokerName'] as String? ??
+              queryParams['brokerName'] ??
+              'Authorized Broker Desk';
           final dealId = extra['dealId'] as String? ?? queryParams['dealId'];
-          final dealReference = extra['dealReference'] as String? ?? queryParams['dealReference'];
+          final dealReference =
+              extra['dealReference'] as String? ?? queryParams['dealReference'];
           return RateBrokerScreen(
             brokerId: id,
             brokerName: brokerName,
@@ -222,7 +230,8 @@ class AppRouter {
               requestId: extra.id,
               brokerId: extra.assignedBrokerId ?? 'BRK-SYSTEM',
               brokerName: extra.assignedBrokerName ?? 'Designated Broker',
-              commodityContext: '${extra.name} • ${extra.quantityTotal} ${extra.unit}',
+              commodityContext:
+                  '${extra.name} • ${extra.quantityTotal} ${extra.unit}',
               commodity: extra,
             );
           }
@@ -231,7 +240,8 @@ class AppRouter {
             requestId: id,
             brokerId: queryParams['brokerId'] ?? 'BRK-SYSTEM',
             brokerName: queryParams['brokerName'] ?? 'Designated Broker',
-            commodityContext: queryParams['commodityContext'] ?? 'Commodity Lot $id',
+            commodityContext:
+                queryParams['commodityContext'] ?? 'Commodity Lot $id',
           );
         },
       ),
@@ -264,9 +274,35 @@ class AppRouter {
             brokerName: queryParams['brokerName'] ?? 'Broker $brokerId',
             brokerPhone: queryParams['brokerPhone'],
             brokerLocation: queryParams['brokerLocation'],
-            commodityContext: queryParams['commodityContext'] ?? 'Direct Negotiation Desk',
+            commodityContext:
+                queryParams['commodityContext'] ?? 'Direct Negotiation Desk',
           );
         },
+      ),
+
+      // Application Settings Route (Protected)
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const SellerSettingsScreen(),
+      ),
+
+      // Help & Support Route (Protected)
+      GoRoute(
+        path: '/help',
+        name: 'help_support',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const SellerHelpSupportScreen(),
+      ),
+
+      // Direct Profile Edit Route (Protected)
+      GoRoute(
+        path: '/profile/edit',
+        name: 'edit_profile',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) =>
+            const SellerProfileScreen(isInitialEdit: true),
       ),
 
       // Core Stateful Navigation Shell with 6 branches

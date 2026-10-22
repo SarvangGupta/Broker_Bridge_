@@ -18,38 +18,41 @@ void main() {
       reviewCount: 3,
     );
 
-    testWidgets('Scenario 1: Displays broker ratings, distribution bars, and verified reviews', (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(800, 1400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    testWidgets(
+      'Scenario 1: Displays broker ratings, distribution bars, and verified reviews',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: const BrokerProfileScreen(
-            brokerId: testBroker.id,
-            initialBroker: testBroker,
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const BrokerProfileScreen(
+              brokerId: testBroker.id,
+              initialBroker: testBroker,
+            ),
           ),
-        ),
-      );
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      // Verify Header Trust Score
-      expect(find.text('Trust Score: 99%'), findsOneWidget);
+        // Verify Header Trust Score
+        expect(find.text('Trust Score: 99%'), findsOneWidget);
 
-      // Verify Ratings Card
-      expect(find.text('Broker Ratings & Reviews'), findsOneWidget);
-      expect(find.text('Rate this Broker Desk'), findsOneWidget);
+        // Verify Ratings Card
+        expect(find.text('Broker Ratings & Reviews'), findsOneWidget);
+        expect(find.text('Rate this Broker Desk'), findsOneWidget);
 
-      // Verify Commodities Handled
-      expect(find.text('Specialized Mandi Commodities'), findsOneWidget);
-      expect(find.text('Desi Chana (Gram)'), findsOneWidget);
-      expect(find.text('Mustard Seeds'), findsOneWidget);
+        // Verify Commodities Handled
+        expect(find.text('Specialized Mandi Commodities'), findsOneWidget);
+        expect(find.text('Desi Chana (Gram)'), findsOneWidget);
+        expect(find.text('Mustard Seeds'), findsOneWidget);
 
-      // Verify Communication Buttons
-      expect(find.text('Call Desk'), findsOneWidget);
-      expect(find.text('WhatsApp'), findsOneWidget);
-    });
+        // Verify Communication Buttons
+        expect(find.text('Call Desk'), findsOneWidget);
+        expect(find.text('WhatsApp'), findsOneWidget);
+      },
+    );
   });
 }

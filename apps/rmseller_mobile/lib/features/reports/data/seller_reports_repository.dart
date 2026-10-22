@@ -13,8 +13,8 @@ class SellerReportsRepository {
   SellerReportsRepository({
     SupabaseClient? client,
     SecureStorageService? storage,
-  })  : _customClient = client,
-        _storage = storage ?? SecureStorageService();
+  }) : _customClient = client,
+       _storage = storage ?? SecureStorageService();
 
   SupabaseClient? get _supabase {
     if (_customClient != null) return _customClient;
@@ -67,7 +67,9 @@ class SellerReportsRepository {
 
         var query = client
             .from('deals')
-            .select('id, agreed_price, agreed_quantity, status, created_at, closed_at')
+            .select(
+              'id, agreed_price, agreed_quantity, status, created_at, closed_at',
+            )
             .gte('created_at', start.toIso8601String())
             .lte('created_at', end.toIso8601String());
 
@@ -99,7 +101,9 @@ class SellerReportsRepository {
             if (status == 'cancelled' || status == 'rejected') {
               cancelledCount++;
               continue; // Never count cancelled deals towards sold volume or gross sales!
-            } else if (status == 'delivered' || status == 'settled' || status == 'completed') {
+            } else if (status == 'delivered' ||
+                status == 'settled' ||
+                status == 'completed') {
               completedCount++;
               totalSoldVolume += qty;
               grossSalesValue += dealVal;
@@ -114,7 +118,10 @@ class SellerReportsRepository {
           }
 
           final outstandingCommission =
-              (totalAgreedCommission - totalCommissionPaid).clamp(0.0, double.infinity);
+              (totalAgreedCommission - totalCommissionPaid).clamp(
+                0.0,
+                double.infinity,
+              );
 
           return SalesReportSummary(
             period: timeframe,
@@ -139,7 +146,9 @@ class SellerReportsRepository {
 
     // Baseline verified financial dataset
     final allTxs = _baselineTransactions;
-    final inRange = allTxs.where((tx) => tx.date.isAfter(start) && tx.date.isBefore(end)).toList();
+    final inRange = allTxs
+        .where((tx) => tx.date.isAfter(start) && tx.date.isBefore(end))
+        .toList();
 
     double totalSoldVolume = 0;
     double grossSalesValue = 0;
@@ -171,7 +180,10 @@ class SellerReportsRepository {
       }
     }
 
-    final outstanding = (totalAgreedCommission - totalCommissionPaid).clamp(0.0, double.infinity);
+    final outstanding = (totalAgreedCommission - totalCommissionPaid).clamp(
+      0.0,
+      double.infinity,
+    );
 
     return SalesReportSummary(
       period: timeframe,

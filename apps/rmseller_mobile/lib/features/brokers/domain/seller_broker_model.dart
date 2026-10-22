@@ -52,9 +52,12 @@ class SellerBrokerModel {
   bool get hasWhatsApp => mobile != null && mobile!.trim().isNotEmpty;
   bool get hasRatings => averageRating != null && reviewCount > 0;
 
-  bool get isInvitationPending => status == SellerBrokerStatus.invitationPending;
-  bool get isPendingVerification => status == SellerBrokerStatus.pendingVerification;
-  bool get isRegisteredVerified => status == SellerBrokerStatus.registeredVerified && isVerified;
+  bool get isInvitationPending =>
+      status == SellerBrokerStatus.invitationPending;
+  bool get isPendingVerification =>
+      status == SellerBrokerStatus.pendingVerification;
+  bool get isRegisteredVerified =>
+      status == SellerBrokerStatus.registeredVerified && isVerified;
 
   // Convenience aliases
   String? get phone => mobile;
@@ -114,7 +117,9 @@ class SellerBrokerModel {
     final isVerified = isVerifiedRaw == true;
 
     final avgRatingRaw = map['average_rating'] ?? map['avg_rating'];
-    final double? avgRating = (avgRatingRaw is num) ? avgRatingRaw.toDouble() : null;
+    final double? avgRating = (avgRatingRaw is num)
+        ? avgRatingRaw.toDouble()
+        : null;
 
     final reviewCountRaw = map['review_count'] ?? map['reviews_count'];
     final int revCount = (reviewCountRaw is num) ? reviewCountRaw.toInt() : 0;
@@ -144,11 +149,14 @@ class SellerBrokerModel {
       name: (map['name'] as String?) ?? 'Authorized Mandi Broker',
       email: map['email'] as String?,
       mobile: map['mobile'] as String?,
-      companyName: (company['name'] as String?) ??
+      companyName:
+          (company['name'] as String?) ??
           (map['company_name'] as String?) ??
           'Licensed Mandi Broker Desk',
-      companyGst: (company['gst'] as String?) ?? (map['company_gst'] as String?),
-      location: (map['location'] as String?) ??
+      companyGst:
+          (company['gst'] as String?) ?? (map['company_gst'] as String?),
+      location:
+          (map['location'] as String?) ??
           (map['mandi'] as String?) ??
           'Mandi Trading Desk',
       trustScore: trustScore,

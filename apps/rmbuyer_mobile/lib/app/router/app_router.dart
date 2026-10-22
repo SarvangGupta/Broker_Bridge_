@@ -102,7 +102,10 @@ class AppRouter {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return AccessDeniedScreen(
             email: extra['email'] as String? ?? authNotifier.deniedEmail ?? '',
-            role: extra['role'] as String? ?? authNotifier.deniedRole ?? 'unauthorized',
+            role:
+                extra['role'] as String? ??
+                authNotifier.deniedRole ??
+                'unauthorized',
             message: extra['message'] as String? ?? authNotifier.deniedMessage,
           );
         },
@@ -186,10 +189,7 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           final offer = state.extra as BuyerOffer?;
-          return OfferDetailsScreen(
-            offerId: id,
-            initialOffer: offer,
-          );
+          return OfferDetailsScreen(offerId: id, initialOffer: offer);
         },
       ),
 
@@ -211,6 +211,14 @@ class AppRouter {
           final id = state.pathParameters['id'] ?? '';
           return FinalDealReviewScreen(dealId: id);
         },
+      ),
+
+      // Application Settings Route (Protected)
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const BuyerProfileScreen(),
       ),
 
       // Core Stateful Buyer Shell with Persistent Bottom Navigation (Protected)

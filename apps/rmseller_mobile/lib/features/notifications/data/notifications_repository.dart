@@ -15,8 +15,8 @@ class NotificationsRepository {
   NotificationsRepository({
     SupabaseClient? client,
     SecureStorageService? storage,
-  })  : _customClient = client,
-        _storage = storage ?? SecureStorageService();
+  }) : _customClient = client,
+       _storage = storage ?? SecureStorageService();
 
   SupabaseClient? get _supabase {
     if (_customClient != null) return _customClient;
@@ -97,7 +97,10 @@ class NotificationsRepository {
       try {
         await client
             .from('notifications')
-            .update({'is_read': true, 'read_at': DateTime.now().toIso8601String()})
+            .update({
+              'is_read': true,
+              'read_at': DateTime.now().toIso8601String(),
+            })
             .eq('id', notificationId);
       } catch (e) {
         debugPrint('Supabase markAsRead notice: $e');
@@ -135,7 +138,10 @@ class NotificationsRepository {
     return list.where((n) => !n.isRead).length;
   }
 
-  List<SellerNotification> _baselineNotifications(String userId, String companyId) {
+  List<SellerNotification> _baselineNotifications(
+    String userId,
+    String companyId,
+  ) {
     final now = DateTime.now();
     return [
       SellerNotification(

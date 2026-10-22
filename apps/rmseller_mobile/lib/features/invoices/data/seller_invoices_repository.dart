@@ -16,8 +16,8 @@ class SellerInvoicesRepository {
   SellerInvoicesRepository({
     SupabaseClient? client,
     SecureStorageService? storage,
-  })  : _customClient = client,
-        _storage = storage ?? SecureStorageService();
+  }) : _customClient = client,
+       _storage = storage ?? SecureStorageService();
 
   SupabaseClient? get _supabase {
     if (_customClient != null) return _customClient;
@@ -38,7 +38,9 @@ class SellerInvoicesRepository {
       try {
         final companyId = await _storage.getCompanyId();
 
-        var query = client.from('invoices').select(
+        var query = client
+            .from('invoices')
+            .select(
               'id, deal_id, seller_id, invoice_no, amount, status, file_url, created_at, '
               'deals(id, agreed_price, agreed_quantity, status, '
               'requirements(master_commodities(name), master_grades(grade_name), master_units(symbol)))',
@@ -56,7 +58,9 @@ class SellerInvoicesRepository {
           query = query.eq('status', statusFilter);
         }
 
-        final data = await query.order('created_at', ascending: false).limit(30);
+        final data = await query
+            .order('created_at', ascending: false)
+            .limit(30);
 
         final list = <SellerInvoice>[];
         for (final item in data) {
@@ -68,7 +72,8 @@ class SellerInvoicesRepository {
 
           final qty = (deal?['agreed_quantity'] as num?)?.toDouble() ?? 0.0;
           final rate = (deal?['agreed_price'] as num?)?.toDouble() ?? 0.0;
-          final rawAmount = (item['amount'] as num?)?.toDouble() ?? (qty * rate);
+          final rawAmount =
+              (item['amount'] as num?)?.toDouble() ?? (qty * rate);
 
           list.add(
             SellerInvoice(
@@ -80,9 +85,11 @@ class SellerInvoicesRepository {
               status: item['status'] as String? ?? 'Pending',
               fileUrl: item['file_url'] as String? ?? '',
               createdAt: item['created_at'] != null
-                  ? DateTime.tryParse(item['created_at'].toString()) ?? DateTime.now()
+                  ? DateTime.tryParse(item['created_at'].toString()) ??
+                        DateTime.now()
                   : DateTime.now(),
-              commodityName: comm?['name'] as String? ?? 'Agricultural Commodity',
+              commodityName:
+                  comm?['name'] as String? ?? 'Agricultural Commodity',
               gradeName: grade?['grade_name'] as String? ?? 'FAQ Standard',
               quantity: qty,
               unit: unit?['symbol'] as String? ?? 'MT',
@@ -105,7 +112,9 @@ class SellerInvoicesRepository {
     }
     if (statusFilter != null && statusFilter != 'ALL') {
       fallbacks = fallbacks
-          .where((inv) => inv.status.toLowerCase() == statusFilter.toLowerCase())
+          .where(
+            (inv) => inv.status.toLowerCase() == statusFilter.toLowerCase(),
+          )
           .toList();
     }
     return fallbacks;
@@ -129,7 +138,9 @@ class SellerInvoicesRepository {
       try {
         final data = await client
             .from('dispatch_documents')
-            .select('id, dispatch_id, document_type, file_url, created_at, uploaded_by, dispatches(deal_id)')
+            .select(
+              'id, dispatch_id, document_type, file_url, created_at, uploaded_by, dispatches(deal_id)',
+            )
             .eq('dispatches.deal_id', dealId)
             .order('created_at', ascending: false);
 
@@ -139,11 +150,13 @@ class SellerInvoicesRepository {
               id: item['id'] as String,
               dealId: dealId,
               dispatchId: item['dispatch_id'] as String?,
-              documentType: item['document_type'] as String? ?? 'Dispatch Document',
+              documentType:
+                  item['document_type'] as String? ?? 'Dispatch Document',
               fileName: '${item['document_type'] ?? 'doc'}.pdf',
               fileUrl: item['file_url'] as String? ?? '',
               createdAt: item['created_at'] != null
-                  ? DateTime.tryParse(item['created_at'].toString()) ?? DateTime.now()
+                  ? DateTime.tryParse(item['created_at'].toString()) ??
+                        DateTime.now()
                   : DateTime.now(),
             ),
           );
@@ -155,7 +168,9 @@ class SellerInvoicesRepository {
 
     if (documents.isEmpty) {
       // Baseline documents for the deal
-      final matchedInvoices = _baselineInvoices.where((i) => i.dealId == dealId);
+      final matchedInvoices = _baselineInvoices.where(
+        (i) => i.dealId == dealId,
+      );
       for (final inv in matchedInvoices) {
         documents.add(
           SellerDocument(

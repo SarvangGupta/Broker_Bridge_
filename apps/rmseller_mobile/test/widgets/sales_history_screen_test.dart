@@ -27,7 +27,9 @@ void main() {
       );
     }
 
-    testWidgets('Renders reporting period filters and header actions', (tester) async {
+    testWidgets('Renders reporting period filters and header actions', (
+      tester,
+    ) async {
       await tester.pumpWidget(createScreen());
       await tester.pumpAndSettle();
 
@@ -39,7 +41,9 @@ void main() {
       expect(find.text('Custom'), findsOneWidget);
     });
 
-    testWidgets('Renders revenue summary cards and commission breakdown', (tester) async {
+    testWidgets('Renders revenue summary cards and commission breakdown', (
+      tester,
+    ) async {
       await tester.pumpWidget(createScreen());
       await tester.pumpAndSettle();
 
@@ -59,28 +63,37 @@ void main() {
       expect(find.text('Outstanding Comm.'), findsOneWidget);
     });
 
-    testWidgets('Renders transaction list with commodity, rate, and broker desk', (tester) async {
-      await tester.pumpWidget(createScreen());
-      await tester.pumpAndSettle();
+    testWidgets(
+      'Renders transaction list with commodity, rate, and broker desk',
+      (tester) async {
+        await tester.pumpWidget(createScreen());
+        await tester.pumpAndSettle();
 
-      expect(find.text('Mustard Seeds'), findsOneWidget);
-      expect(find.textContaining('40.0 MT'), findsOneWidget);
-      expect(find.textContaining('Kota Agro Brokerage'), findsOneWidget);
-      expect(find.text('INV-2026-0042'), findsOneWidget);
-    });
+        expect(find.text('Mustard Seeds'), findsOneWidget);
+        expect(find.textContaining('40.0 MT'), findsOneWidget);
+        expect(find.textContaining('Kota Agro Brokerage'), findsOneWidget);
+        expect(find.text('INV-2026-0042'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Tapping export button opens statement dialog with shield disclaimer', (tester) async {
-      await tester.pumpWidget(createScreen());
-      await tester.pumpAndSettle();
+    testWidgets(
+      'Tapping export button opens statement dialog with shield disclaimer',
+      (tester) async {
+        await tester.pumpWidget(createScreen());
+        await tester.pumpAndSettle();
 
-      // Tap Export icon
-      await tester.tap(find.byTooltip('Export Statement'));
-      await tester.pumpAndSettle();
+        // Tap Export icon
+        await tester.tap(find.byTooltip('Export Statement'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Export Sales Statement'), findsOneWidget);
-      expect(find.textContaining('Reporting Period'), findsOneWidget);
-      expect(find.textContaining('Counterparty Shield Notice'), findsOneWidget);
-      expect(find.text('Download PDF Statement'), findsOneWidget);
-    });
+        expect(find.text('Export Sales Statement'), findsOneWidget);
+        expect(find.textContaining('Reporting Period'), findsOneWidget);
+        expect(
+          find.textContaining('Counterparty Shield Notice'),
+          findsOneWidget,
+        );
+        expect(find.text('Download PDF Statement'), findsOneWidget);
+      },
+    );
   });
 }

@@ -85,10 +85,19 @@ class NegotiationEvent {
       actionType == NegotiationActionType.accept ||
       actionType == NegotiationActionType.reject;
 
-  String? get messageText => payload['text'] as String? ?? payload['message'] as String?;
-  String get senderName => (payload['sender_name'] as String?) ?? (payload['author_name'] as String?) ?? 'Desk User';
-  String get senderRole => ((payload['sender_role'] as String?) ?? (payload['author_role'] as String?) ?? 'seller').toLowerCase();
-  bool get isFromSeller => senderRole == 'seller' || senderRole == 'seller_admin';
+  String? get messageText =>
+      payload['text'] as String? ?? payload['message'] as String?;
+  String get senderName =>
+      (payload['sender_name'] as String?) ??
+      (payload['author_name'] as String?) ??
+      'Desk User';
+  String get senderRole =>
+      ((payload['sender_role'] as String?) ??
+              (payload['author_role'] as String?) ??
+              'seller')
+          .toLowerCase();
+  bool get isFromSeller =>
+      senderRole == 'seller' || senderRole == 'seller_admin';
 
   double? get commissionRate =>
       (payload['rate'] as num?)?.toDouble() ??
@@ -101,7 +110,8 @@ class NegotiationEvent {
       (payload['agreed_basis'] as String?) ??
       '₹/MT';
 
-  String? get notes => payload['notes'] as String? ?? payload['reason'] as String?;
+  String? get notes =>
+      payload['notes'] as String? ?? payload['reason'] as String?;
   String get status => (payload['status'] as String?) ?? 'Proposed';
 
   factory NegotiationEvent.fromMap(Map<String, dynamic> map) {
@@ -110,7 +120,9 @@ class NegotiationEvent {
       requestId: map['request_id']?.toString() ?? '',
       companyId: map['company_id']?.toString() ?? '',
       actorId: map['actor_id']?.toString() ?? '',
-      actionType: NegotiationActionTypeX.fromString(map['action_type']?.toString() ?? 'MESSAGE'),
+      actionType: NegotiationActionTypeX.fromString(
+        map['action_type']?.toString() ?? 'MESSAGE',
+      ),
       payload: (map['payload'] as Map<String, dynamic>?) ?? {},
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
@@ -184,14 +196,18 @@ class CommissionSummary {
   bool get hasAgreedTerms => isAgreed;
   double? get activeProposedRate => latestProposal?.commissionRate;
   DateTime? get effectiveTimestamp => agreedAt;
-  String? get commissionBasis => isAgreed ? agreedBasis : latestProposal?.commissionBasis;
+  String? get commissionBasis =>
+      isAgreed ? agreedBasis : latestProposal?.commissionBasis;
 
   bool get hasActiveProposal =>
-      status == 'Negotiating' && latestProposal != null &&
+      status == 'Negotiating' &&
+      latestProposal != null &&
       (latestProposal!.actionType == NegotiationActionType.proposal ||
-       latestProposal!.actionType == NegotiationActionType.commissionProposal ||
-       latestProposal!.actionType == NegotiationActionType.counter ||
-       latestProposal!.actionType == NegotiationActionType.commissionCounter);
+          latestProposal!.actionType ==
+              NegotiationActionType.commissionProposal ||
+          latestProposal!.actionType == NegotiationActionType.counter ||
+          latestProposal!.actionType ==
+              NegotiationActionType.commissionCounter);
 
   bool get canSellerAccept =>
       hasActiveProposal && !latestProposal!.isFromSeller;

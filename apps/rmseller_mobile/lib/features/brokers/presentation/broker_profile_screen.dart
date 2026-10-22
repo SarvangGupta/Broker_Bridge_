@@ -31,7 +31,8 @@ class BrokerProfileScreen extends StatefulWidget {
 class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
   final SellerBrokerRepository _repository = SellerBrokerRepository();
   final SellerRatingsRepository _ratingsRepository = SellerRatingsRepository();
-  final ContactLauncherService _contactLauncher = const ContactLauncherService();
+  final ContactLauncherService _contactLauncher =
+      const ContactLauncherService();
 
   SellerBrokerModel? _broker;
   BrokerRatingSummary? _ratingSummary;
@@ -79,7 +80,9 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
     if (broker == null) return;
 
     // Check eligibility
-    final eligibility = await _ratingsRepository.checkRatingEligibility(brokerId: broker.id);
+    final eligibility = await _ratingsRepository.checkRatingEligibility(
+      brokerId: broker.id,
+    );
 
     if (!mounted) return;
 
@@ -92,12 +95,18 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
             children: [
               Icon(LucideIcons.lock, color: Colors.amber.shade800, size: 20),
               const SizedBox(width: 8),
-              const Text('Rating Unavailable', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const Text(
+                'Rating Unavailable',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
             ],
           ),
           content: Text(
             eligibility.reason,
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondaryLight,
+            ),
           ),
           actions: [
             TextButton(
@@ -168,7 +177,11 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                   backgroundColor: AppColors.primaryContainer,
                   child: Text(
                     broker.name.substring(0, 1).toUpperCase(),
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.primary),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -178,21 +191,31 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                     Text(broker.name, style: AppTypography.titleLarge),
                     if (broker.isVerified) ...[
                       const SizedBox(width: 6),
-                      const Icon(LucideIcons.badgeCheck, size: 20, color: AppColors.success),
+                      const Icon(
+                        LucideIcons.badgeCheck,
+                        size: 20,
+                        color: AppColors.success,
+                      ),
                     ],
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   broker.companyName ?? 'Licensed Mandi Desk',
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.secondaryContainer,
                         borderRadius: BorderRadius.circular(16),
@@ -200,7 +223,11 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(LucideIcons.shieldCheck, size: 14, color: AppColors.secondaryDark),
+                          const Icon(
+                            LucideIcons.shieldCheck,
+                            size: 14,
+                            color: AppColors.secondaryDark,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Trust Score: ${broker.trustScore}%',
@@ -216,7 +243,10 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                     if (summary != null && !summary.isUnrated) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.amber.shade50,
                           borderRadius: BorderRadius.circular(16),
@@ -225,7 +255,11 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star, size: 14, color: Colors.amber),
+                            const Icon(
+                              Icons.star,
+                              size: 14,
+                              color: Colors.amber,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${summary.averageRating.toStringAsFixed(1)} ★ (${summary.totalReviews})',
@@ -254,10 +288,19 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Broker Ratings & Reviews', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    const Text(
+                      'Broker Ratings & Reviews',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
                     if (summary?.hasUserReviewed ?? false)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.successContainer,
                           borderRadius: BorderRadius.circular(12),
@@ -265,9 +308,20 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(LucideIcons.check, size: 11, color: AppColors.success),
+                            Icon(
+                              LucideIcons.check,
+                              size: 11,
+                              color: AppColors.success,
+                            ),
                             SizedBox(width: 4),
-                            Text('You Reviewed', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.success)),
+                            Text(
+                              'You Reviewed',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.success,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -291,14 +345,20 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                         children: [
                           Text(
                             summary.averageRating.toStringAsFixed(1),
-                            style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: AppColors.textPrimaryLight),
+                            style: const TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimaryLight,
+                            ),
                           ),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: List.generate(5, (index) {
                               final starVal = index + 1;
                               return Icon(
-                                starVal <= summary.averageRating.round() ? Icons.star : Icons.star_border,
+                                starVal <= summary.averageRating.round()
+                                    ? Icons.star
+                                    : Icons.star_border,
                                 size: 16,
                                 color: Colors.amber.shade600,
                               );
@@ -307,7 +367,10 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                           const SizedBox(height: 4),
                           Text(
                             '${summary.totalReviews} verified reviews',
-                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondaryLight,
+                            ),
                           ),
                         ],
                       ),
@@ -318,10 +381,18 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                           children: [5, 4, 3, 2, 1].map((star) {
                             final pct = summary.getPercentage(star);
                             return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 1.5),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 1.5,
+                              ),
                               child: Row(
                                 children: [
-                                  Text('$star★', style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryLight)),
+                                  Text(
+                                    '$star★',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.textSecondaryLight,
+                                    ),
+                                  ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: ClipRRect(
@@ -329,9 +400,14 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                                       child: LinearProgressIndicator(
                                         value: pct,
                                         backgroundColor: Colors.grey.shade200,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          star >= 4 ? Colors.amber.shade600 : (star == 3 ? Colors.amber.shade400 : AppColors.error),
-                                        ),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              star >= 4
+                                                  ? Colors.amber.shade600
+                                                  : (star == 3
+                                                        ? Colors.amber.shade400
+                                                        : AppColors.error),
+                                            ),
                                         minHeight: 6,
                                       ),
                                     ),
@@ -339,7 +415,11 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                                   const SizedBox(width: 6),
                                   Text(
                                     '${summary.starDistribution[star] ?? 0}',
-                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondaryLight),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondaryLight,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -352,7 +432,10 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                   const Divider(height: 20),
 
                   // Criteria Breakdown
-                  const Text('Criteria Performance', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                  const Text(
+                    'Criteria Performance',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                  ),
                   const SizedBox(height: 8),
                   ...summary.criteriaAverages.entries.map((entry) {
                     return Padding(
@@ -360,15 +443,28 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(entry.key, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
+                          Text(
+                            entry.key,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
                           Row(
                             children: [
                               Text(
                                 '${entry.value.toStringAsFixed(1)} / 5',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               const SizedBox(width: 4),
-                              Icon(Icons.star, size: 12, color: Colors.amber.shade600),
+                              Icon(
+                                Icons.star,
+                                size: 12,
+                                color: Colors.amber.shade600,
+                              ),
                             ],
                           ),
                         ],
@@ -385,12 +481,19 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                     ),
                     child: const Row(
                       children: [
-                        Icon(LucideIcons.info, size: 18, color: AppColors.textSecondaryLight),
+                        Icon(
+                          LucideIcons.info,
+                          size: 18,
+                          color: AppColors.textSecondaryLight,
+                        ),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Unrated Desk — This broker has not yet received trade reviews from sellers. Be the first to rate after completing a transaction.',
-                            style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryLight,
+                            ),
                           ),
                         ),
                       ],
@@ -405,13 +508,21 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                   child: OutlinedButton.icon(
                     onPressed: _handleRateBroker,
                     icon: Icon(
-                      summary?.hasUserReviewed ?? false ? LucideIcons.edit3 : LucideIcons.star,
+                      summary?.hasUserReviewed ?? false
+                          ? LucideIcons.edit3
+                          : LucideIcons.star,
                       size: 16,
                       color: AppColors.primary,
                     ),
                     label: Text(
-                      summary?.hasUserReviewed ?? false ? 'Update Your Review' : 'Rate this Broker Desk',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primary),
+                      summary?.hasUserReviewed ?? false
+                          ? 'Update Your Review'
+                          : 'Rate this Broker Desk',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: AppColors.primary,
+                      ),
                     ),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppColors.primary),
@@ -430,7 +541,10 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Verified Trade Feedback', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  const Text(
+                    'Verified Trade Feedback',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
                   const SizedBox(height: 10),
                   ...summary.recentReviews.map((r) {
                     final dateFormat = DateFormat('dd MMM yyyy');
@@ -450,14 +564,27 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(LucideIcons.badgeCheck, size: 14, color: AppColors.success),
+                                  const Icon(
+                                    LucideIcons.badgeCheck,
+                                    size: 14,
+                                    color: AppColors.success,
+                                  ),
                                   const SizedBox(width: 4),
-                                  const Text('Verified Mandi Seller', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                  const Text(
+                                    'Verified Mandi Seller',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ],
                               ),
                               Text(
                                 dateFormat.format(r.createdAt),
-                                style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textMutedLight,
+                                ),
                               ),
                             ],
                           ),
@@ -475,7 +602,11 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                             const SizedBox(height: 6),
                             Text(
                               r.feedback,
-                              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.textPrimaryLight),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                                color: AppColors.textPrimaryLight,
+                              ),
                             ),
                           ],
                         ],
@@ -493,15 +624,26 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Mandi Trading Credentials', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const Text(
+                  'Mandi Trading Credentials',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
                 const SizedBox(height: 12),
-                _buildInfoRow('Operating Mandi:', broker.location ?? 'Regional Mandi'),
+                _buildInfoRow(
+                  'Operating Mandi:',
+                  broker.location ?? 'Regional Mandi',
+                ),
                 if (broker.companyGst != null) ...[
                   const SizedBox(height: 8),
                   _buildInfoRow('GST Registration:', broker.companyGst!),
                 ],
                 const SizedBox(height: 8),
-                _buildInfoRow('Verification Status:', broker.isVerified ? 'Verified Licensed Broker' : 'Pending Audit'),
+                _buildInfoRow(
+                  'Verification Status:',
+                  broker.isVerified
+                      ? 'Verified Licensed Broker'
+                      : 'Pending Audit',
+                ),
               ],
             ),
           ),
@@ -512,7 +654,10 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Specialized Mandi Commodities', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const Text(
+                  'Specialized Mandi Commodities',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
@@ -535,11 +680,17 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Direct Broker Communication', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const Text(
+                  'Direct Broker Communication',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
                 const SizedBox(height: 6),
                 const Text(
                   'Reach out directly to this licensed broker desk to discuss mandi pricing, lot matching, or dispatch scheduling.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -549,11 +700,13 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                         child: AppButton(
                           label: 'Call Desk',
                           icon: LucideIcons.phone,
-                          onPressed: () => _contactLauncher.launchPhone(broker.mobile),
+                          onPressed: () =>
+                              _contactLauncher.launchPhone(broker.mobile),
                           variant: ButtonVariant.outline,
                         ),
                       ),
-                    if (broker.hasPhone && broker.hasWhatsApp) const SizedBox(width: 12),
+                    if (broker.hasPhone && broker.hasWhatsApp)
+                      const SizedBox(width: 12),
                     if (broker.hasWhatsApp)
                       Expanded(
                         child: AppButton(
@@ -561,7 +714,8 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                           icon: LucideIcons.messageCircle,
                           onPressed: () => _contactLauncher.launchWhatsApp(
                             broker.mobile,
-                            defaultMessage: 'Hello ${broker.name}, I would like to consult on my commodity lots.',
+                            defaultMessage:
+                                'Hello ${broker.name}, I would like to consult on my commodity lots.',
                           ),
                           variant: ButtonVariant.secondary,
                         ),
@@ -589,7 +743,9 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
             label: '+ Post Commodity with this Broker Desk',
             icon: LucideIcons.plusCircle,
             onPressed: () {
-              context.push('/commodities/new?brokerId=${broker.id}&brokerName=${Uri.encodeComponent(broker.name)}');
+              context.push(
+                '/commodities/new?brokerId=${broker.id}&brokerName=${Uri.encodeComponent(broker.name)}',
+              );
             },
             variant: ButtonVariant.outline,
           ),
@@ -603,8 +759,17 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondaryLight,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+        ),
       ],
     );
   }

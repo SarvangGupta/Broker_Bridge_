@@ -118,7 +118,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   Text(
                     AppConfig.appName,
-                    style: AppTypography.displayLarge.copyWith(color: AppColors.primary),
+                    style: AppTypography.displayLarge.copyWith(
+                      color: AppColors.primary,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 6),
@@ -136,16 +138,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.errorBackground,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                        border: Border.all(
+                          color: AppColors.error.withOpacity(0.3),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(LucideIcons.triangleAlert, size: 20, color: AppColors.error),
+                          const Icon(
+                            LucideIcons.triangleAlert,
+                            size: 20,
+                            color: AppColors.error,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               _errorMessage!,
-                              style: const TextStyle(fontSize: 13, color: AppColors.error),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.error,
+                              ),
                             ),
                           ),
                         ],
@@ -160,7 +171,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     label: 'Seller Email or Mobile',
                     hint: 'seller@company.com',
                     keyboardType: TextInputType.emailAddress,
-                    prefixIcon: const Icon(LucideIcons.mail, size: 18, color: AppColors.textMutedLight),
+                    prefixIcon: const Icon(
+                      LucideIcons.mail,
+                      size: 18,
+                      color: AppColors.textMutedLight,
+                    ),
                     validator: (val) {
                       if (val == null || val.trim().isEmpty) {
                         return 'Email is required';
@@ -176,7 +191,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     label: 'Password',
                     hint: 'Enter your password',
                     obscureText: _obscurePassword,
-                    prefixIcon: const Icon(LucideIcons.lock, size: 18, color: AppColors.textMutedLight),
+                    prefixIcon: const Icon(
+                      LucideIcons.lock,
+                      size: 18,
+                      color: AppColors.textMutedLight,
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye,
@@ -232,19 +251,31 @@ class _LoginScreenState extends State<LoginScreen> {
                           runSpacing: 8,
                           children: [
                             ActionChip(
-                              label: const Text('Authorized Seller', style: TextStyle(fontSize: 11)),
+                              label: const Text(
+                                'Authorized Seller',
+                                style: TextStyle(fontSize: 11),
+                              ),
                               backgroundColor: AppColors.primaryContainer,
-                              onPressed: () => _quickFill('seller@demo.com', 'Seller'),
+                              onPressed: () =>
+                                  _quickFill('seller@demo.com', 'Seller'),
                             ),
                             ActionChip(
-                              label: const Text('Buyer Account (Deny Test)', style: TextStyle(fontSize: 11)),
+                              label: const Text(
+                                'Buyer Account (Deny Test)',
+                                style: TextStyle(fontSize: 11),
+                              ),
                               backgroundColor: Colors.grey.shade100,
-                              onPressed: () => _quickFill('buyer@demo.com', 'Buyer'),
+                              onPressed: () =>
+                                  _quickFill('buyer@demo.com', 'Buyer'),
                             ),
                             ActionChip(
-                              label: const Text('Broker Desk (Deny Test)', style: TextStyle(fontSize: 11)),
+                              label: const Text(
+                                'Broker Desk (Deny Test)',
+                                style: TextStyle(fontSize: 11),
+                              ),
                               backgroundColor: Colors.grey.shade100,
-                              onPressed: () => _quickFill('broker@demo.com', 'Broker'),
+                              onPressed: () =>
+                                  _quickFill('broker@demo.com', 'Broker'),
                             ),
                           ],
                         ),

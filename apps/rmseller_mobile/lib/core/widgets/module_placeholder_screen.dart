@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_typography.dart';
 import 'app_card.dart';
@@ -23,9 +24,7 @@ class ModulePlaceholderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-      ),
+      appBar: AppBar(title: Text(title)),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -49,7 +48,9 @@ class ModulePlaceholderScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 description,
-                style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondaryLight),
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondaryLight,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -58,11 +59,17 @@ class ModulePlaceholderScreen extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(LucideIcons.calendarClock, size: 18, color: AppColors.secondary),
+                    const Icon(
+                      LucideIcons.calendarClock,
+                      size: 18,
+                      color: AppColors.secondary,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Target Release: $scheduledSprint',
-                      style: AppTypography.labelMedium.copyWith(color: AppColors.secondaryDark),
+                      style: AppTypography.labelMedium.copyWith(
+                        color: AppColors.secondaryDark,
+                      ),
                     ),
                   ],
                 ),

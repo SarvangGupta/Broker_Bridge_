@@ -12,22 +12,22 @@ class CommoditiesRepository {
   final SecureStorageService _storage;
 
   // In-memory registry of newly posted commodities during session, partitioned by company
-  static final Map<String, List<SellerCommodity>> _sessionCommoditiesByCompany = {};
+  static final Map<String, List<SellerCommodity>> _sessionCommoditiesByCompany =
+      {};
   bool _isSubmissionLocked = false;
 
   /// Global notifier signaled whenever a commodity lot is created, updated, or cancelled
-  static final ValueNotifier<int> commoditiesUpdatedNotifier = ValueNotifier<int>(0);
+  static final ValueNotifier<int> commoditiesUpdatedNotifier =
+      ValueNotifier<int>(0);
 
   /// Helper to clear session cache on logout
   static void clearSessionCache() {
     _sessionCommoditiesByCompany.clear();
   }
 
-  CommoditiesRepository({
-    SupabaseClient? client,
-    SecureStorageService? storage,
-  })  : _customClient = client,
-        _storage = storage ?? SecureStorageService();
+  CommoditiesRepository({SupabaseClient? client, SecureStorageService? storage})
+    : _customClient = client,
+      _storage = storage ?? SecureStorageService();
 
   SupabaseClient? get _supabase {
     if (_customClient != null) return _customClient;
@@ -54,7 +54,9 @@ class CommoditiesRepository {
 
         if (data.isNotEmpty) {
           return (data as List)
-              .map((row) => MasterCommodity.fromMap(row as Map<String, dynamic>))
+              .map(
+                (row) => MasterCommodity.fromMap(row as Map<String, dynamic>),
+              )
               .toList();
         }
       } catch (e) {
@@ -103,7 +105,9 @@ class CommoditiesRepository {
     final client = _supabase;
     if (client != null) {
       try {
-        final data = await client.from('master_units').select('id, name, symbol');
+        final data = await client
+            .from('master_units')
+            .select('id, name, symbol');
         if (data.isNotEmpty) {
           return (data as List)
               .map((row) => MasterUnit.fromMap(row as Map<String, dynamic>))
@@ -120,7 +124,10 @@ class CommoditiesRepository {
     final client = _supabase;
     if (client != null) {
       try {
-        final data = await client.from('master_states').select('id, name, code').order('name');
+        final data = await client
+            .from('master_states')
+            .select('id, name, code')
+            .order('name');
         if (data.isNotEmpty) {
           return (data as List)
               .map((row) => MasterState.fromMap(row as Map<String, dynamic>))
@@ -187,8 +194,10 @@ class CommoditiesRepository {
     return fallbacks;
   }
 
-  List<String> getLoadingStatusOptions() => MasterCommodityData.verifiedLoadingStatuses;
-  List<String> getPaymentTermsOptions() => MasterCommodityData.verifiedPaymentTerms;
+  List<String> getLoadingStatusOptions() =>
+      MasterCommodityData.verifiedLoadingStatuses;
+  List<String> getPaymentTermsOptions() =>
+      MasterCommodityData.verifiedPaymentTerms;
 
   // ============================================================================
   // 2. COMMODITY CREATION & PERSISTENCE
@@ -213,7 +222,9 @@ class CommoditiesRepository {
 
     // 2. Concurrency Lock: Prevent duplicate submissions
     if (_isSubmissionLocked) {
-      throw StateError('A commodity submission is already in progress. Please wait.');
+      throw StateError(
+        'A commodity submission is already in progress. Please wait.',
+      );
     }
     _isSubmissionLocked = true;
 
@@ -221,9 +232,10 @@ class CommoditiesRepository {
       final client = _supabase;
       String? companyId;
       try {
-        companyId = await _storage
-            .getCompanyId()
-            .timeout(const Duration(milliseconds: 500), onTimeout: () => null);
+        companyId = await _storage.getCompanyId().timeout(
+          const Duration(milliseconds: 500),
+          onTimeout: () => null,
+        );
       } catch (_) {}
 
       // Check session user or fallback to verified seller company ID
@@ -243,7 +255,8 @@ class CommoditiesRepository {
 
       companyId ??= '20000000-0000-0000-0000-000000000101';
 
-      String listingId = 'AVL-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      String listingId =
+          'AVL-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
       if (client != null) {
         final session = client.auth.currentSession;
@@ -277,7 +290,9 @@ class CommoditiesRepository {
               listingId = res['id'].toString();
             }
           } catch (e) {
-            debugPrint('Local test environment availability insertion notice: $e');
+            debugPrint(
+              'Local test environment availability insertion notice: $e',
+            );
           }
         }
       }
@@ -301,7 +316,9 @@ class CommoditiesRepository {
         availableFrom: dto.availableFrom,
         validUntil: dto.validUntil,
         brokerId: dto.brokerId,
-        brokerName: dto.brokerName ?? (dto.brokerId != null ? 'Assigned Mandi Broker Desk' : null),
+        brokerName:
+            dto.brokerName ??
+            (dto.brokerId != null ? 'Assigned Mandi Broker Desk' : null),
         brokerPhone: dto.brokerPhone,
         brokerLocation: dto.brokerLocation,
         commodityId: dto.commodityId,
@@ -323,7 +340,9 @@ class CommoditiesRepository {
       );
 
       // Register into session cache, partitioned by company
-      _sessionCommoditiesByCompany.putIfAbsent(companyId, () => []).insert(0, createdCommodity);
+      _sessionCommoditiesByCompany
+          .putIfAbsent(companyId, () => [])
+          .insert(0, createdCommodity);
 
       // Notify active listeners
       commoditiesUpdatedNotifier.value++;
@@ -346,9 +365,10 @@ class CommoditiesRepository {
 
     String? companyId;
     try {
-      companyId = await _storage
-          .getCompanyId()
-          .timeout(const Duration(milliseconds: 500), onTimeout: () => null);
+      companyId = await _storage.getCompanyId().timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () => null,
+      );
     } catch (_) {}
 
     if (companyId == null || companyId.isEmpty) {
@@ -373,9 +393,11 @@ class CommoditiesRepository {
 
     if (client != null) {
       try {
-        var query = client.from('availabilities').select(
-          'id, company_id, commodity_id, grade_id, quantity, unit_id, price, state_id, district_id, status, lot_number, total_quantity, available_quantity, reserved_quantity, sold_quantity, asking_price, confidential_minimum_price, available_from, valid_until, loading_status, broker_id, version, created_at, master_commodities(name), master_grades(grade_name), master_units(symbol), master_states(name), master_districts(name)',
-        );
+        var query = client
+            .from('availabilities')
+            .select(
+              'id, company_id, commodity_id, grade_id, quantity, unit_id, price, state_id, district_id, status, lot_number, total_quantity, available_quantity, reserved_quantity, sold_quantity, asking_price, confidential_minimum_price, available_from, valid_until, loading_status, broker_id, version, created_at, master_commodities(name), master_grades(grade_name), master_units(symbol), master_states(name), master_districts(name)',
+            );
 
         query = query.eq('company_id', companyId);
 
@@ -383,7 +405,9 @@ class CommoditiesRepository {
           query = query.eq('status', statusFilter);
         }
 
-        final data = await query.order('created_at', ascending: false).limit(50);
+        final data = await query
+            .order('created_at', ascending: false)
+            .limit(50);
 
         for (final item in data) {
           final id = item['id'].toString();
@@ -398,34 +422,48 @@ class CommoditiesRepository {
           results.add(
             SellerCommodity(
               id: id,
-              lotNumber: item['lot_number'] as String? ?? 'LOT-${id.substring(0, 5).toUpperCase()}',
-              commodityName: comm?['name'] as String? ?? 'Agricultural Commodity',
-              gradeName: grade?['grade_name'] as String? ?? 'Standard Grade FAQ',
-              totalQuantity: (item['total_quantity'] as num?)?.toDouble() ??
+              lotNumber:
+                  item['lot_number'] as String? ??
+                  'LOT-${id.substring(0, 5).toUpperCase()}',
+              commodityName:
+                  comm?['name'] as String? ?? 'Agricultural Commodity',
+              gradeName:
+                  grade?['grade_name'] as String? ?? 'Standard Grade FAQ',
+              totalQuantity:
+                  (item['total_quantity'] as num?)?.toDouble() ??
                   (item['quantity'] as num?)?.toDouble() ??
                   0.0,
-              availableQuantity: (item['available_quantity'] as num?)?.toDouble() ??
+              availableQuantity:
+                  (item['available_quantity'] as num?)?.toDouble() ??
                   (item['quantity'] as num?)?.toDouble() ??
                   0.0,
-              reservedQuantity: (item['reserved_quantity'] as num?)?.toDouble() ?? 0.0,
+              reservedQuantity:
+                  (item['reserved_quantity'] as num?)?.toDouble() ?? 0.0,
               soldQuantity: (item['sold_quantity'] as num?)?.toDouble() ?? 0.0,
               unit: unit?['symbol'] as String? ?? 'MT',
-              askingPrice: (item['asking_price'] as num?)?.toDouble() ??
+              askingPrice:
+                  (item['asking_price'] as num?)?.toDouble() ??
                   (item['price'] as num?)?.toDouble() ??
                   0.0,
-              confidentialMinimumPrice: (item['confidential_minimum_price'] as num?)?.toDouble(),
+              confidentialMinimumPrice:
+                  (item['confidential_minimum_price'] as num?)?.toDouble(),
               stateName: state?['name'] as String? ?? 'Rajasthan',
               districtName: dist?['name'] as String? ?? 'Bikaner',
-              loadingStatus: item['loading_status'] as String? ?? 'Ready to Load',
+              loadingStatus:
+                  item['loading_status'] as String? ?? 'Ready to Load',
               status: item['status'] as String? ?? 'Open',
               availableFrom: item['available_from'] != null
-                  ? DateTime.tryParse(item['available_from'].toString()) ?? DateTime.now()
+                  ? DateTime.tryParse(item['available_from'].toString()) ??
+                        DateTime.now()
                   : DateTime.now(),
               validUntil: item['valid_until'] != null
-                  ? DateTime.tryParse(item['valid_until'].toString()) ?? DateTime.now().add(const Duration(days: 7))
+                  ? DateTime.tryParse(item['valid_until'].toString()) ??
+                        DateTime.now().add(const Duration(days: 7))
                   : DateTime.now().add(const Duration(days: 7)),
               brokerId: item['broker_id'] as String?,
-              brokerName: item['broker_id'] != null ? 'Assigned Mandi Broker Desk' : null,
+              brokerName: item['broker_id'] != null
+                  ? 'Assigned Mandi Broker Desk'
+                  : null,
               commodityId: item['commodity_id'] as String?,
               gradeId: item['grade_id'] as String?,
               unitId: item['unit_id'] as String?,
@@ -433,7 +471,8 @@ class CommoditiesRepository {
               districtId: item['district_id'] as String?,
               version: (item['version'] as num?)?.toInt() ?? 1,
               createdAt: item['created_at'] != null
-                  ? DateTime.tryParse(item['created_at'].toString()) ?? DateTime.now()
+                  ? DateTime.tryParse(item['created_at'].toString()) ??
+                        DateTime.now()
                   : DateTime.now(),
             ),
           );
@@ -446,7 +485,9 @@ class CommoditiesRepository {
     if (results.isEmpty) {
       var fallbacks = _baselineCommodities;
       if (statusFilter != null && statusFilter != 'ALL') {
-        fallbacks = fallbacks.where((c) => c.status.toLowerCase() == statusFilter.toLowerCase()).toList();
+        fallbacks = fallbacks
+            .where((c) => c.status.toLowerCase() == statusFilter.toLowerCase())
+            .toList();
       }
       return fallbacks;
     }
@@ -463,13 +504,17 @@ class CommoditiesRepository {
   }
 
   /// Update listing status (e.g., Cancelled, Fulfilled, Active) with seller company scoping
-  Future<bool> updateCommodityStatus(String commodityId, String newStatus) async {
+  Future<bool> updateCommodityStatus(
+    String commodityId,
+    String newStatus,
+  ) async {
     final client = _supabase;
     String? companyId;
     try {
-      companyId = await _storage
-          .getCompanyId()
-          .timeout(const Duration(milliseconds: 500), onTimeout: () => null);
+      companyId = await _storage.getCompanyId().timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () => null,
+      );
     } catch (_) {}
     companyId ??= '20000000-0000-0000-0000-000000000101';
 
@@ -504,9 +549,10 @@ class CommoditiesRepository {
     final client = _supabase;
     String? companyId;
     try {
-      companyId = await _storage
-          .getCompanyId()
-          .timeout(const Duration(milliseconds: 500), onTimeout: () => null);
+      companyId = await _storage.getCompanyId().timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () => null,
+      );
     } catch (_) {}
     companyId ??= '20000000-0000-0000-0000-000000000101';
 
@@ -550,9 +596,10 @@ class CommoditiesRepository {
     final client = _supabase;
     String? companyId;
     try {
-      companyId = await _storage
-          .getCompanyId()
-          .timeout(const Duration(milliseconds: 500), onTimeout: () => null);
+      companyId = await _storage.getCompanyId().timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () => null,
+      );
     } catch (_) {}
     companyId ??= '20000000-0000-0000-0000-000000000101';
 
@@ -583,15 +630,14 @@ class CommoditiesRepository {
 
     if (client != null) {
       try {
-        final cleanId = (brokerId != null && CreateCommodityDto.isValidUuid(brokerId))
+        final cleanId =
+            (brokerId != null && CreateCommodityDto.isValidUuid(brokerId))
             ? brokerId.trim()
             : null;
 
         await client
             .from('availabilities')
-            .update({
-              'broker_id': cleanId,
-            })
+            .update({'broker_id': cleanId})
             .eq('id', commodityId)
             .eq('company_id', companyId);
       } catch (e) {

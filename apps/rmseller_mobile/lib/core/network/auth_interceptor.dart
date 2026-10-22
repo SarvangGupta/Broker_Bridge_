@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+
 import '../security/secure_storage_service.dart';
 
 /// Injects Bearer token into outgoing HTTP requests and handles auth challenges.
@@ -6,7 +7,7 @@ class AuthInterceptor extends Interceptor {
   final SecureStorageService _storage;
 
   AuthInterceptor({SecureStorageService? storage})
-      : _storage = storage ?? SecureStorageService();
+    : _storage = storage ?? SecureStorageService();
 
   @override
   Future<void> onRequest(

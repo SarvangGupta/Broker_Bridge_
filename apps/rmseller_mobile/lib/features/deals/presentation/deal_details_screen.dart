@@ -17,11 +17,7 @@ class DealDetailsScreen extends StatefulWidget {
   final String dealId;
   final SellerDealModel? initialDeal;
 
-  const DealDetailsScreen({
-    super.key,
-    required this.dealId,
-    this.initialDeal,
-  });
+  const DealDetailsScreen({super.key, required this.dealId, this.initialDeal});
 
   @override
   State<DealDetailsScreen> createState() => _DealDetailsScreenState();
@@ -29,7 +25,8 @@ class DealDetailsScreen extends StatefulWidget {
 
 class _DealDetailsScreenState extends State<DealDetailsScreen> {
   final SellerDealsRepository _repository = SellerDealsRepository();
-  final ContactLauncherService _contactLauncher = const ContactLauncherService();
+  final ContactLauncherService _contactLauncher =
+      const ContactLauncherService();
 
   SellerDealModel? _deal;
   bool _isLoading = true;
@@ -59,7 +56,9 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        body: AppLoadingIndicator(message: 'Loading deal contract & invoices...'),
+        body: AppLoadingIndicator(
+          message: 'Loading deal contract & invoices...',
+        ),
       );
     }
 
@@ -75,9 +74,7 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(
-        title: Text(deal.bookingReference ?? deal.id),
-      ),
+      appBar: AppBar(title: Text(deal.bookingReference ?? deal.id)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -90,29 +87,53 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Text(deal.commodityName, style: AppTypography.titleLarge),
+                      child: Text(
+                        deal.commodityName,
+                        style: AppTypography.titleLarge,
+                      ),
                     ),
                     StatusBadge(status: deal.status),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(deal.gradeName, style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight)),
+                Text(
+                  deal.gradeName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondaryLight,
+                  ),
+                ),
                 const Divider(height: 24),
 
-                _buildInfoRow('Agreed Quantity:', '${deal.agreedQuantity} ${deal.unit}'),
+                _buildInfoRow(
+                  'Agreed Quantity:',
+                  '${deal.agreedQuantity} ${deal.unit}',
+                ),
                 const SizedBox(height: 8),
-                _buildInfoRow('Agreed Rate:', '₹${deal.agreedPrice.toStringAsFixed(0)} / ${deal.unit}'),
+                _buildInfoRow(
+                  'Agreed Rate:',
+                  '₹${deal.agreedPrice.toStringAsFixed(0)} / ${deal.unit}',
+                ),
                 const SizedBox(height: 8),
-                _buildInfoRow('Total Gross Value:', '₹${deal.totalDealValue.toStringAsFixed(0)}'),
+                _buildInfoRow(
+                  'Total Gross Value:',
+                  '₹${deal.totalDealValue.toStringAsFixed(0)}',
+                ),
                 if (deal.bookingReference != null) ...[
                   const SizedBox(height: 8),
                   _buildInfoRow('System Booking ID:', deal.bookingReference!),
                 ],
                 const SizedBox(height: 8),
-                _buildInfoRow('Contract Date:', dateFormat.format(deal.createdAt)),
+                _buildInfoRow(
+                  'Contract Date:',
+                  dateFormat.format(deal.createdAt),
+                ),
                 if (deal.closedAt != null) ...[
                   const SizedBox(height: 8),
-                  _buildInfoRow('Settled Date:', dateFormat.format(deal.closedAt!)),
+                  _buildInfoRow(
+                    'Settled Date:',
+                    dateFormat.format(deal.closedAt!),
+                  ),
                 ],
               ],
             ),
@@ -127,7 +148,10 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Invoices & Tax Statements', style: AppTypography.titleMedium),
+                    Text(
+                      'Invoices & Tax Statements',
+                      style: AppTypography.titleMedium,
+                    ),
                     if (deal.invoiceStatus != null)
                       StatusBadge(status: deal.invoiceStatus!),
                   ],
@@ -148,17 +172,28 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                           children: [
                             Row(
                               children: [
-                                const Icon(LucideIcons.receipt, size: 18, color: AppColors.primary),
+                                const Icon(
+                                  LucideIcons.receipt,
+                                  size: 18,
+                                  color: AppColors.primary,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   deal.invoiceNo!,
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ],
                             ),
                             Text(
                               '₹${(deal.invoiceAmount ?? deal.totalDealValue).toStringAsFixed(0)}',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.primary),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                color: AppColors.primary,
+                              ),
                             ),
                           ],
                         ),
@@ -168,13 +203,23 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: () {
-                                  context.push('/invoices/${deal.invoiceId ?? deal.invoiceNo!}');
+                                  context.push(
+                                    '/invoices/${deal.invoiceId ?? deal.invoiceNo!}',
+                                  );
                                 },
-                                icon: const Icon(LucideIcons.fileText, size: 14),
-                                label: const Text('View Full Tax Invoice', style: TextStyle(fontSize: 12)),
+                                icon: const Icon(
+                                  LucideIcons.fileText,
+                                  size: 14,
+                                ),
+                                label: const Text(
+                                  'View Full Tax Invoice',
+                                  style: TextStyle(fontSize: 12),
+                                ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.primary,
-                                  side: const BorderSide(color: AppColors.primary),
+                                  side: const BorderSide(
+                                    color: AppColors.primary,
+                                  ),
                                 ),
                               ),
                             ),
@@ -192,7 +237,10 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                     ),
                     child: const Text(
                       'No invoice generated yet for this deal. Invoices are issued by the mediating broker upon vehicle dispatch.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondaryLight,
+                      ),
                     ),
                   ),
                 ],
@@ -209,12 +257,16 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Broker Commission Breakdown', style: AppTypography.titleMedium),
+                    Text(
+                      'Broker Commission Breakdown',
+                      style: AppTypography.titleMedium,
+                    ),
                     StatusBadge(status: deal.commissionStatus),
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (deal.commissionRate != null && deal.commissionRate! > 0) ...[
+                if (deal.commissionRate != null &&
+                    deal.commissionRate! > 0) ...[
                   _buildInfoRow(
                     'Agreed Commission Rate:',
                     '₹${deal.commissionRate!.toStringAsFixed(0)} (${deal.commissionBasis})',
@@ -237,7 +289,10 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                 ] else ...[
                   const Text(
                     'No commission terms recorded for this contract.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondaryLight,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 12),
@@ -260,9 +315,18 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Mediating Broker Desk', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const Text(
+                  'Mediating Broker Desk',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
                 const SizedBox(height: 8),
-                Text(deal.brokerDeskName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(
+                  deal.brokerDeskName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -273,12 +337,19 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(LucideIcons.shieldCheck, size: 16, color: Colors.amber.shade800),
+                      Icon(
+                        LucideIcons.shieldCheck,
+                        size: 16,
+                        color: Colors.amber.shade800,
+                      ),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
                           'Counterparty Shield: Direct buyer contact and identification are shielded. All trade actions are broker-mediated.',
-                          style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondaryLight,
+                          ),
                         ),
                       ),
                     ],
@@ -289,19 +360,25 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => _contactLauncher.launchPhone('+919829012345'),
+                        onPressed: () =>
+                            _contactLauncher.launchPhone('+919829012345'),
                         icon: const Icon(LucideIcons.phone, size: 16),
                         label: const Text('Call Broker'),
-                        style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => _contactLauncher.launchWhatsApp('+919829012345'),
+                        onPressed: () =>
+                            _contactLauncher.launchWhatsApp('+919829012345'),
                         icon: const Icon(LucideIcons.messageCircle, size: 16),
                         label: const Text('WhatsApp'),
-                        style: OutlinedButton.styleFrom(foregroundColor: Colors.green.shade700),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.green.shade700,
+                        ),
                       ),
                     ),
                   ],
@@ -311,7 +388,9 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      final brokerId = deal.brokerId ?? 'b354958e-779a-41f2-b7a3-5899eca32e32';
+                      final brokerId =
+                          deal.brokerId ??
+                          'b354958e-779a-41f2-b7a3-5899eca32e32';
                       context.push(
                         '/brokers/$brokerId/rate',
                         extra: {
@@ -321,10 +400,18 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
                         },
                       );
                     },
-                    icon: const Icon(LucideIcons.star, size: 15, color: AppColors.secondaryDark),
+                    icon: const Icon(
+                      LucideIcons.star,
+                      size: 15,
+                      color: AppColors.secondaryDark,
+                    ),
                     label: const Text(
                       'Rate Mandi Broker Desk',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.secondaryDark),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.secondaryDark,
+                      ),
                     ),
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.amber.shade50,
@@ -344,12 +431,18 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Logistics & Vehicle Entry', style: AppTypography.titleMedium),
+                  Text(
+                    'Logistics & Vehicle Entry',
+                    style: AppTypography.titleMedium,
+                  ),
                   const SizedBox(height: 12),
                   _buildInfoRow('Vehicle Registration:', deal.vehicleNumber!),
                   if (deal.dispatchDate != null) ...[
                     const SizedBox(height: 8),
-                    _buildInfoRow('Dispatch Timestamp:', dateFormat.format(deal.dispatchDate!)),
+                    _buildInfoRow(
+                      'Dispatch Timestamp:',
+                      dateFormat.format(deal.dispatchDate!),
+                    ),
                   ],
                 ],
               ),
@@ -366,8 +459,17 @@ class _DealDetailsScreenState extends State<DealDetailsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondaryLight,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
       ],
     );
   }

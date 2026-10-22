@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_typography.dart';
 import 'app_button.dart';
@@ -30,12 +31,24 @@ class AppErrorState extends StatelessWidget {
                 color: AppColors.errorBackground,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(LucideIcons.triangleAlert, size: 40, color: AppColors.error),
+              child: const Icon(
+                LucideIcons.triangleAlert,
+                size: 40,
+                color: AppColors.error,
+              ),
             ),
             const SizedBox(height: 16),
-            Text(title, style: AppTypography.titleMedium, textAlign: TextAlign.center),
+            Text(
+              title,
+              style: AppTypography.titleMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 8),
-            Text(message, style: AppTypography.bodySmall, textAlign: TextAlign.center),
+            Text(
+              message,
+              style: AppTypography.bodySmall,
+              textAlign: TextAlign.center,
+            ),
             if (onRetry != null) ...[
               const SizedBox(height: 20),
               AppButton(

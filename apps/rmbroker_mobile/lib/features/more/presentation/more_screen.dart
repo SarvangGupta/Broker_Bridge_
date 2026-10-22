@@ -8,6 +8,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/confirmation_dialog.dart';
 import '../../authentication/data/auth_repository.dart';
 import '../../authentication/domain/broker_user.dart';
+import 'widgets/app_settings_section.dart';
 
 /// More tools, language toggle, and broker settings screen.
 class MoreScreen extends StatelessWidget {
@@ -20,7 +21,6 @@ class MoreScreen extends StatelessWidget {
     final authRepo = authRepository ?? AuthRepository();
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(title: const Text('More Tools & Settings')),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -129,119 +129,131 @@ class MoreScreen extends StatelessWidget {
               color: Colors.transparent,
               child: Column(
                 children: [
-                ListTile(
-                  leading: const Icon(
-                    LucideIcons.globe,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Language / भाषा'),
-                  subtitle: const Text('English & हिन्दी'),
-                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Language parity active: English & Hindi',
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    LucideIcons.indianRupee,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Brokerage & Commission Ledger'),
-                  subtitle: const Text('Track earnings, invoicing & payments'),
-                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
-                  onTap: () => context.push('/commission'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    LucideIcons.fileSpreadsheet,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Commission Invoices & Statements'),
-                  subtitle: const Text('Issue invoices, statements & reconciliation'),
-                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
-                  onTap: () => context.push('/invoices'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    LucideIcons.checkSquare,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Broker Tasks & Follow-ups'),
-                  subtitle: const Text('Track action items, priorities & business follow-ups'),
-                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
-                  onTap: () => context.push('/tasks'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    LucideIcons.bell,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Notifications & Activity Center'),
-                  subtitle: const Text('Operational alerts, mandates, deals & invoices'),
-                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
-                  onTap: () => context.push('/notifications'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    LucideIcons.shieldCheck,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Security & Access Logs'),
-                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
-                  onTap: () {},
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    LucideIcons.fileText,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Audit Trails & Reports'),
-                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
-                  onTap: () {},
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    LucideIcons.info,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Fiduciary Disclaimer'),
-                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Broker Fiduciary Boundary'),
-                        content: const Text(
-                          '${AppConfig.fiduciaryNoticeEn}\n\n${AppConfig.fiduciaryNoticeHi}',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(),
-                            child: const Text('Understood'),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.globe,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Language / भाषा'),
+                    subtitle: const Text('English & हिन्दी'),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Language parity active: English & Hindi',
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.indianRupee,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Brokerage & Commission Ledger'),
+                    subtitle: const Text(
+                      'Track earnings, invoicing & payments',
+                    ),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () => context.push('/commission'),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.fileSpreadsheet,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Commission Invoices & Statements'),
+                    subtitle: const Text(
+                      'Issue invoices, statements & reconciliation',
+                    ),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () => context.push('/invoices'),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.checkSquare,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Broker Tasks & Follow-ups'),
+                    subtitle: const Text(
+                      'Track action items, priorities & business follow-ups',
+                    ),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () => context.push('/tasks'),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.bell,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Notifications & Activity Center'),
+                    subtitle: const Text(
+                      'Operational alerts, mandates, deals & invoices',
+                    ),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () => context.push('/notifications'),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.shieldCheck,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Security & Access Logs'),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () {},
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.fileText,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Audit Trails & Reports'),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () {},
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.info,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Fiduciary Disclaimer'),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Broker Fiduciary Boundary'),
+                          content: const Text(
+                            '${AppConfig.fiduciaryNoticeEn}\n\n${AppConfig.fiduciaryNoticeHi}',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              child: const Text('Understood'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 16),
+
+          // Application Preferences (Theme, Language, Font Size, Accessibility)
+          const AppSettingsSection(),
+          const SizedBox(height: 24),
 
           // Logout Button
           ListTile(

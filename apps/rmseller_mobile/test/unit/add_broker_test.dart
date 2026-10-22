@@ -5,29 +5,32 @@ import 'package:rmseller_mobile/features/brokers/domain/seller_broker_model.dart
 
 void main() {
   group('PhoneUtils Indian Mobile Normalization Tests', () {
-    test('Normalizes valid 10-digit Indian numbers starting with 6, 7, 8, 9', () {
-      final res1 = PhoneUtils.validateAndNormalize('9829012345');
-      expect(res1.isValid, isTrue);
-      expect(res1.normalized, '+919829012345');
-      expect(res1.formatted, '+91 98290 12345');
-      expect(res1.rawDigits, '9829012345');
+    test(
+      'Normalizes valid 10-digit Indian numbers starting with 6, 7, 8, 9',
+      () {
+        final res1 = PhoneUtils.validateAndNormalize('9829012345');
+        expect(res1.isValid, isTrue);
+        expect(res1.normalized, '+919829012345');
+        expect(res1.formatted, '+91 98290 12345');
+        expect(res1.rawDigits, '9829012345');
 
-      final res2 = PhoneUtils.validateAndNormalize('+91 98290 12345');
-      expect(res2.isValid, isTrue);
-      expect(res2.normalized, '+919829012345');
+        final res2 = PhoneUtils.validateAndNormalize('+91 98290 12345');
+        expect(res2.isValid, isTrue);
+        expect(res2.normalized, '+919829012345');
 
-      final res3 = PhoneUtils.validateAndNormalize('09829012345');
-      expect(res3.isValid, isTrue);
-      expect(res3.normalized, '+919829012345');
+        final res3 = PhoneUtils.validateAndNormalize('09829012345');
+        expect(res3.isValid, isTrue);
+        expect(res3.normalized, '+919829012345');
 
-      final res4 = PhoneUtils.validateAndNormalize('919829012345');
-      expect(res4.isValid, isTrue);
-      expect(res4.normalized, '+919829012345');
+        final res4 = PhoneUtils.validateAndNormalize('919829012345');
+        expect(res4.isValid, isTrue);
+        expect(res4.normalized, '+919829012345');
 
-      final res5 = PhoneUtils.validateAndNormalize('98290-12345');
-      expect(res5.isValid, isTrue);
-      expect(res5.normalized, '+919829012345');
-    });
+        final res5 = PhoneUtils.validateAndNormalize('98290-12345');
+        expect(res5.isValid, isTrue);
+        expect(res5.normalized, '+919829012345');
+      },
+    );
 
     test('Rejects invalid phone numbers with clear messages', () {
       final empty = PhoneUtils.validateAndNormalize('');
@@ -51,19 +54,30 @@ void main() {
       repository = SellerBrokerRepository();
     });
 
-    test('Authoritatively recognizes registered fallback broker desks', () async {
-      final result = await repository.lookupBrokerByPhone('+919829012345');
-      expect(result.status == BrokerLookupStatus.found || result.status == BrokerLookupStatus.alreadyLinked, isTrue);
-      expect(result.broker, isNotNull);
-      expect(result.broker!.name, 'Bikaner Mandi Broker Desk');
-      expect(result.broker!.isVerified, isTrue);
-      expect(result.broker!.isRegisteredVerified, isTrue);
-    });
+    test(
+      'Authoritatively recognizes registered fallback broker desks',
+      () async {
+        final result = await repository.lookupBrokerByPhone('+919829012345');
+        expect(
+          result.status == BrokerLookupStatus.found ||
+              result.status == BrokerLookupStatus.alreadyLinked,
+          isTrue,
+        );
+        expect(result.broker, isNotNull);
+        expect(result.broker!.name, 'Bikaner Mandi Broker Desk');
+        expect(result.broker!.isVerified, isTrue);
+        expect(result.broker!.isRegisteredVerified, isTrue);
+      },
+    );
 
     test('Detects already linked brokers correctly', () async {
       // Bikaner is already in fallbackBrokers
       final result = await repository.lookupBrokerByPhone('9829012345');
-      expect(result.status == BrokerLookupStatus.found || result.status == BrokerLookupStatus.alreadyLinked, isTrue);
+      expect(
+        result.status == BrokerLookupStatus.found ||
+            result.status == BrokerLookupStatus.alreadyLinked,
+        isTrue,
+      );
     });
 
     test('Identifies unregistered contacts as notFound without creating fake accounts', () async {

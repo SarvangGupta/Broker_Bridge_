@@ -57,78 +57,100 @@ void main() {
           brokerName: testCommodity.brokerName,
           brokerPhone: testCommodity.brokerPhone,
           brokerLocation: testCommodity.brokerLocation,
-          commodityContext: '${testCommodity.name} • ${testCommodity.quantityTotal} ${testCommodity.unit}',
+          commodityContext:
+              '${testCommodity.name} • ${testCommodity.quantityTotal} ${testCommodity.unit}',
           commodity: testCommodity,
         ),
       );
     }
 
-    testWidgets('Renders broker header, tabs, and counterparty shield disclaimer', (tester) async {
-      await tester.pumpWidget(createScreen());
-      await tester.pump();
+    testWidgets(
+      'Renders broker header, tabs, and counterparty shield disclaimer',
+      (tester) async {
+        await tester.pumpWidget(createScreen());
+        await tester.pump();
 
-      // Broker name and header
-      expect(find.text('Bikaner Mandi Broker Desk'), findsOneWidget);
-      expect(find.text('+919829012345'), findsOneWidget);
+        // Broker name and header
+        expect(find.text('Bikaner Mandi Broker Desk'), findsOneWidget);
+        expect(find.text('+919829012345'), findsOneWidget);
 
-      // Counterparty shield badge/disclaimer
-      expect(find.textContaining('Counterparty Shield'), findsAtLeastNWidgets(1));
+        // Counterparty shield badge/disclaimer
+        expect(
+          find.textContaining('Counterparty Shield'),
+          findsAtLeastNWidgets(1),
+        );
 
-      // Dual tab structure
-      expect(find.text('Broker Chat'), findsOneWidget);
-      expect(find.text('Commission Terms'), findsOneWidget);
+        // Dual tab structure
+        expect(find.text('Broker Chat'), findsOneWidget);
+        expect(find.text('Commission Terms'), findsOneWidget);
 
-      // Chat input bar
-      expect(find.byType(TextField), findsOneWidget);
-    });
+        // Chat input bar
+        expect(find.byType(TextField), findsOneWidget);
+      },
+    );
 
-    testWidgets('Chat tab displays message input bar and quick communication info', (tester) async {
-      await tester.pumpWidget(createScreen());
-      await tester.pump();
+    testWidgets(
+      'Chat tab displays message input bar and quick communication info',
+      (tester) async {
+        await tester.pumpWidget(createScreen());
+        await tester.pump();
 
-      final inputFinder = find.byType(TextField);
-      expect(inputFinder, findsOneWidget);
+        final inputFinder = find.byType(TextField);
+        expect(inputFinder, findsOneWidget);
 
-      // Enter message text
-      await tester.enterText(inputFinder, 'Broker Ji, dispatch is ready for tomorrow morning.');
-      await tester.pump();
+        // Enter message text
+        await tester.enterText(
+          inputFinder,
+          'Broker Ji, dispatch is ready for tomorrow morning.',
+        );
+        await tester.pump();
 
-      expect(find.text('Broker Ji, dispatch is ready for tomorrow morning.'), findsOneWidget);
-    });
+        expect(
+          find.text('Broker Ji, dispatch is ready for tomorrow morning.'),
+          findsOneWidget,
+        );
+      },
+    );
 
-    testWidgets('Commission Terms tab renders status banner and proposal actions', (tester) async {
-      await tester.pumpWidget(createScreen());
-      await tester.pump();
+    testWidgets(
+      'Commission Terms tab renders status banner and proposal actions',
+      (tester) async {
+        await tester.pumpWidget(createScreen());
+        await tester.pump();
 
-      // Tap on Commission Terms Tab
-      await tester.tap(find.text('Commission Terms'));
-      await tester.pumpAndSettle();
+        // Tap on Commission Terms Tab
+        await tester.tap(find.text('Commission Terms'));
+        await tester.pumpAndSettle();
 
-      // Status banner
-      expect(find.textContaining('Commission Status'), findsOneWidget);
+        // Status banner
+        expect(find.textContaining('Commission Status'), findsOneWidget);
 
-      // Propose Commission action button
-      expect(find.textContaining('Propose Commission Terms'), findsOneWidget);
-    });
+        // Propose Commission action button
+        expect(find.textContaining('Propose Commission Terms'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Tapping Propose Commission opens modal sheet with validation fields', (tester) async {
-      await tester.pumpWidget(createScreen());
-      await tester.pump();
+    testWidgets(
+      'Tapping Propose Commission opens modal sheet with validation fields',
+      (tester) async {
+        await tester.pumpWidget(createScreen());
+        await tester.pump();
 
-      // Go to Commission tab
-      await tester.tap(find.text('Commission Terms'));
-      await tester.pumpAndSettle();
+        // Go to Commission tab
+        await tester.tap(find.text('Commission Terms'));
+        await tester.pumpAndSettle();
 
-      // Tap Propose Commission button
-      await tester.tap(find.textContaining('Propose Commission Terms'));
-      await tester.pumpAndSettle();
+        // Tap Propose Commission button
+        await tester.tap(find.textContaining('Propose Commission Terms'));
+        await tester.pumpAndSettle();
 
-      // Modal bottom sheet should appear with proposal fields
-      expect(find.text('Propose Broker Commission'), findsOneWidget);
-      expect(find.text('Proposed Commission Rate *'), findsOneWidget);
-      expect(find.text('Commission Calculation Basis *'), findsOneWidget);
-      expect(find.text('₹/MT (Per Metric Ton)'), findsOneWidget);
-      expect(find.text('Submit Proposal to Broker'), findsOneWidget);
-    });
+        // Modal bottom sheet should appear with proposal fields
+        expect(find.text('Propose Broker Commission'), findsOneWidget);
+        expect(find.text('Proposed Commission Rate *'), findsOneWidget);
+        expect(find.text('Commission Calculation Basis *'), findsOneWidget);
+        expect(find.text('₹/MT (Per Metric Ton)'), findsOneWidget);
+        expect(find.text('Submit Proposal to Broker'), findsOneWidget);
+      },
+    );
   });
 }

@@ -20,17 +20,23 @@ void main() {
       repository = SellerDealsRepository(storage: storage);
     });
 
-    test('getDeals returns authenticated seller deals with booking references', () async {
-      final deals = await repository.getDeals();
-      expect(deals, isNotEmpty);
-      expect(deals.any((d) => d.commodityName.contains('Soybean')), isTrue);
-      expect(deals.every((d) => d.agreedQuantity > 0), isTrue);
-      expect(deals.every((d) => d.agreedPrice > 0), isTrue);
-    });
+    test(
+      'getDeals returns authenticated seller deals with booking references',
+      () async {
+        final deals = await repository.getDeals();
+        expect(deals, isNotEmpty);
+        expect(deals.any((d) => d.commodityName.contains('Soybean')), isTrue);
+        expect(deals.every((d) => d.agreedQuantity > 0), isTrue);
+        expect(deals.every((d) => d.agreedPrice > 0), isTrue);
+      },
+    );
 
     test('getDeals filters by status correctly', () async {
       final dispatched = await repository.getDeals(statusFilter: 'Dispatched');
-      expect(dispatched.every((d) => d.status.toLowerCase() == 'dispatched'), isTrue);
+      expect(
+        dispatched.every((d) => d.status.toLowerCase() == 'dispatched'),
+        isTrue,
+      );
     });
 
     test('getDealById returns correct contract details', () async {

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../core/utils/phone_utils.dart';
 import '../domain/seller_broker_model.dart';
 
@@ -38,7 +39,8 @@ class BrokerLookupResult {
   });
 
   bool get isFound => status == BrokerLookupStatus.found;
-  bool get isPendingVerification => status == BrokerLookupStatus.pendingVerification;
+  bool get isPendingVerification =>
+      status == BrokerLookupStatus.pendingVerification;
   bool get isNotFound => status == BrokerLookupStatus.notFound;
   bool get isAlreadyLinked => status == BrokerLookupStatus.alreadyLinked;
   bool get isError => status == BrokerLookupStatus.error;
@@ -92,7 +94,11 @@ class SellerBrokerRepository {
         if (data.isNotEmpty) {
           for (final row in data) {
             final model = SellerBrokerModel.fromMap(row);
-            if (!combined.any((b) => b.id == model.id || (model.mobile != null && b.mobile == model.mobile))) {
+            if (!combined.any(
+              (b) =>
+                  b.id == model.id ||
+                  (model.mobile != null && b.mobile == model.mobile),
+            )) {
               combined.add(model);
             }
           }
@@ -108,7 +114,9 @@ class SellerBrokerRepository {
     } else {
       // Ensure key licensed fallback desks are available in demo mode
       for (final fb in fallbackBrokers) {
-        if (!combined.any((b) => b.id == fb.id || (fb.mobile != null && b.mobile == fb.mobile))) {
+        if (!combined.any(
+          (b) => b.id == fb.id || (fb.mobile != null && b.mobile == fb.mobile),
+        )) {
           combined.add(fb);
         }
       }
@@ -118,11 +126,15 @@ class SellerBrokerRepository {
     var list = combined;
     if (query != null && query.trim().isNotEmpty) {
       final q = query.trim().toLowerCase();
-      list = list.where((b) =>
-          b.name.toLowerCase().contains(q) ||
-          (b.companyName?.toLowerCase().contains(q) ?? false) ||
-          (b.location?.toLowerCase().contains(q) ?? false) ||
-          b.commoditiesHandled.any((c) => c.toLowerCase().contains(q))).toList();
+      list = list
+          .where(
+            (b) =>
+                b.name.toLowerCase().contains(q) ||
+                (b.companyName?.toLowerCase().contains(q) ?? false) ||
+                (b.location?.toLowerCase().contains(q) ?? false) ||
+                b.commoditiesHandled.any((c) => c.toLowerCase().contains(q)),
+          )
+          .toList();
     }
     return list;
   }
@@ -179,7 +191,9 @@ class SellerBrokerRepository {
               'id, name, role, mobile, email, status, company_id, companies!users_company_id_companies_id_fk(id, name, gst, is_verified, trust_score)',
             )
             .eq('role', 'broker')
-            .or('mobile.eq.$normalized,mobile.eq.$rawDigits,mobile.eq.+91$rawDigits')
+            .or(
+              'mobile.eq.$normalized,mobile.eq.$rawDigits,mobile.eq.+91$rawDigits',
+            )
             .limit(1);
 
         if (data.isNotEmpty) {
@@ -212,7 +226,9 @@ class SellerBrokerRepository {
         final fbNorm = PhoneUtils.getNormalized(fb.mobile);
         if (fbNorm == normalized || fb.mobile!.contains(rawDigits)) {
           return BrokerLookupResult(
-            status: fb.isVerified ? BrokerLookupStatus.found : BrokerLookupStatus.pendingVerification,
+            status: fb.isVerified
+                ? BrokerLookupStatus.found
+                : BrokerLookupStatus.pendingVerification,
             broker: fb,
             normalizedPhone: normalized,
             formattedPhone: formatted,
@@ -232,7 +248,11 @@ class SellerBrokerRepository {
   /// Adds a verified or registered broker desk to the seller's active brokers list.
   Future<bool> addBroker(SellerBrokerModel broker) async {
     // Avoid duplicates
-    final exists = _sessionBrokers.any((b) => b.id == broker.id || (broker.mobile != null && b.mobile == broker.mobile));
+    final exists = _sessionBrokers.any(
+      (b) =>
+          b.id == broker.id ||
+          (broker.mobile != null && b.mobile == broker.mobile),
+    );
     if (!exists) {
       _sessionBrokers.insert(0, broker);
     }
@@ -247,7 +267,9 @@ class SellerBrokerRepository {
     String? nominationSource,
   }) async {
     final validation = PhoneUtils.validateAndNormalize(normalizedPhone);
-    final displayPhone = validation.formatted.isNotEmpty ? validation.formatted : normalizedPhone;
+    final displayPhone = validation.formatted.isNotEmpty
+        ? validation.formatted
+        : normalizedPhone;
     final displayName = (contactName != null && contactName.trim().isNotEmpty)
         ? contactName.trim()
         : 'Nominated Broker ($displayPhone)';
@@ -255,7 +277,9 @@ class SellerBrokerRepository {
     final invitedBroker = SellerBrokerModel(
       id: 'inv-${DateTime.now().millisecondsSinceEpoch}',
       name: displayName,
-      mobile: validation.normalized.isNotEmpty ? validation.normalized : normalizedPhone,
+      mobile: validation.normalized.isNotEmpty
+          ? validation.normalized
+          : normalizedPhone,
       companyName: 'Invited Broker Desk (Pending Confirmation)',
       location: 'Pending Broker Registration',
       trustScore: 100,
@@ -298,7 +322,12 @@ class SellerBrokerRepository {
       location: 'Krishi Upaj Mandi, Bikaner',
       trustScore: 99,
       isVerified: true,
-      commoditiesHandled: ['Desi Chana (Gram)', 'Mustard Seeds', 'Guar Gum', 'Wheat'],
+      commoditiesHandled: [
+        'Desi Chana (Gram)',
+        'Mustard Seeds',
+        'Guar Gum',
+        'Wheat',
+      ],
       averageRating: 4.7,
       reviewCount: 3,
       status: SellerBrokerStatus.registeredVerified,
@@ -343,7 +372,12 @@ class SellerBrokerRepository {
       location: 'Surajpole Grain Mandi, Jaipur',
       trustScore: 97,
       isVerified: true,
-      commoditiesHandled: ['Desi Chana (Gram)', 'Barley', 'Mustard Seeds', 'Bajra'],
+      commoditiesHandled: [
+        'Desi Chana (Gram)',
+        'Barley',
+        'Mustard Seeds',
+        'Bajra',
+      ],
       averageRating: null, // Unrated desk
       reviewCount: 0,
       status: SellerBrokerStatus.registeredVerified,

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+
 import '../config/app_config.dart';
 import '../errors/app_exception.dart';
 import 'auth_interceptor.dart';
@@ -8,7 +9,8 @@ class ApiClient {
   late final Dio _dio;
 
   ApiClient({Dio? customDio}) {
-    _dio = customDio ??
+    _dio =
+        customDio ??
         Dio(
           BaseOptions(
             baseUrl: AppConfig.apiBaseUrl,
@@ -70,14 +72,21 @@ class ApiClient {
       case DioExceptionType.badResponse:
         final status = error.response?.statusCode;
         final message = error.response?.data is Map
-            ? (error.response?.data['error'] ?? error.response?.data['message'] ?? 'Request failed')
+            ? (error.response?.data['error'] ??
+                  error.response?.data['message'] ??
+                  'Request failed')
             : 'Request failed with status $status';
         if (status == 401 || status == 403) {
           return AccessDeniedException(message: message.toString());
         }
-        return ServerException(message: message.toString(), code: status?.toString());
+        return ServerException(
+          message: message.toString(),
+          code: status?.toString(),
+        );
       default:
-        return ServerException(message: error.message ?? 'An unexpected error occurred');
+        return ServerException(
+          message: error.message ?? 'An unexpected error occurred',
+        );
     }
   }
 }

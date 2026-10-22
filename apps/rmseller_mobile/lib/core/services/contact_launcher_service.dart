@@ -32,7 +32,10 @@ class ContactLauncherService {
   }
 
   /// Launch WhatsApp chat for authorized Broker contact.
-  Future<bool> launchWhatsApp(String? phoneNumber, {String? defaultMessage}) async {
+  Future<bool> launchWhatsApp(
+    String? phoneNumber, {
+    String? defaultMessage,
+  }) async {
     if (phoneNumber == null || phoneNumber.trim().isEmpty) {
       debugPrint('Cannot launch WhatsApp: phone number is null or empty');
       return false;
@@ -43,7 +46,8 @@ class ContactLauncherService {
       cleanNumber = '91$cleanNumber';
     }
 
-    final message = defaultMessage ??
+    final message =
+        defaultMessage ??
         'Hello, I am reaching out regarding a commodity supply lot on the RMSeller Portal.';
     final encodedMessage = Uri.encodeComponent(message);
 

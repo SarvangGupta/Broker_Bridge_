@@ -45,7 +45,9 @@ class AccessDeniedScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 Text(
                   'Access Restricted',
-                  style: AppTypography.displayMedium.copyWith(color: AppColors.error),
+                  style: AppTypography.displayMedium.copyWith(
+                    color: AppColors.error,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(

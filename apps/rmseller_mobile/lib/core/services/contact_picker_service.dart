@@ -6,10 +6,7 @@ class PickedContact {
   final String name;
   final String phone;
 
-  const PickedContact({
-    required this.name,
-    required this.phone,
-  });
+  const PickedContact({required this.name, required this.phone});
 
   factory PickedContact.fromMap(Map<dynamic, dynamic> map) {
     return PickedContact(
@@ -42,10 +39,7 @@ class ContactPickerResult {
   }
 
   factory ContactPickerResult.cancelled() {
-    return const ContactPickerResult._(
-      isSuccess: false,
-      isCancelled: true,
-    );
+    return const ContactPickerResult._(isSuccess: false, isCancelled: true);
   }
 
   factory ContactPickerResult.error(String message) {
@@ -61,7 +55,9 @@ class ContactPickerResult {
 /// Uses Intent.ACTION_PICK to return only the single contact chosen by the user,
 /// without requesting broad address-book permissions or dumping contact lists.
 class ContactPickerService {
-  static const MethodChannel _channel = MethodChannel('com.brokerbridge.rmseller/contacts');
+  static const MethodChannel _channel = MethodChannel(
+    'com.brokerbridge.rmseller/contacts',
+  );
 
   const ContactPickerService();
 
@@ -80,13 +76,19 @@ class ContactPickerService {
         }
         return ContactPickerResult.success(contact);
       }
-      return ContactPickerResult.error('Unexpected data returned by system contact picker.');
+      return ContactPickerResult.error(
+        'Unexpected data returned by system contact picker.',
+      );
     } on PlatformException catch (e) {
       if (e.code == 'CANCELLED' || e.code == 'USER_CANCELLED') {
         return ContactPickerResult.cancelled();
       }
-      debugPrint('ContactPickerService PlatformException: ${e.code} - ${e.message}');
-      return ContactPickerResult.error(e.message ?? 'System contact picker failed.');
+      debugPrint(
+        'ContactPickerService PlatformException: ${e.code} - ${e.message}',
+      );
+      return ContactPickerResult.error(
+        e.message ?? 'System contact picker failed.',
+      );
     } catch (e) {
       debugPrint('ContactPickerService Exception: $e');
       return ContactPickerResult.error('Failed to open contacts: $e');

@@ -79,34 +79,40 @@ void main() {
       expect(fetched.brokerName, 'Bikaner Mandi Broker Desk');
     });
 
-    test('updateCommodityStatus updates listing status and notifies listeners', () async {
-      final dto = CreateCommodityDto(
-        commodityId: '10000000-0000-0000-0000-000000000001',
-        commodityName: 'Yellow Soybean',
-        gradeId: '20000000-0000-0000-0000-000000000001',
-        gradeName: 'Grade A FAQ',
-        lotNumber: 'LOT-STATUS-01',
-        totalQuantity: 80.0,
-        unitId: '30000000-0000-0000-0000-000000000001',
-        unitSymbol: 'MT',
-        askingPrice: 5000.0,
-        stateId: '40000000-0000-0000-0000-000000000001',
-        stateName: 'Rajasthan',
-        districtId: '50000000-0000-0000-0000-000000000001',
-        districtName: 'Bikaner Mandi Hub',
-        availableFrom: DateTime.now(),
-        validUntil: DateTime.now().add(const Duration(days: 7)),
-      );
+    test(
+      'updateCommodityStatus updates listing status and notifies listeners',
+      () async {
+        final dto = CreateCommodityDto(
+          commodityId: '10000000-0000-0000-0000-000000000001',
+          commodityName: 'Yellow Soybean',
+          gradeId: '20000000-0000-0000-0000-000000000001',
+          gradeName: 'Grade A FAQ',
+          lotNumber: 'LOT-STATUS-01',
+          totalQuantity: 80.0,
+          unitId: '30000000-0000-0000-0000-000000000001',
+          unitSymbol: 'MT',
+          askingPrice: 5000.0,
+          stateId: '40000000-0000-0000-0000-000000000001',
+          stateName: 'Rajasthan',
+          districtId: '50000000-0000-0000-0000-000000000001',
+          districtName: 'Bikaner Mandi Hub',
+          availableFrom: DateTime.now(),
+          validUntil: DateTime.now().add(const Duration(days: 7)),
+        );
 
-      final created = await repository.createCommodity(dto);
-      expect(created.status, 'Open');
+        final created = await repository.createCommodity(dto);
+        expect(created.status, 'Open');
 
-      final success = await repository.updateCommodityStatus(created.id, 'Cancelled');
-      expect(success, isTrue);
+        final success = await repository.updateCommodityStatus(
+          created.id,
+          'Cancelled',
+        );
+        expect(success, isTrue);
 
-      final updated = await repository.getCommodityById(created.id);
-      expect(updated?.status, 'Cancelled');
-    });
+        final updated = await repository.getCommodityById(created.id);
+        expect(updated?.status, 'Cancelled');
+      },
+    );
 
     test('updateCommodityPrice updates listing asking price', () async {
       final dto = CreateCommodityDto(
@@ -137,48 +143,54 @@ void main() {
       expect(updated?.askingPrice, 5250.0);
     });
 
-    test('createCommodity rejects negative or zero quantity with ArgumentError', () async {
-      final dto = CreateCommodityDto(
-        commodityId: '10000000-0000-0000-0000-000000000001',
-        commodityName: 'Yellow Soybean',
-        gradeId: '20000000-0000-0000-0000-000000000001',
-        gradeName: 'Grade A FAQ',
-        lotNumber: 'LOT-INV-01',
-        totalQuantity: 0.0,
-        unitId: '30000000-0000-0000-0000-000000000001',
-        unitSymbol: 'MT',
-        askingPrice: 4950.0,
-        stateId: '40000000-0000-0000-0000-000000000001',
-        stateName: 'Rajasthan',
-        districtId: '50000000-0000-0000-0000-000000000001',
-        districtName: 'Bikaner Mandi Hub',
-        availableFrom: DateTime.now(),
-        validUntil: DateTime.now().add(const Duration(days: 7)),
-      );
+    test(
+      'createCommodity rejects negative or zero quantity with ArgumentError',
+      () async {
+        final dto = CreateCommodityDto(
+          commodityId: '10000000-0000-0000-0000-000000000001',
+          commodityName: 'Yellow Soybean',
+          gradeId: '20000000-0000-0000-0000-000000000001',
+          gradeName: 'Grade A FAQ',
+          lotNumber: 'LOT-INV-01',
+          totalQuantity: 0.0,
+          unitId: '30000000-0000-0000-0000-000000000001',
+          unitSymbol: 'MT',
+          askingPrice: 4950.0,
+          stateId: '40000000-0000-0000-0000-000000000001',
+          stateName: 'Rajasthan',
+          districtId: '50000000-0000-0000-0000-000000000001',
+          districtName: 'Bikaner Mandi Hub',
+          availableFrom: DateTime.now(),
+          validUntil: DateTime.now().add(const Duration(days: 7)),
+        );
 
-      expect(() => repository.createCommodity(dto), throwsArgumentError);
-    });
+        expect(() => repository.createCommodity(dto), throwsArgumentError);
+      },
+    );
 
-    test('createCommodity rejects non-positive asking price with ArgumentError', () async {
-      final dto = CreateCommodityDto(
-        commodityId: '10000000-0000-0000-0000-000000000001',
-        commodityName: 'Yellow Soybean',
-        gradeId: '20000000-0000-0000-0000-000000000001',
-        gradeName: 'Grade A FAQ',
-        lotNumber: 'LOT-INV-02',
-        totalQuantity: 50.0,
-        unitId: '30000000-0000-0000-0000-000000000001',
-        unitSymbol: 'MT',
-        askingPrice: -100.0,
-        stateId: '40000000-0000-0000-0000-000000000001',
-        stateName: 'Rajasthan',
-        districtId: '50000000-0000-0000-0000-000000000001',
-        districtName: 'Bikaner Mandi Hub',
-        availableFrom: DateTime.now(),
-        validUntil: DateTime.now().add(const Duration(days: 7)),
-      );
+    test(
+      'createCommodity rejects non-positive asking price with ArgumentError',
+      () async {
+        final dto = CreateCommodityDto(
+          commodityId: '10000000-0000-0000-0000-000000000001',
+          commodityName: 'Yellow Soybean',
+          gradeId: '20000000-0000-0000-0000-000000000001',
+          gradeName: 'Grade A FAQ',
+          lotNumber: 'LOT-INV-02',
+          totalQuantity: 50.0,
+          unitId: '30000000-0000-0000-0000-000000000001',
+          unitSymbol: 'MT',
+          askingPrice: -100.0,
+          stateId: '40000000-0000-0000-0000-000000000001',
+          stateName: 'Rajasthan',
+          districtId: '50000000-0000-0000-0000-000000000001',
+          districtName: 'Bikaner Mandi Hub',
+          availableFrom: DateTime.now(),
+          validUntil: DateTime.now().add(const Duration(days: 7)),
+        );
 
-      expect(() => repository.createCommodity(dto), throwsArgumentError);
-    });
+        expect(() => repository.createCommodity(dto), throwsArgumentError);
+      },
+    );
   });
 }

@@ -4,11 +4,7 @@ abstract class AppException implements Exception {
   final String? code;
   final dynamic details;
 
-  const AppException({
-    required this.message,
-    this.code,
-    this.details,
-  });
+  const AppException({required this.message, this.code, this.details});
 
   @override
   String toString() => message;
@@ -17,7 +13,8 @@ abstract class AppException implements Exception {
 /// Network-level connectivity or transport exceptions (e.g. offline, DNS failure, timeout).
 class NetworkException extends AppException {
   const NetworkException({
-    super.message = 'Network connection unavailable. Please check your data or Wi-Fi.',
+    super.message =
+        'Network connection unavailable. Please check your data or Wi-Fi.',
     super.code = 'NETWORK_ERROR',
     super.details,
   });
