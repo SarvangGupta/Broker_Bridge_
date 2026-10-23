@@ -22,18 +22,28 @@ class SecureStorageService {
   static const String _keyUserName = 'rmbroker_user_name';
 
   Future<void> saveToken(String token) async {
+    if (_useMemoryFallback) {
+      _memoryStorage[_keyToken] = token;
+      return;
+    }
     await _storage.write(key: _keyToken, value: token);
   }
 
   Future<String?> getToken() async {
+    if (_useMemoryFallback) return _memoryStorage[_keyToken];
     return await _storage.read(key: _keyToken);
   }
 
   Future<void> saveRefreshToken(String refreshToken) async {
+    if (_useMemoryFallback) {
+      _memoryStorage[_keyRefreshToken] = refreshToken;
+      return;
+    }
     await _storage.write(key: _keyRefreshToken, value: refreshToken);
   }
 
   Future<String?> getRefreshToken() async {
+    if (_useMemoryFallback) return _memoryStorage[_keyRefreshToken];
     return await _storage.read(key: _keyRefreshToken);
   }
 
@@ -43,6 +53,13 @@ class SecureStorageService {
     String? email,
     String? fullName,
   }) async {
+    if (_useMemoryFallback) {
+      _memoryStorage[_keyUserId] = id;
+      _memoryStorage[_keyUserRole] = role;
+      if (email != null) _memoryStorage[_keyUserEmail] = email;
+      if (fullName != null) _memoryStorage[_keyUserName] = fullName;
+      return;
+    }
     await _storage.write(key: _keyUserId, value: id);
     await _storage.write(key: _keyUserRole, value: role);
     if (email != null) {
@@ -54,18 +71,22 @@ class SecureStorageService {
   }
 
   Future<String?> getUserRole() async {
+    if (_useMemoryFallback) return _memoryStorage[_keyUserRole];
     return await _storage.read(key: _keyUserRole);
   }
 
   Future<String?> getUserId() async {
+    if (_useMemoryFallback) return _memoryStorage[_keyUserId];
     return await _storage.read(key: _keyUserId);
   }
 
   Future<String?> getUserEmail() async {
+    if (_useMemoryFallback) return _memoryStorage[_keyUserEmail];
     return await _storage.read(key: _keyUserEmail);
   }
 
   Future<String?> getUserName() async {
+    if (_useMemoryFallback) return _memoryStorage[_keyUserName];
     return await _storage.read(key: _keyUserName);
   }
 

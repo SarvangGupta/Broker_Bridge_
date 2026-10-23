@@ -21,11 +21,31 @@ class RMBrokerApp extends ConsumerWidget {
       themeMode: settings.themeMode,
       locale: settings.locale,
       builder: (context, child) {
-        return MediaQuery(
+        Widget content = MediaQuery(
           data: MediaQuery.of(context)
               .copyWith(textScaler: TextScaler.linear(settings.fontScale)),
           child: child ?? const SizedBox.shrink(),
         );
+
+        if (settings.eyeProtectionMode) {
+          content = Stack(
+            textDirection: TextDirection.ltr,
+            children: [
+              content,
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Color(0x12FF9800), // ~7% comfortable warm tint without obscuring prices
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return content;
       },
       routerConfig: AppRouter.router,
     );

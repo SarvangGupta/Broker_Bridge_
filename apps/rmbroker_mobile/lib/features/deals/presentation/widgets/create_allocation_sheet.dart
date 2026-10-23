@@ -32,6 +32,7 @@ class CreateAllocationSheet extends ConsumerStatefulWidget {
   }) {
     return showModalBottomSheet<T>(
       context: context,
+      useRootNavigator: false,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceLight,
       shape: const RoundedRectangleBorder(

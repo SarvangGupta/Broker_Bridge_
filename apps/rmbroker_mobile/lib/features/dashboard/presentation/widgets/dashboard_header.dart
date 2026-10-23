@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:rmbroker_mobile/app/theme/app_colors.dart';
+import 'package:rmbroker_mobile/core/preferences/app_settings_provider.dart';
 import 'package:rmbroker_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:rmbroker_mobile/core/widgets/status_badge.dart';
 import 'package:rmbroker_mobile/features/authentication/domain/broker_user.dart';
@@ -141,26 +142,177 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
                   ),
                 ),
 
+                // Profile link
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: const Icon(
+                    LucideIcons.userCheck,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                  title: const Text(
+                    'My Broker Profile',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'View & edit credentials, commodities & mandi locations',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 16),
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    context.push('/profile');
+                  },
+                ),
+
+                // Market Price Broadcast link
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: const Icon(
+                    LucideIcons.radio,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                  title: const Text(
+                    'Market Price Broadcast',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Broadcast latest verified seller prices to associated buyers',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 16),
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    context.push('/broadcast/market-price');
+                  },
+                ),
+
+                // Broadcast Price History link
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: const Icon(
+                    LucideIcons.history,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                  title: const Text(
+                    'Broadcast Price History',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Audit sent prices, buyer recipients & delivery logs',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 16),
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    context.push('/broadcast/history');
+                  },
+                ),
+
                 // Settings link
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                   leading: const Icon(
                     LucideIcons.settings,
-                    color: AppColors.textSecondaryLight,
+                    color: AppColors.primary,
                     size: 18,
                   ),
                   title: const Text(
                     'Desk Settings & Preferences',
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.textPrimaryLight,
                     ),
                   ),
+                  subtitle: const Text(
+                    'Theme, language, eye-protection & label modes',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 16),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
-                    context.go('/more');
+                    context.push('/settings');
+                  },
+                ),
+
+                // Icon-Only Asterisk Mode quick toggle inside modal
+                Consumer(
+                  builder: (context, modalRef, _) {
+                    final settings = modalRef.watch(appSettingsProvider);
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      leading: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          '*',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                      title: const Text(
+                        'Asterisk (*) Icon-Only Mode',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      subtitle: Text(
+                        settings.iconOnlyMode ? 'Labels hidden' : 'Labels visible',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      trailing: Switch(
+                        value: settings.iconOnlyMode,
+                        activeThumbColor: AppColors.primary,
+                        onChanged: (val) {
+                          modalRef
+                              .read(appSettingsProvider.notifier)
+                              .setIconOnlyMode(val);
+                        },
+                      ),
+                    );
                   },
                 ),
 
@@ -218,6 +370,7 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
+    final settings = ref.watch(appSettingsProvider);
 
     final initials =
         (broker?.fullName.isNotEmpty == true ? broker!.fullName : 'BB')
@@ -272,8 +425,31 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
       ),
       actions: [
         const StatusBadge(status: 'LIVE', isLive: true),
-        const SizedBox(width: 4),
+        // Asterisk (*) global icon-only label toggle button
         IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: settings.iconOnlyMode ? 'Show labels (*)' : 'Hide labels (*)',
+          icon: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: settings.iconOnlyMode
+                  ? AppColors.primary
+                  : AppColors.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '*',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: settings.iconOnlyMode ? Colors.white : AppColors.primary,
+              ),
+            ),
+          ),
+          onPressed: () => ref.read(appSettingsProvider.notifier).toggleIconOnlyMode(),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
           tooltip: 'Global Search',
           icon: const Icon(LucideIcons.search, size: 20),
           onPressed: () => context.push('/search'),
@@ -281,6 +457,7 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
         NotificationBadge(
           count: unreadCount,
           child: IconButton(
+            visualDensity: VisualDensity.compact,
             tooltip: 'Desk Notifications',
             icon: const Icon(LucideIcons.bell, size: 20),
             onPressed: () => context.push('/notifications'),

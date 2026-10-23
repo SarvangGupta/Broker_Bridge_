@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
@@ -18,7 +19,6 @@ import 'widgets/match_card.dart';
 import 'widgets/offer_card.dart';
 import 'widgets/offer_detail_sheet.dart';
 import 'widgets/requirement_card.dart';
-import 'widgets/requirement_detail_sheet.dart';
 import 'widgets/negotiate_requirement_sheet.dart';
 import '../../deals/presentation/widgets/create_allocation_sheet.dart';
 
@@ -45,29 +45,16 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
   final _reqSearchController = TextEditingController();
   final _offerSearchController = TextEditingController();
   bool _isOpeningSheet = false;
-  Future<void> _openRequirementDetail(RequirementItem req) async {
-    if (_isOpeningSheet) return;
-    _isOpeningSheet = true;
-    RequirementDetailAction? action;
-    try {
-      action = await RequirementDetailSheet.show(
-        context: context,
-        requirement: req,
-        onFindMatches: () => _onFindMatchesForRequirement(req),
-      );
-    } finally {
+  bool _isNavigating = false;
+
+  void _openRequirementDetail(RequirementItem req) {
+    if (_isNavigating) return;
+    _isNavigating = true;
+    context.push('/requirements/${req.id}').whenComplete(() {
       if (mounted) {
-        _isOpeningSheet = false;
+        _isNavigating = false;
       }
-    }
-
-    if (!mounted) return;
-
-    if (action == RequirementDetailAction.negotiate) {
-      await _openNegotiateRequirement(req);
-    } else if (action == RequirementDetailAction.findMatches) {
-      _onFindMatchesForRequirement(req);
-    }
+    });
   }
 
   Future<void> _openNegotiateRequirement(RequirementItem req) async {
@@ -156,6 +143,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
   @override
   void didUpdateWidget(covariant WorkScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _isOpeningSheet = false;
     if (widget.initialTabIndex != oldWidget.initialTabIndex) {
       _tabController.animateTo(widget.initialTabIndex.clamp(0, 2));
     }
@@ -191,7 +179,14 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
   }
 
   @override
+  void deactivate() {
+    _isOpeningSheet = false;
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _isOpeningSheet = false;
     _tabController.dispose();
     _reqSearchController.dispose();
     _offerSearchController.dispose();
@@ -817,6 +812,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
           final tab = _tabController.index;
           if (tab == 0) {
             return FloatingActionButton.extended(
+              heroTag: 'work_desk_mandate_fab',
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               icon: const Icon(LucideIcons.plus, size: 18),
@@ -825,6 +821,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
             );
           } else if (tab == 1) {
             return FloatingActionButton.extended(
+              heroTag: 'work_desk_offer_fab',
               backgroundColor: AppColors.success,
               foregroundColor: Colors.white,
               icon: const Icon(LucideIcons.plus, size: 18),

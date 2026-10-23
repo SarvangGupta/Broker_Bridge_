@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/preferences/app_settings_provider.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/confirmation_dialog.dart';
 import '../../authentication/data/auth_repository.dart';
@@ -11,21 +13,49 @@ import '../../authentication/domain/broker_user.dart';
 import 'widgets/app_settings_section.dart';
 
 /// More tools, language toggle, and broker settings screen.
-class MoreScreen extends StatelessWidget {
+class MoreScreen extends ConsumerWidget {
   final AuthRepository? authRepository;
 
   const MoreScreen({super.key, this.authRepository});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final authRepo = authRepository ?? AuthRepository();
+    final settings = ref.watch(appSettingsProvider);
+    final isIconOnly = settings.iconOnlyMode;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('More Tools & Settings')),
+      appBar: AppBar(
+        title: const Text('More Tools & Settings'),
+        actions: [
+          IconButton(
+            tooltip: isIconOnly ? 'Show labels (*)' : 'Hide labels (*)',
+            icon: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isIconOnly
+                    ? AppColors.primary
+                    : AppColors.primaryContainer.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '*',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isIconOnly ? Colors.white : AppColors.primary,
+                ),
+              ),
+            ),
+            onPressed: () =>
+                ref.read(appSettingsProvider.notifier).toggleIconOnlyMode(),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          // Dynamic Profile Card
+          // Dynamic Profile Card (Tappable to /profile)
           FutureBuilder<BrokerUser?>(
             future: authRepo.getCurrentBroker(),
             builder: (context, snapshot) {
@@ -45,77 +75,82 @@ class MoreScreen extends StatelessWidget {
                   .map((part) => part[0].toUpperCase())
                   .join();
 
-              return AppCard(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: AppColors.primaryContainer,
-                      child: Text(
-                        initials.isNotEmpty ? initials : 'BR',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primaryDark,
+              return InkWell(
+                onTap: () => context.push('/profile'),
+                borderRadius: BorderRadius.circular(12),
+                child: AppCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: AppColors.primaryContainer,
+                        child: Text(
+                          initials.isNotEmpty ? initials : 'BR',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primaryDark,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  name,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimaryLight,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  role,
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimaryLight,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            email,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondaryLight,
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    role,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                            const SizedBox(height: 2),
+                            Text(
+                              email,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondaryLight,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.textSecondaryLight),
+                    ],
+                  ),
                 ),
               );
             },
@@ -146,6 +181,28 @@ class MoreScreen extends StatelessWidget {
                         ),
                       );
                     },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.radio,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Market Price Broadcast'),
+                    subtitle: const Text('Send verified prices to associated buyers'),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () => context.push('/broadcast/market-price'),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.history,
+                      color: AppColors.primary,
+                    ),
+                    title: const Text('Broadcast Price History'),
+                    subtitle: const Text('Review sent prices, recipients & audit trail'),
+                    trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                    onTap: () => context.push('/broadcast/history'),
                   ),
                   const Divider(height: 1),
                   ListTile(

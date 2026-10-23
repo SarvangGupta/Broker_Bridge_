@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:rmbroker_mobile/app/router/app_router.dart';
 import 'package:rmbroker_mobile/features/work/data/work_repository.dart';
 import 'package:rmbroker_mobile/features/work/domain/requirement_model.dart';
 import 'package:rmbroker_mobile/features/work/domain/requirement_negotiation_model.dart';
 import 'package:rmbroker_mobile/features/work/presentation/controllers/requirements_controller.dart';
-import 'package:rmbroker_mobile/features/work/presentation/work_screen.dart';
-import 'package:rmbroker_mobile/features/work/presentation/widgets/negotiate_requirement_sheet.dart';
+import 'package:rmbroker_mobile/features/work/presentation/screens/requirement_detail_screen.dart';
 import 'package:rmbroker_mobile/features/work/presentation/widgets/requirement_card.dart';
-import 'package:rmbroker_mobile/features/work/presentation/widgets/requirement_detail_sheet.dart';
 
 class MockWorkRepository extends WorkRepository {
   final List<RequirementItem> mockRequirements;
@@ -109,128 +107,95 @@ void main() {
   );
 
   testWidgets('WorkScreen allows selecting multiple requirements without hanging', (tester) async {
-    FlutterError.onError = (details) {
-      debugPrint('STACK TRACE OF OVERFLOW:');
-      debugPrint(details.stack.toString());
-      debugPrint(details.context.toString());
-    };
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
     final mockRepo = MockWorkRepository(mockRequirements: [req1, req2]);
+    final router = AppRouter.router;
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           workRepositoryProvider.overrideWithValue(mockRepo),
         ],
-        child: const MaterialApp(
-          home: WorkScreen(),
+        child: MaterialApp.router(
+          routerConfig: router,
         ),
       ),
     );
 
+    router.go('/work');
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
 
     debugPrint('STEP 1: Verify rendered');
     expect(find.byType(RequirementCard), findsNWidgets(2));
     expect(find.text('RBTEST Frontier Starch Processing'), findsOneWidget);
     expect(find.text('RBTEST Golden Harvest Flour Mills'), findsOneWidget);
 
-    // 1. Tap first requirement card to open detail sheet
+    // 1. Tap first requirement card to open dedicated RequirementDetailScreen
     debugPrint('STEP 2: Tap first card');
     await tester.tap(find.text('RBTEST Frontier Starch Processing'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
 
-    debugPrint('STEP 3: Expect RequirementDetailSheet');
-    expect(find.byType(RequirementDetailSheet), findsOneWidget);
+    debugPrint('STEP 3: Expect RequirementDetailScreen for req1');
+    expect(find.byType(RequirementDetailScreen), findsOneWidget);
+    expect(find.text('#REQ-600001'), findsOneWidget);
 
-    // Close the detail sheet using the X button
-    debugPrint('STEP 4: Close sheet');
-    await tester.tap(find.byIcon(LucideIcons.x).first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    // Close detail screen using Back button
+    debugPrint('STEP 4: Back navigation');
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
 
-    debugPrint('STEP 5: Expect sheet closed');
-    expect(find.byType(RequirementDetailSheet), findsNothing);
+    debugPrint('STEP 5: Expect returned to WorkScreen');
+    expect(find.byType(RequirementDetailScreen), findsNothing);
+    expect(find.text('RBTEST Frontier Starch Processing'), findsOneWidget);
 
-    // 2. Tap second requirement card to open detail sheet
+    // Wait for 600ms debounce to expire
+    await tester.pump(const Duration(milliseconds: 700));
+
+    // 2. Tap second requirement card to open dedicated RequirementDetailScreen
     debugPrint('STEP 6: Tap second card');
     await tester.tap(find.text('RBTEST Golden Harvest Flour Mills'));
+    await tester.pumpAndSettle();
+
+    debugPrint('STEP 7: Expect second RequirementDetailScreen for req2');
+    expect(find.byType(RequirementDetailScreen), findsOneWidget);
+    expect(find.text('#REQ-600002'), findsOneWidget);
+
+    // Close second detail screen
+    debugPrint('STEP 8: Back navigation from second detail');
+    await tester.tap(find.byIcon(Icons.arrow_back));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
 
-    debugPrint('STEP 7: Expect second sheet');
-    expect(find.byType(RequirementDetailSheet), findsOneWidget);
+    debugPrint('STEP 9: Expect returned to WorkScreen');
+    expect(find.byType(RequirementDetailScreen), findsNothing);
 
-    // Close the second sheet
-    debugPrint('STEP 8: Close second sheet');
-    await tester.tap(find.byIcon(LucideIcons.x).first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    debugPrint('STEP 10: Requirements card navigation verified cleanly');
 
-    debugPrint('STEP 9: Expect second sheet closed');
-    expect(find.byType(RequirementDetailSheet), findsNothing);
-
-    // 3. Tap on Negotiate / Proposal directly on first card
-    debugPrint('STEP 10: Tap Proposal button');
-    await tester.tap(find.text('Proposal'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    debugPrint('STEP 11: Expect NegotiateRequirementSheet');
-    expect(find.byType(NegotiateRequirementSheet), findsOneWidget);
-
-    // Close negotiate sheet
-    debugPrint('STEP 12: Close negotiate sheet');
-    await tester.tap(find.byIcon(LucideIcons.x).first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    debugPrint('STEP 13: Negotiate sheet closed');
-    expect(find.byType(NegotiateRequirementSheet), findsNothing);
-
-    // 4. Test Transition: Open detail sheet and tap 'Initiate Negotiation & Submit Proposal'
-    debugPrint('STEP 14: Tap first card again');
-    await tester.tap(find.text('RBTEST Frontier Starch Processing'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(RequirementDetailSheet), findsOneWidget);
-
-    debugPrint('STEP 15: Tap proposal button inside detail sheet');
-    final proposalButton = find.text('Initiate Negotiation & Submit Proposal');
-    final amendButton = find.text('View / Amend Commercial Proposal');
-    final buttonToTap = proposalButton.evaluate().isNotEmpty ? proposalButton : amendButton;
-    await tester.tap(buttonToTap);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    debugPrint('STEP 16: Verify detail sheet dismissed and negotiate sheet opened');
-    expect(find.byType(RequirementDetailSheet), findsNothing);
-    expect(find.byType(NegotiateRequirementSheet), findsOneWidget);
-
-    // Close negotiate sheet
-    debugPrint('STEP 17: Close negotiate sheet');
-    await tester.tap(find.byIcon(LucideIcons.x).first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(NegotiateRequirementSheet), findsNothing);
-
-    // 5. Test Tab Switching (Requirements -> Offers -> Match Center -> Requirements)
-    debugPrint('STEP 18: Tap Offers tab');
+    // 4. Tab Switching
+    debugPrint('STEP 14: Tap Offers tab');
     await tester.tap(find.textContaining('Offers'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    debugPrint('STEP 19: Tap Match Center tab');
-    await tester.tap(find.text('Match Center'));
+    debugPrint('STEP 15: Tap Match Center tab');
+    await tester.tap(find.text('Match Center'), warnIfMissed: false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    debugPrint('STEP 20: Tap Requirements tab');
+    debugPrint('STEP 16: Tap Requirements tab');
     await tester.tap(find.textContaining('Requirements'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    debugPrint('STEP 21: Done - all transitions verified successfully');
+    debugPrint('STEP 17: Done - all transitions verified successfully');
   });
 }

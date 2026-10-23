@@ -19,25 +19,31 @@ import '../../features/more/presentation/more_screen.dart';
 import '../../features/notifications/presentation/screens/notification_center_screen.dart';
 import '../../features/search/domain/search_result.dart';
 import '../../features/search/presentation/global_search_screen.dart';
+import '../../features/broadcast/presentation/broadcast_detail_screen.dart';
+import '../../features/broadcast/presentation/broadcast_history_screen.dart';
+import '../../features/broadcast/presentation/market_price_broadcast_screen.dart';
+import '../../features/profile/presentation/broker_profile_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/tasks/presentation/screens/task_detail_screen.dart';
 import '../../features/tasks/presentation/screens/task_list_screen.dart';
+import '../../features/work/presentation/screens/requirement_detail_screen.dart';
 import '../../features/work/presentation/work_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
-final GlobalKey<NavigatorState> _dashboardNavigatorKey =
+final GlobalKey<NavigatorState> dashboardNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'dashboardNav');
-final GlobalKey<NavigatorState> _workNavigatorKey = GlobalKey<NavigatorState>(
+final GlobalKey<NavigatorState> workNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'workNav',
 );
-final GlobalKey<NavigatorState> _dealsNavigatorKey = GlobalKey<NavigatorState>(
+final GlobalKey<NavigatorState> dealsNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'dealsNav',
 );
-final GlobalKey<NavigatorState> _directoryNavigatorKey =
+final GlobalKey<NavigatorState> directoryNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'directoryNav');
-final GlobalKey<NavigatorState> _moreNavigatorKey = GlobalKey<NavigatorState>(
+final GlobalKey<NavigatorState> moreNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'moreNav',
 );
 
@@ -93,7 +99,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/buyer/requirements/:id',
-        redirect: (context, state) => '/work',
+        redirect: (context, state) => '/requirements/${state.pathParameters['id']}',
       ),
       GoRoute(
         path: '/',
@@ -126,6 +132,17 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           return DealDetailScreen(dealId: id);
+        },
+      ),
+
+      // Requirement Detail Screen
+      GoRoute(
+        path: '/requirements/:id',
+        name: 'requirement_detail',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return RequirementDetailScreen(requirementId: id);
         },
       ),
 
@@ -217,7 +234,40 @@ class AppRouter {
         path: '/settings',
         name: 'settings',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const MoreScreen(),
+        builder: (context, state) => const SettingsScreen(),
+      ),
+
+      // Broker Profile Route (Protected)
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const BrokerProfileScreen(),
+      ),
+
+      // Market Price Broadcast Route (Protected)
+      GoRoute(
+        path: '/broadcast/market-price',
+        name: 'market_price_broadcast',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const MarketPriceBroadcastScreen(),
+      ),
+
+      // Broadcast Price History Routes (Protected)
+      GoRoute(
+        path: '/broadcast/history',
+        name: 'broadcast_history',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const BroadcastHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/broadcast/history/:id',
+        name: 'broadcast_detail',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return BroadcastDetailScreen(broadcastId: id);
+        },
       ),
 
       // Core Broker Shell with Persistent Bottom Navigation
@@ -227,7 +277,7 @@ class AppRouter {
         },
         branches: [
           StatefulShellBranch(
-            navigatorKey: _dashboardNavigatorKey,
+            navigatorKey: dashboardNavigatorKey,
             routes: [
               GoRoute(
                 path: '/dashboard',
@@ -237,7 +287,7 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: _workNavigatorKey,
+            navigatorKey: workNavigatorKey,
             routes: [
               GoRoute(
                 path: '/work',
@@ -259,7 +309,7 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: _dealsNavigatorKey,
+            navigatorKey: dealsNavigatorKey,
             routes: [
               GoRoute(
                 path: '/deals',
@@ -272,7 +322,7 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: _directoryNavigatorKey,
+            navigatorKey: directoryNavigatorKey,
             routes: [
               GoRoute(
                 path: '/directory',
@@ -282,7 +332,7 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: _moreNavigatorKey,
+            navigatorKey: moreNavigatorKey,
             routes: [
               GoRoute(
                 path: '/more',

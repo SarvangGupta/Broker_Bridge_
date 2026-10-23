@@ -14,6 +14,7 @@ class CreateOfferSheet extends ConsumerStatefulWidget {
   static Future<bool?> show(BuildContext context) {
     return showModalBottomSheet<bool>(
       context: context,
+      useRootNavigator: false,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceLight,
       shape: const RoundedRectangleBorder(

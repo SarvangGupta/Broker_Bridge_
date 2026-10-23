@@ -101,9 +101,11 @@ void main() {
       expect(find.text('Large'), findsOneWidget);
       expect(find.text('Extra Large'), findsOneWidget);
 
-      // Verify Accessibility toggle
+      // Verify Accessibility toggle & switches
       expect(find.text('High Contrast Outlines'), findsOneWidget);
-      expect(find.byType(Switch), findsOneWidget);
+      expect(find.text('Eye-Protection Mode'), findsOneWidget);
+      expect(find.text('Asterisk (*) Icon-Only Mode'), findsOneWidget);
+      expect(find.byType(Switch), findsNWidgets(3));
     });
 
     testWidgets('Tapping Dark theme updates state reactively', (WidgetTester tester) async {

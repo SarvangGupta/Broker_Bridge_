@@ -25,6 +25,7 @@ class NegotiateRequirementSheet extends ConsumerStatefulWidget {
   }) {
     return showModalBottomSheet<bool>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => NegotiateRequirementSheet(
@@ -561,6 +562,7 @@ class _NegotiateRequirementSheetState extends ConsumerState<NegotiateRequirement
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<String>(
+                                  isExpanded: true,
                                   initialValue: _priceBasis,
                                   decoration: InputDecoration(
                                     labelText: 'Price Basis',
@@ -671,11 +673,12 @@ class _NegotiateRequirementSheetState extends ConsumerState<NegotiateRequirement
                             children: [
                               const Icon(LucideIcons.history, size: 16, color: AppColors.primary),
                               const SizedBox(width: 6),
-                              const Text(
-                                'Negotiation Timeline & History',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                              const Expanded(
+                                child: Text(
+                                  'Negotiation Timeline & History',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                                ),
                               ),
-                              const Spacer(),
                               if (_negotiationData != null && _negotiationData!.rounds.isNotEmpty)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -771,26 +774,32 @@ class _NegotiateRequirementSheetState extends ConsumerState<NegotiateRequirement
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isBroker ? AppColors.primary : AppColors.textSecondaryLight,
-                      borderRadius: BorderRadius.circular(4),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isBroker ? AppColors.primary : AppColors.textSecondaryLight,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Round ${round.roundNumber}',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
                     ),
-                    child: Text(
-                      'Round ${round.roundNumber}',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        round.senderName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    round.senderName,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Text(
                 round.createdAtFormatted,
                 style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
@@ -801,10 +810,14 @@ class _NegotiateRequirementSheetState extends ConsumerState<NegotiateRequirement
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Offered: ₹${round.proposedPrice.toStringAsFixed(0)} / ${widget.requirement.unitSymbol}',
-                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
+              Flexible(
+                child: Text(
+                  'Offered: ₹${round.proposedPrice.toStringAsFixed(0)} / ${widget.requirement.unitSymbol}',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
+                ),
               ),
+              const SizedBox(width: 8),
               Text(
                 'Qty: ${round.proposedQuantity.toStringAsFixed(0)} ${widget.requirement.unitSymbol}',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),

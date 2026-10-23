@@ -1,16 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../app/router/app_router.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/preferences/app_settings_provider.dart';
 
 /// Bottom navigation shell wrapping the 5 core broker modules.
-class NavigationShell extends StatelessWidget {
+class NavigationShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
   const NavigationShell({super.key, required this.navigationShell});
 
+  static final List<GlobalKey<NavigatorState>> _branchKeys = [
+    dashboardNavigatorKey,
+    workNavigatorKey,
+    dealsNavigatorKey,
+    directoryNavigatorKey,
+    moreNavigatorKey,
+  ];
+
   void _onTap(int index) {
+    if (index != navigationShell.currentIndex) {
+      final currentIdx = navigationShell.currentIndex;
+      if (currentIdx >= 0 && currentIdx < _branchKeys.length) {
+        final currentBranchKey = _branchKeys[currentIdx];
+        if (currentBranchKey.currentState?.canPop() == true) {
+          currentBranchKey.currentState?.popUntil((route) => route.isFirst);
+        }
+      }
+      if (rootNavigatorKey.currentState?.canPop() == true) {
+        rootNavigatorKey.currentState?.pop();
+      }
+    }
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -18,7 +41,10 @@ class NavigationShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(appSettingsProvider);
+    final isIconOnly = settings.iconOnlyMode;
+
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: Container(
@@ -30,6 +56,9 @@ class NavigationShell extends StatelessWidget {
         child: NavigationBar(
           selectedIndex: navigationShell.currentIndex,
           onDestinationSelected: _onTap,
+          labelBehavior: isIconOnly
+              ? NavigationDestinationLabelBehavior.alwaysHide
+              : NavigationDestinationLabelBehavior.alwaysShow,
           destinations: const [
             NavigationDestination(
               icon: Icon(LucideIcons.home),

@@ -106,12 +106,16 @@ class AppSettingsState {
   final AppFontSizePreference fontSizePref;
   final AppLanguagePreference languagePref;
   final bool highContrast;
+  final bool eyeProtectionMode;
+  final bool iconOnlyMode;
 
   const AppSettingsState({
     this.themeModePref = AppThemeModePreference.system,
     this.fontSizePref = AppFontSizePreference.normal,
     this.languagePref = AppLanguagePreference.en,
     this.highContrast = false,
+    this.eyeProtectionMode = false,
+    this.iconOnlyMode = false,
   });
 
   ThemeMode get themeMode => themeModePref.toThemeMode();
@@ -123,12 +127,16 @@ class AppSettingsState {
     AppFontSizePreference? fontSizePref,
     AppLanguagePreference? languagePref,
     bool? highContrast,
+    bool? eyeProtectionMode,
+    bool? iconOnlyMode,
   }) {
     return AppSettingsState(
       themeModePref: themeModePref ?? this.themeModePref,
       fontSizePref: fontSizePref ?? this.fontSizePref,
       languagePref: languagePref ?? this.languagePref,
       highContrast: highContrast ?? this.highContrast,
+      eyeProtectionMode: eyeProtectionMode ?? this.eyeProtectionMode,
+      iconOnlyMode: iconOnlyMode ?? this.iconOnlyMode,
     );
   }
 
@@ -140,14 +148,18 @@ class AppSettingsState {
           themeModePref == other.themeModePref &&
           fontSizePref == other.fontSizePref &&
           languagePref == other.languagePref &&
-          highContrast == other.highContrast;
+          highContrast == other.highContrast &&
+          eyeProtectionMode == other.eyeProtectionMode &&
+          iconOnlyMode == other.iconOnlyMode;
 
   @override
   int get hashCode =>
       themeModePref.hashCode ^
       fontSizePref.hashCode ^
       languagePref.hashCode ^
-      highContrast.hashCode;
+      highContrast.hashCode ^
+      eyeProtectionMode.hashCode ^
+      iconOnlyMode.hashCode;
 }
 
 /// Riverpod provider for application settings.
@@ -162,6 +174,8 @@ class AppSettingsNotifier extends Notifier<AppSettingsState> {
   static const String _keyFontSize = 'rb_pref_font_size';
   static const String _keyLanguage = 'rb_pref_language';
   static const String _keyHighContrast = 'rb_pref_high_contrast';
+  static const String _keyEyeProtection = 'rb_pref_eye_protection';
+  static const String _keyIconOnly = 'rb_pref_icon_only';
 
   late final SecureStorageService _storage;
 
@@ -178,12 +192,16 @@ class AppSettingsNotifier extends Notifier<AppSettingsState> {
       final fontStr = await _storage.getPreference(_keyFontSize);
       final langStr = await _storage.getPreference(_keyLanguage);
       final contrastStr = await _storage.getPreference(_keyHighContrast);
+      final eyeProtStr = await _storage.getPreference(_keyEyeProtection);
+      final iconOnlyStr = await _storage.getPreference(_keyIconOnly);
 
       final loaded = AppSettingsState(
         themeModePref: AppThemeModePreference.fromString(themeStr),
         fontSizePref: AppFontSizePreference.fromString(fontStr),
         languagePref: AppLanguagePreference.fromString(langStr),
         highContrast: contrastStr == 'true',
+        eyeProtectionMode: eyeProtStr == 'true',
+        iconOnlyMode: iconOnlyStr == 'true',
       );
 
       state = loaded;
@@ -210,5 +228,19 @@ class AppSettingsNotifier extends Notifier<AppSettingsState> {
   Future<void> setHighContrast(bool enabled) async {
     state = state.copyWith(highContrast: enabled);
     await _storage.savePreference(_keyHighContrast, enabled ? 'true' : 'false');
+  }
+
+  Future<void> setEyeProtectionMode(bool enabled) async {
+    state = state.copyWith(eyeProtectionMode: enabled);
+    await _storage.savePreference(_keyEyeProtection, enabled ? 'true' : 'false');
+  }
+
+  Future<void> setIconOnlyMode(bool enabled) async {
+    state = state.copyWith(iconOnlyMode: enabled);
+    await _storage.savePreference(_keyIconOnly, enabled ? 'true' : 'false');
+  }
+
+  Future<void> toggleIconOnlyMode() async {
+    await setIconOnlyMode(!state.iconOnlyMode);
   }
 }

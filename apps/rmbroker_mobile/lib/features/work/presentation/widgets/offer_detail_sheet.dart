@@ -18,6 +18,7 @@ class OfferDetailSheet extends StatelessWidget {
   }) {
     return showModalBottomSheet<T>(
       context: context,
+      useRootNavigator: false,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceLight,
       shape: const RoundedRectangleBorder(

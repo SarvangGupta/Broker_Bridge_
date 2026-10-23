@@ -28,6 +28,7 @@ class RequirementDetailSheet extends ConsumerWidget {
   }) {
     return showModalBottomSheet<RequirementDetailAction>(
       context: context,
+      useRootNavigator: false,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceLight,
       shape: const RoundedRectangleBorder(

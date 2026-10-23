@@ -283,9 +283,12 @@ class RequirementCard extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Fulfillment',
-                              style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
+                            const Flexible(
+                              child: Text(
+                                'Fulfillment',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
+                              ),
                             ),
                             Text(
                               '${requirement.fulfillmentPercentage}%',

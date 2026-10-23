@@ -618,6 +618,130 @@ class AppSettingsSection extends ConsumerWidget {
             ),
           ),
         ),
+        const Divider(height: 12),
+        // Eye-Protection Mode Toggle
+        Semantics(
+          label: isHindi ? 'नेत्र सुरक्षा मोड' : 'Eye-Protection Mode',
+          toggled: settings.eyeProtectionMode,
+          child: InkWell(
+            onTap: () => notifier.setEyeProtectionMode(!settings.eyeProtectionMode),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isHindi
+                              ? 'नेत्र सुरक्षा मोड (Eye-Protection Mode)'
+                              : 'Eye-Protection Mode',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isHindi
+                              ? 'मंडी भाव और स्थिति की स्पष्टता बनाए रखते हुए कम चमक वाली गर्म डिस्प्ले'
+                              : 'Comfortable low-glare warm tint display for extended desk trading sessions',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Switch(
+                    value: settings.eyeProtectionMode,
+                    activeThumbColor: AppColors.primary,
+                    onChanged: (val) => notifier.setEyeProtectionMode(val),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const Divider(height: 12),
+        // Asterisk (*) Global Icon-Only Label Toggle
+        Semantics(
+          label: isHindi ? 'आइकन-ओनली लेबल मोड' : 'Asterisk (*) Icon-Only Mode',
+          toggled: settings.iconOnlyMode,
+          child: InkWell(
+            onTap: () => notifier.toggleIconOnlyMode(),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                '*',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                isHindi
+                                    ? 'आइकन-ओनली लेबल मोड (* Toggle)'
+                                    : 'Asterisk (*) Icon-Only Mode',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isHindi
+                              ? 'अनिवार्य फॉर्म लेबल्स, त्रुटियों और मंडी भावों को सुरक्षित रखते हुए नेविगेशन लेबल्स छुपाएं'
+                              : 'Hides nonessential navigation labels while preserving essential form labels, validation errors & prices',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Switch(
+                    value: settings.iconOnlyMode,
+                    activeThumbColor: AppColors.primary,
+                    onChanged: (val) => notifier.setIconOnlyMode(val),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.all(10),
