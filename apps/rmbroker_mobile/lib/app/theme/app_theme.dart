@@ -104,7 +104,10 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: Colors.white,
-        indicatorColor: AppColors.primaryContainer,
+        indicatorColor: const Color(0xFFDCFCE7),
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         elevation: 3,
         height: 65,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {

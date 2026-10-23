@@ -89,32 +89,37 @@ void main() {
       expect(actions.length, equals(6));
 
       // Core implemented modules
-      expect(actions[0].id, equals('action_requirements'));
+      expect(actions[0].id, equals('action_post_requirement'));
+      expect(actions[0].title, equals('Post Requirement'));
       expect(actions[0].isImplemented, isTrue);
       expect(actions[0].route, equals('/work'));
 
-      expect(actions[1].id, equals('action_offers'));
+      expect(actions[1].id, equals('action_add_offer'));
+      expect(actions[1].title, equals('Add Offer'));
       expect(actions[1].isImplemented, isTrue);
-      expect(actions[1].route, equals('/work'));
+      expect(actions[1].route, equals('/work?tab=1'));
 
-      expect(actions[2].id, equals('action_deals'));
+      expect(actions[2].id, equals('action_manage_deals'));
+      expect(actions[2].title, equals('Manage Deals'));
       expect(actions[2].isImplemented, isTrue);
       expect(actions[2].route, equals('/deals'));
 
-      expect(actions[3].id, equals('action_directory'));
-      expect(actions[3].isImplemented, isTrue);
-      expect(actions[3].route, equals('/directory'));
+      // Roadmap logistics module
+      expect(actions[3].id, equals('action_track_dispatch'));
+      expect(actions[3].title, equals('Track Dispatch'));
+      expect(actions[3].isImplemented, isFalse);
+      expect(actions[3].badge, equals('Roadmap'));
+      expect(actions[3].route, equals('/orders'));
 
-      // Roadmap modules clearly marked
-      expect(actions[4].id, equals('action_logistics'));
-      expect(actions[4].isImplemented, isFalse);
-      expect(actions[4].badge, equals('Roadmap'));
-      expect(actions[4].route, equals('/orders'));
+      expect(actions[4].id, equals('action_view_earnings'));
+      expect(actions[4].title, equals('View Earnings'));
+      expect(actions[4].isImplemented, isTrue);
+      expect(actions[4].route, equals('/commission'));
 
-      expect(actions[5].id, equals('action_finance'));
-      expect(actions[5].isImplemented, isFalse);
-      expect(actions[5].badge, equals('Roadmap'));
-      expect(actions[5].route, equals('/commission'));
+      expect(actions[5].id, equals('action_new_dispute'));
+      expect(actions[5].title, equals('New Dispute'));
+      expect(actions[5].isImplemented, isTrue);
+      expect(actions[5].route, equals('/deals?filter=disputed'));
     });
 
     test('BrokerActivityItem fromJson parses event properties correctly', () {

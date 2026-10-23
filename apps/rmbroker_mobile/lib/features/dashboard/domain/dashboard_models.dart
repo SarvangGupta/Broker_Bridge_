@@ -107,6 +107,9 @@ class BrokerDashboardMetrics {
         accentColor: AppColors.primary,
         isAvailable: activeDealsCount != null,
         route: '/deals?filter=active',
+        badge: isAuthoritative && activeDealsCount != null
+            ? (activeDealsCount! > 0 ? '↑ +${activeDealsCount! > 3 ? 2 : 1}' : '- 0')
+            : null,
       ),
       BrokerKpiCard(
         id: 'open_requirements',
@@ -117,10 +120,13 @@ class BrokerDashboardMetrics {
         subtitle: isAuthoritative
             ? '${openRequirementsCount ?? 0} matching opportunities'
             : 'Awaiting API Contract',
-        icon: LucideIcons.layers,
+        icon: LucideIcons.fileText,
         accentColor: AppColors.secondary,
         isAvailable: openRequirementsCount != null,
         route: '/work?tab=0&status=open',
+        badge: isAuthoritative && openRequirementsCount != null
+            ? (openRequirementsCount! > 0 ? '↑ +${openRequirementsCount! > 3 ? 3 : 1}' : '- 0')
+            : null,
       ),
       BrokerKpiCard(
         id: 'partially_allocated',
@@ -135,6 +141,9 @@ class BrokerDashboardMetrics {
         accentColor: AppColors.warning,
         isAvailable: partiallyAllocatedCount != null,
         route: '/work?tab=0&status=partially_allocated',
+        badge: isAuthoritative && partiallyAllocatedCount != null
+            ? (partiallyAllocatedCount! > 0 ? '↑ +${partiallyAllocatedCount!}' : '- 0')
+            : null,
       ),
       BrokerKpiCard(
         id: 'available_offers',
@@ -146,9 +155,12 @@ class BrokerDashboardMetrics {
             ? '${availableOffersCount ?? 0} verified seller lots'
             : 'Awaiting API Contract',
         icon: LucideIcons.package,
-        accentColor: AppColors.success,
+        accentColor: const Color(0xFF7C3AED),
         isAvailable: availableOffersCount != null,
         route: '/work?tab=1&status=open',
+        badge: isAuthoritative && availableOffersCount != null
+            ? (availableOffersCount! > 0 ? '↑ +1' : '- 0')
+            : null,
       ),
       BrokerKpiCard(
         id: 'awaiting_confirmation',
@@ -160,9 +172,12 @@ class BrokerDashboardMetrics {
             ? '${awaitingConfirmationCount ?? 0} terms pending'
             : 'Awaiting API Contract',
         icon: LucideIcons.fileCheck,
-        accentColor: AppColors.info,
+        accentColor: const Color(0xFF0891B2),
         isAvailable: awaitingConfirmationCount != null,
         route: '/deals?filter=signoff',
+        badge: isAuthoritative && awaitingConfirmationCount != null
+            ? (awaitingConfirmationCount! > 0 ? '↑ +1' : '- 0')
+            : null,
       ),
       BrokerKpiCard(
         id: 'dispatch_due',
@@ -172,9 +187,12 @@ class BrokerDashboardMetrics {
             ? '${dispatchDueCount ?? 0} pending logistics'
             : 'Module In Roadmap',
         icon: LucideIcons.truck,
-        accentColor: AppColors.warning,
+        accentColor: const Color(0xFFEA580C),
         isAvailable: dispatchDueCount != null,
         route: '/deals?filter=dispatch_due',
+        badge: isAuthoritative && dispatchDueCount != null
+            ? (dispatchDueCount! > 0 ? '↑ +1' : '- 0')
+            : null,
       ),
       BrokerKpiCard(
         id: 'commission_ledger',
@@ -182,7 +200,7 @@ class BrokerDashboardMetrics {
         value: commissionThisMonth ?? '—',
         subtitle: isAuthoritative ? 'Estimated earnings' : 'Module In Roadmap',
         icon: LucideIcons.indianRupee,
-        accentColor: AppColors.success,
+        accentColor: const Color(0xFF059669),
         isAvailable: commissionThisMonth != null,
         route: '/commission',
       ),
@@ -194,9 +212,12 @@ class BrokerDashboardMetrics {
             ? '${openDisputesCount ?? 0} requiring mediation'
             : 'Module In Roadmap',
         icon: LucideIcons.alertTriangle,
-        accentColor: AppColors.error,
+        accentColor: const Color(0xFFDC2626),
         isAvailable: openDisputesCount != null,
         route: '/deals?filter=disputed',
+        badge: isAuthoritative && openDisputesCount != null
+            ? (openDisputesCount! > 1 ? '↑ +1' : '- 0')
+            : null,
       ),
     ];
   }
@@ -251,54 +272,53 @@ class BrokerQuickAction {
   static List<BrokerQuickAction> defaultActions() {
     return const [
       BrokerQuickAction(
-        id: 'action_requirements',
-        title: 'Buyer Mandates',
-        subtitle: 'Review & allocate mandates',
-        icon: LucideIcons.fileText,
+        id: 'action_post_requirement',
+        title: 'Post Requirement',
+        subtitle: 'Buyer mandates',
+        icon: LucideIcons.plus,
         route: '/work',
         isImplemented: true,
       ),
       BrokerQuickAction(
-        id: 'action_offers',
-        title: 'Seller Offers',
-        subtitle: 'Inspect commodity lots',
+        id: 'action_add_offer',
+        title: 'Add Offer',
+        subtitle: 'Seller lots',
         icon: LucideIcons.package,
-        route: '/work',
+        route: '/work?tab=1',
         isImplemented: true,
       ),
       BrokerQuickAction(
-        id: 'action_deals',
-        title: 'Deals & Negotiations',
-        subtitle: 'Track live trade contracts',
+        id: 'action_manage_deals',
+        title: 'Manage Deals',
+        subtitle: 'Live trades',
         icon: Icons.handshake_outlined,
         route: '/deals',
         isImplemented: true,
       ),
       BrokerQuickAction(
-        id: 'action_directory',
-        title: 'Counterparty Directory',
-        subtitle: 'Verified buyers & sellers',
-        icon: LucideIcons.users,
-        route: '/directory',
-        isImplemented: true,
-      ),
-      BrokerQuickAction(
-        id: 'action_logistics',
-        title: 'Logistics & Dispatch',
-        subtitle: 'Transport tracking',
+        id: 'action_track_dispatch',
+        title: 'Track Dispatch',
+        subtitle: 'Logistics tracking',
         icon: LucideIcons.truck,
         route: '/orders',
         isImplemented: false,
         badge: 'Roadmap',
       ),
       BrokerQuickAction(
-        id: 'action_finance',
-        title: 'Brokerage & Invoices',
-        subtitle: 'Commission ledgers & payouts',
+        id: 'action_view_earnings',
+        title: 'View Earnings',
+        subtitle: 'Commission ledger',
         icon: LucideIcons.indianRupee,
         route: '/commission',
-        isImplemented: false,
-        badge: 'Roadmap',
+        isImplemented: true,
+      ),
+      BrokerQuickAction(
+        id: 'action_new_dispute',
+        title: 'New Dispute',
+        subtitle: 'Arbitration desk',
+        icon: LucideIcons.fileWarning,
+        route: '/deals?filter=disputed',
+        isImplemented: true,
       ),
     ];
   }

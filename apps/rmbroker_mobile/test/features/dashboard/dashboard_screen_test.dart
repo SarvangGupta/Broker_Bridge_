@@ -208,13 +208,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(QuickActionsSection), findsOneWidget);
-      expect(find.text('Buyer Mandates'), findsOneWidget);
-      expect(find.text('Seller Offers'), findsOneWidget);
-      expect(find.text('Deals & Negotiations'), findsOneWidget);
-      expect(find.text('Counterparty Directory'), findsOneWidget);
-      expect(find.text('Logistics & Dispatch'), findsOneWidget);
-      expect(find.text('Brokerage & Invoices'), findsOneWidget);
-      expect(find.text('Roadmap'), findsNWidgets(2));
+      expect(find.text('Post Requirement'), findsOneWidget);
+      expect(find.text('Add Offer'), findsOneWidget);
+      expect(find.text('Manage Deals'), findsOneWidget);
+      expect(find.text('Track Dispatch'), findsOneWidget);
+      expect(find.text('View Earnings'), findsOneWidget);
+      expect(find.text('New Dispute'), findsOneWidget);
+      expect(find.text('Roadmap'), findsOneWidget);
     });
 
     testWidgets('tapping profile avatar opens profile bottom sheet with sign out access', (

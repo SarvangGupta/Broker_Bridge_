@@ -183,48 +183,6 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
 
-              // Global Search Quick Entry Bar
-              InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => context.push('/search'),
-                child: Container(
-                  height: 46,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.borderLight),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: const [
-                      Icon(LucideIcons.search, size: 18, color: AppColors.primary),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Search buyers, sellers, commodities, deals...',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textDisabled,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Icon(LucideIcons.mic, size: 18, color: AppColors.textSecondaryLight),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
               // Dynamic Body based on DashboardState
               if (state.status == DashboardStatus.loading &&
                   state.metrics == null) ...[
@@ -282,8 +240,11 @@ class DashboardScreen extends ConsumerWidget {
                 QuickActionsSection(actions: state.quickActions),
               ] else ...[
                 // Summary KPI Grid
-                DashboardKpiGrid(cards: state.kpiCards),
-                const SizedBox(height: 20),
+                DashboardKpiGrid(
+                  cards: state.kpiCards,
+                  onRefresh: () => controller.refresh(),
+                ),
+                const SizedBox(height: 18),
 
                 // Quick Actions
                 QuickActionsSection(actions: state.quickActions),
@@ -296,17 +257,19 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ],
 
-              const SizedBox(height: 40),
+              const SizedBox(height: 72),
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.small(
         onPressed: () => _showQuickDialSheet(context),
         backgroundColor: AppColors.primary,
+        elevation: 4,
         tooltip: 'Broker Communication Desk',
-        child: const Icon(LucideIcons.phoneCall, color: Colors.white),
+        child: const Icon(LucideIcons.phoneCall, color: Colors.white, size: 18),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

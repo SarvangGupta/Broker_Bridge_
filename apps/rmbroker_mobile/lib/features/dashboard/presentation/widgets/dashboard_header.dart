@@ -47,20 +47,40 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: AppColors.primary,
-                      child: Text(
-                        name
-                            .split(' ')
-                            .where((s) => s.isNotEmpty)
-                            .take(2)
-                            .map((s) => s[0].toUpperCase())
-                            .join(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF0F766E),
+                            Color(0xFF14B8A6),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          name
+                              .split(' ')
+                              .where((s) => s.isNotEmpty)
+                              .take(2)
+                              .map((s) => s[0].toUpperCase())
+                              .join(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -370,7 +390,6 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
-    final settings = ref.watch(appSettingsProvider);
 
     final initials =
         (broker?.fullName.isNotEmpty == true ? broker!.fullName : 'BB')
@@ -382,14 +401,26 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
 
     return AppBar(
       titleSpacing: 16,
+      elevation: 0,
+      scrolledUnderElevation: 1,
+      surfaceTintColor: Colors.transparent,
+      backgroundColor: AppColors.surfaceLight,
       title: Row(
         children: [
+          // Dark teal rounded logo container
           Container(
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(8),
+              color: const Color(0xFF134E4A), // Slate/dark teal
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
             child: const Center(
               child: Text(
@@ -398,6 +429,7 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
                   fontSize: 14,
+                  letterSpacing: 0.5,
                 ),
               ),
             ),
@@ -405,53 +437,37 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: const [
               Text(
                 'RMBroker',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                ),
               ),
               Text(
                 'COMMODITY DESK',
                 style: TextStyle(
-                  fontSize: 10,
-                  color: AppColors.primary,
+                  fontSize: 9,
+                  color: Color(0xFF64748B),
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
+                  letterSpacing: 0.8,
                 ),
               ),
             ],
           ),
+          const SizedBox(width: 10),
+          const StatusBadge(status: 'LIVE', isLive: true),
         ],
       ),
       actions: [
-        const StatusBadge(status: 'LIVE', isLive: true),
-        // Asterisk (*) global icon-only label toggle button
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          tooltip: settings.iconOnlyMode ? 'Show labels (*)' : 'Hide labels (*)',
-          icon: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            decoration: BoxDecoration(
-              color: settings.iconOnlyMode
-                  ? AppColors.primary
-                  : AppColors.primaryContainer.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              '*',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: settings.iconOnlyMode ? Colors.white : AppColors.primary,
-              ),
-            ),
-          ),
-          onPressed: () => ref.read(appSettingsProvider.notifier).toggleIconOnlyMode(),
-        ),
         IconButton(
           visualDensity: VisualDensity.compact,
           tooltip: 'Global Search',
-          icon: const Icon(LucideIcons.search, size: 20),
+          icon: const Icon(LucideIcons.search, size: 21, color: Color(0xFF0F172A)),
           onPressed: () => context.push('/search'),
         ),
         NotificationBadge(
@@ -459,7 +475,7 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
           child: IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: 'Desk Notifications',
-            icon: const Icon(LucideIcons.bell, size: 20),
+            icon: const Icon(LucideIcons.bell, size: 21, color: Color(0xFF0F172A)),
             onPressed: () => context.push('/notifications'),
           ),
         ),
@@ -467,18 +483,26 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
           borderRadius: BorderRadius.circular(20),
           onTap: () => _showProfileModal(context),
           child: Padding(
-            padding: const EdgeInsets.only(right: 14, left: 4),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.primaryContainer.withValues(
-                alpha: 0.5,
+            padding: const EdgeInsets.only(right: 14, left: 2),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFCBD5E1),
+                  width: 1,
+                ),
               ),
-              child: Text(
-                initials.isNotEmpty ? initials : 'B',
-                style: const TextStyle(
-                  color: AppColors.primaryDark,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+              child: Center(
+                child: Text(
+                  initials.isNotEmpty ? initials : 'BB',
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ),
