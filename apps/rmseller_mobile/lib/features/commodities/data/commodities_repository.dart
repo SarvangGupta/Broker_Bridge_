@@ -42,63 +42,68 @@ class CommoditiesRepository {
   // 1. MASTER REFERENCE DATA
   // ============================================================================
 
+  /// Active (tradable) products from the shared Product Master, A→Z, each with its
+  /// authoritative category name. Throws when the catalogue cannot be loaded: there is
+  /// no offline list, so callers must show an error with retry.
   Future<List<MasterCommodity>> getMasterCommodities() async {
     final client = _supabase;
-    if (client != null) {
-      try {
-        final data = await client
-            .from('master_commodities')
-            .select('id, name, code, status')
-            .eq('status', true)
-            .order('name');
-
-        if (data.isNotEmpty) {
-          return (data as List)
-              .map(
-                (row) => MasterCommodity.fromMap(row as Map<String, dynamic>),
-              )
-              .toList();
-        }
-      } catch (e) {
-        debugPrint('Master commodities fetch notice: $e');
-      }
+    if (client == null) {
+      throw StateError('Product catalogue service is not available.');
     }
-    return MasterCommodityData.verifiedCommodities;
+    final data = await client
+        .from('master_commodities')
+        .select('id, name, code, status, category_id')
+        .eq('status', true)
+        // postgrest-dart's order() defaults to descending.
+        .order('name', ascending: true);
+    final categoryNames = await _loadCategoryNames(client);
+
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .where((row) => row['status'] != false && (row['id']?.toString() ?? '').isNotEmpty)
+        .map(
+          (row) => MasterCommodity.fromMap(
+            row,
+            categoryName: categoryNames[row['category_id']?.toString()],
+          ),
+        )
+        .toList();
   }
 
+  /// Category id → name. A failure yields an empty map so products still load and the
+  /// form shows "Category unavailable" rather than a guessed label.
+  Future<Map<String, String>> _loadCategoryNames(SupabaseClient client) async {
+    try {
+      final rows = await client.from('master_categories').select('id, name');
+      return {
+        for (final r in (rows as List).whereType<Map<String, dynamic>>())
+          r['id'].toString(): r['name']?.toString() ?? '',
+      };
+    } catch (e) {
+      debugPrint('Category names unavailable: $e');
+      return const {};
+    }
+  }
+
+  /// Grades linked to [commodityId] only. Returns an empty list when the product has
+  /// no grade yet (never a synthetic one); throws when the request fails.
   Future<List<MasterGrade>> getMasterGrades(String commodityId) async {
     final client = _supabase;
-    if (client != null && commodityId.isNotEmpty) {
-      try {
-        final data = await client
-            .from('master_grades')
-            .select('id, commodity_id, grade_name, parameters')
-            .eq('commodity_id', commodityId)
-            .order('grade_name');
-
-        if (data.isNotEmpty) {
-          return (data as List)
-              .map((row) => MasterGrade.fromMap(row as Map<String, dynamic>))
-              .toList();
-        }
-      } catch (e) {
-        debugPrint('Master grades fetch notice: $e');
-      }
+    if (client == null) {
+      throw StateError('Product catalogue service is not available.');
     }
+    if (commodityId.isEmpty) return const [];
+    final data = await client
+        .from('master_grades')
+        .select('id, commodity_id, grade_name, parameters')
+        .eq('commodity_id', commodityId)
+        .order('grade_name', ascending: true);
 
-    final fallbacks = MasterCommodityData.verifiedGrades
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(MasterGrade.fromMap)
         .where((g) => g.commodityId == commodityId)
         .toList();
-
-    return fallbacks.isNotEmpty
-        ? fallbacks
-        : [
-            MasterGrade(
-              id: '20000000-0000-0000-0000-000000000099',
-              commodityId: commodityId,
-              gradeName: 'Standard Mandi FAQ (Medium)',
-            ),
-          ];
   }
 
   Future<List<MasterUnit>> getMasterUnits() async {

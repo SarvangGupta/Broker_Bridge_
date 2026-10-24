@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rmbuyer_mobile/app/theme/app_theme.dart';
-import 'package:rmbuyer_mobile/features/requirements/data/requirements_repository.dart';
 import 'package:rmbuyer_mobile/features/requirements/presentation/post_requirement_screen.dart';
+
+import '../support/fake_requirements_repository.dart';
 
 void main() {
   group('RB-BUYER-03: PostRequirementScreen Widget Tests', () {
@@ -57,7 +58,13 @@ void main() {
     });
 
     testWidgets('Submitting valid requirement opens authoritative confirmation dialog', (WidgetTester tester) async {
-      final repo = RequirementsRepository();
+      final repo = FakeRequirementsRepository();
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
 
       await tester.pumpWidget(
         MaterialApp(
@@ -66,6 +73,12 @@ void main() {
         ),
       );
 
+      await tester.pumpAndSettle();
+
+      // Select a commodity from the live catalogue (nothing is preselected)
+      await tester.tap(find.byKey(const Key('commodity-picker-field')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('commodity-option-$maizeId')));
       await tester.pumpAndSettle();
 
       // Tap Submit button

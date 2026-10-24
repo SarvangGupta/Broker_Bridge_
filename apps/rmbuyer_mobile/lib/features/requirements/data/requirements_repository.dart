@@ -42,63 +42,81 @@ class RequirementsRepository {
   // 1. MASTER REFERENCE DATA
   // ============================================================================
 
-  /// Retrieve verified commodity catalog.
+  /// Retrieve the active commodity catalogue from the shared Product Master
+  /// (`master_commodities`, `status = true`).
+  ///
+  /// Throws when the catalogue cannot be loaded. There is deliberately no
+  /// offline fallback list: a stale list would offer products (and IDs) that
+  /// are not in the live catalogue, so callers must show an error with retry.
   Future<List<MasterCommodity>> getMasterCommodities() async {
     final client = _supabase;
-    if (client != null) {
-      try {
-        final data = await client
-            .from('master_commodities')
-            .select('id, name, code, status')
-            .eq('status', true)
-            .order('name');
-
-        if (data.isNotEmpty) {
-          return (data as List)
-              .map((row) => MasterCommodity.fromMap(row as Map<String, dynamic>))
-              .toList();
-        }
-      } catch (e) {
-        debugPrint('Master commodities fetch notice: $e');
-      }
+    if (client == null) {
+      throw StateError('Product catalogue service is not available.');
     }
-    return MasterRequirementData.verifiedCommodities;
+
+    final data = await client
+        .from('master_commodities')
+        .select('id, name, code, status, category_id')
+        .eq('status', true)
+        // postgrest-dart's order() defaults to descending.
+        .order('name', ascending: true);
+    final categoryNames = await _loadCategoryNames(client);
+
+    return parseActiveCommodities(data, categoryNames: categoryNames);
   }
 
-  /// Retrieve quality grades for a specific commodity.
+  /// Category id → name from `master_categories`. A failure yields an empty map so
+  /// products still load and the form shows "Category unavailable" instead of a guess.
+  Future<Map<String, String>> _loadCategoryNames(SupabaseClient client) async {
+    try {
+      final rows = await client.from('master_categories').select('id, name');
+      return {
+        for (final r in (rows as List).whereType<Map<String, dynamic>>())
+          r['id'].toString(): r['name']?.toString() ?? '',
+      };
+    } catch (e) {
+      debugPrint('Category names unavailable: $e');
+      return const {};
+    }
+  }
+
+  /// Maps Product Master rows to selectable commodities, keeping only rows
+  /// that are active and carry a product ID. Missing optional fields (such as
+  /// `code`) never exclude a product. Category names come only from [categoryNames].
+  @visibleForTesting
+  static List<MasterCommodity> parseActiveCommodities(
+    List<dynamic> rows, {
+    Map<String, String> categoryNames = const {},
+  }) {
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map((row) => MasterCommodity.fromMap(
+              row,
+              categoryName: categoryNames[row['category_id']?.toString()],
+            ))
+        .where((c) => c.status && c.id.isNotEmpty)
+        .toList();
+  }
+
+  /// Grades linked to [commodityId] only. Returns an empty list when the product
+  /// has no grade yet (never a synthetic one); throws when the request fails.
   Future<List<MasterGrade>> getMasterGrades(String commodityId) async {
     final client = _supabase;
-    if (client != null && commodityId.isNotEmpty) {
-      try {
-        final data = await client
-            .from('master_grades')
-            .select('id, commodity_id, grade_name, parameters')
-            .eq('commodity_id', commodityId)
-            .order('grade_name');
-
-        if (data.isNotEmpty) {
-          return (data as List)
-              .map((row) => MasterGrade.fromMap(row as Map<String, dynamic>))
-              .toList();
-        }
-      } catch (e) {
-        debugPrint('Master grades fetch notice: $e');
-      }
+    if (client == null) {
+      throw StateError('Product catalogue service is not available.');
     }
+    if (commodityId.isEmpty) return const [];
+    final data = await client
+        .from('master_grades')
+        .select('id, commodity_id, grade_name, parameters')
+        .eq('commodity_id', commodityId)
+        .order('grade_name', ascending: true);
 
-    final fallbacks = MasterRequirementData.verifiedGrades
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(MasterGrade.fromMap)
         .where((g) => g.commodityId == commodityId)
         .toList();
-
-    return fallbacks.isNotEmpty
-        ? fallbacks
-        : [
-            MasterGrade(
-              id: '21000000-0000-0000-0000-000000000099',
-              commodityId: commodityId,
-              gradeName: 'Standard Mandi FAQ',
-            ),
-          ];
   }
 
   /// Retrieve supported trade units (MT, Quintal, etc.).

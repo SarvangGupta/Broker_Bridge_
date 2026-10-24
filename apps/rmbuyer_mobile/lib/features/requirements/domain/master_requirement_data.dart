@@ -7,19 +7,24 @@ class MasterCommodity {
   final String code;
   final bool status;
 
+  /// Authoritative category name from `master_categories`; null when unavailable.
+  final String? categoryName;
+
   const MasterCommodity({
     required this.id,
     required this.name,
     required this.code,
     this.status = true,
+    this.categoryName,
   });
 
-  factory MasterCommodity.fromMap(Map<String, dynamic> map) {
+  factory MasterCommodity.fromMap(Map<String, dynamic> map, {String? categoryName}) {
     return MasterCommodity(
       id: map['id']?.toString() ?? '',
       name: map['name']?.toString() ?? 'Agricultural Commodity',
       code: map['code']?.toString() ?? '',
       status: map['status'] as bool? ?? true,
+      categoryName: categoryName,
     );
   }
 }
@@ -68,68 +73,11 @@ class MasterUnit {
 }
 
 /// Verified baseline reference data aligned with Supabase seed and master tables.
+///
+/// Commodities and grades are intentionally absent: the selectable catalogue and
+/// each product's grades always come from the live shared Product Master
+/// (see `RequirementsRepository.getMasterCommodities` / `getMasterGrades`).
 class MasterRequirementData {
-  static const List<MasterCommodity> verifiedCommodities = [
-    MasterCommodity(
-      id: '20000000-0000-0000-0000-000000000001',
-      name: 'Yellow Maize (Corn)',
-      code: 'MAIZE-01',
-    ),
-    MasterCommodity(
-      id: '20000000-0000-0000-0000-000000000002',
-      name: 'Sharbati Wheat',
-      code: 'WHEAT-01',
-    ),
-    MasterCommodity(
-      id: '20000000-0000-0000-0000-000000000003',
-      name: 'Soybean Seed',
-      code: 'SOY-01',
-    ),
-    MasterCommodity(
-      id: '20000000-0000-0000-0000-000000000004',
-      name: 'Mustard Seeds',
-      code: 'MUSTARD-01',
-    ),
-    MasterCommodity(
-      id: '20000000-0000-0000-0000-000000000005',
-      name: 'Desi Chana (Gram)',
-      code: 'CHANA-01',
-    ),
-  ];
-
-  static const List<MasterGrade> verifiedGrades = [
-    MasterGrade(
-      id: '21000000-0000-0000-0000-000000000001',
-      commodityId: '20000000-0000-0000-0000-000000000001',
-      gradeName: 'Grade A Milling',
-    ),
-    MasterGrade(
-      id: '21000000-0000-0000-0000-000000000002',
-      commodityId: '20000000-0000-0000-0000-000000000001',
-      gradeName: 'Feed Grade Premium',
-    ),
-    MasterGrade(
-      id: '21000000-0000-0000-0000-000000000003',
-      commodityId: '20000000-0000-0000-0000-000000000002',
-      gradeName: 'Premium Sharbati',
-    ),
-    MasterGrade(
-      id: '21000000-0000-0000-0000-000000000004',
-      commodityId: '20000000-0000-0000-0000-000000000003',
-      gradeName: 'Standard Mandi Grade',
-    ),
-    MasterGrade(
-      id: '21000000-0000-0000-0000-000000000005',
-      commodityId: '20000000-0000-0000-0000-000000000004',
-      gradeName: 'High Oil 42%',
-    ),
-    MasterGrade(
-      id: '21000000-0000-0000-0000-000000000006',
-      commodityId: '20000000-0000-0000-0000-000000000005',
-      gradeName: 'Standard Mandi FAQ',
-    ),
-  ];
-
   static const List<MasterUnit> verifiedUnits = [
     MasterUnit(
       id: '22000000-0000-0000-0000-000000000001',

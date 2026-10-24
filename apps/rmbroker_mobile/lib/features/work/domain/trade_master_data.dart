@@ -6,10 +6,18 @@ class MasterDropdownItem {
   final String name;
   final String? extra;
 
+  /// Commodities: authoritative category name from `master_categories` (null = unavailable).
+  final String? categoryName;
+
+  /// Grades: the commodity this grade belongs to (`master_grades.commodity_id`).
+  final String? parentId;
+
   const MasterDropdownItem({
     required this.id,
     required this.name,
     this.extra,
+    this.categoryName,
+    this.parentId,
   });
 
   factory MasterDropdownItem.fromJson(Map<String, dynamic> json) {
@@ -17,6 +25,8 @@ class MasterDropdownItem {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       extra: json['symbol']?.toString() ?? json['categoryName']?.toString() ?? json['code']?.toString(),
+      categoryName: json['categoryName']?.toString() ?? json['category_name']?.toString(),
+      parentId: json['commodityId']?.toString() ?? json['commodity_id']?.toString(),
     );
   }
 }
@@ -50,6 +60,26 @@ class TradeMasterData {
         states: [],
         districts: [],
       );
+
+  MasterDropdownItem? commodityById(String? id) {
+    if (id == null) return null;
+    for (final c in commodities) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  /// Only the grades linked to [commodityId]; never the full grade list (KI-43).
+  List<MasterDropdownItem> gradesFor(String? commodityId) {
+    if (commodityId == null || commodityId.isEmpty) return const [];
+    return grades.where((g) => g.parentId == commodityId).toList();
+  }
+
+  /// True when [gradeId] is one of [commodityId]'s own grades.
+  bool isValidProductGrade(String? commodityId, String? gradeId) {
+    if (gradeId == null || gradeId.isEmpty) return false;
+    return gradesFor(commodityId).any((g) => g.id == gradeId);
+  }
 
   factory TradeMasterData.fromJson(Map<String, dynamic> json) {
     List<MasterDropdownItem> parseList(dynamic raw) {

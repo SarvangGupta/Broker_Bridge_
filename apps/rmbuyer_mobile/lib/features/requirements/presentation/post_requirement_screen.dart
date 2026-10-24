@@ -11,6 +11,7 @@ import '../../search/domain/broker_model.dart';
 import '../data/requirements_repository.dart';
 import '../domain/master_requirement_data.dart';
 import '../domain/requirement_model.dart';
+import 'commodity_picker_sheet.dart';
 
 /// Screen allowing authenticated buyers to draft, configure commercial preferences,
 /// and submit authoritative commodity procurement requirements to the shared backend.
@@ -28,6 +29,26 @@ class PostRequirementScreen extends StatefulWidget {
     this.repository,
   });
 
+  /// Resolves a commodity passed in by route (search result, broker desk, etc.)
+  /// against the live catalogue. Returns null when nothing matches, or when a
+  /// partial match is ambiguous (e.g. "Maize" → Yellow Maize, Maize DDGS, …),
+  /// so an unintended product is never preselected.
+  static MasterCommodity? matchInitialCommodity(
+    List<MasterCommodity> catalogue,
+    String? requested,
+  ) {
+    final query = requested?.trim().toLowerCase() ?? '';
+    if (query.isEmpty) return null;
+    for (final c in catalogue) {
+      if (c.name.toLowerCase() == query) return c;
+    }
+    final partial = catalogue.where((c) {
+      final name = c.name.toLowerCase();
+      return name.contains(query) || query.contains(name);
+    }).toList();
+    return partial.length == 1 ? partial.single : null;
+  }
+
   @override
   State<PostRequirementScreen> createState() => _PostRequirementScreenState();
 }
@@ -37,7 +58,13 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
 
   // Master Data State
   List<MasterCommodity> _commodities = [];
+  bool _isLoadingCommodities = true;
+  String? _commodityLoadError;
+  bool _initialCommodityResolved = false;
+  String? _unmatchedInitialCommodity;
   List<MasterGrade> _grades = [];
+  bool _isLoadingGrades = false;
+  String? _gradeLoadError;
   List<MasterUnit> _units = [];
   List<String> _savedLocations = [];
   List<String> _paymentOptions = [];
@@ -87,6 +114,7 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
     }
 
     _loadMasterData();
+    _loadCommodities();
     _loadBrokers();
   }
 
@@ -143,40 +171,19 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
 
   Future<void> _loadMasterData() async {
     try {
-      final comms = await _repo.getMasterCommodities();
       final units = await _repo.getMasterUnits();
       final locations = await _repo.getSavedDeliveryLocations();
       final payments = await _repo.getPaymentTermsOptions();
 
-      // Find matching initial commodity or default to first
-      MasterCommodity? initialComm;
-      if (widget.initialCommodity != null && widget.initialCommodity!.isNotEmpty) {
-        final query = widget.initialCommodity!.toLowerCase();
-        initialComm = comms.firstWhere(
-          (c) => c.name.toLowerCase().contains(query) || query.contains(c.name.toLowerCase()),
-          orElse: () => comms.first,
-        );
-      } else if (comms.isNotEmpty) {
-        initialComm = comms.first;
-      }
-
-      final grades = initialComm != null
-          ? await _repo.getMasterGrades(initialComm.id)
-          : <MasterGrade>[];
-
       if (!mounted) return;
 
       setState(() {
-        _commodities = comms;
         _units = units;
         _savedLocations = locations;
         _paymentOptions = payments;
-        _selectedCommodity = initialComm;
-        _selectedGrade = grades.isNotEmpty ? grades.first : null;
         _selectedUnit = units.isNotEmpty ? units.first : null;
         _selectedLocation = locations.isNotEmpty ? locations.first : 'FOR Mill Delivery';
         _selectedPaymentTerm = payments.isNotEmpty ? payments.first : 'Payment on Delivery (CAD)';
-        _grades = grades;
         _isLoadingMasterData = false;
       });
     } catch (e) {
@@ -188,21 +195,111 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
     }
   }
 
+  /// Loads the active catalogue from the shared Product Master. No commodity is
+  /// preselected unless the caller passed one that matches the live catalogue.
+  Future<void> _loadCommodities() async {
+    try {
+      final comms = await _repo.getMasterCommodities();
+      if (!mounted) return;
+
+      _applyCatalogue(comms);
+
+      if (!_initialCommodityResolved) {
+        _initialCommodityResolved = true;
+        final requested = widget.initialCommodity?.trim() ?? '';
+        final match = PostRequirementScreen.matchInitialCommodity(comms, requested);
+        if (match != null) {
+          await _onCommodityChanged(match);
+        } else if (requested.isNotEmpty && mounted) {
+          setState(() => _unmatchedInitialCommodity = requested);
+        }
+      }
+    } catch (e) {
+      debugPrint('Commodity catalogue load failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingCommodities = false;
+        _commodityLoadError =
+            'Could not load the commodity catalogue. Check your connection and retry.';
+      });
+    }
+  }
+
+  void _retryCommodities() {
+    setState(() {
+      _isLoadingCommodities = true;
+      _commodityLoadError = null;
+    });
+    _loadCommodities();
+  }
+
+  /// Refresh used by the picker sheet; rethrows so the sheet can show the failure.
+  Future<List<MasterCommodity>> _refreshCatalogue() async {
+    final comms = await _repo.getMasterCommodities();
+    if (mounted) _applyCatalogue(comms);
+    return comms;
+  }
+
+  void _applyCatalogue(List<MasterCommodity> comms) {
+    setState(() {
+      _commodities = comms;
+      _isLoadingCommodities = false;
+      _commodityLoadError = null;
+      // A product deactivated since it was selected must not be submitted.
+      final selectedId = _selectedCommodity?.id;
+      if (selectedId != null && !comms.any((c) => c.id == selectedId)) {
+        _selectedCommodity = null;
+        _grades = [];
+        _selectedGrade = null;
+      }
+    });
+  }
+
+  Future<void> _openCommodityPicker() async {
+    final picked = await showCommodityPickerSheet(
+      context: context,
+      commodities: _commodities,
+      onRefresh: _refreshCatalogue,
+      selectedId: _selectedCommodity?.id,
+    );
+    if (picked != null && mounted) {
+      await _onCommodityChanged(picked);
+    }
+  }
+
   Future<void> _onCommodityChanged(MasterCommodity? newCommodity) async {
     if (newCommodity == null) return;
+    // Clear grades first so a grade from the previous commodity can never be submitted.
     setState(() {
       _selectedCommodity = newCommodity;
+      _unmatchedInitialCommodity = null;
+      _grades = [];
+      _selectedGrade = null;
+      _isLoadingGrades = true;
+      _gradeLoadError = null;
     });
 
     try {
       final grades = await _repo.getMasterGrades(newCommodity.id);
-      if (!mounted) return;
+      if (!mounted || _selectedCommodity?.id != newCommodity.id) return;
       setState(() {
         _grades = grades;
         _selectedGrade = grades.isNotEmpty ? grades.first : null;
+        _isLoadingGrades = false;
       });
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Grade load failed for ${newCommodity.id}: $e');
+      if (!mounted || _selectedCommodity?.id != newCommodity.id) return;
+      setState(() {
+        _isLoadingGrades = false;
+        _gradeLoadError = 'Could not load grades for ${newCommodity.name}.';
+      });
+    }
   }
+
+  String _noGradeMessage(String productName) =>
+      'No grade is defined for $productName in the Product Master yet. '
+      'It cannot be submitted until a grade is added.';
 
   Future<void> _handlePost() async {
     if (_isSubmitting) return;
@@ -213,6 +310,17 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
 
     if (_selectedCommodity == null) {
       setState(() => _errorMessage = 'Please select a commodity.');
+      return;
+    }
+
+    final grade = _selectedGrade;
+    if (grade == null && !_isLoadingGrades && _gradeLoadError == null && _grades.isEmpty) {
+      setState(() => _errorMessage = _noGradeMessage(_selectedCommodity!.name));
+      return;
+    }
+    if (grade == null || grade.commodityId != _selectedCommodity!.id) {
+      setState(() => _errorMessage =
+          'Please select a quality grade for ${_selectedCommodity!.name}.');
       return;
     }
 
@@ -248,8 +356,8 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
     final dto = CreateRequirementDto(
       commodityId: _selectedCommodity!.id,
       commodityName: _selectedCommodity!.name,
-      gradeId: _selectedGrade?.id ?? '21000000-0000-0000-0000-000000000001',
-      gradeName: _selectedGrade?.gradeName ?? 'Standard FAQ Grade',
+      gradeId: grade.id,
+      gradeName: grade.gradeName,
       quantity: quantity,
       unitId: _selectedUnit?.id ?? '22000000-0000-0000-0000-000000000001',
       unitSymbol: _selectedUnit?.symbol ?? 'MT',
@@ -616,31 +724,123 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
         ),
         const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceLight,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.borderLight),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<MasterCommodity>(
-              isExpanded: true,
-              value: _selectedCommodity,
-              items: _commodities.map((c) {
-                return DropdownMenuItem<MasterCommodity>(
-                  value: c,
+        if (_isLoadingCommodities)
+          _buildCommodityStatusBox(
+            key: const Key('commodity-loading'),
+            child: const Row(
+              children: [
+                SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Loading commodity catalogue...',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+                ),
+              ],
+            ),
+          )
+        else if (_commodityLoadError != null)
+          _buildCommodityStatusBox(
+            key: const Key('commodity-load-error'),
+            isError: true,
+            child: Row(
+              children: [
+                const Icon(LucideIcons.alertCircle, color: AppColors.error, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
                   child: Text(
-                    c.name,
-                    style: const TextStyle(fontSize: 14, color: AppColors.textPrimaryLight),
+                    _commodityLoadError!,
+                    style: const TextStyle(fontSize: 12, color: AppColors.error),
                   ),
-                );
-              }).toList(),
-              onChanged: _onCommodityChanged,
+                ),
+                TextButton(
+                  key: const Key('commodity-retry'),
+                  onPressed: _retryCommodities,
+                  child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          )
+        else if (_commodities.isEmpty)
+          _buildCommodityStatusBox(
+            key: const Key('commodity-empty'),
+            child: Row(
+              children: [
+                const Icon(LucideIcons.info, size: 18, color: AppColors.textSecondaryLight),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'No active commodities are available in the catalogue.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _retryCommodities,
+                  child: const Text('Refresh', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          )
+        else
+          InkWell(
+            key: const Key('commodity-picker-field'),
+            onTap: _openCommodityPicker,
+            borderRadius: BorderRadius.circular(10),
+            child: _buildCommodityStatusBox(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _selectedCommodity?.name ?? 'Tap to select a commodity',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: _selectedCommodity != null
+                                ? AppColors.textPrimaryLight
+                                : AppColors.textMutedLight,
+                          ),
+                        ),
+                        if (_selectedCommodity != null) ...[
+                          const SizedBox(height: 2),
+                          CategoryLabel(categoryName: _selectedCommodity!.categoryName),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_drop_down, color: AppColors.textSecondaryLight),
+                ],
+              ),
             ),
           ),
-        ),
+        if (_unmatchedInitialCommodity != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            '"$_unmatchedInitialCommodity" is not in the current catalogue. Please select a commodity.',
+            style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildCommodityStatusBox({Key? key, required Widget child, bool isError = false}) {
+    return Container(
+      key: key,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: isError ? AppColors.errorBackground : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isError ? AppColors.error.withValues(alpha: 0.3) : AppColors.borderLight,
+        ),
+      ),
+      child: child,
     );
   }
 
@@ -653,6 +853,41 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
         ),
         const SizedBox(height: 6),
+        if (_selectedCommodity != null && _isLoadingGrades)
+          _buildCommodityStatusBox(
+            child: Text(
+              'Loading grades for ${_selectedCommodity!.name}...',
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+            ),
+          )
+        else if (_selectedCommodity != null && _gradeLoadError != null)
+          _buildCommodityStatusBox(
+            isError: true,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _gradeLoadError!,
+                    style: const TextStyle(fontSize: 12, color: AppColors.error),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _onCommodityChanged(_selectedCommodity),
+                  child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          )
+        else if (_selectedCommodity != null && _grades.isEmpty)
+          _buildCommodityStatusBox(
+            key: const Key('no-grade-notice'),
+            isError: true,
+            child: Text(
+              _noGradeMessage(_selectedCommodity!.name),
+              style: const TextStyle(fontSize: 12, color: AppColors.error),
+            ),
+          )
+        else
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
@@ -663,7 +898,11 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
           child: DropdownButtonHideUnderline(
             child: DropdownButton<MasterGrade>(
               isExpanded: true,
-              value: _selectedGrade,
+              value: _grades.contains(_selectedGrade) ? _selectedGrade : null,
+              hint: Text(
+                _selectedCommodity == null ? 'Select a commodity first' : 'Select grade',
+                style: const TextStyle(fontSize: 14, color: AppColors.textMutedLight),
+              ),
               items: _grades.map((g) {
                 return DropdownMenuItem<MasterGrade>(
                   value: g,
@@ -1289,7 +1528,9 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
           const SizedBox(height: 12),
           _buildSummaryRow(
             'Commodity',
-            '${_selectedCommodity?.name ?? "Commodity"} (${_selectedGrade?.gradeName ?? "FAQ"})',
+            _selectedCommodity == null
+                ? 'Not selected'
+                : '${_selectedCommodity!.name} (${_selectedGrade?.gradeName ?? "FAQ"})',
           ),
           _buildSummaryRow(
             'Quantity & Price',

@@ -20,17 +20,20 @@ import '../data/lab_testing_repository.dart';
 import '../domain/commodity_model.dart';
 import '../domain/lab_testing_model.dart';
 import '../domain/master_commodity_data.dart';
+import 'commodity_picker_sheet.dart';
 
 class PostCommodityScreen extends StatefulWidget {
   final String? initialCommodityId;
   final String? initialBrokerId;
   final SellerCommodity? initialLot;
+  final CommoditiesRepository? commoditiesRepository;
 
   const PostCommodityScreen({
     super.key,
     this.initialCommodityId,
     this.initialBrokerId,
     this.initialLot,
+    this.commoditiesRepository,
   });
 
   @override
@@ -39,7 +42,8 @@ class PostCommodityScreen extends StatefulWidget {
 
 class _PostCommodityScreenState extends State<PostCommodityScreen> {
   final _formKey = GlobalKey<FormState>();
-  final CommoditiesRepository _commoditiesRepository = CommoditiesRepository();
+  late final CommoditiesRepository _commoditiesRepository =
+      widget.commoditiesRepository ?? CommoditiesRepository();
   final SellerBrokerRepository _brokerRepository = SellerBrokerRepository();
   final LabTestingRepository _labTestingRepository = LabTestingRepository();
 
@@ -49,7 +53,10 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
   // Master Catalogs
   List<MasterCommodity> _commodities = [];
+  String? _commodityLoadError;
   List<MasterGrade> _grades = [];
+  bool _isLoadingGrades = false;
+  String? _gradeLoadError;
   List<MasterUnit> _units = [];
   List<MasterState> _states = [];
   List<MasterDistrict> _districts = [];
@@ -140,30 +147,43 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   Future<void> _loadMasterData() async {
     setState(() => _isLoadingMasterData = true);
     try {
-      final comms = await _commoditiesRepository.getMasterCommodities();
+      // The product catalogue loads on its own so a failure shows a retry instead of
+      // blocking the whole form, and never falls back to a stale list.
+      List<MasterCommodity> comms = [];
+      String? commodityError;
+      try {
+        comms = await _commoditiesRepository.getMasterCommodities();
+      } catch (e) {
+        debugPrint('Product catalogue load failed: $e');
+        commodityError =
+            'Could not load the product catalogue. Check your connection and retry.';
+      }
       final units = await _commoditiesRepository.getMasterUnits();
       final states = await _commoditiesRepository.getMasterStates();
       final brokers = await _brokerRepository.getBrokers();
 
+      // Preselect only an exact ID match (route or edited lot); never the first product.
+      final wantedId = widget.initialCommodityId ?? widget.initialLot?.commodityId;
       MasterCommodity? initialComm;
-      if (widget.initialCommodityId != null) {
-        initialComm = comms.firstWhere(
-          (c) => c.id == widget.initialCommodityId,
-          orElse: () => comms.first,
-        );
-      } else if (widget.initialLot != null) {
-        final lot = widget.initialLot!;
-        initialComm = comms.firstWhere(
-          (c) => c.id == lot.commodityId,
-          orElse: () => comms.first,
-        );
-      } else if (comms.isNotEmpty) {
-        initialComm = comms.first;
+      for (final c in comms) {
+        if (c.id == wantedId) initialComm = c;
       }
 
-      final grades = initialComm != null
-          ? await _commoditiesRepository.getMasterGrades(initialComm.id)
-          : <MasterGrade>[];
+      List<MasterGrade> grades = [];
+      String? gradeError;
+      if (initialComm != null) {
+        try {
+          grades = await _commoditiesRepository.getMasterGrades(initialComm.id);
+        } catch (e) {
+          gradeError = 'Could not load grades for ${initialComm.name}.';
+        }
+      }
+      MasterGrade? initialGrade;
+      final wantedGradeId = widget.initialLot?.gradeId;
+      for (final g in grades) {
+        if (g.id == wantedGradeId) initialGrade = g;
+      }
+      initialGrade ??= grades.isNotEmpty ? grades.first : null;
 
       MasterState? initState;
       List<MasterDistrict> districts = [];
@@ -273,12 +293,14 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
       setState(() {
         _commodities = comms;
+        _commodityLoadError = commodityError;
         _units = units;
         _states = states;
         _brokers = brokers;
         _selectedCommodity = initialComm;
         _grades = grades;
-        _selectedGrade = grades.isNotEmpty ? grades.first : null;
+        _gradeLoadError = gradeError;
+        _selectedGrade = initialGrade;
         _selectedUnit = units.isNotEmpty ? units.first : null;
         _selectedState = initState;
         _districts = districts;
@@ -301,17 +323,59 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
   Future<void> _onCommodityChanged(MasterCommodity? newComm) async {
     if (newComm == null) return;
+    // Clear first so a grade of the previous product can never be submitted.
     setState(() {
       _selectedCommodity = newComm;
+      _grades = [];
       _selectedGrade = null;
+      _isLoadingGrades = true;
+      _gradeLoadError = null;
     });
 
-    final grades = await _commoditiesRepository.getMasterGrades(newComm.id);
-    if (!mounted) return;
-    setState(() {
-      _grades = grades;
-      _selectedGrade = grades.isNotEmpty ? grades.first : null;
-    });
+    try {
+      final grades = await _commoditiesRepository.getMasterGrades(newComm.id);
+      if (!mounted || _selectedCommodity?.id != newComm.id) return;
+      setState(() {
+        _grades = grades;
+        _selectedGrade = grades.isNotEmpty ? grades.first : null;
+        _isLoadingGrades = false;
+      });
+    } catch (e) {
+      if (!mounted || _selectedCommodity?.id != newComm.id) return;
+      setState(() {
+        _isLoadingGrades = false;
+        _gradeLoadError = 'Could not load grades for ${newComm.name}.';
+      });
+    }
+  }
+
+  Future<void> _retryCommodities() async {
+    setState(() => _commodityLoadError = null);
+    try {
+      final comms = await _commoditiesRepository.getMasterCommodities();
+      if (!mounted) return;
+      setState(() => _commodities = comms);
+    } catch (e) {
+      if (!mounted) return;
+      setState(
+        () => _commodityLoadError =
+            'Could not load the product catalogue. Check your connection and retry.',
+      );
+    }
+  }
+
+  Future<void> _openCommodityPicker() async {
+    final picked = await showCommodityPickerSheet(
+      context: context,
+      commodities: _commodities,
+      selectedId: _selectedCommodity?.id,
+      onRefresh: () async {
+        final comms = await _commoditiesRepository.getMasterCommodities();
+        if (mounted) setState(() => _commodities = comms);
+        return comms;
+      },
+    );
+    if (picked != null && mounted) await _onCommodityChanged(picked);
   }
 
   void _openLocationPopup() {
@@ -1878,6 +1942,24 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
     if (!_formKey.currentState!.validate()) return;
 
+    final commodity = _selectedCommodity;
+    if (commodity != null && !_isLoadingGrades && _gradeLoadError == null && _grades.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_noGradeMessage(commodity.name))),
+      );
+      return;
+    }
+    if (commodity != null &&
+        _selectedGrade != null &&
+        _selectedGrade!.commodityId != commodity.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('The selected grade does not belong to ${commodity.name}'),
+        ),
+      );
+      return;
+    }
+
     if (_selectedCommodity == null ||
         _selectedGrade == null ||
         _selectedUnit == null) {
@@ -3064,6 +3146,137 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     );
   }
 
+  String _noGradeMessage(String productName) =>
+      'No grade is defined for $productName in the Product Master yet. '
+      'It cannot be listed until a grade is added.';
+
+  Widget _buildStatusBox({
+    Key? key,
+    required String message,
+    bool isError = false,
+    VoidCallback? onRetry,
+  }) {
+    return Container(
+      key: key,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isError ? AppColors.errorBackground : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isError
+              ? AppColors.error.withValues(alpha: 0.3)
+              : AppColors.borderLight,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 12,
+                color: isError ? AppColors.error : AppColors.textSecondaryLight,
+              ),
+            ),
+          ),
+          if (onRetry != null)
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
+    );
+  }
+
+  /// Tappable product field: name plus the authoritative category label.
+  Widget _buildCommodityField() {
+    if (_commodityLoadError != null) {
+      return _buildStatusBox(
+        key: const Key('commodity-load-error'),
+        message: _commodityLoadError!,
+        isError: true,
+        onRetry: _retryCommodities,
+      );
+    }
+    if (_commodities.isEmpty) {
+      return _buildStatusBox(
+        key: const Key('commodity-empty'),
+        message: 'No active products are available in the catalogue.',
+        onRetry: _retryCommodities,
+      );
+    }
+    final sel = _selectedCommodity;
+    return InkWell(
+      key: const Key('commodity-picker-field'),
+      onTap: _openCommodityPicker,
+      borderRadius: BorderRadius.circular(10),
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          suffixIcon: Icon(LucideIcons.search, size: 18),
+        ),
+        child: sel == null
+            ? const Text(
+                'Tap to search products',
+                style: TextStyle(fontSize: 14, color: AppColors.textMutedLight),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    sel.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  CategoryLabel(categoryName: sel.categoryName),
+                ],
+              ),
+      ),
+    );
+  }
+
+  /// Only the selected product's own grades, with loading / error / no-grade states.
+  Widget _buildGradeField() {
+    final sel = _selectedCommodity;
+    if (sel != null && _isLoadingGrades) {
+      return _buildStatusBox(message: 'Loading grades for ${sel.name}...');
+    }
+    if (sel != null && _gradeLoadError != null) {
+      return _buildStatusBox(
+        message: _gradeLoadError!,
+        isError: true,
+        onRetry: () => _onCommodityChanged(sel),
+      );
+    }
+    if (sel != null && _grades.isEmpty) {
+      return _buildStatusBox(
+        key: const Key('no-grade-notice'),
+        message: _noGradeMessage(sel.name),
+        isError: true,
+      );
+    }
+    return DropdownButtonFormField<MasterGrade>(
+      key: ValueKey('grade-field-${sel?.id}'),
+      initialValue: _grades.contains(_selectedGrade) ? _selectedGrade : null,
+      isExpanded: true,
+      hint: Text(sel == null ? 'Select a product first' : 'Select grade'),
+      decoration: const InputDecoration(
+        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
+      items: _grades.map((g) {
+        return DropdownMenuItem(
+          value: g,
+          child: Text(
+            g.gradeName,
+            style: const TextStyle(fontSize: 13),
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      }).toList(),
+      onChanged: sel == null ? null : (g) => setState(() => _selectedGrade = g),
+    );
+  }
+
   Widget _buildFormFieldWrapper({
     required String label,
     required Widget child,
@@ -3173,49 +3386,17 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               final isWide = constraints.maxWidth >= 520;
               final commodityDropdown = _buildFormFieldWrapper(
                 label: 'Commodity *',
-                child: DropdownButtonFormField<MasterCommodity>(
+                child: KeyedSubtree(
                   key: const Key('commodity_dropdown'),
-                  value: _selectedCommodity,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                  ),
-                  items: _commodities.map((c) {
-                    return DropdownMenuItem(
-                      value: c,
-                      child: Text(c.name, overflow: TextOverflow.ellipsis),
-                    );
-                  }).toList(),
-                  onChanged: _onCommodityChanged,
+                  child: _buildCommodityField(),
                 ),
               );
 
               final gradeDropdown = _buildFormFieldWrapper(
                 label: 'Quality Grade *',
-                child: DropdownButtonFormField<MasterGrade>(
+                child: KeyedSubtree(
                   key: const Key('grade_dropdown'),
-                  value: _selectedGrade,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                  ),
-                  items: _grades.map((g) {
-                    return DropdownMenuItem(
-                      value: g,
-                      child: Text(
-                        g.gradeName,
-                        style: const TextStyle(fontSize: 13),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (g) => setState(() => _selectedGrade = g),
+                  child: _buildGradeField(),
                 ),
               );
 

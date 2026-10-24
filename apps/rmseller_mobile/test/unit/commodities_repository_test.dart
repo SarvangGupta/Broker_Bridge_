@@ -22,11 +22,12 @@ void main() {
       CommoditiesRepository.clearSessionCache();
     });
 
-    test('getMasterCommodities returns verified catalog', () async {
-      final commodities = await repository.getMasterCommodities();
-      expect(commodities, isNotEmpty);
-      expect(commodities.any((c) => c.name.contains('Soybean')), isTrue);
-      expect(commodities.any((c) => c.name.contains('Chana')), isTrue);
+    test('getMasterCommodities fails loudly without a backend (no stale fallback list)', () async {
+      await expectLater(repository.getMasterCommodities(), throwsStateError);
+    });
+
+    test('getMasterGrades never invents a grade', () async {
+      await expectLater(repository.getMasterGrades('any-id'), throwsStateError);
     });
 
     test('createCommodity successfully creates and stores lot listing with broker and extended fields', () async {

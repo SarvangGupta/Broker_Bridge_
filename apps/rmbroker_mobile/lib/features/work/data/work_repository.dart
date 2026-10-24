@@ -167,6 +167,10 @@ class WorkRepository {
     if (validationErr != null) {
       return WorkError(message: validationErr);
     }
+    final gradeErr = await validateProductGrade(dto.commodityId, dto.gradeId);
+    if (gradeErr != null) {
+      return WorkError(message: gradeErr);
+    }
 
     // 1. Attempt REST endpoint
     try {
@@ -347,6 +351,10 @@ class WorkRepository {
     if (validationErr != null) {
       return WorkError(message: validationErr);
     }
+    final gradeErr = await validateProductGrade(dto.commodityId, dto.gradeId);
+    if (gradeErr != null) {
+      return WorkError(message: gradeErr);
+    }
 
     // 1. Attempt REST endpoint
     try {
@@ -476,8 +484,17 @@ class WorkRepository {
     try {
       final client = _supabase;
       if (client != null) {
-        final commRes = await client.from('master_commodities').select('id, name');
-        final gradeRes = await client.from('master_grades').select('id, grade_name');
+        // Only active (tradable) products, A→Z (postgrest-dart's order() defaults to descending).
+        final commRes = await client
+            .from('master_commodities')
+            .select('id, name, status, category_id')
+            .eq('status', true)
+            .order('name', ascending: true);
+        final gradeRes = await client
+            .from('master_grades')
+            .select('id, grade_name, commodity_id')
+            .order('grade_name', ascending: true);
+        final categoryNames = await _loadCategoryNames(client);
         final unitRes = await client.from('master_units').select('id, name, symbol');
         final compRes = await client.from('companies').select('id, name');
         final stateRes = await client.from('master_states').select('id, name');
@@ -495,8 +512,22 @@ class WorkRepository {
         final master = TradeMasterData(
           buyerCompanies: (compRes as List).map((r) => mapItem(r)).toList(),
           sellerCompanies: (compRes as List).map((r) => mapItem(r)).toList(),
-          commodities: (commRes as List).map((r) => mapItem(r)).toList(),
-          grades: (gradeRes as List).map((r) => mapItem(r, nameKey: 'grade_name')).toList(),
+          commodities: (commRes as List).map((r) {
+            final m = r as Map<String, dynamic>;
+            return MasterDropdownItem(
+              id: m['id']?.toString() ?? '',
+              name: m['name']?.toString() ?? '',
+              categoryName: categoryNames[m['category_id']?.toString()],
+            );
+          }).toList(),
+          grades: (gradeRes as List).map((r) {
+            final m = r as Map<String, dynamic>;
+            return MasterDropdownItem(
+              id: m['id']?.toString() ?? '',
+              name: m['grade_name']?.toString() ?? '',
+              parentId: m['commodity_id']?.toString(),
+            );
+          }).toList(),
           units: (unitRes as List).map((r) => mapItem(r, extraKey: 'symbol')).toList(),
           states: (stateRes as List).map((r) => mapItem(r)).toList(),
           districts: (distRes as List).map((r) => mapItem(r)).toList(),
@@ -517,6 +548,44 @@ class WorkRepository {
       states: [],
       districts: [],
     ));
+  }
+
+  /// Category id → name from `master_categories`. A failure yields an empty map so
+  /// products still load and show "Category unavailable" instead of a guessed label.
+  Future<Map<String, String>> _loadCategoryNames(SupabaseClient client) async {
+    try {
+      final rows = await client.from('master_categories').select('id, name');
+      return {
+        for (final r in (rows as List).whereType<Map<String, dynamic>>())
+          r['id'].toString(): r['name']?.toString() ?? '',
+      };
+    } catch (e) {
+      debugPrint('Category names unavailable: $e');
+      return const {};
+    }
+  }
+
+  /// Rejects a product-grade pair unless the grade belongs to that product and the
+  /// product is active. Returns an error message, or null when the pair is valid.
+  @visibleForTesting
+  Future<String?> validateProductGrade(String commodityId, String gradeId) async {
+    final client = _supabase;
+    if (client == null) return null; // No direct DB path; the server must enforce it.
+    try {
+      final grade = await client
+          .from('master_grades')
+          .select('id, commodity_id, master_commodities!inner(status)')
+          .eq('id', gradeId)
+          .eq('commodity_id', commodityId)
+          .eq('master_commodities.status', true)
+          .maybeSingle();
+      if (grade == null) {
+        return 'The selected grade does not belong to the selected product.';
+      }
+      return null;
+    } catch (e) {
+      return 'Could not verify the product grade. Please retry. ($e)';
+    }
   }
 
   // ============================================================================

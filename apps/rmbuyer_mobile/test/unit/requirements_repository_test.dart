@@ -2,28 +2,43 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rmbuyer_mobile/features/requirements/data/requirements_repository.dart';
 import 'package:rmbuyer_mobile/features/requirements/domain/requirement_model.dart';
 
+import '../support/fake_requirements_repository.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('RB-BUYER-03: RequirementsRepository Unit Tests', () {
-    test('getMasterCommodities returns verified catalog', () async {
+    test('getMasterCommodities fails loudly without a backend (no stale fallback list)', () async {
       final repo = RequirementsRepository();
-      final commodities = await repo.getMasterCommodities();
-
-      expect(commodities, isNotEmpty);
-      expect(commodities.any((c) => c.name.contains('Maize')), isTrue);
-      expect(commodities.any((c) => c.name.contains('Wheat')), isTrue);
-      expect(commodities.any((c) => c.name.contains('Soybean')), isTrue);
+      await expectLater(repo.getMasterCommodities(), throwsStateError);
     });
 
-    test('getMasterGrades returns grades filtered by commodity id', () async {
-      final repo = RequirementsRepository();
-      final maizeGrades = await repo.getMasterGrades('20000000-0000-0000-0000-000000000001');
+    test('parseActiveCommodities keeps active rows with IDs and tolerates missing optional fields', () {
+      final parsed = RequirementsRepository.parseActiveCommodities(
+        productMasterRows,
+        categoryNames: productMasterCategories,
+      );
 
-      expect(maizeGrades, isNotEmpty);
-      for (final g in maizeGrades) {
-        expect(g.commodityId, '20000000-0000-0000-0000-000000000001');
-      }
+      expect(parsed.map((c) => c.id), [dalId, riceId, wheatId, soybeanId, maizeId, soybeanDocId, maizeDdgsId]);
+      expect(parsed.firstWhere((c) => c.id == dalId).code, isEmpty);
+      expect(parsed.firstWhere((c) => c.id == soybeanDocId).categoryName, 'Oil Cakes & Oil Meals');
+      // Without category data the name is never guessed.
+      expect(
+        RequirementsRepository.parseActiveCommodities(productMasterRows).first.categoryName,
+        isNull,
+      );
+      expect(
+        RequirementsRepository.parseActiveCommodities([
+          {'id': '', 'name': 'No ID', 'status': true},
+          {'id': 'x', 'name': 'Inactive', 'status': false},
+        ]),
+        isEmpty,
+      );
+    });
+
+    test('getMasterGrades never invents a grade without a backend', () async {
+      final repo = RequirementsRepository();
+      await expectLater(repo.getMasterGrades(maizeId), throwsStateError);
     });
 
     test('getMasterUnits returns verified measurement units (MT, Qtl)', () async {

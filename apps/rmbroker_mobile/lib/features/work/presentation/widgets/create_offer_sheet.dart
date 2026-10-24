@@ -7,6 +7,7 @@ import '../../domain/offer_model.dart';
 import '../../domain/trade_master_data.dart';
 import '../controllers/master_data_controller.dart';
 import '../controllers/offers_controller.dart';
+import 'product_grade_fields.dart';
 
 class CreateOfferSheet extends ConsumerStatefulWidget {
   const CreateOfferSheet({super.key});
@@ -81,8 +82,22 @@ class _CreateOfferSheetState extends ConsumerState<CreateOfferSheet> {
       setState(() => _errorMessage = 'Please select a commodity');
       return;
     }
+    final master = ref.read(masterDataProvider).value;
+    final commodity = master?.commodityById(_selectedCommodityId);
+    if (master == null || commodity == null) {
+      setState(() => _errorMessage = 'Please select a product from the catalogue');
+      return;
+    }
+    if (master.gradesFor(commodity.id).isEmpty) {
+      setState(() => _errorMessage = noGradeMessage(commodity.name));
+      return;
+    }
     if (_selectedGradeId == null || _selectedGradeId!.isEmpty) {
       setState(() => _errorMessage = 'Please select a quality grade');
+      return;
+    }
+    if (!master.isValidProductGrade(commodity.id, _selectedGradeId)) {
+      setState(() => _errorMessage = 'The selected grade does not belong to ${commodity.name}');
       return;
     }
 
@@ -259,25 +274,6 @@ class _CreateOfferSheetState extends ConsumerState<CreateOfferSheet> {
                             id: '00000000-0000-0000-0000-000000000011',
                             name: 'Karnal Agro Traders'),
                       ];
-                final commodities = master.commodities.isNotEmpty
-                    ? master.commodities
-                    : [
-                        const MasterDropdownItem(
-                            id: 'comm-101', name: 'Sharbati Wheat'),
-                        const MasterDropdownItem(
-                            id: 'comm-102', name: 'Yellow Maize (Corn)'),
-                        const MasterDropdownItem(
-                            id: 'comm-103', name: 'Soybean Meal (DOC)'),
-                      ];
-                final grades = master.grades.isNotEmpty
-                    ? master.grades
-                    : [
-                        const MasterDropdownItem(
-                            id: 'grade-101', name: 'Grade A Milling'),
-                        const MasterDropdownItem(
-                            id: 'grade-102', name: 'Feed Grade Premium'),
-                      ];
-
                 return Column(
                   children: [
                     // Seller Selector
@@ -296,39 +292,18 @@ class _CreateOfferSheetState extends ConsumerState<CreateOfferSheet> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Commodity & Grade
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            decoration: const InputDecoration(
-                              labelText: 'Commodity *',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            initialValue: _selectedCommodityId,
-                            items: commodities.map((c) {
-                              return DropdownMenuItem<String>(value: c.id, child: Text(c.name));
-                            }).toList(),
-                            onChanged: (val) => setState(() => _selectedCommodityId = val),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            decoration: const InputDecoration(
-                              labelText: 'Quality Grade *',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            initialValue: _selectedGradeId,
-                            items: grades.map((g) {
-                              return DropdownMenuItem<String>(value: g.id, child: Text(g.name));
-                            }).toList(),
-                            onChanged: (val) => setState(() => _selectedGradeId = val),
-                          ),
-                        ),
-                      ],
+                    // Product (searchable, with category label) & product-specific Grade
+                    ProductGradeFields(
+                      master: master,
+                      commodityId: _selectedCommodityId,
+                      gradeId: _selectedGradeId,
+                      onRetry: () => ref.invalidate(masterDataProvider),
+                      onCommodityChanged: (c) => setState(() {
+                        _selectedCommodityId = c.id;
+                        final own = master.gradesFor(c.id);
+                        _selectedGradeId = own.isNotEmpty ? own.first.id : null;
+                      }),
+                      onGradeChanged: (g) => setState(() => _selectedGradeId = g),
                     ),
                   ],
                 );
@@ -355,6 +330,7 @@ class _CreateOfferSheetState extends ConsumerState<CreateOfferSheet> {
                 Expanded(
                   flex: 2,
                   child: DropdownButtonFormField<String>(
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Unit *',
                       border: OutlineInputBorder(),
@@ -411,6 +387,7 @@ class _CreateOfferSheetState extends ConsumerState<CreateOfferSheet> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<LoadingReadiness>(
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Loading Readiness',
                       border: OutlineInputBorder(),
