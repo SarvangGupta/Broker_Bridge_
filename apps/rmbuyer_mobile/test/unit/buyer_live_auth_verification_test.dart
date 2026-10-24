@@ -1,9 +1,13 @@
+@Tags(['live'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:rmbuyer_mobile/core/config/app_config.dart';
 import 'package:rmbuyer_mobile/core/security/secure_storage_service.dart';
 import 'package:rmbuyer_mobile/features/authentication/data/auth_repository.dart';
 import 'package:rmbuyer_mobile/features/authentication/domain/auth_result.dart';
+
+import '../support/live_test_config.dart';
 
 class TestSecureStorageService extends SecureStorageService {
   final Map<String, String> _data = {};
@@ -59,71 +63,42 @@ class TestSecureStorageService extends SecureStorageService {
   Future<void> clearAll() async => _data.clear();
 }
 
+Future<AuthSuccess> _signIn(LiveTestConfig config, String email, String password) async {
+  final client = SupabaseClient(config.supabaseUrl, config.anonKey);
+  final authRepo = AuthRepository(supabase: client, storage: TestSecureStorageService());
+
+  final result = await authRepo.signInWithPassword(email: email, password: password);
+  if (result is AuthFailure) {
+    fail('Login failed: ${result.message} (${result.code})');
+  }
+  expect(result, isA<AuthSuccess>());
+  return result as AuthSuccess;
+}
+
 void main() {
-  test('Live Authentication Validation for Rohan Gupta (Buyer)', () async {
-    final client = SupabaseClient(
-      AppConfig.supabaseUrl,
-      AppConfig.supabaseAnonKey,
-    );
+  test('Live authentication: primary test buyer signs in with buyer role', () async {
+    final config = LiveTestConfig.require();
 
-    final storage = TestSecureStorageService();
-    final authRepo = AuthRepository(
-      supabase: client,
-      storage: storage,
-    );
+    final success = await _signIn(config, config.buyerEmail, config.buyerPassword);
 
-    final result = await authRepo.signInWithPassword(
-      email: 'rohan@gmail.com',
-      password: 'rohan123',
-    );
+    expect(success.user.email, config.buyerEmail);
+    expect(success.user.role, 'buyer');
+    expect(success.user.fullName, isNotEmpty);
+    expect(success.user.companyId, isNotNull);
+  }, skip: LiveTestConfig.skipReason);
 
-    if (result is AuthFailure) {
-      fail('Login failed: ${result.message} (${result.code})');
+  test('Live authentication: second test buyer signs in with buyer role', () async {
+    final config = LiveTestConfig.require();
+    final email = config.secondBuyerEmail;
+    final password = config.secondBuyerPassword;
+    if (email == null || password == null) {
+      fail('Set RMBUYER_TEST_SECOND_BUYER_EMAIL and RMBUYER_TEST_SECOND_BUYER_PASSWORD.');
     }
 
-    expect(result, isA<AuthSuccess>());
-    final success = result as AuthSuccess;
-    expect(success.user.email, 'rohan@gmail.com');
+    final success = await _signIn(config, email, password);
+
+    expect(success.user.email, email);
     expect(success.user.role, 'buyer');
-    expect(success.user.fullName, 'Rohan Gupta');
-    expect(success.user.companyId, '53b23dbe-df8e-4dbd-8ad8-322550ab8cdf');
-
-    // ignore: avoid_print
-    print('>>> LIVE LOGIN VALIDATED SUCCESSFULLY FOR: ${success.user.fullName} (${success.user.email})');
-    // ignore: avoid_print
-    print('>>> Role: ${success.user.role}');
-    // ignore: avoid_print
-    print('>>> Company ID: ${success.user.companyId}');
-  });
-
-  test('Live Authentication Validation for Rahul (Buyer)', () async {
-    final client = SupabaseClient(
-      AppConfig.supabaseUrl,
-      AppConfig.supabaseAnonKey,
-    );
-
-    final storage = TestSecureStorageService();
-    final authRepo = AuthRepository(
-      supabase: client,
-      storage: storage,
-    );
-
-    final result = await authRepo.signInWithPassword(
-      email: 'rahul@gmail.com',
-      password: 'rahul123',
-    );
-
-    if (result is AuthFailure) {
-      fail('Login failed: ${result.message} (${result.code})');
-    }
-
-    expect(result, isA<AuthSuccess>());
-    final success = result as AuthSuccess;
-    expect(success.user.email, 'rahul@gmail.com');
-    expect(success.user.role, 'buyer');
-    expect(success.user.fullName, 'Rahul');
-
-    // ignore: avoid_print
-    print('>>> LIVE LOGIN VALIDATED SUCCESSFULLY FOR: ${success.user.fullName} (${success.user.email})');
-  });
+    expect(success.user.fullName, isNotEmpty);
+  }, skip: LiveTestConfig.skipReason);
 }

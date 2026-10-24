@@ -1,11 +1,16 @@
+@Tags(['live'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:rmbuyer_mobile/core/config/app_config.dart';
 import 'package:rmbuyer_mobile/core/security/secure_storage_service.dart';
 import 'package:rmbuyer_mobile/features/authentication/data/auth_repository.dart';
 import 'package:rmbuyer_mobile/features/authentication/domain/auth_result.dart';
 import 'package:rmbuyer_mobile/features/requirements/data/requirements_repository.dart';
 import 'package:rmbuyer_mobile/features/requirements/domain/requirement_model.dart';
+
+import '../support/live_master_data.dart';
+import '../support/live_test_config.dart';
 
 class TestSecureStorageService extends SecureStorageService {
   final Map<String, String> _data = {};
@@ -54,18 +59,21 @@ class TestSecureStorageService extends SecureStorageService {
 
 void main() {
   test('RB-BUYER-07: Backend Integration: Requirement creation dispatches notification to selected broker', () async {
-    final client = SupabaseClient(
-      AppConfig.supabaseUrl,
-      AppConfig.supabaseAnonKey,
-    );
+    final config = LiveTestConfig.require();
+    final brokerId = config.brokerId;
+    if (brokerId == null) {
+      fail('Set RMBUYER_TEST_BROKER_ID to a broker user in the live-test backend.');
+    }
+
+    final client = SupabaseClient(config.supabaseUrl, config.anonKey);
 
     final storage = TestSecureStorageService();
     final authRepo = AuthRepository(supabase: client, storage: storage);
 
-    // 1. Sign in as verified live buyer (Rohan)
+    // 1. Sign in as the configured test buyer
     final authRes = await authRepo.signInWithPassword(
-      email: 'rohan@gmail.com',
-      password: 'rohan123',
+      email: config.buyerEmail,
+      password: config.buyerPassword,
     );
     expect(authRes, isA<AuthSuccess>());
     final success = authRes as AuthSuccess;
@@ -75,37 +83,37 @@ void main() {
       client: client,
       storage: storage,
     );
+    final master = await LiveMasterData.load(client);
 
-    const brokerVarunId = 'b354958e-779a-41f2-b7a3-5899eca32e32';
     final testQuantity = (50.0 + (DateTime.now().second % 30)).toDouble();
 
     final validDto = CreateRequirementDto(
-      commodityId: 'a732266b-b30d-4688-8519-8b3e9784685e',
-      commodityName: 'Soyabean',
-      gradeId: '1f13a047-687d-4f61-bc25-5f93f134ae10',
-      gradeName: 'Moisture',
+      commodityId: master.commodityId,
+      commodityName: master.commodityName,
+      gradeId: master.gradeId,
+      gradeName: master.gradeName,
       quantity: testQuantity,
-      unitId: 'bfefee25-68a1-4771-8910-6d4b04db39cc',
-      unitSymbol: 'kg',
+      unitId: master.unitId,
+      unitSymbol: master.unitSymbol,
       targetPrice: 5350.0,
       deliveryLocation: 'Kota Mandi Yard Gate 1',
       targetDate: DateTime.now().add(const Duration(days: 12)),
       paymentTerms: 'Payment on Delivery (CAD)',
       notes: 'RB-BUYER-07 Automated Test Requirement',
-      selectedBrokerIds: const [brokerVarunId],
-      selectedBrokerNames: const ['Varun Broker Desk'],
+      selectedBrokerIds: [brokerId],
+      selectedBrokerNames: const ['Test Broker Desk'],
     );
 
     // 2. Persist requirement and notify selected broker
     final created = await reqRepo.createRequirement(validDto);
     expect(created, isNotNull);
     expect(created.id, isNotEmpty);
-    expect(created.commodityName, 'Soyabean');
+    expect(created.commodityName, master.commodityName);
 
     // 3. Verify notification was dispatched via RPC and idempotency prevents duplicates
     final notifiedCount = await reqRepo.notifyRequirementBrokers(
       requirementId: created.id,
-      brokerIds: [brokerVarunId],
+      brokerIds: [brokerId],
     );
     expect(notifiedCount, 0);
 
@@ -115,5 +123,5 @@ void main() {
       brokerIds: [],
     );
     expect(unselectedResult, 0);
-  });
+  }, skip: LiveTestConfig.skipReason);
 }

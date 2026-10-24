@@ -1,0 +1,6 @@
+tags:
+  live:
+    description: >-
+      Tests that call a real Supabase backend. Skipped unless RMBUYER_LIVE_TESTS=1 and the
+      RMBUYER_TEST_* variables point at an isolated, non-production project
+      (see test/support/live_test_config.dart). Production URLs and keys are rejected.

@@ -1,11 +1,16 @@
+@Tags(['live'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:rmbuyer_mobile/core/config/app_config.dart';
 import 'package:rmbuyer_mobile/core/security/secure_storage_service.dart';
 import 'package:rmbuyer_mobile/features/authentication/data/auth_repository.dart';
 import 'package:rmbuyer_mobile/features/authentication/domain/auth_result.dart';
 import 'package:rmbuyer_mobile/features/requirements/data/requirements_repository.dart';
 import 'package:rmbuyer_mobile/features/requirements/domain/requirement_model.dart';
+
+import '../support/live_master_data.dart';
+import '../support/live_test_config.dart';
 
 class TestSecureStorageService extends SecureStorageService {
   final Map<String, String> _data = {};
@@ -54,38 +59,43 @@ class TestSecureStorageService extends SecureStorageService {
 
 void main() {
   test('E2E Requirement Creation, Backend Persistence & List Verification', () async {
-    final client = SupabaseClient(
-      AppConfig.supabaseUrl,
-      AppConfig.supabaseAnonKey,
-    );
+    final config = LiveTestConfig.require();
+    final secondEmail = config.secondBuyerEmail;
+    final secondPassword = config.secondBuyerPassword;
+    if (secondEmail == null || secondPassword == null) {
+      fail('Set RMBUYER_TEST_SECOND_BUYER_EMAIL and RMBUYER_TEST_SECOND_BUYER_PASSWORD (tenant isolation check).');
+    }
+
+    final client = SupabaseClient(config.supabaseUrl, config.anonKey);
 
     final storage = TestSecureStorageService();
     final authRepo = AuthRepository(supabase: client, storage: storage);
 
-    // 1. Sign in as verified live test buyer (Rohan)
+    // 1. Sign in as the configured test buyer
     final authRes = await authRepo.signInWithPassword(
-      email: 'rohan@gmail.com',
-      password: 'rohan123',
+      email: config.buyerEmail,
+      password: config.buyerPassword,
     );
     expect(authRes, isA<AuthSuccess>());
     final success = authRes as AuthSuccess;
     expect(success.user.role, 'buyer');
-    expect(success.user.companyId, '53b23dbe-df8e-4dbd-8ad8-322550ab8cdf');
+    expect(success.user.companyId, isNotNull);
 
     final reqRepo = RequirementsRepository(
       client: client,
       storage: storage,
     );
+    final master = await LiveMasterData.load(client);
 
     // 2. Verify invalid fields are rejected
     final invalidQtyDto = CreateRequirementDto(
-      commodityId: 'a732266b-b30d-4688-8519-8b3e9784685e',
-      commodityName: 'Soyabean',
-      gradeId: '1f13a047-687d-4f61-bc25-5f93f134ae10',
-      gradeName: 'Moisture',
+      commodityId: master.commodityId,
+      commodityName: master.commodityName,
+      gradeId: master.gradeId,
+      gradeName: master.gradeName,
       quantity: -10,
-      unitId: 'bfefee25-68a1-4771-8910-6d4b04db39cc',
-      unitSymbol: 'kg',
+      unitId: master.unitId,
+      unitSymbol: master.unitSymbol,
       targetPrice: 4800,
       deliveryLocation: 'Jaipur Mandi Gate 2',
       targetDate: DateTime.now().add(const Duration(days: 7)),
@@ -102,13 +112,13 @@ void main() {
     final testLocation = 'Jaipur Depot Gate ${DateTime.now().second}';
 
     final validDto = CreateRequirementDto(
-      commodityId: 'a732266b-b30d-4688-8519-8b3e9784685e',
-      commodityName: 'Soyabean',
-      gradeId: '1f13a047-687d-4f61-bc25-5f93f134ae10',
-      gradeName: 'Moisture',
+      commodityId: master.commodityId,
+      commodityName: master.commodityName,
+      gradeId: master.gradeId,
+      gradeName: master.gradeName,
       quantity: testQuantity,
-      unitId: 'bfefee25-68a1-4771-8910-6d4b04db39cc',
-      unitSymbol: 'kg',
+      unitId: master.unitId,
+      unitSymbol: master.unitSymbol,
       targetPrice: 5250.0,
       deliveryLocation: testLocation,
       targetDate: DateTime.now().add(const Duration(days: 10)),
@@ -133,7 +143,7 @@ void main() {
     expect(list.any((r) => r.id == created.id), isTrue);
 
     final fromList = list.firstWhere((r) => r.id == created.id);
-    expect(fromList.commodityName, 'Soyabean');
+    expect(fromList.commodityName, master.commodityName);
     expect(fromList.quantity, testQuantity);
     expect(fromList.status, 'Open');
 
@@ -170,28 +180,26 @@ void main() {
     expect(cancelledDetail!.status, 'Cancelled');
     expect(cancelledDetail.canCancel, isFalse);
 
-    // 9. Tenant Isolation: Second buyer (Rahul) cannot access Rohan requirement
-    final rahulClient = SupabaseClient(
-      AppConfig.supabaseUrl,
-      AppConfig.supabaseAnonKey,
-    );
-    final rahulStorage = TestSecureStorageService();
-    final rahulAuthRepo = AuthRepository(supabase: rahulClient, storage: rahulStorage);
+    // 9. Tenant Isolation: a buyer from another company cannot access this requirement
+    final secondClient = SupabaseClient(config.supabaseUrl, config.anonKey);
+    final secondStorage = TestSecureStorageService();
+    final secondAuthRepo = AuthRepository(supabase: secondClient, storage: secondStorage);
 
-    final rahulLogin = await rahulAuthRepo.signInWithPassword(
-      email: 'rahul@gmail.com',
-      password: 'rahul123',
+    final secondLogin = await secondAuthRepo.signInWithPassword(
+      email: secondEmail,
+      password: secondPassword,
     );
-    expect(rahulLogin, isA<AuthSuccess>());
-    final rahulSuccess = rahulLogin as AuthSuccess;
-    expect(rahulSuccess.user.companyId, '567f1ce4-c89e-40b1-934d-00ad826903ef');
+    expect(secondLogin, isA<AuthSuccess>());
+    final secondSuccess = secondLogin as AuthSuccess;
+    expect(secondSuccess.user.companyId, isNotNull);
+    expect(secondSuccess.user.companyId, isNot(success.user.companyId));
 
-    final rahulReqRepo = RequirementsRepository(
-      client: rahulClient,
-      storage: rahulStorage,
+    final secondReqRepo = RequirementsRepository(
+      client: secondClient,
+      storage: secondStorage,
     );
 
-    final rahulList = await rahulReqRepo.getRequirements();
-    expect(rahulList.any((r) => r.id == created.id), isFalse);
-  });
+    final secondList = await secondReqRepo.getRequirements();
+    expect(secondList.any((r) => r.id == created.id), isFalse);
+  }, skip: LiveTestConfig.skipReason);
 }
