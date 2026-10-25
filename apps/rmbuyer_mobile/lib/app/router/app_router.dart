@@ -11,6 +11,7 @@ import '../../features/deals/presentation/final_deal_review_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/home/presentation/navigation_shell.dart';
 import '../../features/notifications/presentation/buyer_notifications_screen.dart';
+import '../../features/nutrition/presentation/nutrition_guide_screen.dart';
 import '../../features/offers/domain/buyer_offer_model.dart';
 import '../../features/offers/presentation/buyer_offers_screen.dart';
 import '../../features/offers/presentation/offer_details_screen.dart';
@@ -144,6 +145,7 @@ class AppRouter {
             initialCommodity: commodity ?? extra?['commodity'] as String?,
             initialBrokerId: brokerId ?? extra?['brokerId'] as String?,
             initialBrokerName: brokerName ?? extra?['brokerName'] as String?,
+            blankCommercialTerms: extra?['blankCommercialTerms'] == true,
           );
         },
       ),
@@ -251,6 +253,15 @@ class AppRouter {
                 path: '/deals',
                 name: 'deals',
                 builder: (context, state) => const BuyerDealsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/nutrition',
+                name: 'nutrition',
+                builder: (context, state) => const NutritionGuideScreen(),
               ),
             ],
           ),

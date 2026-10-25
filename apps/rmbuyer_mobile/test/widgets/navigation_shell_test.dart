@@ -32,6 +32,7 @@ void main() {
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Requirements'), findsOneWidget);
     expect(find.text('Deals'), findsOneWidget);
+    expect(find.text('Nutrition Guide'), findsOneWidget);
     expect(find.text('Profile'), findsOneWidget);
 
     // Tap Requirements tab in bottom nav
@@ -53,5 +54,32 @@ void main() {
     await tester.pump();
 
     expect(find.text('Buyer Profile & Settings'), findsOneWidget);
+  });
+
+  testWidgets('Five tabs fit a phone-width bar and Nutrition Guide opens', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    AppRouter.authNotifier.setStatus(AuthStatus.authenticated);
+    addTearDown(() {
+      AppRouter.resetForTesting();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp.router(
+          theme: AppTheme.lightTheme,
+          routerConfig: AppRouter.router,
+        ),
+      ),
+    );
+    // Opened directly: Home has its own pre-existing narrow-width overflows.
+    AppRouter.router.go('/nutrition');
+    await tester.pumpAndSettle();
+
+    // Bar label plus the screen's AppBar title; no layout overflow was reported.
+    expect(find.text('Nutrition Guide'), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
   });
 }

@@ -44,6 +44,10 @@ class NavigationShell extends StatelessWidget {
             label: 'Deals',
           ),
           BottomNavigationBarItem(
+            icon: Icon(LucideIcons.leaf),
+            label: 'Nutrition Guide',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(LucideIcons.user),
             label: 'Profile',
           ),

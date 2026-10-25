@@ -65,6 +65,25 @@ class RequirementsRepository {
     return parseActiveCommodities(data, categoryNames: categoryNames);
   }
 
+  /// Active parent categories from `master_categories`, ordered by name.
+  /// Throws when they cannot be loaded; there is no fallback list.
+  Future<List<MasterCategory>> getMasterCategories() async {
+    final client = _supabase;
+    if (client == null) {
+      throw StateError('Product catalogue service is not available.');
+    }
+    final rows = await client
+        .from('master_categories')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name', ascending: true);
+    return [
+      for (final r in (rows as List).whereType<Map<String, dynamic>>())
+        if ((r['name']?.toString().trim() ?? '').isNotEmpty)
+          MasterCategory(id: r['id'].toString(), name: r['name'].toString().trim()),
+    ];
+  }
+
   /// Category id → name from `master_categories`. A failure yields an empty map so
   /// products still load and the form shows "Category unavailable" instead of a guess.
   Future<Map<String, String>> _loadCategoryNames(SupabaseClient client) async {

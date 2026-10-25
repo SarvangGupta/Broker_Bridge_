@@ -94,6 +94,18 @@ class FakeRequirementsRepository extends RequirementsRepository {
     return RequirementsRepository.parseActiveCommodities(active, categoryNames: productMasterCategories);
   }
 
+  /// Active `master_categories` rows; defaults to [productMasterCategories].
+  List<MasterCategory>? categories;
+  Object? categoryError;
+
+  @override
+  Future<List<MasterCategory>> getMasterCategories() async {
+    if (categoryError != null) throw categoryError!;
+    final list = categories ??
+        [for (final e in productMasterCategories.entries) MasterCategory(id: e.key, name: e.value)];
+    return [...list]..sort((a, b) => a.name.compareTo(b.name));
+  }
+
   @override
   Future<List<MasterGrade>> getMasterGrades(String commodityId) async {
     return productMasterGrades[commodityId] ?? const [];

@@ -21,12 +21,17 @@ class PostRequirementScreen extends StatefulWidget {
   final String? initialBrokerName;
   final RequirementsRepository? repository;
 
+  /// When true, quantity, price, delivery location, delivery date and payment
+  /// terms start empty for the buyer to enter (used by the Nutrition Guide).
+  final bool blankCommercialTerms;
+
   const PostRequirementScreen({
     super.key,
     this.initialCommodity,
     this.initialBrokerId,
     this.initialBrokerName,
     this.repository,
+    this.blankCommercialTerms = false,
   });
 
   /// Resolves a commodity passed in by route (search result, broker desk, etc.)
@@ -76,7 +81,7 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
   MasterUnit? _selectedUnit;
   String _selectedLocation = '';
   bool _isCustomLocation = false;
-  String _selectedPaymentTerm = 'Payment on Delivery (CAD)';
+  String? _selectedPaymentTerm = 'Payment on Delivery (CAD)';
   String _visibility = 'global'; // 'global' or 'restricted'
 
   // Broker Selection State (RB-BUYER-07)
@@ -96,7 +101,7 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
   final _packagingController = TextEditingController();
   final _notesController = TextEditingController();
 
-  DateTime _targetDate = DateTime.now().add(const Duration(days: 14));
+  DateTime? _targetDate = DateTime.now().add(const Duration(days: 14));
   bool _isSubmitting = false;
   String? _errorMessage;
 
@@ -104,6 +109,12 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
   void initState() {
     super.initState();
     _repo = widget.repository ?? RequirementsRepository();
+    if (widget.blankCommercialTerms) {
+      _quantityController.clear();
+      _priceController.clear();
+      _selectedPaymentTerm = null;
+      _targetDate = null;
+    }
     _visibility = widget.initialBrokerId != null ? 'restricted' : 'global';
 
     // Pre-select initial broker desk if routed from broker screen
@@ -182,8 +193,10 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
         _savedLocations = locations;
         _paymentOptions = payments;
         _selectedUnit = units.isNotEmpty ? units.first : null;
-        _selectedLocation = locations.isNotEmpty ? locations.first : 'FOR Mill Delivery';
-        _selectedPaymentTerm = payments.isNotEmpty ? payments.first : 'Payment on Delivery (CAD)';
+        if (!widget.blankCommercialTerms) {
+          _selectedLocation = locations.isNotEmpty ? locations.first : 'FOR Mill Delivery';
+          _selectedPaymentTerm = payments.isNotEmpty ? payments.first : 'Payment on Delivery (CAD)';
+        }
         _isLoadingMasterData = false;
       });
     } catch (e) {
@@ -330,6 +343,11 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
       return;
     }
 
+    // A blank form must not turn an empty price into an implied ₹0 target.
+    if (widget.blankCommercialTerms && _priceController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Please enter your target price.');
+      return;
+    }
     final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
     if (price < 0) {
       setState(() => _errorMessage = 'Target price cannot be negative.');
@@ -342,6 +360,18 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
 
     if (deliveryLoc.isEmpty) {
       setState(() => _errorMessage = 'Please specify the delivery location.');
+      return;
+    }
+
+    final targetDate = _targetDate;
+    if (targetDate == null) {
+      setState(() => _errorMessage = 'Please select the required delivery date.');
+      return;
+    }
+
+    final paymentTerm = _selectedPaymentTerm;
+    if (paymentTerm == null) {
+      setState(() => _errorMessage = 'Please select payment terms.');
       return;
     }
 
@@ -363,8 +393,8 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
       unitSymbol: _selectedUnit?.symbol ?? 'MT',
       targetPrice: price,
       deliveryLocation: deliveryLoc,
-      targetDate: _targetDate,
-      paymentTerms: _selectedPaymentTerm,
+      targetDate: targetDate,
+      paymentTerms: paymentTerm,
       packagingType: _packagingController.text.trim().isNotEmpty
           ? _packagingController.text.trim()
           : 'Standard Trade Packaging',
@@ -996,7 +1026,8 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 isExpanded: true,
-                value: _selectedLocation,
+                value: _selectedLocation.isEmpty ? null : _selectedLocation,
+                hint: const Text('Select delivery location', style: TextStyle(fontSize: 14)),
                 items: _savedLocations.map((loc) {
                   return DropdownMenuItem<String>(
                     value: loc,
@@ -1036,7 +1067,7 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
           onTap: () async {
             final picked = await showDatePicker(
               context: context,
-              initialDate: _targetDate,
+              initialDate: _targetDate ?? DateTime.now(),
               firstDate: DateTime.now(),
               lastDate: DateTime.now().add(const Duration(days: 90)),
             );
@@ -1057,8 +1088,16 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
                 const Icon(LucideIcons.calendar, size: 18, color: AppColors.textSecondaryLight),
                 const SizedBox(width: 10),
                 Text(
-                  DateFormat('dd MMMM yyyy').format(_targetDate),
-                  style: const TextStyle(fontSize: 14, color: AppColors.textPrimaryLight),
+                  _targetDate == null
+                      ? 'Select delivery date'
+                      : DateFormat('dd MMMM yyyy').format(_targetDate!),
+                  key: const Key('target-date-value'),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _targetDate == null
+                        ? AppColors.textMutedLight
+                        : AppColors.textPrimaryLight,
+                  ),
                 ),
               ],
             ),
@@ -1099,6 +1138,7 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
             child: DropdownButton<String>(
               isExpanded: true,
               value: _selectedPaymentTerm,
+              hint: const Text('Select payment terms', style: TextStyle(fontSize: 13)),
               items: _paymentOptions.map((term) {
                 return DropdownMenuItem<String>(
                   value: term,
@@ -1539,7 +1579,9 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
           _buildSummaryRow('Delivery Location', deliveryLoc),
           _buildSummaryRow(
             'Required Date',
-            DateFormat('dd MMM yyyy').format(_targetDate),
+            _targetDate == null
+                ? 'Not selected'
+                : DateFormat('dd MMM yyyy').format(_targetDate!),
           ),
           _buildSummaryRow(
             'Selected Recipients',

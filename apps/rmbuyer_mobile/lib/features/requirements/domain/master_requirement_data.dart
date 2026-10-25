@@ -10,12 +10,16 @@ class MasterCommodity {
   /// Authoritative category name from `master_categories`; null when unavailable.
   final String? categoryName;
 
+  /// `master_commodities.category_id`; null when the product has no category.
+  final String? categoryId;
+
   const MasterCommodity({
     required this.id,
     required this.name,
     required this.code,
     this.status = true,
     this.categoryName,
+    this.categoryId,
   });
 
   factory MasterCommodity.fromMap(Map<String, dynamic> map, {String? categoryName}) {
@@ -25,8 +29,17 @@ class MasterCommodity {
       code: map['code']?.toString() ?? '',
       status: map['status'] as bool? ?? true,
       categoryName: categoryName,
+      categoryId: map['category_id']?.toString(),
     );
   }
+}
+
+/// An active parent category from `master_categories`.
+class MasterCategory {
+  final String id;
+  final String name;
+
+  const MasterCategory({required this.id, required this.name});
 }
 
 class MasterGrade {
