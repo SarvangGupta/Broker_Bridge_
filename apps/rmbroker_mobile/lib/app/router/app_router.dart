@@ -16,6 +16,7 @@ import '../../features/deals/presentation/deals_screen.dart';
 import '../../features/deals/presentation/screens/deal_detail_screen.dart';
 import '../../features/directory/presentation/directory_screen.dart';
 import '../../features/more/presentation/more_screen.dart';
+import '../../features/more/presentation/more_section_screens.dart';
 import '../../features/notifications/presentation/screens/notification_center_screen.dart';
 import '../../features/search/domain/search_result.dart';
 import '../../features/search/presentation/global_search_screen.dart';
@@ -299,10 +300,14 @@ class AppRouter {
                   final reqId =
                       state.uri.queryParameters['requirementId'] ??
                       state.uri.queryParameters['reqId'];
+                  final offerId =
+                      state.uri.queryParameters['offerId'] ??
+                      state.uri.queryParameters['availabilityId'];
                   return WorkScreen(
                     initialTabIndex: tab,
                     initialStatusFilter: status,
                     initialRequirementId: reqId,
+                    initialOfferId: offerId,
                   );
                 },
               ),
@@ -338,6 +343,37 @@ class AppRouter {
                 path: '/more',
                 name: 'more',
                 builder: (context, state) => const MoreScreen(),
+                // Section pages stay in the More branch (bottom bar visible, More
+                // selected); their items open the existing full-screen routes.
+                routes: [
+                  GoRoute(
+                    path: 'tools',
+                    name: 'more_tools',
+                    builder: (context, state) => const ToolsMenuScreen(),
+                  ),
+                  GoRoute(
+                    path: 'finance',
+                    name: 'more_finance',
+                    builder: (context, state) => const FinanceMenuScreen(),
+                  ),
+                  GoRoute(
+                    path: 'settings',
+                    name: 'more_settings',
+                    builder: (context, state) => const SettingsMenuScreen(),
+                    routes: [
+                      GoRoute(
+                        path: ':group',
+                        name: 'more_settings_group',
+                        builder: (context, state) {
+                          final group = PreferenceGroupScreen.fromSlug(state.pathParameters['group']);
+                          return group == null
+                              ? const SettingsMenuScreen()
+                              : PreferenceGroupScreen(group: group);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),

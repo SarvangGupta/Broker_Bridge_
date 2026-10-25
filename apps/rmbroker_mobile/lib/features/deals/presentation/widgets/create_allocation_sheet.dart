@@ -8,6 +8,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../work/domain/offer_model.dart';
 import '../../../work/domain/requirement_model.dart';
+import '../../../work/domain/unit_utils.dart';
 import '../../../work/presentation/controllers/offers_controller.dart';
 import '../../../work/presentation/controllers/requirements_controller.dart';
 import '../../domain/allocation_model.dart';
@@ -19,16 +20,22 @@ class CreateAllocationSheet extends ConsumerStatefulWidget {
   final RequirementItem requirement;
   final OfferItem offer;
 
+  /// When false only the seller allocation is recorded; no deal record is
+  /// created (Allocate Seller on the requirement page).
+  final bool createDeal;
+
   const CreateAllocationSheet({
     super.key,
     required this.requirement,
     required this.offer,
+    this.createDeal = true,
   });
 
   static Future<T?> show<T>({
     required BuildContext context,
     required RequirementItem requirement,
     required OfferItem offer,
+    bool createDeal = true,
   }) {
     return showModalBottomSheet<T>(
       context: context,
@@ -41,6 +48,7 @@ class CreateAllocationSheet extends ConsumerStatefulWidget {
       builder: (_) => CreateAllocationSheet(
         requirement: requirement,
         offer: offer,
+        createDeal: createDeal,
       ),
     );
   }
@@ -61,15 +69,30 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
   String? _errorMessage;
   bool _showConfirmationSummary = false;
 
-  // Post-submission success state
+  // Post-submission state. An allocation that succeeded is kept when the deal
+  // step fails, so a retry only re-runs the deal step (no duplicate allocation).
   AllocationItem? _createdAllocation;
   DealItem? _createdDeal;
+  String? _dealErrorMessage;
+
+  /// Quantities are entered in the requirement's unit.
+  String get _unit => widget.requirement.unitSymbol;
+
+  /// Seller lot balance expressed in the requirement unit; null when the two
+  /// units cannot be converted safely.
+  double? get _offerAvailInReqUnit => UnitUtils.convertBetween(
+        widget.offer.availableQuantity,
+        widget.offer.unitSymbol,
+        _unit,
+      );
+
+  double get _offerAvail => _offerAvailInReqUnit ?? 0.0;
 
   @override
   void initState() {
     super.initState();
     // Default proposed quantity is minimum of remaining requirement and available offer
-    final maxEligible = min(widget.requirement.remainingQuantity, widget.offer.availableQuantity);
+    final maxEligible = min(widget.requirement.remainingQuantity, _offerAvail);
     _qtyController = TextEditingController(
       text: maxEligible > 0 ? maxEligible.toStringAsFixed(maxEligible.truncateToDouble() == maxEligible ? 0 : 2) : '',
     );
@@ -100,23 +123,28 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
   double get _remainingReqQty =>
       max(0.0, widget.requirement.remainingQuantity - _proposedQty);
   double get _remainingOfferQty =>
-      max(0.0, widget.offer.availableQuantity - _proposedQty);
+      max(0.0, _offerAvail - _proposedQty);
 
   void _onProceedToSummary() {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_offerAvailInReqUnit == null) {
+      setState(() => _errorMessage =
+          'Seller lot unit (${widget.offer.unitSymbol}) cannot be converted to the requirement unit ($_unit).');
+      return;
+    }
     if (_proposedQty <= 0) {
       setState(() => _errorMessage = 'Allocation quantity must be greater than zero');
       return;
     }
     if (_proposedQty > widget.requirement.remainingQuantity) {
       setState(() => _errorMessage =
-          'Proposed quantity cannot exceed remaining requirement (${widget.requirement.remainingQuantity} MT)');
+          'Proposed quantity cannot exceed remaining requirement (${widget.requirement.remainingQuantity} $_unit)');
       return;
     }
-    if (_proposedQty > widget.offer.availableQuantity) {
+    if (_proposedQty > _offerAvail) {
       setState(() => _errorMessage =
-          'Proposed quantity cannot exceed offer available quantity (${widget.offer.availableQuantity} MT)');
+          'Proposed quantity cannot exceed offer available quantity (${_offerAvail.toStringAsFixed(2)} $_unit)');
       return;
     }
 
@@ -127,33 +155,48 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
   }
 
   Future<void> _executeAuthoritativeAllocation() async {
+    if (_isSubmitting) return;
     setState(() {
       _isSubmitting = true;
       _errorMessage = null;
+      _dealErrorMessage = null;
     });
 
-    final allocDto = CreateAllocationDto(
-      requirementId: widget.requirement.id,
-      availabilityId: widget.offer.id,
-      proposedQuantity: _proposedQty,
-      unitSymbol: widget.requirement.unitSymbol,
-      remainingRequirementQuantity: widget.requirement.remainingQuantity,
-      availableOfferQuantity: widget.offer.availableQuantity,
-      agreedPrice: _agreedPrice,
-      priceBasis: _priceBasis,
-      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-    );
-
-    // 1. Propose & confirm allocation on authoritative backend
-    final allocNotifier = ref.read(allocationsProvider(widget.requirement.id).notifier);
-    final allocResult = await allocNotifier.proposeAllocation(allocDto);
-
+    // 1. Propose & confirm allocation, unless an earlier attempt already did.
+    var allocResult = _createdAllocation;
     if (allocResult == null) {
-      final allocState = ref.read(allocationsProvider(widget.requirement.id));
-      setState(() {
-        _isSubmitting = false;
-        _errorMessage = allocState.errorMessage ?? allocState.contractNotice ?? 'Failed to submit allocation';
-      });
+      final allocDto = CreateAllocationDto(
+        requirementId: widget.requirement.id,
+        availabilityId: widget.offer.id,
+        proposedQuantity: _proposedQty,
+        unitSymbol: _unit,
+        remainingRequirementQuantity: widget.requirement.remainingQuantity,
+        availableOfferQuantity: _offerAvail,
+        agreedPrice: _agreedPrice,
+        priceBasis: _priceBasis,
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      );
+
+      final allocNotifier = ref.read(allocationsProvider(widget.requirement.id).notifier);
+      allocResult = await allocNotifier.proposeAllocation(allocDto);
+      if (!mounted) return;
+
+      if (allocResult == null) {
+        final allocState = ref.read(allocationsProvider(widget.requirement.id));
+        setState(() {
+          _isSubmitting = false;
+          _errorMessage = allocState.errorMessage ?? allocState.contractNotice ?? 'Failed to submit allocation';
+        });
+        return;
+      }
+      _createdAllocation = allocResult;
+    }
+
+    if (!widget.createDeal) {
+      ref.read(requirementsProvider.notifier).loadRequirements();
+      ref.read(offersProvider.notifier).loadOffers();
+      ref.read(allocationsProvider(widget.requirement.id).notifier).loadAllocations();
+      setState(() => _isSubmitting = false);
       return;
     }
 
@@ -169,15 +212,20 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
     );
 
     final dealResult = await ref.read(dealsProvider.notifier).createDeal(dealDto);
+    if (!mounted) return;
 
-    // 3. Refresh requirement desk and offer desk state to update available quantities
+    // 3. Refresh requirement desk, offer desk and linked allocations
     ref.read(requirementsProvider.notifier).loadRequirements();
     ref.read(offersProvider.notifier).loadOffers();
+    ref.read(allocationsProvider(widget.requirement.id).notifier).loadAllocations();
 
+    final dealsState = ref.read(dealsProvider);
     setState(() {
       _isSubmitting = false;
-      _createdAllocation = allocResult;
       _createdDeal = dealResult;
+      _dealErrorMessage = dealResult == null
+          ? (dealsState.errorMessage ?? dealsState.contractNotice ?? 'Deal record could not be created.')
+          : null;
     });
   }
 
@@ -220,9 +268,11 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
             ),
             const SizedBox(height: 12),
 
-            // SUCCESS STATE
-            if (_createdAllocation != null) ...[
+            // SUCCESS STATE (allocation and deal both recorded)
+            if (_createdAllocation != null && (_createdDeal != null || !widget.createDeal)) ...[
               _buildSuccessView(currencyFormat),
+            ] else if (_createdAllocation != null) ...[
+              _buildDealPendingView(),
             ] else if (_showConfirmationSummary) ...[
               _buildConfirmationSummaryView(currencyFormat),
             ] else ...[
@@ -235,7 +285,7 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
   }
 
   Widget _buildAllocationFormView(NumberFormat currencyFormat) {
-    final maxEligible = min(widget.requirement.remainingQuantity, widget.offer.availableQuantity);
+    final maxEligible = min(widget.requirement.remainingQuantity, _offerAvail);
 
     return Form(
       key: _formKey,
@@ -331,13 +381,15 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
           // Quantity Input & Math
           Row(
             children: [
-              const Text(
-                'Proposed Allocation Quantity *',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              const Expanded(
+                child: Text(
+                  'Proposed Allocation Quantity *',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text(
-                'Max Eligible: ${maxEligible.toStringAsFixed(1)} MT',
+                'Max Eligible: ${maxEligible.toStringAsFixed(1)} $_unit',
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
               ),
             ],
@@ -348,8 +400,8 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              hintText: 'Enter quantity in MT',
-              suffixText: 'MT',
+              hintText: 'Enter quantity in $_unit',
+              suffixText: _unit,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               isDense: true,
@@ -359,10 +411,10 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
               final d = double.tryParse(val);
               if (d == null || d <= 0) return 'Must be greater than 0';
               if (d > widget.requirement.remainingQuantity) {
-                return 'Exceeds requirement balance (${widget.requirement.remainingQuantity} MT)';
+                return 'Exceeds requirement balance (${widget.requirement.remainingQuantity} $_unit)';
               }
-              if (d > widget.offer.availableQuantity) {
-                return 'Exceeds offer availability (${widget.offer.availableQuantity} MT)';
+              if (d > _offerAvail) {
+                return 'Exceeds offer availability (${_offerAvail.toStringAsFixed(2)} $_unit)';
               }
               return null;
             },
@@ -384,7 +436,7 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
                   children: [
                     const Text('Req Balance After:', style: TextStyle(fontSize: 10.5, color: AppColors.textSecondaryLight)),
                     Text(
-                      '${_remainingReqQty.toStringAsFixed(1)} MT',
+                      '${_remainingReqQty.toStringAsFixed(1)} $_unit',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -398,7 +450,7 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
                   children: [
                     const Text('Offer Avail After:', style: TextStyle(fontSize: 10.5, color: AppColors.textSecondaryLight)),
                     Text(
-                      '${_remainingOfferQty.toStringAsFixed(1)} MT',
+                      '${_remainingOfferQty.toStringAsFixed(1)} $_unit',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -419,7 +471,7 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Agreed Price / MT *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                    Text('Agreed Price / $_unit *', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: _priceController,
@@ -592,12 +644,12 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
               _buildSummaryRow('Commodity & Grade', '${widget.requirement.commodityName} (${widget.offer.gradeName})'),
               _buildSummaryRow('Buyer Enterprise', widget.requirement.buyerCompanyName),
               _buildSummaryRow('Seller Enterprise', widget.offer.sellerCompanyName),
-              _buildSummaryRow('Proposed Allocation', '$_proposedQty MT'),
-              _buildSummaryRow('Agreed Rate', '${currencyFormat.format(_agreedPrice)} / MT ($_priceBasis)'),
+              _buildSummaryRow('Proposed Allocation', '$_proposedQty $_unit'),
+              _buildSummaryRow('Agreed Rate', '${currencyFormat.format(_agreedPrice)} / $_unit ($_priceBasis)'),
               _buildSummaryRow('Total Contract Value', currencyFormat.format(_totalValuation), isBold: true),
               _buildSummaryRow('Delivery Destination', _locationController.text.trim()),
-              _buildSummaryRow('Req Remaining Balance', '${_remainingReqQty.toStringAsFixed(1)} MT'),
-              _buildSummaryRow('Offer Remaining Stock', '${_remainingOfferQty.toStringAsFixed(1)} MT'),
+              _buildSummaryRow('Req Remaining Balance', '${_remainingReqQty.toStringAsFixed(1)} $_unit'),
+              _buildSummaryRow('Offer Remaining Stock', '${_remainingOfferQty.toStringAsFixed(1)} $_unit'),
             ],
           ),
         ),
@@ -610,14 +662,16 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
             color: AppColors.goldMuted.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(LucideIcons.info, size: 14, color: AppColors.goldDark),
-              SizedBox(width: 8),
+              const Icon(LucideIcons.info, size: 14, color: AppColors.goldDark),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Authoritative submission locks proposed allocation and initiates a Draft/Negotiation deal record. Double-allocations are strictly prevented by backend concurrency locks.',
-                  style: TextStyle(fontSize: 10.5, color: AppColors.goldDark, fontWeight: FontWeight.w600),
+                  widget.createDeal
+                      ? 'Authoritative submission locks proposed allocation and initiates a Draft/Negotiation deal record. Double-allocations are strictly prevented by backend concurrency locks.'
+                      : 'Records the seller allocation and reserves this quantity on the lot. No deal is created until you start one.',
+                  style: const TextStyle(fontSize: 10.5, color: AppColors.goldDark, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -686,6 +740,76 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                           ),
                         ],
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Allocation recorded but the deal step failed: offer a retry of the deal step only.
+  Widget _buildDealPendingView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.goldMuted.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Allocation ${_createdAllocation!.reference} recorded (${_createdAllocation!.formattedQuantity})',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.goldDark),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'The deal record was not created: ${_dealErrorMessage ?? 'unknown error'}. '
+                'Retrying reuses this allocation; no extra quantity is reserved.',
+                style: const TextStyle(fontSize: 11.5, color: AppColors.textPrimaryLight, height: 1.35),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Close Desk'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                key: const ValueKey('retry_deal_creation'),
+                onPressed: _isSubmitting ? null : _executeAuthoritativeAllocation,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text(
+                        'Retry Deal Creation',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                       ),
               ),
             ),
@@ -786,15 +910,21 @@ class _CreateAllocationSheetState extends ConsumerState<CreateAllocationSheet> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3.5),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-              color: isBold ? AppColors.primaryDark : AppColors.textPrimaryLight,
+          Flexible(
+            child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+                color: isBold ? AppColors.primaryDark : AppColors.textPrimaryLight,
+              ),
             ),
           ),
         ],

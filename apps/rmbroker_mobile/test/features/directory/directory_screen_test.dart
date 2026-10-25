@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rmbroker_mobile/features/directory/data/directory_repository.dart';
 import 'package:rmbroker_mobile/features/directory/domain/directory_contact.dart';
 import 'package:rmbroker_mobile/features/directory/presentation/controllers/directory_controller.dart';
 import 'package:rmbroker_mobile/features/directory/presentation/directory_screen.dart';
 import 'package:rmbroker_mobile/features/directory/presentation/widgets/contact_action_buttons.dart';
+import 'package:rmbroker_mobile/features/directory/presentation/widgets/contact_details_sheet.dart';
 import 'package:rmbroker_mobile/features/directory/presentation/widgets/contact_form_modal.dart';
 import 'package:rmbroker_mobile/features/directory/presentation/widgets/directory_contact_card.dart';
-import 'package:rmbroker_mobile/features/directory/presentation/widgets/directory_kpi_bar.dart';
 
 class MockDirectoryRepository extends DirectoryRepository {
   final DirectoryDataResult<DirectoryListPayload> listResult;
@@ -20,6 +22,8 @@ class MockDirectoryRepository extends DirectoryRepository {
     String? role,
     String? search,
     String? status,
+    int? limit,
+    String? cursor,
   }) async =>
       listResult;
 }
@@ -80,7 +84,7 @@ void main() {
   }
 
   group('DirectoryScreen UI & Interaction Tests', () {
-    testWidgets('renders AppBar, branding, KPI bar, search bar, role tabs, and FAB', (
+    testWidgets('renders title, subtitle, search, role tabs and FAB; no summary metrics', (
       tester,
     ) async {
       final repo = MockDirectoryRepository(
@@ -92,9 +96,18 @@ void main() {
       await tester.pumpWidget(createTestWidget(repository: repo));
       await tester.pumpAndSettle();
 
-      expect(find.text('Counterparty Directory'), findsOneWidget);
-      expect(find.text('Authorized Buyers & Sellers'), findsOneWidget);
-      expect(find.byType(DirectoryKpiBar), findsOneWidget);
+      expect(find.text('Directory'), findsOneWidget);
+      expect(find.text('(Buyers & Sellers)'), findsOneWidget);
+      expect(find.text('Total Counterparties'), findsNothing);
+      expect(find.text('Active Buyers'), findsNothing);
+      expect(find.text('Active Sellers'), findsNothing);
+      expect(find.text('Search by name, company or phone number...'), findsOneWidget);
+      expect(find.text('All (2)'), findsOneWidget);
+      expect(find.text('Buyers (1)'), findsOneWidget);
+      expect(find.text('Sellers (1)'), findsOneWidget);
+      expect(find.byKey(const Key('filter_status_all')), findsNothing);
+      expect(find.byKey(const Key('directory_refresh_button')), findsOneWidget);
+      expect(find.byKey(const Key('directory_add_contact_button')), findsOneWidget);
       expect(find.byKey(const Key('directory_search_field')), findsOneWidget);
       expect(find.byKey(const Key('tab_all')), findsOneWidget);
       expect(find.byKey(const Key('tab_buyers')), findsOneWidget);
@@ -102,7 +115,7 @@ void main() {
       expect(find.byKey(const Key('add_contact_fab')), findsOneWidget);
     });
 
-    testWidgets('renders counterparty cards with verified ticks, trust scores, and action buttons', (
+    testWidgets('renders compact rows with role, verified badge only when verified, and action buttons', (
       tester,
     ) async {
       final repo = MockDirectoryRepository(
@@ -119,7 +132,11 @@ void main() {
       expect(find.text('Ramesh Agrawal'), findsOneWidget);
       expect(find.text('Sunil Mittal'), findsOneWidget);
       expect(find.text('Verified'), findsOneWidget);
-      expect(find.text('98% Trust'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('contact_card_c-101')), matching: find.text('Verified')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('contact_card_c-102')), matching: find.text('Verified')), findsNothing);
+      expect(find.text('Buyer'), findsOneWidget);
+      expect(find.text('Seller'), findsOneWidget);
+      expect(find.text('Kota, Rajasthan'), findsOneWidget);
       expect(find.byType(ContactActionButtons), findsNWidgets(2));
       expect(find.byType(DirectoryContactCard), findsNWidgets(2));
     });
@@ -246,8 +263,70 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Counterparty Directory'), findsOneWidget);
+      expect(find.text('Directory'), findsOneWidget);
       expect(find.byType(DirectoryContactCard), findsNWidgets(2));
+    });
+
+    testWidgets('search matches contact name and phone number', (tester) async {
+      final repo = MockDirectoryRepository(
+        listResult: DirectorySuccess(DirectoryListPayload(contacts: sampleContacts, stats: sampleStats)),
+      );
+      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('directory_search_field')), 'Sunil');
+      await tester.pumpAndSettle();
+      expect(find.text('Jaipur Mustard Mill'), findsOneWidget);
+      expect(find.text('Malwa Agro Traders'), findsNothing);
+
+      await tester.enterText(find.byKey(const Key('directory_search_field')), '43210');
+      await tester.pumpAndSettle();
+      expect(find.text('Malwa Agro Traders'), findsOneWidget);
+      expect(find.text('Jaipur Mustard Mill'), findsNothing);
+    });
+
+    testWidgets('row tap opens details; call and WhatsApp taps do not', (tester) async {
+      final launched = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('plugins.flutter.io/url_launcher'),
+        (call) async {
+          launched.add(call.arguments is Map ? (call.arguments as Map)['url'].toString() : '${call.arguments}');
+          return true;
+        },
+      );
+      final repo = MockDirectoryRepository(
+        listResult: DirectorySuccess(DirectoryListPayload(contacts: sampleContacts, stats: sampleStats)),
+      );
+      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpAndSettle();
+
+      final row = find.byKey(const Key('contact_card_c-101'));
+      await tester.tap(find.descendant(of: row, matching: find.byIcon(LucideIcons.phone)));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContactDetailsSheet), findsNothing);
+
+      await tester.tap(find.descendant(of: row, matching: find.byIcon(LucideIcons.messageSquare)));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContactDetailsSheet), findsNothing);
+      expect(launched.any((u) => u.contains('tel:')), isTrue);
+      expect(launched.any((u) => u.contains('wa.me/919876543210')), isTrue);
+
+      await tester.tap(find.descendant(of: row, matching: find.text('Malwa Agro Traders')));
+      // The details sheet shows a loading spinner; pump fixed frames.
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(ContactDetailsSheet), findsOneWidget);
+    });
+
+    testWidgets('header Add Contact opens the existing form', (tester) async {
+      final repo = MockDirectoryRepository(
+        listResult: DirectorySuccess(DirectoryListPayload(contacts: sampleContacts, stats: sampleStats)),
+      );
+      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('directory_add_contact_button')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContactFormModal), findsOneWidget);
     });
   });
 }

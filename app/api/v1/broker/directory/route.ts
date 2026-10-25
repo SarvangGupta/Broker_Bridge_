@@ -4,6 +4,11 @@ import {
   createBrokerContactAction,
   type CreateContactInput,
 } from '@/src/server/actions/broker-directory-actions';
+import {
+  decodeDirectoryCursor,
+  directoryErrorStatus,
+  parseDirectoryLimit,
+} from '@/src/server/utils/broker-directory-query';
 
 function extractAuthToken(req: NextRequest): string | undefined {
   const authHeader = req.headers.get('authorization');
@@ -26,22 +31,27 @@ export async function GET(req: NextRequest) {
     const status =
       statusParam === 'active' || statusParam === 'inactive' ? statusParam : 'all';
     const search = searchParam || undefined;
+    const limit = parseDirectoryLimit(searchParams.get('limit'));
+    const cursorParam = searchParams.get('cursor');
+    const cursor = decodeDirectoryCursor(cursorParam);
+    if (cursorParam && !cursor) {
+      return NextResponse.json({ success: false, error: 'Invalid page cursor' }, { status: 400 });
+    }
 
     const result = await getBrokerDirectoryContactsAction(
-      { role, status, search },
+      { role, status, search, limit, cursor },
       token
     );
 
     if (!result.success) {
-      const isUnauth = result.error?.toLowerCase().includes('unauthorized') ||
-        result.error?.toLowerCase().includes('session');
-      return NextResponse.json(result, { status: isUnauth ? 401 : 400 });
+      return NextResponse.json(result, { status: directoryErrorStatus(result.error) });
     }
 
     return NextResponse.json(result, { status: 200 });
   } catch (error: any) {
+    console.error('GET /broker/directory error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -58,14 +68,14 @@ export async function POST(req: NextRequest) {
       if (result.isDuplicate) {
         return NextResponse.json(result, { status: 409 });
       }
-      const isUnauth = result.error?.toLowerCase().includes('unauthorized');
-      return NextResponse.json(result, { status: isUnauth ? 401 : 400 });
+      return NextResponse.json(result, { status: directoryErrorStatus(result.error) });
     }
 
     return NextResponse.json(result, { status: 201 });
   } catch (error: any) {
+    console.error('POST /broker/directory error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }

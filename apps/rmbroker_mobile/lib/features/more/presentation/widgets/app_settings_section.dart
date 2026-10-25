@@ -11,8 +11,15 @@ import '../../../../core/preferences/app_settings_provider.dart';
 /// - Language Selection (English, Hindi)
 /// - Accessible Font Scaling (Small, Default, Large, Extra Large)
 /// - Accessibility Features (High Contrast UI Outlines, Semantic Readability)
+/// One group of [AppSettingsSection], shown alone on a Settings sub-page.
+enum AppSettingsGroup { theme, language, fontSize, accessibility }
+
 class AppSettingsSection extends ConsumerWidget {
-  const AppSettingsSection({super.key});
+  /// When set, only this group's controls are shown (same controls, same
+  /// provider); when null, the full section is shown.
+  final AppSettingsGroup? group;
+
+  const AppSettingsSection({super.key, this.group});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,6 +33,68 @@ class AppSettingsSection extends ConsumerWidget {
         ? (isDark ? Colors.white70 : Colors.black87)
         : (isDark ? AppColors.borderDark : AppColors.borderLight);
     final borderWidth = settings.highContrast ? 2.0 : 1.0;
+
+    if (group != null) {
+      final isHindi = settings.languagePref == AppLanguagePreference.hi;
+      final List<Widget> body = switch (group!) {
+        AppSettingsGroup.theme => [
+            _buildSubHeader(context,
+                icon: LucideIcons.palette,
+                title: isHindi ? 'थीम (रंग मोड)' : 'Appearance & Theme',
+                description: isHindi
+                    ? 'लाइट, डार्क या सिस्टम के अनुसार स्वचालित'
+                    : 'Choose light, dark, or follow device system settings'),
+            const SizedBox(height: 12),
+            _buildThemeSelector(context, settings, notifier, isDark),
+          ],
+        AppSettingsGroup.language => [
+            _buildSubHeader(context,
+                icon: LucideIcons.globe,
+                title: isHindi ? 'भाषा चयन (Language Selection)' : 'Language Selection',
+                description: isHindi
+                    ? 'प्रमाणित समर्थित भाषा चुनें'
+                    : 'Select from genuinely supported application languages'),
+            const SizedBox(height: 12),
+            _buildLanguageSelector(context, settings, notifier, isDark),
+            const SizedBox(height: 8),
+            _buildLanguageDisclosure(context, settings, isDark),
+          ],
+        AppSettingsGroup.fontSize => [
+            _buildSubHeader(context,
+                icon: LucideIcons.type,
+                title: isHindi ? 'फ़ॉन्ट आकार (टेक्स्ट स्केलिंग)' : 'Font Size & Text Scaling',
+                description: isHindi
+                    ? 'सुलभ पठन के लिए आकार समायोजित करें'
+                    : 'Adjust typography scale for optimal legibility across all screens'),
+            const SizedBox(height: 12),
+            _buildFontSizeSelector(context, settings, notifier, isDark),
+            const SizedBox(height: 12),
+            _buildFontPreviewBox(context, settings, isDark),
+          ],
+        AppSettingsGroup.accessibility => [
+            _buildSubHeader(context,
+                icon: LucideIcons.contrast,
+                title: isHindi ? 'अभिगम्यता और उच्च कंट्रास्ट' : 'Accessibility & Contrast',
+                description: isHindi
+                    ? 'दृश्य स्पष्टता और स्क्रीन रीडर अनुकूलन'
+                    : 'Enhanced borders, minimum 48px touch targets & screen reader semantics'),
+            const SizedBox(height: 10),
+            _buildAccessibilityToggles(context, settings, notifier, isDark),
+          ],
+      };
+      return Material(
+        color: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor, width: borderWidth),
+          ),
+          padding: const EdgeInsets.all(18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: body),
+        ),
+      );
+    }
 
     return Material(
       color: Colors.transparent,

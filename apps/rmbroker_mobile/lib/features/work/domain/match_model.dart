@@ -123,6 +123,15 @@ class SupplyMatchItem {
 class RequirementMatcher {
   const RequirementMatcher._();
 
+  /// Same product master: by id, or by name when an id is missing.
+  static bool isSameCommodity(RequirementItem requirement, OfferItem offer) {
+    if (requirement.commodityId.isNotEmpty && offer.commodityId.isNotEmpty) {
+      return requirement.commodityId == offer.commodityId;
+    }
+    return requirement.commodityName.trim().toLowerCase() ==
+        offer.commodityName.trim().toLowerCase();
+  }
+
   static SupplyMatchItem computeMatch({
     required RequirementItem requirement,
     required OfferItem offer,

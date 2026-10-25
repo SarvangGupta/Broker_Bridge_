@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { toggleContactStatusAction } from '@/src/server/actions/broker-directory-actions';
+import { directoryErrorStatus } from '@/src/server/utils/broker-directory-query';
 
 function extractAuthToken(req: NextRequest): string | undefined {
   const authHeader = req.headers.get('authorization');
@@ -20,18 +21,14 @@ export async function PATCH(
     const result = await toggleContactStatusAction(id, token);
 
     if (!result.success) {
-      const isUnauth = result.error?.toLowerCase().includes('unauthorized');
-      const isNotFound = result.error?.toLowerCase().includes('not found');
-      return NextResponse.json(
-        result,
-        { status: isUnauth ? 401 : isNotFound ? 404 : 400 }
-      );
+      return NextResponse.json(result, { status: directoryErrorStatus(result.error) });
     }
 
     return NextResponse.json(result, { status: 200 });
   } catch (error: any) {
+    console.error('PATCH /broker/directory/[id]/status error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }

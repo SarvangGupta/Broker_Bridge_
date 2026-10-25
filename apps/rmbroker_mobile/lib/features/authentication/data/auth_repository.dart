@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/security/secure_storage_service.dart';
+import '../../../core/security/session_guard.dart';
 import '../domain/auth_result.dart';
 import '../domain/broker_user.dart';
 
@@ -146,12 +147,17 @@ class AuthRepository {
   Future<SessionStatus> checkSession() async {
     final client = _supabase;
     if (client != null) {
+      // The restored session may be expired while supabase_flutter refreshes
+      // it in the background; refresh it here instead of signing out.
+      final check = await SessionGuard.ensureValidSession(client, storage: _storage);
+      if (check == SessionCheck.signedOut) {
+        final hadSession = client.auth.currentSession != null ||
+            (await _storage.getToken())?.isNotEmpty == true;
+        await signOut();
+        return hadSession ? SessionStatus.expired : SessionStatus.unauthenticated;
+      }
       final session = client.auth.currentSession;
       if (session != null) {
-        if (session.isExpired) {
-          await signOut();
-          return SessionStatus.expired;
-        }
 
         // Check role authorization
         final storedRole = await _storage.getUserRole();

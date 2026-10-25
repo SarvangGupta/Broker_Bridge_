@@ -61,14 +61,19 @@ void main() {
       expect(find.text('REQ-2026-0099'), findsOneWidget);
       expect(find.text('Sharbati Wheat'), findsOneWidget);
       expect(find.text('AgrInnovate Flour Mills'), findsOneWidget);
-      expect(find.text('Partially Allocated'), findsOneWidget);
+      expect(find.text('PARTIALLY ALLOCATED'), findsOneWidget);
 
-      // Verify quantity metrics
+      // Verify quantity metrics and real allocation state
       expect(find.text('100 MT'), findsOneWidget); // Requested
-      expect(find.text('80 MT'), findsOneWidget); // Remaining
+      expect(find.text('20 MT of 100 MT allocated'), findsOneWidget);
+      expect(find.text('View Details'), findsOneWidget);
+      expect(find.text('Allocate Seller'), findsNothing);
 
-      // Verify actions
+      // Find Matches lives in the card menu
+      await tester.tap(find.byKey(const Key('requirement_card_menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Find Matches'));
+      await tester.pumpAndSettle();
       expect(findMatchesTapped, isTrue);
 
       await tester.tap(find.byType(RequirementCard));

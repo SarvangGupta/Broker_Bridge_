@@ -298,21 +298,24 @@ void main() {
       expect(find.text('AgrInnovate Flour Mills'), findsOneWidget);
       expect(find.text('Shekhawati Agro Traders'), findsOneWidget);
 
-      // Verify Dual Confirmation Status
-      expect(find.text('Party Confirmation Verification'), findsOneWidget);
-      expect(find.text('Buyer Confirmation: Confirmed'), findsOneWidget);
-      expect(find.text('Seller Confirmation: Pending'), findsOneWidget);
+      // Verify one confirmation chip per party in the top card
+      expect(find.text('Party Confirmation Verification'), findsNothing);
+      expect(find.text('Confirmed'), findsOneWidget);
+      expect(find.text('Pending'), findsOneWidget);
 
-      // Verify Contract Terms
+      // Contract Terms collapsed until tapped
       expect(find.text('Contract Terms & Logistics'), findsOneWidget);
+      expect(find.text('50kg HDPE Bags'), findsNothing);
+      await tester.tap(find.text('Contract Terms & Logistics'));
+      await tester.pumpAndSettle();
       expect(find.text('FOR Destination Jaipur Mandi'), findsOneWidget);
       expect(find.text('50kg HDPE Bags'), findsOneWidget);
       expect(find.text('₹50 / ₹/MT'), findsAtLeast(1));
 
-      // Verify Cancel Button and Dialog
-      expect(find.text('Cancel Deal Record'), findsOneWidget);
-      await tester.ensureVisible(find.text('Cancel Deal Record'));
+      // Cancel moved to the overflow menu; dialog unchanged
+      await tester.tap(find.byKey(const ValueKey('deal_more_menu')));
       await tester.pumpAndSettle();
+      expect(find.text('Cancel Deal Record'), findsOneWidget);
       await tester.tap(find.text('Cancel Deal Record'));
       await tester.pumpAndSettle();
 

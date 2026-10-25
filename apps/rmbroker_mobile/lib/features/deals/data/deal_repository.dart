@@ -4,6 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/security/secure_storage_service.dart';
+import '../../work/domain/offer_model.dart';
+import '../../work/domain/requirement_model.dart';
+import '../../work/domain/unit_utils.dart';
 import '../domain/allocation_model.dart';
 import '../domain/deal_model.dart';
 
@@ -76,6 +79,93 @@ class DealRepository {
     return null;
   }
 
+  /// Signed-in broker's user id, or null without a valid session.
+  @visibleForTesting
+  String? activeBrokerId() {
+    final session = _supabase?.auth.currentSession;
+    if (session == null || session.isExpired) return null;
+    return session.user.id;
+  }
+
+  static double _num(dynamic v) {
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '') ?? 0.0;
+  }
+
+  static bool _isUniqueViolation(Object e) => e is PostgrestException && e.code == '23505';
+
+  /// Deal statuses after which no confirmation, amendment or finalization applies.
+  static const Set<String> _closedDealStatuses = {
+    'finalized',
+    'in fulfillment',
+    'dispatch pending',
+    'in transit',
+    'completed',
+    'delivered',
+    'cancelled',
+    'disputed',
+  };
+
+  static bool _isClosedDealStatus(String? status) =>
+      _closedDealStatuses.contains((status ?? '').trim().toLowerCase());
+
+  /// Moves seller-lot stock between available and reserved with an optimistic
+  /// lock on `availabilities.version`. A positive [reserveDelta] reserves stock
+  /// and requires `available_quantity >= reserveDelta`; a negative one releases.
+  /// Returns false when the lot is missing, short, changed concurrently (after
+  /// retries) or not updatable by this broker (RLS returns zero rows).
+  Future<bool> _shiftLotReservation(SupabaseClient client, String lotId, double reserveDelta) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final lot = await client
+          .from('availabilities')
+          .select('id, available_quantity, reserved_quantity, version')
+          .eq('id', lotId)
+          .maybeSingle();
+      if (lot == null) return false;
+      final available = _num(lot['available_quantity']);
+      final reserved = _num(lot['reserved_quantity']);
+      if (reserveDelta > 0 && available + 1e-9 < reserveDelta) return false;
+      final version = (lot['version'] as num?)?.toInt() ?? 1;
+      final updated = await client
+          .from('availabilities')
+          .update({
+            'available_quantity': available - reserveDelta,
+            'reserved_quantity': (reserved + reserveDelta) < 0 ? 0 : reserved + reserveDelta,
+            'version': version + 1,
+          })
+          .eq('id', lotId)
+          .eq('version', version)
+          .select('id');
+      if ((updated as List).isNotEmpty) return true;
+    }
+    return false;
+  }
+
+  /// Adds [delta] to `requirements.fulfilled_quantity` with compare-and-set on the
+  /// previous value. A positive delta may not exceed the remaining quantity.
+  Future<bool> _shiftRequirementFulfilled(SupabaseClient client, String requirementId, double delta) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final req = await client
+          .from('requirements')
+          .select('id, quantity, fulfilled_quantity')
+          .eq('id', requirementId)
+          .maybeSingle();
+      if (req == null) return false;
+      final quantity = _num(req['quantity']);
+      final fulfilled = _num(req['fulfilled_quantity']);
+      if (delta > 0 && quantity - fulfilled + 1e-9 < delta) return false;
+      final next = fulfilled + delta;
+      final updated = await client
+          .from('requirements')
+          .update({'fulfilled_quantity': next < 0 ? 0 : next})
+          .eq('id', requirementId)
+          .eq('fulfilled_quantity', req['fulfilled_quantity'] ?? 0)
+          .select('id');
+      if ((updated as List).isNotEmpty) return true;
+    }
+    return false;
+  }
+
   // ============================================================================
   // 1. BROKER DEALS LIST & SEARCH
   // ============================================================================
@@ -101,7 +191,7 @@ class DealRepository {
           final payload = data['data'] as Map<String, dynamic>? ?? {};
           final list = payload['deals'] as List<dynamic>? ?? [];
           final items = list.whereType<Map<String, dynamic>>().map(DealItem.fromJson).toList();
-          return DealSuccess(items);
+          return DealSuccess(await _withRequirementNegotiations(items));
         }
       }
     } on DioException catch (dioErr) {
@@ -116,9 +206,8 @@ class DealRepository {
     // 2. Fallback: Supabase PostgREST query on deals
     try {
       final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
-        final brokerId = session.user.id;
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
 
         var query = client.from('deals').select(
               'id, requirement_id, quotation_id, buyer_id, seller_id, broker_id, '
@@ -157,7 +246,7 @@ class DealRepository {
           }
         }
 
-        return DealSuccess(items);
+        return DealSuccess(await _withRequirementNegotiations(items));
       }
     } catch (supabaseErr) {
       debugPrint('Supabase deals fallback error: $supabaseErr');
@@ -168,6 +257,104 @@ class DealRepository {
     return const DealContractPending(
       contractNotice:
           'Authoritative endpoint /api/v1/broker/deals is pending backend exposure. Direct Supabase desk sync was attempted but tables are restricted or offline.',
+    );
+  }
+
+  /// Broker proposals recorded on requirements are persisted as a deal version
+  /// plus requirement status `Proposed to Buyer`; no `deals` row exists until
+  /// an allocation creates one. Appends those as Negotiation items so the tab
+  /// shows them. Requirements that already have a deal are skipped. Never
+  /// fails the deal list: on error the deals are returned unchanged.
+  Future<List<DealItem>> _withRequirementNegotiations(List<DealItem> deals) async {
+    final client = _supabase;
+    final brokerId = activeBrokerId();
+    if (client == null || brokerId == null) return deals;
+    try {
+      final rows = await fetchRequirementNegotiationRows(brokerId);
+      final withDeal = {for (final d in deals) d.requirementId};
+      final pending = rows.where((r) => !withDeal.contains(r['id']?.toString())).toList();
+      if (pending.isEmpty) return deals;
+
+      final latest = await fetchLatestProposalSnapshots(
+        pending.map((r) => r['id'].toString()).toList(),
+      );
+      final extra = [for (final r in pending) requirementNegotiationItem(r, latest[r['id'].toString()])];
+      return [...deals, ...extra]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    } catch (e) {
+      debugPrint('Requirement negotiations unavailable: $e');
+      return deals;
+    }
+  }
+
+  /// This broker's requirements awaiting the buyer's response to a proposal.
+  @visibleForTesting
+  Future<List<Map<String, dynamic>>> fetchRequirementNegotiationRows(String brokerId) async {
+    final rows = await _supabase!
+        .from('requirements')
+        .select(
+          'id, company_id, quantity, target_price, target_date, status, created_at, '
+          'master_commodities(name), master_grades(grade_name), master_units(symbol), '
+          'companies(name)',
+        )
+        .eq('broker_id', brokerId)
+        .eq('status', 'Proposed to Buyer')
+        .order('created_at', ascending: false);
+    return (rows as List).whereType<Map<String, dynamic>>().toList();
+  }
+
+  /// Latest deal version snapshot per request id (requirement id). Best effort.
+  @visibleForTesting
+  Future<Map<String, Map<String, dynamic>>> fetchLatestProposalSnapshots(List<String> requestIds) async {
+    final out = <String, Map<String, dynamic>>{};
+    try {
+      final rows = await _supabase!
+          .from('deal_versions')
+          .select('request_id, version_number, snapshot_payload, created_at')
+          .inFilter('request_id', requestIds)
+          .order('version_number', ascending: false);
+      for (final r in (rows as List).whereType<Map<String, dynamic>>()) {
+        final id = r['request_id']?.toString();
+        if (id == null || out.containsKey(id)) continue;
+        out[id] = {
+          'version_number': r['version_number'],
+          'created_at': r['created_at'],
+          ...?(r['snapshot_payload'] as Map<String, dynamic>?),
+        };
+      }
+    } catch (e) {
+      debugPrint('Proposal versions unavailable: $e');
+    }
+    return out;
+  }
+
+  @visibleForTesting
+  static DealItem requirementNegotiationItem(Map<String, dynamic> r, Map<String, dynamic>? version) {
+    final id = r['id'].toString();
+    final shortId = id.length >= 6 ? id.substring(0, 6).toUpperCase() : id;
+    final qty = (version?['quantity'] as num?)?.toDouble() ?? (r['quantity'] as num?)?.toDouble() ?? 0.0;
+    final price = (version?['rate'] as num?)?.toDouble() ?? (r['target_price'] as num?)?.toDouble() ?? 0.0;
+    final createdRaw = version?['created_at'] ?? r['created_at'];
+    return DealItem(
+      id: id,
+      ref: 'RQ-$shortId',
+      quotationId: '',
+      requirementId: id,
+      commodityName: (r['master_commodities'] as Map?)?['name']?.toString() ?? 'Agricultural Commodity',
+      gradeName: (r['master_grades'] as Map?)?['grade_name']?.toString(),
+      buyerCompanyId: r['company_id']?.toString() ?? '',
+      buyerCompanyName: (r['companies'] as Map?)?['name']?.toString() ?? 'Buyer Mandate',
+      sellerCompanyId: '',
+      sellerCompanyName: 'Seller not allocated',
+      agreedQuantity: qty,
+      unitSymbol: (r['master_units'] as Map?)?['symbol']?.toString() ?? 'MT',
+      agreedPrice: price,
+      totalValuation: qty * price,
+      priceBasis: 'FOR_DESTINATION',
+      deliveryDate: version?['deliveryDate']?.toString() ?? r['target_date']?.toString(),
+      status: DealStatus.negotiation,
+      latestVersionNumber: (version?['version_number'] as num?)?.toInt() ?? 1,
+      createdAt: DateTime.tryParse(createdRaw?.toString() ?? '') ?? DateTime.now(),
+      isRequirementNegotiation: true,
     );
   }
 
@@ -202,8 +389,7 @@ class DealRepository {
     // 2. Fallback: Supabase PostgREST query on deals and deal_versions
     try {
       final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
+      if (client != null && activeBrokerId() != null) {
         final isUuid = RegExp(
           r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
         ).hasMatch(dealId);
@@ -241,69 +427,54 @@ class DealRepository {
           flat['seller_company_name'] = seller['name'] ?? 'Seller Enterprise';
           flat['booking_reference'] = bookingRef;
 
-          // Check versions for confirmation state
+          // Confirmation state and terms come from the latest version
           if (isUuid) {
             final versionsRes = await client
                 .from('deal_versions')
-                .select('version_number, status')
+                .select('version_number, status, snapshot_payload')
                 .eq('request_id', dealId)
                 .order('version_number', ascending: false)
                 .limit(1);
 
             final versionList = versionsRes as List<dynamic>? ?? [];
-            bool buyerConfirmed = false;
-            bool sellerConfirmed = false;
+            var confirmation = const DealVersionConfirmation();
             int latestVer = 1;
 
             if (versionList.isNotEmpty) {
               final latest = versionList.first as Map<String, dynamic>;
               latestVer = (latest['version_number'] as num?)?.toInt() ?? 1;
-              final vStatus = (latest['status']?.toString() ?? '').toLowerCase();
-              if (vStatus.contains('buyer confirmed')) buyerConfirmed = true;
-              if (vStatus.contains('seller confirmed')) sellerConfirmed = true;
+              final snapshot = latest['snapshot_payload'] as Map<String, dynamic>? ?? {};
+              confirmation = DealVersionConfirmation.fromRecords(
+                dealStatus: response['status']?.toString(),
+                versionStatus: latest['status']?.toString(),
+                snapshot: snapshot,
+              );
+              for (final key in const ['deliveryLocation', 'deliveryDate', 'paymentTerms', 'packagingType', 'priceBasis', 'notes']) {
+                if (snapshot[key] != null) flat[key] = snapshot[key];
+              }
+              final terms = snapshot['deliveryTerms'] ?? snapshot['deliveryLocation'];
+              if (terms != null) flat['deliveryTerms'] = terms;
+              final unit = snapshot['unitSymbol'];
+              if (unit != null) flat['unit_symbol'] = unit;
+              final commission = snapshot['brokerCommissionRate'];
+              if (commission is num) flat['brokerCommissionRate'] = commission;
             }
 
             flat['latestVersionNumber'] = latestVer;
-            flat['buyerConfirmed'] = buyerConfirmed;
-            flat['sellerConfirmed'] = sellerConfirmed;
+            flat['buyerConfirmed'] = confirmation.buyerConfirmed;
+            flat['sellerConfirmed'] = confirmation.sellerConfirmed;
           }
 
           return DealSuccess(DealDetailItem.fromJson(flat));
         }
+        // Query succeeded but returned no row: deleted, malformed id, or RLS-hidden.
+        return const DealError(
+          message: 'Deal not found. It may have been removed or is not managed by your desk.',
+          code: 'NOT_FOUND',
+        );
       }
     } catch (supabaseErr) {
       debugPrint('Supabase deal detail fallback error: $supabaseErr');
-    }
-
-    // 3. Historical / Ended Negotiation Confirmation Fallback
-    if (dealId == 'deal-bkg-0042' ||
-        dealId == 'DL-2026-0891' ||
-        dealId.contains('0042') ||
-        dealId.contains('0891')) {
-      final now = DateTime.now();
-      return DealSuccess(
-        DealDetailItem.fromJson({
-          'id': dealId,
-          'booking_reference': 'BKG-2026-0891',
-          'commodity_name': 'Mustard Seed (Sarson)',
-          'grade_name': 'Grade-A Bold (42% Oil Content)',
-          'agreed_price': 5450.0,
-          'agreed_quantity': 50.0,
-          'status': 'finalized',
-          'buyer_company_name': 'Sharma Agro Mills Ltd',
-          'seller_company_name': 'Kisan Agro Producers Co.',
-          'created_at': now.subtract(const Duration(days: 2)).toIso8601String(),
-          'closed_at': now.subtract(const Duration(minutes: 30)).toIso8601String(),
-          'latestVersionNumber': 2,
-          'buyerConfirmed': true,
-          'sellerConfirmed': true,
-          'deliveryTerms': 'FOR Alwar Mandi Depot',
-          'paymentTerms': '100% Advance against Lorry Receipt',
-          'packagingType': '50kg HDPE / Jute Bags',
-          'brokerCommissionRate': 50.0,
-          'commissionBasis': '₹/MT',
-        }),
-      );
     }
 
     return const DealContractPending(
@@ -352,8 +523,8 @@ class DealRepository {
     // 2. Fallback: Supabase PostgREST query on requirement_allocations
     try {
       final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
+      if (client != null && activeBrokerId() != null) {
+        // The seller company is availabilities.company_id (there is no seller_id column).
         final response = await client
             .from('requirement_allocations')
             .select(
@@ -361,7 +532,7 @@ class DealRepository {
               'allocated_quantity, unit_id, price_basis, allocated_price, status, notes, '
               'release_reason, version, allocated_at, confirmed_at, released_at, '
               'master_units(id, name, symbol), '
-              'availabilities!inner(id, lot_number, seller_id, companies!seller_id(id, name, is_verified))',
+              'availabilities!inner(id, lot_number, company_id, companies(id, name, is_verified))',
             )
             .eq('requirement_id', requirementId)
             .order('allocated_at', ascending: false);
@@ -377,7 +548,7 @@ class DealRepository {
 
             final flat = Map<String, dynamic>.from(item);
             flat['lot_number'] = avail['lot_number'];
-            flat['seller_company_id'] = seller['id'] ?? avail['seller_id'];
+            flat['seller_company_id'] = seller['id'] ?? avail['company_id'];
             flat['seller_company_name'] = seller['name'] ?? 'Seller Enterprise';
             flat['seller_company_verified'] = seller['is_verified'] ?? false;
             flat['unit_name'] = u['name'] ?? 'Metric Tonne';
@@ -449,46 +620,9 @@ class DealRepository {
     // 2. Direct Supabase PostgREST insertion fallback
     try {
       final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
-        final brokerId = session.user.id;
-        final timestampStr = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
-        final refCode = 'ALC-$timestampStr';
-
-        // Resolve unit_id from requirement
-        final reqRes = await client
-            .from('requirements')
-            .select('unit_id, master_units(id, name, symbol)')
-            .eq('id', dto.requirementId)
-            .maybeSingle();
-
-        final unitId = reqRes?['unit_id']?.toString() ?? '';
-        final unitObj = reqRes?['master_units'] as Map<String, dynamic>? ?? {};
-
-        final insertRes = await client
-            .from('requirement_allocations')
-            .insert({
-              'allocation_reference': refCode,
-              'requirement_id': dto.requirementId,
-              'availability_id': dto.availabilityId,
-              'broker_id': brokerId,
-              'allocated_quantity': dto.proposedQuantity,
-              'unit_id': unitId,
-              'price_basis': dto.priceBasis,
-              'allocated_price': dto.agreedPrice,
-              'status': 'CONFIRMED', // Immediately confirmed when broker commits
-              'notes': dto.notes,
-              'version': 1,
-            })
-            .select()
-            .single();
-
-        final flat = Map<String, dynamic>.from(insertRes);
-        flat['unit_name'] = unitObj['name'] ?? 'Metric Tonne';
-        flat['unit_symbol'] = unitObj['symbol'] ?? dto.unitSymbol;
-        flat['seller_company_name'] = 'Allocated Seller Lot';
-
-        return DealSuccess(AllocationItem.fromJson(flat));
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
+        return await _allocateWithReservation(client, brokerId, dto);
       }
     } catch (supabaseErr) {
       debugPrint('Supabase propose allocation error: $supabaseErr');
@@ -498,6 +632,167 @@ class DealRepository {
     return const DealContractPending(
       contractNotice: 'Allocation proposal service is currently unavailable.',
     );
+  }
+
+  /// Direct-database allocation following the web desk's propose + confirm rules
+  /// (broker-allocation-actions.ts), without its single transaction:
+  /// 1. re-reads the requirement and seller lot and validates assignment, status,
+  ///    product, validity and both balances (lot stock converted to the
+  ///    requirement unit);
+  /// 2. reuses an uncommitted allocation of the same lot and quantity instead of
+  ///    creating a duplicate (retry after a failed deal step);
+  /// 3. inserts PROPOSED, reserves lot stock, raises fulfilled_quantity, then
+  ///    marks CONFIRMED — each step guarded, earlier steps compensated on failure.
+  Future<DealDataResult<AllocationItem>> _allocateWithReservation(
+    SupabaseClient client,
+    String brokerId,
+    CreateAllocationDto dto,
+  ) async {
+    final req = await client
+        .from('requirements')
+        .select('id, broker_id, status, quantity, fulfilled_quantity, unit_id, commodity_id, '
+            'target_date, master_units(id, name, symbol)')
+        .eq('id', dto.requirementId)
+        .maybeSingle();
+    if (req == null) {
+      return const DealError(message: 'Requirement not found or no longer visible to your desk.');
+    }
+    if (req['broker_id']?.toString() != brokerId) {
+      return const DealError(message: 'Forbidden: this requirement is not assigned to your desk.');
+    }
+    final reqStatus = RequirementStatus.fromString(req['status']?.toString());
+    final targetDate = DateTime.tryParse(req['target_date']?.toString() ?? '');
+    if (!reqStatus.isEligibleForMatching || (targetDate != null && targetDate.isBefore(DateTime.now()))) {
+      return DealError(message: 'Requirement is "${req['status']}" and cannot take new allocations.');
+    }
+    final reqUnitObj = req['master_units'] as Map<String, dynamic>? ?? {};
+    final reqUnit = reqUnitObj['symbol']?.toString() ?? dto.unitSymbol;
+    final remaining = _num(req['quantity']) - _num(req['fulfilled_quantity']);
+    if (dto.proposedQuantity > remaining + 1e-9) {
+      return DealError(
+        message: 'Allocation (${dto.proposedQuantity} $reqUnit) exceeds the remaining requirement '
+            '(${remaining < 0 ? 0 : remaining} $reqUnit). Refresh and retry.',
+      );
+    }
+
+    final lot = await client
+        .from('availabilities')
+        .select('id, broker_id, status, commodity_id, available_quantity, valid_until, '
+            'master_units(symbol)')
+        .eq('id', dto.availabilityId)
+        .maybeSingle();
+    if (lot == null) {
+      return const DealError(message: 'Seller lot not found or no longer visible to your desk.');
+    }
+    if (lot['commodity_id']?.toString() != req['commodity_id']?.toString()) {
+      return const DealError(message: 'Seller lot is a different product from the requirement.');
+    }
+    final validUntil = DateTime.tryParse(lot['valid_until']?.toString() ?? '');
+    if (!OfferStatus.fromString(lot['status']?.toString()).isEligibleForMatching ||
+        (validUntil != null && !validUntil.isAfter(DateTime.now()))) {
+      return const DealError(message: 'Seller lot is no longer active or its validity has expired.');
+    }
+    if (lot['broker_id']?.toString() != brokerId) {
+      // RLS lets only the managing broker update the lot, so stock cannot be reserved.
+      return const DealError(
+        message: 'This seller lot is managed by another broker desk; only that desk can reserve its stock.',
+      );
+    }
+    final lotUnit = (lot['master_units'] as Map<String, dynamic>?)?['symbol']?.toString() ?? reqUnit;
+    final lotQty = UnitUtils.convertBetween(dto.proposedQuantity, reqUnit, lotUnit);
+    if (lotQty == null) {
+      return DealError(message: 'Cannot convert $reqUnit to the lot unit $lotUnit; allocation blocked.');
+    }
+    if (lotQty > _num(lot['available_quantity']) + 1e-9) {
+      return DealError(
+        message: 'Allocation exceeds the seller lot balance (${_num(lot['available_quantity'])} $lotUnit). Refresh and retry.',
+      );
+    }
+
+    Map<String, dynamic> withUnit(Map<String, dynamic> row) => {
+          ...row,
+          'unit_name': reqUnitObj['name'] ?? 'Metric Tonne',
+          'unit_symbol': reqUnit,
+          'seller_company_name': 'Allocated Seller Lot',
+        };
+
+    // Idempotent retry: a reserved allocation of this lot that never reached a deal.
+    // Rows without confirmed_at were inserted as CONFIRMED by the old fallback
+    // without reserving stock, so they are never reused.
+    final open = await client
+        .from('requirement_allocations')
+        .select()
+        .eq('requirement_id', dto.requirementId)
+        .eq('availability_id', dto.availabilityId)
+        .eq('broker_id', brokerId)
+        .eq('status', 'CONFIRMED')
+        .isFilter('deal_id', null)
+        .not('confirmed_at', 'is', null);
+    for (final row in (open as List).whereType<Map<String, dynamic>>()) {
+      if ((_num(row['allocated_quantity']) - dto.proposedQuantity).abs() < 1e-9) {
+        return DealSuccess(AllocationItem.fromJson(withUnit(row)));
+      }
+    }
+
+    final stamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final inserted = await client
+        .from('requirement_allocations')
+        .insert({
+          'allocation_reference': 'ALC-${stamp.substring(stamp.length - 9)}',
+          'requirement_id': dto.requirementId,
+          'availability_id': dto.availabilityId,
+          'broker_id': brokerId,
+          'allocated_quantity': dto.proposedQuantity,
+          'unit_id': req['unit_id'],
+          'price_basis': dto.priceBasis,
+          'allocated_price': dto.agreedPrice,
+          'status': 'PROPOSED',
+          'notes': dto.notes,
+          'version': 1,
+        })
+        .select()
+        .single();
+    final allocationId = inserted['id'].toString();
+
+    Future<void> abandon() async {
+      await client
+          .from('requirement_allocations')
+          .update({'status': 'CANCELLED', 'release_reason': 'Reservation failed on broker mobile'})
+          .eq('id', allocationId);
+    }
+
+    if (!await _shiftLotReservation(client, dto.availabilityId, lotQty)) {
+      await abandon();
+      return const DealError(
+        message: 'Seller lot stock changed or is no longer sufficient. Refresh the offers and retry.',
+      );
+    }
+    if (!await _shiftRequirementFulfilled(client, dto.requirementId, dto.proposedQuantity)) {
+      await _shiftLotReservation(client, dto.availabilityId, -lotQty);
+      await abandon();
+      return const DealError(
+        message: 'Requirement balance changed or would be over-allocated. Refresh and retry.',
+      );
+    }
+
+    final confirmed = await client
+        .from('requirement_allocations')
+        .update({
+          'status': 'CONFIRMED',
+          'confirmed_at': DateTime.now().toUtc().toIso8601String(),
+          'version': 2,
+        })
+        .eq('id', allocationId)
+        .eq('status', 'PROPOSED')
+        .select();
+    final rows = (confirmed as List).whereType<Map<String, dynamic>>().toList();
+    if (rows.isEmpty) {
+      await _shiftRequirementFulfilled(client, dto.requirementId, -dto.proposedQuantity);
+      await _shiftLotReservation(client, dto.availabilityId, -lotQty);
+      await abandon();
+      return const DealError(message: 'Allocation could not be confirmed. No quantity was reserved.');
+    }
+    return DealSuccess(AllocationItem.fromJson(withUnit(rows.first)));
   }
 
   // ============================================================================
@@ -604,17 +899,18 @@ class DealRepository {
     // 2. Direct Supabase PostgREST transaction fallback
     try {
       final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
-        final brokerId = session.user.id;
-
-        // Fetch allocation
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
+        // Fetch allocation. The seller company is availabilities.company_id
+        // (there is no seller_id column), and deals.buyer_id/seller_id reference companies.
         final allocRes = await client
             .from('requirement_allocations')
             .select(
-              'id, requirement_id, availability_id, allocated_quantity, allocated_price, '
-              'requirements(id, company_id, commodity_id, master_commodities(name)), '
-              'availabilities(id, seller_id, companies!seller_id(name))',
+              'id, status, deal_id, broker_id, allocation_reference, requirement_id, availability_id, '
+              'allocated_quantity, allocated_price, '
+              'requirements(id, company_id, commodity_id, status, master_commodities(name), '
+              'master_units(symbol), companies(name)), '
+              'availabilities(id, company_id, status, companies(name))',
             )
             .eq('id', dto.allocationId)
             .maybeSingle();
@@ -622,29 +918,62 @@ class DealRepository {
         if (allocRes == null) {
           return const DealError(message: 'Allocation record not found for deal creation');
         }
+        if (allocRes['broker_id']?.toString() != brokerId) {
+          return const DealError(message: 'Forbidden: this allocation belongs to another broker desk.');
+        }
+
+        // Idempotency: a retry or late response must not create a second deal.
+        final existingDealId = allocRes['deal_id']?.toString();
+        if (existingDealId != null && existingDealId.isNotEmpty) {
+          final existing = await getDealDetail(existingDealId);
+          if (existing is DealSuccess<DealDetailItem>) return DealSuccess(existing.data.deal);
+          return DealError(message: 'This allocation is already committed to deal $existingDealId.');
+        }
+        if (allocRes['status'] != 'CONFIRMED') {
+          return DealError(
+            message: 'Allocation is "${allocRes['status']}" and must be confirmed before a deal is created.',
+          );
+        }
 
         final req = allocRes['requirements'] as Map<String, dynamic>? ?? {};
         final avail = allocRes['availabilities'] as Map<String, dynamic>? ?? {};
+        if (const ['Cancelled', 'Expired', 'Rejected'].contains(req['status'])) {
+          return DealError(message: 'Linked buyer requirement is inactive (${req['status']}).');
+        }
+        if (const ['Cancelled', 'Expired', 'Rejected'].contains(avail['status'])) {
+          return DealError(message: 'Linked seller lot is inactive (${avail['status']}).');
+        }
         final buyerId = req['company_id']?.toString() ?? '';
-        final sellerId = avail['seller_id']?.toString() ?? '';
+        final sellerId = avail['company_id']?.toString() ?? '';
         final comm = req['master_commodities'] as Map<String, dynamic>? ?? {};
+        final buyerCo = req['companies'] as Map<String, dynamic>? ?? {};
         final sellerCo = avail['companies'] as Map<String, dynamic>? ?? {};
+        final unitSymbol = (req['master_units'] as Map<String, dynamic>?)?['symbol']?.toString() ?? 'MT';
 
-        // Create baseline quotation placeholder
-        final quoteRes = await client
+        // Find or create the quotation link (as the web desk does), so a retried
+        // deal step never leaves duplicate quotations behind.
+        final existingQuote = await client
             .from('quotations')
-            .insert({
-              'requirement_id': allocRes['requirement_id'],
-              'broker_id': brokerId,
-              'seller_availability_id': allocRes['availability_id'],
-              'offered_price': dto.agreedPrice,
-              'status': 'Accepted',
-              'valid_until': DateTime.now().add(const Duration(days: 7)).toIso8601String(),
-            })
-            .select()
-            .single();
-
-        final quotationId = quoteRes['id'];
+            .select('id')
+            .eq('requirement_id', allocRes['requirement_id'])
+            .eq('seller_availability_id', allocRes['availability_id'])
+            .eq('broker_id', brokerId)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        final quotationId = existingQuote?['id'] ??
+            (await client
+                .from('quotations')
+                .insert({
+                  'requirement_id': allocRes['requirement_id'],
+                  'broker_id': brokerId,
+                  'seller_availability_id': allocRes['availability_id'],
+                  'offered_price': dto.agreedPrice,
+                  'status': 'Accepted',
+                  'valid_until': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+                })
+                .select('id')
+                .single())['id'];
 
         // Create deal
         final dealRes = await client
@@ -672,14 +1001,28 @@ class DealRepository {
           'status': 'Draft',
           'snapshot_payload': {
             'dealId': dealId,
+            'quotationId': quotationId,
+            'allocationId': dto.allocationId,
+            'allocationReference': allocRes['allocation_reference'],
+            'requirementId': allocRes['requirement_id'],
+            'availabilityId': allocRes['availability_id'],
+            'commodityName': comm['name'],
+            'unitSymbol': unitSymbol,
             'agreedPrice': dto.agreedPrice,
             'agreedQuantity': dto.agreedQuantity,
+            'priceBasis': dto.priceBasis,
             'deliveryLocation': dto.deliveryLocation,
             'deliveryDate': dto.deliveryDate.toIso8601String(),
             'deliveryTerms': dto.deliveryTerms,
             'paymentTerms': dto.paymentTerms,
             'packagingType': dto.packagingType,
             'brokerCommissionRate': dto.brokerCommissionRate,
+            'buyerCompanyId': buyerId,
+            'sellerCompanyId': sellerId,
+            'buyerConfirmed': false,
+            'sellerConfirmed': false,
+            'versionReason': 'Initial deal draft created from confirmed allocation',
+            'originatorRole': 'broker',
           },
         });
 
@@ -689,16 +1032,17 @@ class DealRepository {
             .update({
               'status': 'COMMITTED_TO_DEAL',
               'deal_id': dealId,
+              'version': 3,
             })
             .eq('id', dto.allocationId);
 
         final flat = Map<String, dynamic>.from(dealRes);
         flat['commodity_name'] = comm['name'] ?? 'Agricultural Commodity';
         flat['buyer_company_id'] = buyerId;
-        flat['buyer_company_name'] = 'Authorized Buyer Mandate';
+        flat['buyer_company_name'] = buyerCo['name'] ?? 'Buyer Enterprise';
         flat['seller_company_id'] = sellerId;
-        flat['seller_company_name'] = sellerCo['name'] ?? 'Authorized Seller Lot';
-        flat['unit_symbol'] = 'MT';
+        flat['seller_company_name'] = sellerCo['name'] ?? 'Seller Enterprise';
+        flat['unit_symbol'] = unitSymbol;
         flat['total_valuation'] = dto.agreedQuantity * dto.agreedPrice;
         flat['allocation_id'] = dto.allocationId;
 
@@ -741,18 +1085,57 @@ class DealRepository {
     // 2. Direct Supabase Fallback
     try {
       final client = _supabase;
-      if (client != null) {
-        await client.from('deals').update({'status': 'Cancelled'}).eq('id', dealId);
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
+        final deal = await client
+            .from('deals')
+            .select('id, status, broker_id')
+            .eq('id', dealId)
+            .maybeSingle();
+        if (deal == null) return const DealError(message: 'Deal record not found');
+        if (deal['broker_id']?.toString() != brokerId) {
+          return const DealError(message: 'Forbidden: this deal is managed by another broker desk.');
+        }
+        final status = deal['status']?.toString();
+        if (status == 'Cancelled') return const DealError(message: 'This deal has already been cancelled.');
+        if (_isClosedDealStatus(status)) {
+          return DealError(message: 'Cannot cancel a "$status" deal.');
+        }
 
-        // Release linked allocations back to inventory
-        await client
+        final nowIso = DateTime.now().toUtc().toIso8601String();
+        // deal_versions rows are not updatable from the app (no UPDATE policy);
+        // the deal row carries the terminal state.
+        await client.from('deals').update({'status': 'Cancelled', 'closed_at': nowIso}).eq('id', dealId);
+
+        // Release linked allocations and give their reserved quantity back.
+        final linked = await client
             .from('requirement_allocations')
-            .update({
-              'status': 'RELEASED',
-              'release_reason': 'Deal cancelled: $reason',
-              'released_at': DateTime.now().toIso8601String(),
-            })
+            .select('id, requirement_id, availability_id, allocated_quantity, status, confirmed_at, '
+                'master_units(symbol), availabilities(master_units(symbol))')
             .eq('deal_id', dealId);
+        for (final alloc in (linked as List).whereType<Map<String, dynamic>>()) {
+          if (alloc['status'] == 'RELEASED' || alloc['status'] == 'CANCELLED') continue;
+          await client
+              .from('requirement_allocations')
+              .update({
+                'status': 'RELEASED',
+                'release_reason': 'Deal cancelled: ${reason.trim()}',
+                'released_at': nowIso,
+              })
+              .eq('id', alloc['id']);
+          // Only allocations reserved through the guarded path moved quantities.
+          if (alloc['confirmed_at'] == null) continue;
+          final qty = _num(alloc['allocated_quantity']);
+          final reqUnit = (alloc['master_units'] as Map<String, dynamic>?)?['symbol']?.toString() ?? 'MT';
+          final lotUnit = ((alloc['availabilities'] as Map<String, dynamic>?)?['master_units']
+                  as Map<String, dynamic>?)?['symbol']
+              ?.toString() ?? reqUnit;
+          final lotQty = UnitUtils.convertBetween(qty, reqUnit, lotUnit);
+          if (lotQty != null) {
+            await _shiftLotReservation(client, alloc['availability_id'].toString(), -lotQty);
+          }
+          await _shiftRequirementFulfilled(client, alloc['requirement_id'].toString(), -qty);
+        }
 
         return const DealSuccess(true);
       }
@@ -799,7 +1182,8 @@ class DealRepository {
       if (client != null) {
         final versionsRes = await client
             .from('deal_versions')
-            .select('id, request_id, version_number, status, actor_id, created_at, snapshot_payload, change_reason')
+            // deal_versions has no change_reason column; the reason travels in the snapshot.
+            .select('id, request_id, version_number, status, actor_id, created_at, snapshot_payload')
             .eq('request_id', dealId)
             .order('version_number', ascending: true);
 
@@ -813,6 +1197,7 @@ class DealRepository {
             final diffs = DealVersionEngine.getMaterialDiffList(previousSnapshot, snapshot);
 
             final flat = Map<String, dynamic>.from(row);
+            flat['change_reason'] = snapshot['changeReason'] ?? snapshot['versionReason'];
             flat['snapshot'] = snapshot;
             flat['diffs'] = diffs.map((d) => d.toJson()).toList();
             flat['actor_name'] = 'Broker Desk';
@@ -892,9 +1277,17 @@ class DealRepository {
     // 2. Direct Supabase PostgREST versioning fallback
     try {
       final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
-        final brokerId = session.user.id;
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
+        final deal = await client
+            .from('deals')
+            .select('id, status, broker_id')
+            .eq('id', dto.dealId)
+            .maybeSingle();
+        if (deal == null) return const DealError(message: 'Deal record not found');
+        if (_isClosedDealStatus(deal['status']?.toString())) {
+          return DealError(message: 'Deal is "${deal['status']}"; its terms can no longer be amended.');
+        }
 
         // Fetch latest version
         final latestVersions = await client
@@ -907,13 +1300,11 @@ class DealRepository {
         final rawList = latestVersions as List<dynamic>;
         int currentVer = 1;
         Map<String, dynamic>? oldSnapshot;
-        String? previousVerId;
 
         if (rawList.isNotEmpty) {
           final top = rawList.first as Map<String, dynamic>;
           currentVer = (top['version_number'] as num?)?.toInt() ?? 1;
           oldSnapshot = top['snapshot_payload'] as Map<String, dynamic>?;
-          previousVerId = top['id']?.toString();
         }
 
         // Optimistic Concurrency Guard
@@ -936,44 +1327,33 @@ class DealRepository {
 
         final nextVersionNumber = currentVer + 1;
 
-        // Invalidate prior version
-        if (previousVerId != null) {
-          await client.from('deal_versions').update({
-            'status': 'Superseded',
-          }).eq('id', previousVerId);
+        // Keep record links from the previous version, and reset confirmations.
+        for (final key in const [
+          'dealId', 'quotationId', 'allocationId', 'allocationReference', 'requirementId',
+          'availabilityId', 'commodityName', 'unitSymbol', 'buyerCompanyId', 'sellerCompanyId',
+        ]) {
+          if (oldSnapshot?[key] != null) newSnapshot.putIfAbsent(key, () => oldSnapshot![key]);
         }
-
-        // Reset confirmations to false for the new version
         newSnapshot['buyerConfirmed'] = false;
         newSnapshot['sellerConfirmed'] = false;
+        newSnapshot['changeReason'] = dto.reason ?? 'Broker proposed terms revision to v$nextVersionNumber';
 
-        // Insert new version
+        // Insert the new version (a unique version per deal is enforced by the
+        // stale check above; prior rows are immutable from the app).
         await client.from('deal_versions').insert({
           'request_id': dto.dealId,
           'version_number': nextVersionNumber,
           'status': 'Negotiation',
           'actor_id': brokerId,
           'snapshot_payload': newSnapshot,
-          'change_reason': dto.reason ?? 'Broker proposed terms revision to v$nextVersionNumber',
         });
 
-        // Update deals record
+        // Update deals record; Negotiation clears confirmations of the old version.
         await client.from('deals').update({
           'agreed_price': dto.agreedPrice,
           'agreed_quantity': dto.agreedQuantity,
           'status': 'Negotiation',
         }).eq('id', dto.dealId);
-
-        // Record audit event in negotiation_events if table exists
-        try {
-          await client.from('negotiation_events').insert({
-            'deal_id': dto.dealId,
-            'actor_id': brokerId,
-            'event_type': 'TERMS_AMENDED',
-            'version_number': nextVersionNumber,
-            'notes': dto.reason ?? 'Terms amended to v$nextVersionNumber',
-          });
-        } catch (_) {}
 
         return await getDealDetail(dto.dealId);
       }
@@ -1036,9 +1416,20 @@ class DealRepository {
     // 2. Direct Supabase PostgREST confirmation fallback
     try {
       final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
-        final brokerId = session.user.id;
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
+        final deal = await client
+            .from('deals')
+            .select('id, status, broker_id')
+            .eq('id', dto.dealId)
+            .maybeSingle();
+        if (deal == null) return const DealError(message: 'Deal record not found');
+        if (deal['broker_id']?.toString() != brokerId) {
+          return const DealError(message: 'Forbidden: this deal is managed by another broker desk.');
+        }
+        if (_isClosedDealStatus(deal['status']?.toString())) {
+          return DealError(message: 'Cannot record confirmation for a "${deal['status']}" deal.');
+        }
 
         // Fetch latest version
         final latestVersions = await client
@@ -1064,72 +1455,36 @@ class DealRepository {
           );
         }
 
-        final snapshot = Map<String, dynamic>.from(
-          top['snapshot_payload'] as Map<String, dynamic>? ?? {},
+        final current = DealVersionConfirmation.fromRecords(
+          dealStatus: deal['status']?.toString(),
+          versionStatus: top['status']?.toString(),
+          snapshot: top['snapshot_payload'] as Map<String, dynamic>?,
         );
-        final nowIso = DateTime.now().toIso8601String();
+        final next = current.withParty(dto.party);
 
-        if (dto.party == 'BUYER') {
-          snapshot['buyerConfirmed'] = true;
-          snapshot['buyerConfirmedAt'] = nowIso;
-          if (dto.verificationNotes != null) {
-            snapshot['buyerVerificationNotes'] = dto.verificationNotes;
-          }
-        } else {
-          snapshot['sellerConfirmed'] = true;
-          snapshot['sellerConfirmedAt'] = nowIso;
-          if (dto.verificationNotes != null) {
-            snapshot['sellerVerificationNotes'] = dto.verificationNotes;
+        // A repeated tap or retry for an already-confirmed party writes nothing.
+        if (!current.hasConfirmed(dto.party)) {
+          // The version row is immutable from the app, so progress lives on the deal.
+          final updated = await client
+              .from('deals')
+              .update({'status': next.dealStatus})
+              .eq('id', dto.dealId)
+              .eq('status', deal['status'] ?? '')
+              .select('id');
+          if ((updated as List).isEmpty) {
+            return const DealError(
+              message: 'The deal changed while confirming. Refresh and review the latest terms.',
+              code: 'STALE_VERSION_DETECTED',
+            );
           }
         }
-
-        final buyerConf = snapshot['buyerConfirmed'] == true;
-        final sellerConf = snapshot['sellerConfirmed'] == true;
-        final canFinalize = buyerConf && sellerConf;
-
-        String nextStatus = 'Negotiation';
-        if (canFinalize) {
-          nextStatus = 'Ready to Finalize';
-        } else if (buyerConf) {
-          nextStatus = 'Awaiting Seller Confirmation';
-        } else if (sellerConf) {
-          nextStatus = 'Awaiting Buyer Confirmation';
-        }
-
-        // Update deal_versions
-        await client.from('deal_versions').update({
-          'snapshot_payload': snapshot,
-          'status': nextStatus,
-        }).eq('id', top['id']);
-
-        // Update deals record status
-        await client.from('deals').update({
-          'status': nextStatus,
-        }).eq('id', dto.dealId);
-
-        // Record audit event in negotiation_events if table exists
-        try {
-          await client.from('negotiation_events').insert({
-            'deal_id': dto.dealId,
-            'actor_id': brokerId,
-            'event_type': '${dto.party}_CONFIRMED',
-            'version_number': currentVer,
-            'notes': dto.verificationNotes ?? 'Formal ${dto.party} acceptance recorded by broker',
-          });
-        } catch (_) {}
 
         return DealSuccess(
           DealConfirmationState(
             latestVersionNumber: currentVer,
-            buyerConfirmed: buyerConf,
-            buyerConfirmedAt: snapshot['buyerConfirmedAt'] != null
-                ? DateTime.tryParse(snapshot['buyerConfirmedAt'].toString())
-                : null,
-            sellerConfirmed: sellerConf,
-            sellerConfirmedAt: snapshot['sellerConfirmedAt'] != null
-                ? DateTime.tryParse(snapshot['sellerConfirmedAt'].toString())
-                : null,
-            canFinalize: canFinalize,
+            buyerConfirmed: next.buyerConfirmed,
+            sellerConfirmed: next.sellerConfirmed,
+            canFinalize: next.isComplete,
           ),
         );
       }
@@ -1183,26 +1538,39 @@ class DealRepository {
     // 2. Direct Supabase PostgREST finalization fallback
     try {
       final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
-        final brokerId = session.user.id;
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
 
         // Check deal status
         final dealRes = await client
             .from('deals')
-            .select('id, status, agreed_price, agreed_quantity, quotation_id')
+            .select('id, status, broker_id, agreed_price, agreed_quantity, quotation_id')
             .eq('id', dealId)
             .maybeSingle();
 
         if (dealRes == null) {
           return const DealError(message: 'Deal record not found');
         }
+        if (dealRes['broker_id']?.toString() != brokerId) {
+          return const DealError(message: 'Forbidden: only the managing broker can finalize this deal.');
+        }
+
+        Future<String?> existingBookingRef() async {
+          final row = await client
+              .from('bookings')
+              .select('booking_reference')
+              .eq('deal_id', dealId)
+              .maybeSingle();
+          return row?['booking_reference']?.toString();
+        }
 
         final currentStatus = dealRes['status']?.toString();
-        if (currentStatus == 'Finalized' || currentStatus == 'Completed') {
-          return const DealError(message: 'Deal is already finalized and cannot be re-finalized');
+        if (currentStatus == 'Finalized') {
+          // Late response or repeated tap: report the booking that already exists.
+          final ref = await existingBookingRef();
+          if (ref != null) return DealSuccess(ref);
         }
-        if (currentStatus == 'Cancelled' || currentStatus == 'Disputed') {
+        if (_isClosedDealStatus(currentStatus)) {
           return DealError(
             message: 'Deal is in $currentStatus state and cannot be finalized.',
           );
@@ -1232,9 +1600,13 @@ class DealRepository {
           );
         }
 
-        final snapshot = top['snapshot_payload'] as Map<String, dynamic>? ?? {};
-        final buyerConf = snapshot['buyerConfirmed'] == true;
-        final sellerConf = snapshot['sellerConfirmed'] == true;
+        final confirmation = DealVersionConfirmation.fromRecords(
+          dealStatus: currentStatus,
+          versionStatus: top['status']?.toString(),
+          snapshot: top['snapshot_payload'] as Map<String, dynamic>?,
+        );
+        final buyerConf = confirmation.buyerConfirmed;
+        final sellerConf = confirmation.sellerConfirmed;
 
         // CRITICAL INVARIANT: PRE-FLIGHT GATE REQUIRES BOTH PARTIES CONFIRMED
         if (!buyerConf || !sellerConf) {
@@ -1245,40 +1617,44 @@ class DealRepository {
           );
         }
 
-        // Generate enterprise booking reference BKG-YYYY-XXXX
-        final randomCode = DateTime.now().millisecondsSinceEpoch.toString().substring(9);
-        final bookingRef = 'BKG-${DateTime.now().year}-$randomCode';
+        // One booking per deal (bookings_deal_id_unique) is the idempotency guard:
+        // a duplicate tap or retry hits 23505 and reuses the existing booking.
+        String? bookingRef;
+        for (var attempt = 0; attempt < 2 && bookingRef == null; attempt++) {
+          final stamp = DateTime.now().millisecondsSinceEpoch.toString();
+          final candidate = 'BKG-${DateTime.now().year}-${stamp.substring(stamp.length - 6)}';
+          try {
+            final inserted = await client
+                .from('bookings')
+                .insert({
+                  'deal_id': dealId,
+                  'booking_reference': candidate,
+                  'locked_version_id': top['id'],
+                  'status': 'Confirmed',
+                })
+                .select('booking_reference')
+                .single();
+            bookingRef = inserted['booking_reference']?.toString() ?? candidate;
+          } catch (e) {
+            if (!_isUniqueViolation(e)) rethrow;
+            // Either this deal already has a booking, or the reference collided.
+            bookingRef = await existingBookingRef();
+          }
+        }
+        if (bookingRef == null) {
+          return const DealError(message: 'Could not issue a booking reference. Please retry.');
+        }
 
-        // Insert booking record
-        await client.from('bookings').insert({
-          'deal_id': dealId,
-          'booking_reference': bookingRef,
-          'status': 'Confirmed',
-          'broker_id': brokerId,
-          'created_at': DateTime.now().toIso8601String(),
-        });
-
-        // Freeze latest deal_version status to 'Broker Finalized'
-        await client.from('deal_versions').update({
-          'status': 'Broker Finalized',
-        }).eq('id', top['id']);
-
-        // Update deals record to Finalized
+        // Update deals record to Finalized (version rows are immutable from the app).
         await client.from('deals').update({
           'status': 'Finalized',
-          'closed_at': DateTime.now().toIso8601String(),
+          'closed_at': DateTime.now().toUtc().toIso8601String(),
         }).eq('id', dealId);
 
-        // Record audit event in negotiation_events if table exists
-        try {
-          await client.from('negotiation_events').insert({
-            'deal_id': dealId,
-            'actor_id': brokerId,
-            'event_type': 'DEAL_FINALIZED',
-            'version_number': currentVer,
-            'notes': 'Authoritative contract finalization locked with booking reference $bookingRef',
-          });
-        } catch (_) {}
+        final quotationId = dealRes['quotation_id'];
+        if (quotationId != null) {
+          await client.from('quotations').update({'status': 'Broker Finalized'}).eq('id', quotationId);
+        }
 
         return DealSuccess(bookingRef);
       }

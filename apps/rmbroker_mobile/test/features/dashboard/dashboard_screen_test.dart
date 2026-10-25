@@ -254,9 +254,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify communication desk sheet
-      expect(find.text('Broker Communication Desk'), findsOneWidget);
-      expect(find.text('Open Counterparty Directory'), findsOneWidget);
-      expect(find.text('Jaipur Mandi Support Line'), findsOneWidget);
+      expect(find.text('Broker Desk'), findsOneWidget);
+      expect(find.text('Directory'), findsWidgets);
+      expect(find.text('Mandi Support'), findsOneWidget);
+      expect(find.textContaining('Direct broker phone and WhatsApp'), findsNothing);
     });
 
     testWidgets('renders without overflow on compact 360x640 mobile screen', (

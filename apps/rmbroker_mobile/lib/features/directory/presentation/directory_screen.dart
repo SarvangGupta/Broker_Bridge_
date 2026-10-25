@@ -10,10 +10,9 @@ import 'controllers/directory_controller.dart';
 import 'widgets/contact_details_sheet.dart';
 import 'widgets/contact_form_modal.dart';
 import 'widgets/directory_contact_card.dart';
-import 'widgets/directory_kpi_bar.dart';
 import 'widgets/directory_search_filter_bar.dart';
 
-/// Counterparty Buyer & Seller Directory Screen for RMBroker workstation.
+/// Buyer & Seller Directory screen for the RMBroker workstation.
 class DirectoryScreen extends ConsumerWidget {
   const DirectoryScreen({super.key});
 
@@ -31,17 +30,17 @@ class DirectoryScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Counterparty Directory',
+              'Directory',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 19,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
             ),
             Text(
-              'Authorized Buyers & Sellers',
+              '(Buyers & Sellers)',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12.5,
                 color: Colors.white70,
                 fontWeight: FontWeight.w400,
               ),
@@ -57,26 +56,18 @@ class DirectoryScreen extends ConsumerWidget {
             tooltip: 'Refresh Directory',
             onPressed: () => controller.loadContacts(isRefresh: true),
           ),
+          IconButton(
+            key: const Key('directory_add_contact_button'),
+            icon: const Icon(LucideIcons.userPlus, size: 20, color: Colors.white),
+            tooltip: 'Add Contact',
+            onPressed: () => _addContact(context, defaultRole),
+          ),
           const SizedBox(width: 4),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('add_contact_fab'),
-        onPressed: () async {
-          final added = await ContactFormModal.show(
-            context,
-            defaultRole: defaultRole,
-          );
-          if (added == true && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Counterparty successfully registered in directory.'),
-                backgroundColor: Color(0xFF0D9488),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        },
+        onPressed: () => _addContact(context, defaultRole),
         backgroundColor: AppColors.primaryNavy,
         foregroundColor: Colors.white,
         icon: const Icon(LucideIcons.userPlus, size: 18),
@@ -87,10 +78,7 @@ class DirectoryScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // 1. KPI Summary Bar
-          DirectoryKpiBar(stats: state.stats),
-
-          // 2. Search & Segmented Filter Bar
+          // 1. Search & role tabs
           DirectorySearchFilterBar(
             activeTab: state.activeTab,
             searchQuery: state.searchQuery,
@@ -104,13 +92,29 @@ class DirectoryScreen extends ConsumerWidget {
 
           const Divider(height: 1, color: AppColors.borderLight),
 
-          // 3. Main Body Content based on status
+          // 2. Main Body Content based on status
           Expanded(
             child: _buildBodyContent(context, state, controller),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _addContact(BuildContext context, ContactRole defaultRole) async {
+    final added = await ContactFormModal.show(
+      context,
+      defaultRole: defaultRole,
+    );
+    if (added == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Counterparty successfully registered in directory.'),
+          backgroundColor: Color(0xFF0D9488),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Widget _buildBodyContent(
@@ -147,20 +151,28 @@ class DirectoryScreen extends ConsumerWidget {
 
       case DirectoryStatus.loaded:
         final contacts = state.filteredContacts;
-        if (contacts.isEmpty) {
+        if (contacts.isEmpty && !state.hasMore) {
           return _buildEmptyState(context, state, controller);
         }
 
+        // A footer row while more pages exist: it loads the next page when it
+        // scrolls into view (or shows a retry if that page failed).
+        final showFooter = state.hasMore || state.loadMoreError != null;
         return RefreshIndicator(
           onRefresh: () => controller.loadContacts(isRefresh: true),
           color: AppColors.primaryNavy,
-          child: ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 88),
-            itemCount: contacts.length,
+          child: ListView.separated(
+            // Bottom padding keeps the last row clear of the Add Contact button.
+            padding: const EdgeInsets.only(bottom: 96),
+            itemCount: contacts.length + (showFooter ? 1 : 0),
+            separatorBuilder: (_, _) => const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.borderLight),
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
             itemBuilder: (ctx, i) {
+              if (i == contacts.length) {
+                return _buildLoadMoreFooter(state, controller);
+              }
               final contact = contacts[i];
               return DirectoryContactCard(
                 key: Key('contact_card_${contact.id}'),
@@ -171,6 +183,42 @@ class DirectoryScreen extends ConsumerWidget {
           ),
         );
     }
+  }
+
+  Widget _buildLoadMoreFooter(DirectoryState state, DirectoryController controller) {
+    if (state.loadMoreError != null && !state.isLoadingMore) {
+      return Padding(
+        key: const Key('directory_load_more_error'),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          children: [
+            Text(
+              state.loadMoreError!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            TextButton(
+              onPressed: controller.loadMore,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (!state.isLoadingMore) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => controller.loadMore());
+    }
+    return const Padding(
+      key: Key('directory_load_more'),
+      padding: EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2.2, color: AppColors.primaryNavy),
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyState(

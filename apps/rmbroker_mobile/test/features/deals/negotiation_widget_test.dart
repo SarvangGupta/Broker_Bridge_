@@ -340,16 +340,15 @@ void main() {
       expect(find.text('Version 2'), findsOneWidget);
       expect(find.text('Soybean Special Yellow'), findsOneWidget);
 
-      // Confirmation tracking card
-      expect(find.text('Party Confirmation Verification'), findsOneWidget);
-      expect(find.text('Buyer Confirmation: Pending'), findsOneWidget);
-      expect(find.text('Seller Confirmation: Pending'), findsOneWidget);
+      // One confirmation chip per party (top card only)
+      expect(find.text('Party Confirmation Verification'), findsNothing);
+      expect(find.text('Pending'), findsNWidgets(2));
       expect(find.text('Record Counterparty Acceptance'), findsOneWidget);
 
-      // Operational buttons
+      // Operational buttons; cancel lives in the overflow menu
       expect(find.text('Negotiate Terms (Propose v3)'), findsOneWidget);
       expect(find.text('Inspect Terms History & Diffs'), findsOneWidget);
-      expect(find.text('Cancel Deal Record'), findsOneWidget);
+      expect(find.byKey(const ValueKey('deal_more_menu')), findsOneWidget);
 
       // App bar has Version History button
       expect(find.byIcon(LucideIcons.history), findsWidgets);

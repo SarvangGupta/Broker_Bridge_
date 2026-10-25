@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_loading_indicator.dart';
-import '../../search/presentation/widgets/quick_communication_sheet.dart';
 import '../domain/dashboard_state.dart';
 import 'controllers/dashboard_controller.dart';
+import 'widgets/broker_desk_sheet.dart';
 import 'widgets/broker_welcome_banner.dart';
 import 'widgets/dashboard_header.dart';
 import 'widgets/dashboard_kpi_grid.dart';
@@ -20,139 +19,7 @@ import 'widgets/recent_activity_section.dart';
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
-  void _showQuickDialSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: AppColors.surfaceLight,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Broker Communication Desk',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimaryLight,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.x, size: 20),
-                      onPressed: () => Navigator.pop(sheetContext),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Direct broker phone and WhatsApp coordination line with buyers and sellers.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondaryLight,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(LucideIcons.phoneForwarded, color: AppColors.primary),
-                  ),
-                  title: const Text(
-                    'Speed Dial Counterparties',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                  ),
-                  subtitle: const Text(
-                    'Quick Call or WhatsApp authorized contacts',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    QuickCommunicationSheet.show(context);
-                  },
-                ),
-                const SizedBox(height: 6),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(LucideIcons.users, color: AppColors.primary),
-                  ),
-                  title: const Text(
-                    'Open Counterparty Directory',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                  ),
-                  subtitle: const Text(
-                    'Call or WhatsApp verified buyers & sellers',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    context.go('/directory');
-                  },
-                ),
-                const SizedBox(height: 6),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      LucideIcons.messageSquare,
-                      color: AppColors.success,
-                    ),
-                  ),
-                  title: const Text(
-                    'Jaipur Mandi Support Line',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                  ),
-                  subtitle: const Text(
-                    'Technical desk arbitration support',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Support Desk: +91 141 274 0000 (Jaipur Mandi Exchange)',
-                        ),
-                        duration: Duration(seconds: 3),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+  void _showQuickDialSheet(BuildContext context) => BrokerDeskSheet.show(context);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -266,7 +133,7 @@ class DashboardScreen extends ConsumerWidget {
         onPressed: () => _showQuickDialSheet(context),
         backgroundColor: AppColors.primary,
         elevation: 4,
-        tooltip: 'Broker Communication Desk',
+        tooltip: 'Broker Desk',
         child: const Icon(LucideIcons.phoneCall, color: Colors.white, size: 18),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

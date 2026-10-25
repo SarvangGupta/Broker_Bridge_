@@ -225,7 +225,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('MoreScreen integrates AppSettingsSection cleanly with existing tools list',
+    testWidgets('MoreScreen is a four-section hub; preferences live under Settings',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 2000);
       tester.view.devicePixelRatio = 1.0;
@@ -242,10 +242,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('More Tools & Settings'), findsOneWidget);
-      expect(find.text('Language / भाषा'), findsOneWidget);
-      expect(find.byType(AppSettingsSection), findsOneWidget);
-      expect(find.text('Application Preferences'), findsOneWidget);
+      expect(find.text('More'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.byType(AppSettingsSection), findsNothing);
+      expect(find.text('Application Preferences'), findsNothing);
       expect(find.text('Sign Out from Desk'), findsOneWidget);
     });
   });

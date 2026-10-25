@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../app/router/app_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/preferences/app_settings_provider.dart';
+import '../../deals/presentation/controllers/deals_controller.dart';
 
 /// Bottom navigation shell wrapping the 5 core broker modules.
 class NavigationShell extends ConsumerWidget {
@@ -21,7 +22,9 @@ class NavigationShell extends ConsumerWidget {
     moreNavigatorKey,
   ];
 
-  void _onTap(int index) {
+  void _onTap(WidgetRef ref, int index) {
+    // Deals tab keeps its state alive; refetch so recorded negotiations show.
+    if (index == 2) ref.read(dealsProvider.notifier).loadDeals();
     if (index != navigationShell.currentIndex) {
       final currentIdx = navigationShell.currentIndex;
       if (currentIdx >= 0 && currentIdx < _branchKeys.length) {
@@ -55,7 +58,7 @@ class NavigationShell extends ConsumerWidget {
         ),
         child: NavigationBar(
           selectedIndex: navigationShell.currentIndex,
-          onDestinationSelected: _onTap,
+          onDestinationSelected: (i) => _onTap(ref, i),
           labelBehavior: isIconOnly
               ? NavigationDestinationLabelBehavior.alwaysHide
               : NavigationDestinationLabelBehavior.alwaysShow,

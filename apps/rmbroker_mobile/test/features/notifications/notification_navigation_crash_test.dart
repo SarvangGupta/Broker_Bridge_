@@ -117,7 +117,8 @@ void main() {
       deliveryStatus: 'Sent',
       isRead: false,
       createdAt: now.subtract(const Duration(hours: 1)),
-      payload: {'requirementId': 'req-1234'},
+      // No record id: a generic Work Desk alert (record ids route to the record,
+      // covered in notification_lifecycle_routing_test.dart).
     );
   });
 

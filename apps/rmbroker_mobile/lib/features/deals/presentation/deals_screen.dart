@@ -295,7 +295,9 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                             final deal = state.filteredDeals[index];
                             return DealCard(
                               deal: deal,
-                              onTap: () => context.push('/deals/${deal.id}'),
+                              onTap: () => context.push(deal.isRequirementNegotiation
+                                  ? '/requirements/${deal.requirementId}'
+                                  : '/deals/${deal.id}'),
                             );
                           },
                         ),

@@ -6,9 +6,13 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../deals/presentation/controllers/allocations_controller.dart';
+import '../../../deals/presentation/controllers/deals_controller.dart';
+import '../../data/work_repository.dart';
 import '../../domain/requirement_model.dart';
 import '../controllers/requirements_controller.dart';
 import '../widgets/negotiate_requirement_sheet.dart';
+import '../widgets/select_seller_lot_sheet.dart';
 
 /// Dedicated Requirement Detail Screen following the established Deal Detail navigation pattern.
 class RequirementDetailScreen extends ConsumerStatefulWidget {
@@ -24,6 +28,198 @@ class RequirementDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScreen> {
+  /// Fresh copy loaded by id (deep links may arrive before or without the list).
+  RequirementItem? _fresh;
+  bool _loading = true;
+  bool _notFound = false;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_load);
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    final result = await ref.read(workRepositoryProvider).getRequirementById(widget.requirementId);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      switch (result) {
+        case WorkSuccess(:final data):
+          _fresh = data;
+          _notFound = false;
+        case WorkError(:final message, :final code):
+          _notFound = code == 'NOT_FOUND';
+          _loadError = _notFound ? null : message;
+        case WorkUnauthorized(:final message):
+          _loadError = message;
+        case WorkContractPending(:final contractNotice):
+          _loadError = contractNotice;
+      }
+    });
+  }
+
+  Future<void> _refreshAll() async {
+    await _load();
+    if (!mounted) return;
+    ref.read(allocationsProvider(widget.requirementId).notifier).loadAllocations();
+    ref.read(dealsProvider.notifier).loadDeals();
+  }
+
+  static bool _isClosed(RequirementItem r) =>
+      r.isExpired ||
+      r.status == RequirementStatus.cancelled ||
+      r.status == RequirementStatus.fulfilled ||
+      r.status == RequirementStatus.expired ||
+      r.status == RequirementStatus.fullyAllocated;
+
+  Widget _buildNotice({required IconData icon, required Color color, required String title, required String body}) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: color)),
+                const SizedBox(height: 2),
+                Text(body, style: const TextStyle(fontSize: 11.5, color: AppColors.textPrimaryLight, height: 1.35)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Pick a verified seller lot, then record the allocation only (no deal).
+  /// Stays on this page; the section refreshes after the backend confirms.
+  Future<void> _allocateSeller(RequirementItem requirement) async {
+    await SelectSellerLotSheet.allocate(context, requirement);
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    ref.read(allocationsProvider(widget.requirementId).notifier).loadAllocations();
+  }
+
+  /// Allocations and deals recorded against this requirement, so the broker can
+  /// continue the workflow without losing the requirement link.
+  Widget _buildLinkedRecords(BuildContext context, RequirementItem requirement) {
+    final allocState = ref.watch(allocationsProvider(requirement.id));
+    // Only real deal records: a requirement-level negotiation item has no
+    // deal row, and opening it as a deal showed a "Deal record pending" page.
+    final deals = ref
+        .watch(dealsProvider)
+        .deals
+        .where((d) => d.requirementId == requirement.id && !d.isRequirementNegotiation)
+        .toList();
+    final unallocated = !allocState.isLoading && allocState.allocations.isEmpty && deals.isEmpty;
+    final canAllocate = unallocated &&
+        SelectSellerLotSheet.canAllocate(requirement, ref.read(workRepositoryProvider).activeBrokerId());
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Linked Seller Allocations & Deals',
+            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimaryLight),
+          ),
+          const SizedBox(height: 10),
+          if (allocState.isLoading && allocState.allocations.isEmpty)
+            const Text('Loading allocations...', style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight))
+          else if (allocState.allocations.isEmpty && deals.isEmpty) ...[
+            Text(
+              allocState.errorMessage ?? allocState.contractNotice ?? 'No seller lot has been allocated to this requirement yet.',
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+            ),
+            if (canAllocate) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const ValueKey('allocate_seller_button'),
+                onPressed: () => _allocateSeller(requirement),
+                icon: const Icon(LucideIcons.userPlus, size: 14),
+                label: const Text('Allocate Seller'),
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ],
+          for (final a in allocState.allocations)
+            Padding(
+              key: ValueKey('linked_alloc_${a.id}'),
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.gitCommit, size: 14, color: AppColors.textSecondaryLight),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${a.reference} · ${a.formattedQuantity} · ${a.sellerCompanyName}',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textPrimaryLight),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(a.status.displayLabel,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                ],
+              ),
+            ),
+          for (final d in deals)
+            InkWell(
+              key: ValueKey('linked_deal_${d.id}'),
+              onTap: () => context.push('/deals/${d.id}'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(
+                  children: [
+                    const Icon(LucideIcons.handshake, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Deal ${d.ref} · ${d.formattedQuantity} · ${d.sellerCompanyName}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(d.status.displayLabel,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    const Icon(LucideIcons.chevronRight, size: 14, color: AppColors.textSecondaryLight),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Color _getStatusColor(RequirementStatus status) {
     switch (status) {
       case RequirementStatus.open:
@@ -133,11 +329,18 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
   Widget build(BuildContext context) {
     final state = ref.watch(requirementsProvider);
     final cleanId = widget.requirementId.trim().toLowerCase();
-    final requirement = state.requirements.where((r) {
+    final listed = state.requirements.where((r) {
       return r.id.toLowerCase() == cleanId ||
           r.ref.toLowerCase() == cleanId ||
           r.ref.replaceAll('#', '').toLowerCase() == cleanId;
     }).firstOrNull;
+    // The fresh row wins; a row deleted since the list loaded is not shown.
+    final requirement = _notFound ? null : (_fresh ?? listed);
+
+    final brokerId = ref.read(workRepositoryProvider).activeBrokerId();
+    final isAssigned = requirement != null && brokerId != null && requirement.brokerId == brokerId;
+    final isClosed = requirement != null && _isClosed(requirement);
+    final canAct = isAssigned && !isClosed;
 
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
@@ -147,37 +350,64 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
         title: Text(requirement?.ref ?? 'Requirement Mandate'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/work'),
         ),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.refreshCw, size: 18),
             tooltip: 'Refresh',
-            onPressed: () => ref.read(requirementsProvider.notifier).loadRequirements(),
+            onPressed: _refreshAll,
           ),
         ],
       ),
-      body: state.isLoading && requirement == null
+      body: _loading && requirement == null
           ? const Center(child: CircularProgressIndicator())
           : requirement == null
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: AppEmptyState(
-                      icon: LucideIcons.fileX,
-                      title: 'Requirement Not Found',
-                      description: 'Mandate "${widget.requirementId}" is not found in the active broker portfolio.',
-                      actionLabel: 'Return to Work Desk',
-                      onAction: () => context.pop(),
-                    ),
+                    child: _loadError != null
+                        ? AppEmptyState(
+                            icon: LucideIcons.alertCircle,
+                            title: 'Could Not Load Requirement',
+                            description: _loadError!,
+                            actionLabel: 'Retry',
+                            onAction: _load,
+                          )
+                        : AppEmptyState(
+                            icon: LucideIcons.fileX,
+                            title: 'Requirement Not Found',
+                            description:
+                                'This requirement may have been deleted, or it is not visible to your broker desk.',
+                            actionLabel: 'Return to Work Desk',
+                            onAction: () => context.canPop() ? context.pop() : context.go('/work'),
+                          ),
                   ),
                 )
-              : SingleChildScrollView(
+              : RefreshIndicator(
+                  onRefresh: _refreshAll,
+                  child: SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (!isAssigned)
+                          _buildNotice(
+                            icon: LucideIcons.lock,
+                            color: AppColors.goldDark,
+                            title: 'Not assigned to your desk',
+                            body: requirement.brokerId == null
+                                ? 'The buyer has not assigned this requirement to a broker. You can view it, but matching and proposals are disabled.'
+                                : 'This requirement is assigned to another broker desk. You can view it, but matching and proposals are disabled.',
+                          )
+                        else if (isClosed)
+                          _buildNotice(
+                            icon: LucideIcons.archive,
+                            color: AppColors.textSecondaryLight,
+                            title: 'Requirement closed (${requirement.status.displayLabel})',
+                            body: 'This requirement is no longer an active opportunity. Linked deals remain available below.',
+                          ),
                         // 1. Status & Urgency Header Banner
                         Container(
                           width: double.infinity,
@@ -292,7 +522,8 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
                                       padding: EdgeInsets.only(left: 4, right: 8),
                                       child: Icon(Icons.verified, size: 16, color: AppColors.primary),
                                     ),
-                                  Container(
+                                  // No trust chip when the buyer company is not visible to this desk.
+                                  if (requirement.buyerTrustScore > 0) Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: AppColors.primaryContainer.withValues(alpha: 0.25),
@@ -340,7 +571,7 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
                                     ),
                                   ),
                                   Text(
-                                    '${(requirement.fulfillmentPercentage * 100).toStringAsFixed(0)}% Fulfilled',
+                                    '${requirement.fulfillmentPercentage}% Fulfilled',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
@@ -353,7 +584,7 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
                                 child: LinearProgressIndicator(
-                                  value: requirement.fulfillmentPercentage.clamp(0.0, 1.0).toDouble(),
+                                  value: (requirement.fulfillmentPercentage / 100).clamp(0.0, 1.0).toDouble(),
                                   backgroundColor: AppColors.borderLight,
                                   valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
                                   minHeight: 6,
@@ -583,8 +814,12 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
                         ),
                         const SizedBox(height: 20),
 
-                        // 7. Broker Action Buttons
-                        if (requirement.status != RequirementStatus.cancelled && requirement.status != RequirementStatus.fulfilled) ...[
+                        // 7. Linked allocations and deals
+                        _buildLinkedRecords(context, requirement),
+                        const SizedBox(height: 20),
+
+                        // 8. Broker Action Buttons (assigned, active requirements only)
+                        if (canAct) ...[
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
@@ -612,7 +847,7 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
                           ),
                           const SizedBox(height: 10),
                         ],
-                        Row(
+                        if (isAssigned && !isClosed) Row(
                           children: [
                             if (requirement.status != RequirementStatus.cancelled) ...[
                               Expanded(
@@ -671,6 +906,7 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
                       ],
                     ),
                   ),
+                ),
     );
   }
 }

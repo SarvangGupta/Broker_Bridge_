@@ -34,12 +34,36 @@ class DirectoryContact {
   final bool status; // true = Active, false = Inactive / Archived
   final bool isVerified;
   final int trustScore;
+  /// Stored values (`companies.district_id` / `state_id`): a master-table UUID
+  /// or legacy free text. Kept unchanged so edits never overwrite them.
   final String? city;
   final String? state;
+
+  /// Master names resolved for [city] / [state] when they are UUIDs.
+  final String? cityName;
+  final String? stateName;
   final DateTime createdAt;
   final int openRequirementsCount;
   final int availableOffersCount;
   final int activeDealsCount;
+
+  static final _uuid = RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  );
+
+  static bool isUuid(String? v) => v != null && _uuid.hasMatch(v.trim());
+
+  /// Display text for a stored location value: the resolved name, else the
+  /// stored text, but never a raw UUID.
+  static String? _label(String? stored, String? resolved) {
+    if (resolved != null && resolved.trim().isNotEmpty) return resolved.trim();
+    if (stored == null || stored.trim().isEmpty || isUuid(stored)) return null;
+    return stored.trim();
+  }
+
+  String? get cityLabel => _label(city, cityName);
+  String? get stateLabel => _label(state, stateName);
 
   const DirectoryContact({
     required this.id,
@@ -56,6 +80,8 @@ class DirectoryContact {
     this.trustScore = 100,
     this.city,
     this.state,
+    this.cityName,
+    this.stateName,
     required this.createdAt,
     this.openRequirementsCount = 0,
     this.availableOffersCount = 0,
@@ -67,15 +93,39 @@ class DirectoryContact {
     return parsed.isValid ? parsed.formatted : mobile;
   }
 
+  bool get hasLocation => cityLabel != null || stateLabel != null;
+
   String get locationLabel {
-    if (city != null && city!.isNotEmpty && state != null && state!.isNotEmpty) {
-      return '$city, $state';
-    }
-    return city ?? state ?? 'Location not specified';
+    final c = cityLabel;
+    final s = stateLabel;
+    if (c != null && s != null) return '$c, $s';
+    return c ?? s ?? 'Location not specified';
   }
 
   int get totalMandatesCount =>
       openRequirementsCount + availableOffersCount + activeDealsCount;
+
+  /// The directory's role tab / status / search rules. Shared by the screen
+  /// and the paged repository scan so both always agree on what matches
+  /// (the server's SQL filters mirror these rules too).
+  bool matchesFilters({String? role, String? status, String? search}) {
+    if (role == 'buyer' && this.role != ContactRole.buyer) return false;
+    if (role == 'seller' && this.role != ContactRole.seller) return false;
+    if (status == 'active' && !this.status) return false;
+    if (status == 'inactive' && this.status) return false;
+
+    final q = search?.toLowerCase().trim() ?? '';
+    if (q.isEmpty) return true;
+    final digits = q.replaceAll(RegExp(r'\D'), '');
+    // Location matches the displayed (resolved) names, never stored UUIDs.
+    return name.toLowerCase().contains(q) ||
+        companyName.toLowerCase().contains(q) ||
+        (email?.toLowerCase().contains(q) ?? false) ||
+        (cityLabel?.toLowerCase().contains(q) ?? false) ||
+        (stateLabel?.toLowerCase().contains(q) ?? false) ||
+        (digits.length >= 3 &&
+            mobile.replaceAll(RegExp(r'\D'), '').contains(digits));
+  }
 
   factory DirectoryContact.fromJson(Map<String, dynamic> json) {
     return DirectoryContact(
@@ -142,6 +192,8 @@ class DirectoryContact {
     int? trustScore,
     String? city,
     String? state,
+    String? cityName,
+    String? stateName,
     DateTime? createdAt,
     int? openRequirementsCount,
     int? availableOffersCount,
@@ -162,6 +214,8 @@ class DirectoryContact {
       trustScore: trustScore ?? this.trustScore,
       city: city ?? this.city,
       state: state ?? this.state,
+      cityName: cityName ?? this.cityName,
+      stateName: stateName ?? this.stateName,
       createdAt: createdAt ?? this.createdAt,
       openRequirementsCount: openRequirementsCount ?? this.openRequirementsCount,
       availableOffersCount: availableOffersCount ?? this.availableOffersCount,

@@ -117,6 +117,9 @@ class OfferItem {
   final String? notes;
   final DateTime createdAt;
 
+  /// Managing broker desk; only that broker can reserve the lot's stock.
+  final String? brokerId;
+
   const OfferItem({
     required this.id,
     required this.ref,
@@ -154,6 +157,7 @@ class OfferItem {
     this.labReportDisclaimer = 'Seller Declared / Pending Verification',
     this.notes,
     required this.createdAt,
+    this.brokerId,
   });
 
   /// True if offer has available volume and is not expired or cancelled.
@@ -270,6 +274,7 @@ class OfferItem {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
+      brokerId: json['broker_id']?.toString() ?? json['brokerId']?.toString(),
     );
   }
 

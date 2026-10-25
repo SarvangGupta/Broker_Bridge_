@@ -98,6 +98,62 @@ class DealConfirmationState {
   }
 }
 
+/// Party confirmations on the latest deal version.
+///
+/// The broker app cannot change a version row: `snapshot_payload` is immutable
+/// (trigger `prevent_deal_version_snapshot_tampering`) and `deal_versions` has
+/// no UPDATE policy for `authenticated`. Confirmation progress is therefore
+/// written to `deals.status` with the backend lifecycle values
+/// (`Awaiting Seller Confirmation` = buyer confirmed, `Awaiting Buyer
+/// Confirmation` = seller confirmed, `Ready to Finalize` = both), which a terms
+/// amendment resets to `Negotiation`. Version statuses (`Buyer Confirmed`,
+/// `Seller Confirmed`, `Confirmed`) and snapshot flags from other writers are
+/// still honoured when read.
+@immutable
+class DealVersionConfirmation {
+  final bool buyerConfirmed;
+  final bool sellerConfirmed;
+
+  const DealVersionConfirmation({this.buyerConfirmed = false, this.sellerConfirmed = false});
+
+  factory DealVersionConfirmation.fromRecords({
+    String? dealStatus,
+    String? versionStatus,
+    Map<String, dynamic>? snapshot,
+  }) {
+    final d = (dealStatus ?? '').trim().toLowerCase();
+    final v = (versionStatus ?? '').trim().toLowerCase();
+    final both = d == 'ready to finalize' || v == 'confirmed' || v == 'broker finalized' || v == 'ready to finalize';
+    return DealVersionConfirmation(
+      buyerConfirmed: both ||
+          d == 'awaiting seller confirmation' ||
+          v.contains('buyer confirmed') ||
+          snapshot?['buyerConfirmed'] == true,
+      sellerConfirmed: both ||
+          d == 'awaiting buyer confirmation' ||
+          v.contains('seller confirmed') ||
+          snapshot?['sellerConfirmed'] == true,
+    );
+  }
+
+  bool get isComplete => buyerConfirmed && sellerConfirmed;
+
+  bool hasConfirmed(String party) => party == 'BUYER' ? buyerConfirmed : sellerConfirmed;
+
+  DealVersionConfirmation withParty(String party) => DealVersionConfirmation(
+        buyerConfirmed: buyerConfirmed || party == 'BUYER',
+        sellerConfirmed: sellerConfirmed || party == 'SELLER',
+      );
+
+  /// Value for `deals.status` (backend `DealLifecycleStatus`).
+  String get dealStatus {
+    if (isComplete) return 'Ready to Finalize';
+    if (buyerConfirmed) return 'Awaiting Seller Confirmation';
+    if (sellerConfirmed) return 'Awaiting Buyer Confirmation';
+    return 'Negotiation';
+  }
+}
+
 /// Summary deal item for lists and overview tiles.
 @immutable
 class DealItem {
@@ -128,6 +184,11 @@ class DealItem {
   final DateTime createdAt;
   final DateTime? closedAt;
 
+  /// True for a broker proposal recorded on a requirement (deal_versions +
+  /// requirement status `Proposed to Buyer`) that has no `deals` row yet.
+  /// [id] is then the requirement id; open it via `/requirements/:id`.
+  final bool isRequirementNegotiation;
+
   const DealItem({
     required this.id,
     required this.ref,
@@ -155,6 +216,7 @@ class DealItem {
     this.sellerConfirmed = false,
     required this.createdAt,
     this.closedAt,
+    this.isRequirementNegotiation = false,
   });
 
   String get formattedQuantity => UnitUtils.format(agreedQuantity, unitSymbol);

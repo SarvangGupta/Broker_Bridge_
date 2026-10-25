@@ -19,19 +19,27 @@ import 'widgets/match_card.dart';
 import 'widgets/offer_card.dart';
 import 'widgets/offer_detail_sheet.dart';
 import 'widgets/requirement_card.dart';
+import 'widgets/select_seller_lot_sheet.dart';
 import 'widgets/negotiate_requirement_sheet.dart';
 import '../../deals/presentation/widgets/create_allocation_sheet.dart';
 
 /// Active Work Desk screen hosting Requirements, Seller Offers, and Match Center.
 class WorkScreen extends ConsumerStatefulWidget {
   final int initialTabIndex;
+
+  /// With tab 2 the requirement is selected in the Match Center; otherwise its
+  /// detail screen is opened.
   final String? initialRequirementId;
+
+  /// Opens this seller offer's detail once offers are loaded.
+  final String? initialOfferId;
   final String? initialStatusFilter;
 
   const WorkScreen({
     super.key,
     this.initialTabIndex = 0,
     this.initialRequirementId,
+    this.initialOfferId,
     this.initialStatusFilter,
   });
 
@@ -138,6 +146,51 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
       initialIndex: widget.initialTabIndex.clamp(0, 2),
     );
     _applyInitialStatusFilter(widget.initialTabIndex, widget.initialStatusFilter);
+    _pendingRequirementId = widget.initialRequirementId;
+    _pendingOfferId = widget.initialOfferId;
+  }
+
+  // Deep-link targets waiting for the requirement/offer lists to load.
+  String? _pendingRequirementId;
+  String? _pendingOfferId;
+
+  void _resolvePendingTargets(RequirementsState reqState, OffersState offerState) {
+    if (_pendingRequirementId == null && _pendingOfferId == null) return;
+    if (reqState.isLoading || offerState.isLoading) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final reqId = _pendingRequirementId;
+      final offerId = _pendingOfferId;
+      _pendingRequirementId = null;
+      _pendingOfferId = null;
+
+      if (reqId != null) {
+        if (widget.initialTabIndex == 2) {
+          final req = reqState.requirements.where((r) => r.id == reqId).firstOrNull;
+          if (req != null) {
+            ref.read(matchesProvider.notifier).selectRequirement(req, offerState.offers);
+            _tabController.animateTo(2);
+          } else {
+            _showMissingTarget('This requirement is not in your assigned mandates.');
+          }
+        } else {
+          context.push('/requirements/$reqId');
+        }
+      }
+      if (offerId != null) {
+        final offer = offerState.offers.where((o) => o.id == offerId).firstOrNull;
+        if (offer != null) {
+          _tabController.animateTo(1);
+          _openOfferDetail(offer);
+        } else {
+          _showMissingTarget('This seller offer is no longer available or not visible to your desk.');
+        }
+      }
+    });
+  }
+
+  void _showMissingTarget(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -146,6 +199,12 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
     _isOpeningSheet = false;
     if (widget.initialTabIndex != oldWidget.initialTabIndex) {
       _tabController.animateTo(widget.initialTabIndex.clamp(0, 2));
+    }
+    if (widget.initialRequirementId != oldWidget.initialRequirementId) {
+      _pendingRequirementId = widget.initialRequirementId;
+    }
+    if (widget.initialOfferId != oldWidget.initialOfferId) {
+      _pendingOfferId = widget.initialOfferId;
     }
     if (widget.initialStatusFilter != oldWidget.initialStatusFilter &&
         widget.initialStatusFilter != null) {
@@ -291,7 +350,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
                 controller: _reqSearchController,
                 onChanged: (val) => ref.read(requirementsProvider.notifier).setSearchQuery(val),
                 decoration: InputDecoration(
-                  hintText: 'Search mandates, commodities, buyers...',
+                  hintText: 'Search commodity, buyer, mandate...',
                   prefixIcon: const Icon(LucideIcons.search, size: 18),
                   suffixIcon: _reqSearchController.text.isNotEmpty
                       ? IconButton(
@@ -332,7 +391,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
                     ),
                     const SizedBox(width: 6),
                     _buildStatusChip<RequirementStatus?>(
-                      label: 'Partially Allocated (${state.partiallyAllocatedCount})',
+                      label: 'Partly Allocated (${state.partiallyAllocatedCount})',
                       isSelected: state.statusFilter == RequirementStatus.partiallyAllocated,
                       onTap: () => ref
                           .read(requirementsProvider.notifier)
@@ -356,29 +415,73 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
         // List View
         Expanded(
           child: filtered.isEmpty
-              ? const AppEmptyState(
-                  icon: LucideIcons.fileText,
-                  title: 'No Matching Requirements',
-                  description: 'No buyer requirements match your search filter.',
-                )
+              ? _buildRequirementsEmptyState(state)
               : RefreshIndicator(
                   onRefresh: () => ref.read(requirementsProvider.notifier).loadRequirements(),
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    // Bottom padding keeps the last card clear of the New Mandate button.
+                    padding: const EdgeInsets.only(top: 8, bottom: 88),
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
                       final req = filtered[index];
+                      final brokerId = ref.read(workRepositoryProvider).activeBrokerId();
                       return RequirementCard(
+                        key: ValueKey('requirement_card_${req.id}'),
                         requirement: req,
                         onTap: () => _openRequirementDetail(req),
                         onFindMatches: () => _onFindMatchesForRequirement(req),
                         onNegotiate: () => _openNegotiateRequirement(req),
+                        onAllocateSeller: SelectSellerLotSheet.canAllocate(req, brokerId)
+                            ? () => SelectSellerLotSheet.allocate(context, req)
+                            : null,
                       );
                     },
                   ),
                 ),
         ),
       ],
+    );
+  }
+
+  /// Empty list: says which filter is empty (never implies no requirements
+  /// exist) and offers Clear Filters when a filter or search is active.
+  Widget _buildRequirementsEmptyState(RequirementsState state) {
+    final hasSearch = state.searchQuery.trim().isNotEmpty;
+    final filterName = switch (state.statusFilter) {
+      RequirementStatus.open => 'open',
+      RequirementStatus.partiallyAllocated => 'partly allocated',
+      RequirementStatus.expired => 'expired',
+      null => null,
+      final other => other.displayLabel.toLowerCase(),
+    };
+    final String title;
+    final String description;
+    if (state.totalCount == 0) {
+      title = 'No Requirements Assigned';
+      description = 'No buyer requirements are assigned to your desk yet.';
+    } else if (filterName != null && !hasSearch) {
+      title = 'No $filterName requirements';
+      description = '${state.totalCount} requirements are assigned to you; none are $filterName right now.';
+    } else {
+      title = 'No matching requirements';
+      description = filterName != null
+          ? 'No $filterName requirements match "${state.searchQuery.trim()}".'
+          : 'No requirements match "${state.searchQuery.trim()}".';
+    }
+    final canClear = state.totalCount > 0 && (hasSearch || state.statusFilter != null);
+    return AppEmptyState(
+      icon: LucideIcons.fileText,
+      title: title,
+      description: description,
+      actionLabel: canClear ? 'Clear Filters' : null,
+      onAction: canClear
+          ? () {
+              _reqSearchController.clear();
+              final notifier = ref.read(requirementsProvider.notifier);
+              notifier.setSearchQuery('');
+              notifier.setStatusFilter(null);
+            }
+          : null,
     );
   }
 
@@ -779,6 +882,20 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
     final reqState = ref.watch(requirementsProvider);
     final offerState = ref.watch(offersProvider);
     final matchState = ref.watch(matchesProvider);
+
+    // Keep the Match Center in step with refreshed balances (e.g. after an
+    // allocation), so stale remaining quantities are never offered for allocation.
+    void reselect() {
+      final selected = ref.read(matchesProvider).selectedRequirement;
+      if (selected == null) return;
+      final fresh = ref.read(requirementsProvider).requirements.where((r) => r.id == selected.id).firstOrNull;
+      ref.read(matchesProvider.notifier).selectRequirement(fresh, ref.read(offersProvider).offers);
+    }
+
+    ref.listen(requirementsProvider.select((s) => s.requirements), (_, _) => reselect());
+    ref.listen(offersProvider.select((s) => s.offers), (_, _) => reselect());
+
+    _resolvePendingTargets(reqState, offerState);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,

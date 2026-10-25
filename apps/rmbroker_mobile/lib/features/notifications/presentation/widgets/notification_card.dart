@@ -64,38 +64,46 @@ class NotificationCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
 
-                  // Category Label
-                  Text(
-                    category.labelEn,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: category.color,
+                  // Category Label (takes the free space and ellipsizes on narrow phones)
+                  Expanded(
+                    child: Text(
+                      category.labelEn,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: category.color,
+                      ),
                     ),
                   ),
 
                   // Urgent Badge if applicable
                   if (notification.isUrgent) ...[
                     const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: AppColors.error, width: 0.8),
-                      ),
-                      child: const Text(
-                        'ACTION REQUIRED',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.error,
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppColors.error, width: 0.8),
+                        ),
+                        child: const Text(
+                          'ACTION REQUIRED',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.error,
+                          ),
                         ),
                       ),
                     ),
                   ],
 
-                  const Spacer(),
+                  const SizedBox(width: 8),
 
                   // Relative Timestamp
                   Text(
@@ -134,17 +142,48 @@ class NotificationCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
 
-              // Message / Context Reason
+              // Message (what happened), then record reference and context
               Text(
-                notification.contextReason.isNotEmpty
-                    ? notification.contextReason
-                    : notification.message,
+                notification.message.isNotEmpty
+                    ? notification.message
+                    : notification.contextReason,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 12.5,
-                  color: AppColors.textSecondaryLight,
+                  color: AppColors.textPrimaryLight,
                   height: 1.35,
                 ),
               ),
+              if (notification.detailLine != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  notification.detailLine!,
+                  key: ValueKey('notif_detail_${notification.id}'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: category.color,
+                  ),
+                ),
+              ],
+              if (notification.message.isNotEmpty &&
+                  notification.contextReason.isNotEmpty &&
+                  notification.contextReason != notification.message) ...[
+                const SizedBox(height: 4),
+                Text(
+                  notification.contextReason,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textSecondaryLight,
+                    height: 1.3,
+                  ),
+                ),
+              ],
 
               // Bottom Actions Row (if actionable or unread)
               if (notification.isActionable || isUnread) ...[
@@ -171,11 +210,14 @@ class NotificationCard extends StatelessWidget {
                       ),
                     ],
 
-                    const Spacer(),
+                    const SizedBox(width: 8),
 
-                    // Action Button (Navigate to record)
+                    // Action Button (Navigate to record); its label ellipsizes on narrow phones
                     if (notification.isActionable) ...[
-                      ElevatedButton.icon(
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           minimumSize: Size.zero,
@@ -190,6 +232,8 @@ class NotificationCard extends StatelessWidget {
                         icon: const Icon(LucideIcons.externalLink, size: 13),
                         label: Text(
                           notification.actionLabel ?? 'View Record',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
@@ -202,6 +246,8 @@ class NotificationCard extends StatelessWidget {
                             onTap(notification);
                           }
                         },
+                          ),
+                        ),
                       ),
                     ],
                   ],

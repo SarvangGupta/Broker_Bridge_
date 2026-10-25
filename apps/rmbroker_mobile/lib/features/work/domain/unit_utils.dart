@@ -33,6 +33,22 @@ enum CommodityUnit {
     }
     return CommodityUnit.metricTonne;
   }
+
+  /// Strict parse: returns null for symbols that are not a known weight unit,
+  /// instead of assuming Metric Tonne like [fromString].
+  static CommodityUnit? tryParse(String? val) {
+    if (val == null || val.trim().isEmpty) return null;
+    final clean = val.trim().toLowerCase();
+    for (final u in CommodityUnit.values) {
+      if (u.symbol.toLowerCase() == clean || u.label.toLowerCase() == clean) return u;
+    }
+    if (clean == 'mt' || clean == 'ton' || clean == 'tonne' || clean.contains('metric ton')) {
+      return CommodityUnit.metricTonne;
+    }
+    if (clean == 'qtl' || clean.contains('quintal')) return CommodityUnit.quintal;
+    if (clean == 'kg' || clean == 'kgs' || clean.contains('kilogram')) return CommodityUnit.kilogram;
+    return null;
+  }
 }
 
 /// Strict Quantity and Unit Conversion Utility.
@@ -66,6 +82,16 @@ class UnitUtils {
   static double toMT(double quantity, String unitString) {
     final unit = CommodityUnit.fromString(unitString);
     return convert(quantity: quantity, from: unit, to: CommodityUnit.metricTonne);
+  }
+
+  /// Converts [quantity] between two unit symbols, or returns null when either
+  /// unit is unknown and the symbols differ (never guess a conversion).
+  static double? convertBetween(double quantity, String fromUnit, String toUnit) {
+    if (fromUnit.trim().toLowerCase() == toUnit.trim().toLowerCase()) return quantity;
+    final from = CommodityUnit.tryParse(fromUnit);
+    final to = CommodityUnit.tryParse(toUnit);
+    if (from == null || to == null) return null;
+    return convert(quantity: quantity, from: from, to: to);
   }
 
   /// Convenience helper to normalize any quantity to Quintals.

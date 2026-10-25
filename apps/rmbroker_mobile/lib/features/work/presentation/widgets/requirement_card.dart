@@ -1,14 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../domain/requirement_model.dart';
+import '../../domain/unit_utils.dart';
 
+/// Allocation state shown in a requirement card's bottom row, derived only
+/// from the requirement's own status and quantities.
+enum RequirementAllocationView { notAllocated, partlyAllocated, fullyAllocated, expired, closed }
+
+/// Compact buyer requirement card for the Work Desk list.
 class RequirementCard extends StatelessWidget {
   final RequirementItem requirement;
   final VoidCallback onTap;
   final VoidCallback onFindMatches;
   final VoidCallback? onNegotiate;
+
+  /// Set when this broker may allocate a seller (assigned, open, quantity left).
+  final VoidCallback? onAllocateSeller;
 
   const RequirementCard({
     super.key,
@@ -16,21 +26,34 @@ class RequirementCard extends StatelessWidget {
     required this.onTap,
     required this.onFindMatches,
     this.onNegotiate,
+    this.onAllocateSeller,
   });
 
-  Color _getStatusColor(RequirementStatus status) {
+  static RequirementAllocationView allocationViewOf(RequirementItem r) {
+    if (r.status == RequirementStatus.expired || r.isExpired) return RequirementAllocationView.expired;
+    if (r.status == RequirementStatus.cancelled || r.status == RequirementStatus.fulfilled) {
+      return RequirementAllocationView.closed;
+    }
+    if (r.status == RequirementStatus.fullyAllocated || (r.requestedQuantity > 0 && r.remainingQuantity <= 0)) {
+      return RequirementAllocationView.fullyAllocated;
+    }
+    if (r.allocatedQuantity > 0) return RequirementAllocationView.partlyAllocated;
+    return RequirementAllocationView.notAllocated;
+  }
+
+  static Color _statusColor(RequirementStatus status) {
     switch (status) {
       case RequirementStatus.open:
-        return AppColors.info;
-      case RequirementStatus.matching:
         return AppColors.primary;
+      case RequirementStatus.matching:
+        return const Color(0xFF7C3AED);
       case RequirementStatus.partiallyAllocated:
-        return const Color(0xFFD97706); // Amber
+        return const Color(0xFF1D4ED8);
       case RequirementStatus.fullyAllocated:
       case RequirementStatus.fulfilled:
         return AppColors.success;
       case RequirementStatus.expired:
-        return AppColors.textDisabled;
+        return AppColors.textSecondaryLight;
       case RequirementStatus.cancelled:
         return AppColors.error;
     }
@@ -38,7 +61,10 @@ class RequirementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _getStatusColor(requirement.status);
+    final r = requirement;
+    final statusColor = _statusColor(r.status);
+    final price = NumberFormat.decimalPattern('en_IN');
+    final delivery = r.deliveryTerms.trim().isEmpty ? 'Not specified' : r.deliveryTerms;
 
     return Card(
       elevation: 0,
@@ -52,325 +78,255 @@ class RequirementCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 10, 6, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Row: Ref, Status Badge & Urgency
+              // Top row: status badge · Req ID · menu · chevron
               Row(
                 children: [
-                  Text(
-                    requirement.ref,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryDark,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      requirement.status.displayLabel,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  if (requirement.isUrgent)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  Flexible(
+                    flex: 3,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
+                        color: statusColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(LucideIcons.clock, size: 10, color: AppColors.error),
-                          SizedBox(width: 3),
-                          Text(
-                            'Urgent',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.error,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        r.status.displayLabel.toUpperCase(),
+                        key: const Key('requirement_status_badge'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: statusColor, letterSpacing: 0.3),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Commodity & Grade
-              Text(
-                requirement.commodityName,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimaryLight,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                requirement.gradeName,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondaryLight,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Buyer Info
-              Row(
-                children: [
-                  const Icon(LucideIcons.building, size: 13, color: AppColors.textSecondaryLight),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      requirement.buyerCompanyName,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimaryLight,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (requirement.isBuyerVerified)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4),
-                      child: Icon(Icons.verified, size: 13, color: AppColors.primary),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Separated Quantities Box (Zero ambiguous mixing)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Requested',
-                            style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            requirement.formattedRequestedQuantity,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimaryLight,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Allocated',
-                            style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            requirement.formattedAllocatedQuantity,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Remaining',
-                            style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            requirement.formattedRemainingQuantity,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFD97706),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  if (r.isUrgent) ...[
+                    const SizedBox(width: 6),
+                    const Icon(LucideIcons.clock, size: 13, color: AppColors.error),
                   ],
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Target Price & Delivery terms
-              Row(
-                children: [
+                  const SizedBox(width: 8),
                   Expanded(
+                    flex: 2,
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        const Icon(LucideIcons.indianRupee, size: 13, color: AppColors.textSecondaryLight),
-                        const SizedBox(width: 4),
-                        Text(
-                          '₹${requirement.targetPrice.toInt()} / ${requirement.unitSymbol}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimaryLight,
+                        const Flexible(
+                          child: Text(
+                            'Req ID: ',
+                            maxLines: 1,
+                            overflow: TextOverflow.clip,
+                            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondaryLight),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        const Icon(LucideIcons.mapPin, size: 13, color: AppColors.textSecondaryLight),
-                        const SizedBox(width: 4),
-                        Expanded(
+                        Flexible(
+                          flex: 2,
                           child: Text(
-                            requirement.deliveryTerms,
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              color: AppColors.textSecondaryLight,
-                            ),
+                            r.ref,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondaryLight),
                           ),
                         ),
                       ],
                     ),
                   ),
+                  _moreMenu(),
+                  const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.textSecondaryLight),
                 ],
               ),
-              const SizedBox(height: 12),
-
-              // Bottom Row: Fulfillment Progress & "Find Matches" CTA
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      r.commodityName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimaryLight),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Flexible(
-                              child: Text(
-                                'Fulfillment',
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
-                              ),
-                            ),
-                            Text(
-                              '${requirement.fulfillmentPercentage}%',
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primaryDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: requirement.fulfillmentPercentage / 100,
-                            minHeight: 5,
-                            backgroundColor: AppColors.borderLight,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              requirement.fulfillmentPercentage == 100
-                                  ? AppColors.success
-                                  : AppColors.primary,
-                            ),
+                        const Icon(LucideIcons.building2, size: 13, color: AppColors.textSecondaryLight),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            r.buyerCompanyName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondaryLight),
                           ),
                         ),
+                        if (r.isBuyerVerified) ...[
+                          const SizedBox(width: 4),
+                          const Icon(Icons.verified, size: 13, color: AppColors.primary),
+                        ],
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  if (onNegotiate != null && requirement.status != RequirementStatus.cancelled) ...[
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _metric(LucideIcons.package, 'Quantity', r.formattedRequestedQuantity)),
+                        Expanded(
+                          child: _metric(
+                            LucideIcons.coins,
+                            'Target Price',
+                            '₹${price.format(r.targetPrice.round())} / ${r.unitSymbol}',
+                          ),
                         ),
-                      ),
-                      icon: const Icon(LucideIcons.scale, size: 12),
-                      label: Text(
-                        requirement.isProposed ? 'Proposal' : 'Negotiate',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      onPressed: onNegotiate,
+                        Expanded(child: _metric(LucideIcons.mapPin, 'Delivery', delivery)),
+                      ],
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(height: 8),
+                    _metric(LucideIcons.calendar, 'Required By', r.targetDateFormatted),
+                    const SizedBox(height: 10),
+                    _allocationRow(),
                   ],
-                  if (requirement.canBeMatched)
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      icon: const Icon(LucideIcons.sparkles, size: 12, color: AppColors.primary),
-                      label: const Text(
-                        'Find Matches',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      onPressed: onFindMatches,
-                    ),
-                ],
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _moreMenu() {
+    final canNegotiate = onNegotiate != null && requirement.status != RequirementStatus.cancelled;
+    if (!canNegotiate && !requirement.canBeMatched) return const SizedBox(width: 4);
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: PopupMenuButton<String>(
+        key: const Key('requirement_card_menu'),
+        padding: EdgeInsets.zero,
+        iconSize: 18,
+        icon: const Icon(LucideIcons.moreHorizontal, color: AppColors.textSecondaryLight),
+        onSelected: (v) => v == 'negotiate' ? onNegotiate?.call() : onFindMatches(),
+        itemBuilder: (_) => [
+          if (canNegotiate)
+            PopupMenuItem(
+              value: 'negotiate',
+              child: Text(requirement.isProposed ? 'Proposal' : 'Negotiate'),
+            ),
+          if (requirement.canBeMatched) const PopupMenuItem(value: 'matches', child: Text('Find Matches')),
+        ],
+      ),
+    );
+  }
+
+  Widget _metric(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: AppColors.textSecondaryLight),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondaryLight)),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimaryLight),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _allocationRow() {
+    final r = requirement;
+    final view = allocationViewOf(r);
+    late final String label;
+    late final IconData icon;
+    late final Color color;
+    switch (view) {
+      case RequirementAllocationView.notAllocated:
+        label = 'Seller not allocated';
+        icon = LucideIcons.users;
+        color = const Color(0xFFEA580C);
+      case RequirementAllocationView.partlyAllocated:
+        label = '${UnitUtils.format(r.allocatedQuantity, r.unitSymbol)} of ${r.formattedRequestedQuantity} allocated';
+        icon = LucideIcons.truck;
+        color = const Color(0xFF1D4ED8);
+      case RequirementAllocationView.fullyAllocated:
+        label = 'Fully allocated';
+        icon = LucideIcons.checkCircle2;
+        color = AppColors.success;
+      case RequirementAllocationView.expired:
+        label = 'Expired — allocation closed';
+        icon = LucideIcons.clock;
+        color = AppColors.textSecondaryLight;
+      case RequirementAllocationView.closed:
+        label = r.status.displayLabel;
+        icon = LucideIcons.lock;
+        color = AppColors.textSecondaryLight;
+    }
+
+    final allocate = view == RequirementAllocationView.notAllocated ? onAllocateSeller : null;
+
+    return Row(
+      children: [
+        Expanded(
+          flex: 3,
+          child: Container(
+            key: const Key('requirement_allocation_status'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: OutlinedButton.icon(
+            key: Key(allocate != null ? 'requirement_allocate_seller' : 'requirement_view_details'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              minimumSize: const Size(0, 38),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              side: const BorderSide(color: AppColors.primary),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: Icon(allocate != null ? LucideIcons.userPlus : LucideIcons.fileText, size: 15, color: AppColors.primary),
+            label: Text(
+              allocate != null ? 'Allocate Seller' : 'View Details',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+            ),
+            onPressed: allocate ?? onTap,
+          ),
+        ),
+      ],
     );
   }
 }

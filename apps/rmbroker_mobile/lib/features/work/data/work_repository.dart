@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/security/secure_storage_service.dart';
+import '../../../core/security/session_guard.dart';
 import '../domain/match_model.dart';
 import '../domain/offer_model.dart';
 import '../domain/requirement_model.dart';
@@ -63,12 +64,112 @@ class WorkRepository {
     }
   }
 
+  /// Signed-in broker's user id, or null without a valid session. Used for
+  /// assignment checks on screens; tests override it.
+  String? activeBrokerId() {
+    final session = _supabase?.auth.currentSession;
+    if (session == null || session.isExpired) return null;
+    return session.user.id;
+  }
+
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  /// Buyer company is a plain (left) embed: `companies` RLS shows a broker only
+  /// companies in their CRM directory, and an inner embed silently dropped every
+  /// assigned requirement whose buyer was not a CRM contact (KI-46).
+  static const String _requirementSelect =
+      'id, company_id, commodity_id, grade_id, unit_id, broker_id, '
+      'quantity, fulfilled_quantity, target_price, delivery_terms_id, '
+      'target_date, status, created_at, '
+      'companies(id, name, is_verified, trust_score), '
+      'master_commodities!inner(id, name, code), '
+      'master_grades(id, grade_name, parameters), '
+      'master_units(id, name, symbol)';
+
+  /// Buyer name shown when RLS does not expose the buyer company to this broker.
+  static const String restrictedBuyerLabel = 'Buyer company not in your directory';
+
+  /// Flattens a PostgREST requirements row with its embedded masters.
+  static RequirementItem _requirementFromRow(Map<String, dynamic> item) {
+    final c = item['companies'] as Map<String, dynamic>? ?? {};
+    final comm = item['master_commodities'] as Map<String, dynamic>? ?? {};
+    final g = item['master_grades'] as Map<String, dynamic>? ?? {};
+    final u = item['master_units'] as Map<String, dynamic>? ?? {};
+
+    final flat = Map<String, dynamic>.from(item);
+    flat['company_id'] = item['company_id'] ?? c['id'];
+    flat['commodity_id'] = item['commodity_id'] ?? comm['id'];
+    flat['grade_id'] = item['grade_id'] ?? g['id'];
+    flat['unit_id'] = item['unit_id'] ?? u['id'];
+    flat['broker_id'] = item['broker_id'];
+    // A restricted company row is shown as such, never as a verified buyer.
+    flat['buyer_company_name'] = c['name'] ?? restrictedBuyerLabel;
+    flat['buyer_company_verified'] = c['is_verified'] ?? false;
+    flat['buyer_trust_score'] = c['trust_score'] ?? 0;
+    flat['commodity_name'] = comm['name'] ?? 'Agricultural Commodity';
+    flat['commodity_code'] = comm['code'];
+    flat['grade_name'] = g['grade_name'] ?? 'Standard Quality';
+    flat['quality_parameters'] = g['parameters'];
+    flat['unit_name'] = u['name'] ?? 'Metric Tonne';
+    flat['unit_symbol'] = u['symbol'] ?? 'MT';
+    return RequirementItem.fromJson(flat);
+  }
+
   // ============================================================================
   // 1. BUYER REQUIREMENTS
   // ============================================================================
 
+  /// Loads one requirement by id, fresh from the database, for deep links and
+  /// the detail screen. Unlike [getRequirements] it is not limited to the
+  /// broker's own rows: RLS also returns open global requirements, so callers
+  /// must check [RequirementItem.brokerId] before offering actions.
+  /// Returns a [WorkError] with code `NOT_FOUND` when the row is missing,
+  /// deleted or not visible to this broker.
+  Future<WorkDataResult<RequirementItem>> getRequirementById(String requirementId) async {
+    final id = requirementId.trim();
+    if (!_uuidPattern.hasMatch(id)) {
+      return const WorkError(message: 'Requirement not found', code: 'NOT_FOUND');
+    }
+    final client = _supabase;
+    if (client == null || activeBrokerId() == null) {
+      return const WorkUnauthorized();
+    }
+    try {
+      final row = await client
+          .from('requirements')
+          .select(_requirementSelect)
+          .eq('id', id)
+          .maybeSingle();
+      if (row == null) {
+        return const WorkError(message: 'Requirement not found', code: 'NOT_FOUND');
+      }
+      return WorkSuccess(_requirementFromRow(row));
+    } catch (e) {
+      debugPrint('Requirement detail fetch error: $e');
+      return WorkError(message: 'Could not load requirement. Please retry. ($e)');
+    }
+  }
+
   /// Fetches assigned buyer requirements for the authenticated broker.
   Future<WorkDataResult<List<RequirementItem>>> getRequirements() async {
+    // 0. Wait for a usable session (startup/resume refresh) before any request;
+    //    also syncs the REST bearer so a stale copy never draws a 401.
+    if (_supabase != null && (_supabase!.auth.currentSession != null || activeBrokerId() == null)) {
+      switch (await SessionGuard.ensureValidSession(_supabase, storage: _storage)) {
+        case SessionCheck.signedOut:
+          return const WorkUnauthorized();
+        case SessionCheck.offline:
+          return const WorkError(
+            message: 'Could not reach the server to restore your session. Check your connection and retry.',
+            code: 'OFFLINE',
+          );
+        case SessionCheck.valid:
+          break;
+      }
+    }
+
     // 1. Attempt REST endpoint
     try {
       final response = await _apiClient.get('/broker/requirements');
@@ -101,58 +202,37 @@ class WorkRepository {
     // 2. Fallback: Supabase PostgREST query
     try {
       final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
-        final brokerId = session.user.id;
-
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
         final response = await client
             .from('requirements')
-            .select(
-              'id, company_id, commodity_id, grade_id, unit_id, broker_id, '
-              'quantity, fulfilled_quantity, target_price, delivery_terms_id, '
-              'target_date, status, created_at, '
-              'companies!inner(id, name, is_verified, trust_score), '
-              'master_commodities!inner(id, name, code), '
-              'master_grades(id, grade_name, parameters), '
-              'master_units(id, name, symbol)',
-            )
+            .select(_requirementSelect)
             .eq('broker_id', brokerId)
             .order('created_at', ascending: false);
 
         final rawList = response as List<dynamic>;
-        final items = <RequirementItem>[];
-
-        for (final item in rawList) {
-          if (item is Map<String, dynamic>) {
-            final c = item['companies'] as Map<String, dynamic>? ?? {};
-            final comm = item['master_commodities'] as Map<String, dynamic>? ?? {};
-            final g = item['master_grades'] as Map<String, dynamic>? ?? {};
-            final u = item['master_units'] as Map<String, dynamic>? ?? {};
-
-            final flat = Map<String, dynamic>.from(item);
-            flat['company_id'] = item['company_id'] ?? c['id'];
-            flat['commodity_id'] = item['commodity_id'] ?? comm['id'];
-            flat['grade_id'] = item['grade_id'] ?? g['id'];
-            flat['unit_id'] = item['unit_id'] ?? u['id'];
-            flat['broker_id'] = item['broker_id'];
-            flat['buyer_company_name'] = c['name'] ?? 'Verified Buyer';
-            flat['buyer_company_verified'] = c['is_verified'] ?? true;
-            flat['buyer_trust_score'] = c['trust_score'] ?? 90;
-            flat['commodity_name'] = comm['name'] ?? 'Agricultural Commodity';
-            flat['commodity_code'] = comm['code'];
-            flat['grade_name'] = g['grade_name'] ?? 'Standard Quality';
-            flat['quality_parameters'] = g['parameters'];
-            flat['unit_name'] = u['name'] ?? 'Metric Tonne';
-            flat['unit_symbol'] = u['symbol'] ?? 'MT';
-
-            items.add(RequirementItem.fromJson(flat));
-          }
-        }
+        final items = rawList
+            .whereType<Map<String, dynamic>>()
+            .map(_requirementFromRow)
+            .toList();
         return WorkSuccess(items);
       }
+    } on PostgrestException catch (dbErr) {
+      debugPrint('Supabase requirements query error: ${dbErr.code}');
+      if (dbErr.code == 'PGRST301' || dbErr.message.toLowerCase().contains('jwt')) {
+        return const WorkUnauthorized();
+      }
+      return const WorkError(message: 'Could not load requirements. Pull to refresh or try again.');
     } catch (supabaseErr) {
-      debugPrint('Supabase requirements fallback error: $supabaseErr');
+      debugPrint('Supabase requirements query error: ${supabaseErr.runtimeType}');
+      return const WorkError(
+        message: 'Could not load requirements. Check your connection and try again.',
+        code: 'NETWORK',
+      );
     }
+
+    // A client without a valid session is a sign-in problem, not a missing backend.
+    if (_supabase != null) return const WorkUnauthorized();
 
     // 3. Zero-Fabrication: Return authoritative notice
     return const WorkContractPending(
@@ -296,7 +376,7 @@ class WorkRepository {
             .select(
               'id, lot_number, total_quantity, available_quantity, reserved_quantity, '
               'sold_quantity, asking_price, confidential_minimum_price, loading_status, '
-              'loading_remarks, available_from, valid_until, version, status, created_at, '
+              'loading_remarks, available_from, valid_until, version, status, created_at, broker_id, '
               'companies!inner(id, name, is_verified, trust_score), '
               'master_commodities!inner(id, name), '
               'master_grades(id, grade_name), '
@@ -448,6 +528,9 @@ class WorkRepository {
     for (final offer in availableOffers) {
       // Offers must be active and have available quantity
       if (!offer.canBeMatched) continue;
+      // Hard eligibility filter, as in src/server/utils/match-engine.ts: a lot of a
+      // different product is never a match, whatever its other scores.
+      if (!RequirementMatcher.isSameCommodity(requirement, offer)) continue;
 
       final match = RequirementMatcher.computeMatch(
         requirement: requirement,

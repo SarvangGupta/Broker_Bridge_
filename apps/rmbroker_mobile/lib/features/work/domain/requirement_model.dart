@@ -40,6 +40,7 @@ enum RequirementStatus {
       case 'partially fulfilled':
         return RequirementStatus.partiallyAllocated;
       case 'fully allocated':
+      case 'allocated':
         return RequirementStatus.fullyAllocated;
       case 'fulfilled':
       case 'closed':
@@ -197,9 +198,16 @@ class RequirementItem {
     final isUrgent = hoursDiff <= 48 && hoursDiff > 0;
 
     final rawStatus = json['status']?.toString();
-    final derivedStatus = isExpired && (rawStatus == 'Open' || rawStatus == 'New')
+    var derivedStatus = isExpired && (rawStatus == 'Open' || rawStatus == 'New')
         ? RequirementStatus.expired
         : RequirementStatus.fromString(rawStatus);
+    // Allocation bookkeeping moves fulfilled_quantity without changing the stored
+    // status (same as the web desk), so an "Open" row is shown by what is left.
+    if (derivedStatus == RequirementStatus.open && qty > 0 && fulfilled > 0) {
+      derivedStatus = remaining <= 0
+          ? RequirementStatus.fullyAllocated
+          : RequirementStatus.partiallyAllocated;
+    }
 
     final id = json['id']?.toString() ?? '';
     final shortId = id.length >= 6 ? id.substring(0, 6).toUpperCase() : id;

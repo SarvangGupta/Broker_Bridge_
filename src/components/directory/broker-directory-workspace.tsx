@@ -68,7 +68,7 @@ export function BrokerDirectoryWorkspace({
       const res = await getBrokerDirectoryContactsAction();
       if (res.success && res.data) {
         setContacts(res.data.contacts);
-        setStats(res.data.stats);
+        if (res.data.stats) setStats(res.data.stats);
       }
     } catch {
       // Ignored

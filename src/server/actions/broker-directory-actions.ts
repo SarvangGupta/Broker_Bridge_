@@ -15,6 +15,13 @@ import {
 import { eq, and, or, ilike, desc, sql, notInArray, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { validateAndNormalizePhone } from '@/src/lib/phone-utils';
+import {
+  pgTimestampToIso,
+  publicDirectoryError,
+  queryDirectoryPage,
+  queryDirectoryStats,
+  type DirectoryCursor,
+} from '@/src/server/utils/broker-directory-query';
 
 // ============================================================================
 // Types & Zod Schemas
@@ -64,7 +71,9 @@ export interface DirectoryListResponse {
   success: boolean;
   data?: {
     contacts: DirectoryContactItem[];
-    stats: DirectorySummaryStats;
+    /** Present on the first page (no cursor); omitted on later pages. */
+    stats?: DirectorySummaryStats;
+    pageInfo: { hasMore: boolean; nextCursor: string | null };
   };
   error?: string;
 }
@@ -184,6 +193,30 @@ export async function getAuthenticatedBroker(authToken?: string): Promise<AuthRe
   };
 }
 
+/**
+ * Creates the missing crm_contacts row for every company that assigned
+ * [brokerId] on a requirement (buyer) or availability (seller). The contact
+ * user is that company's user of the matching role. Existing links (by
+ * company) are left untouched, so this is idempotent.
+ */
+async function linkAssignedCounterparties(brokerId: string): Promise<void> {
+  await db.execute(sql`
+    insert into crm_contacts (broker_id, user_id, company_id, last_activity_at)
+    select distinct on (src.company_id) ${brokerId}::uuid, u.id, src.company_id, now()
+    from (
+      select company_id, 'buyer' as role from requirements where broker_id = ${brokerId}::uuid
+      union
+      select company_id, 'seller' as role from availabilities where broker_id = ${brokerId}::uuid
+    ) src
+    join users u on u.company_id = src.company_id and lower(u.role) = src.role
+    where not exists (
+      select 1 from crm_contacts c
+      where c.broker_id = ${brokerId}::uuid and c.company_id = src.company_id
+    )
+    order by src.company_id, u.created_at
+  `);
+}
+
 // ============================================================================
 // 1. Fetch Authorized Directory Contacts List with Summary Stats
 // ============================================================================
@@ -193,6 +226,9 @@ export async function getBrokerDirectoryContactsAction(
     role?: 'all' | 'buyer' | 'seller';
     search?: string;
     status?: 'all' | 'active' | 'inactive';
+    /** Page size; omitted returns the full list (web workspace). */
+    limit?: number;
+    cursor?: DirectoryCursor | null;
   },
   authToken?: string
 ): Promise<DirectoryListResponse> {
@@ -203,154 +239,110 @@ export async function getBrokerDirectoryContactsAction(
     }
 
     const { brokerId, isAdmin } = auth;
+    const scope = { brokerId, isAdmin };
 
-    // 1. Fetch raw crm_contacts assigned to this broker
-    const rows = await db
-      .select({
-        contactId: crmContacts.id,
-        userId: users.id,
-        userName: users.name,
-        userMobile: users.mobile,
-        userEmail: users.email,
-        userRole: users.role,
-        userStatus: users.status,
-        companyId: companies.id,
-        companyName: companies.name,
-        companyStatus: companies.status,
-        isVerified: companies.isVerified,
-        trustScore: companies.trustScore,
-        districtId: companies.districtId,
-        stateId: companies.stateId,
-        createdAt: crmContacts.createdAt,
-      })
-      .from(crmContacts)
-      .innerJoin(users, eq(crmContacts.userId, users.id))
-      .innerJoin(companies, eq(crmContacts.companyId, companies.id))
-      .where(isAdmin ? sql`true` : eq(crmContacts.brokerId, brokerId))
-      .orderBy(desc(crmContacts.createdAt));
+    // 0. Buyers/sellers who assigned this broker on a requirement or lot get a
+    //    CRM link once, so they appear without manual entry. First page only.
+    if (!filter?.cursor) {
+      await linkAssignedCounterparties(brokerId).catch((err) =>
+        console.error('linkAssignedCounterparties error:', err)
+      );
+    }
 
-    // 2. Fetch associated business metrics in parallel
-    const contacts: DirectoryContactItem[] = await Promise.all(
-      rows.map(async (row) => {
-        const cRole = (row.userRole || '').toLowerCase();
-        const roleNormalized: 'Buyer' | 'Seller' = cRole === 'seller' ? 'Seller' : 'Buyer';
+    // 1. Filtered page (or full list without a limit), filters applied in SQL
+    const page = await queryDirectoryPage(db, scope, filter ?? {}, {
+      limit: filter?.limit,
+      after: filter?.cursor,
+    });
 
-        // Count open requirements for company
-        const reqCountRes = await db
-          .select({ count: sql<number>`count(*)::int` })
+    // 2. Mandate counts for this page only: three grouped queries
+    const companyIds = [...new Set(page.rows.map((r) => r.companyId))];
+    const reqMap = new Map<string, number>();
+    const availMap = new Map<string, number>();
+    const dealsMap = new Map<string, number>();
+    if (companyIds.length > 0) {
+      const [reqRows, availRows, dealRows] = await Promise.all([
+        db
+          .select({ companyId: requirements.companyId, count: sql<number>`count(*)::int` })
           .from(requirements)
           .where(
             and(
-              eq(requirements.companyId, row.companyId),
+              inArray(requirements.companyId, companyIds),
               isAdmin ? sql`true` : eq(requirements.brokerId, brokerId),
               inArray(requirements.status, ['Open', 'Partially Fulfilled'])
             )
           )
-          .catch(() => [{ count: 0 }]);
-
-        // Count available offers for company
-        const availCountRes = await db
-          .select({ count: sql<number>`count(*)::int` })
+          .groupBy(requirements.companyId)
+          .catch(() => []),
+        db
+          .select({ companyId: availabilities.companyId, count: sql<number>`count(*)::int` })
           .from(availabilities)
           .where(
             and(
-              eq(availabilities.companyId, row.companyId),
+              inArray(availabilities.companyId, companyIds),
               isAdmin ? sql`true` : eq(availabilities.brokerId, brokerId),
               eq(availabilities.status, 'Open')
             )
           )
-          .catch(() => [{ count: 0 }]);
-
-        // Count active deals for company
-        const dealsCountRes = await db
-          .select({ count: sql<number>`count(*)::int` })
+          .groupBy(availabilities.companyId)
+          .catch(() => []),
+        db
+          .select({ buyerId: deals.buyerId, sellerId: deals.sellerId })
           .from(deals)
           .where(
             and(
-              or(eq(deals.buyerId, row.companyId), eq(deals.sellerId, row.companyId)),
+              or(inArray(deals.buyerId, companyIds), inArray(deals.sellerId, companyIds)),
               isAdmin ? sql`true` : eq(deals.brokerId, brokerId),
               notInArray(deals.status, ['Closed', 'Cancelled'])
             )
           )
-          .catch(() => [{ count: 0 }]);
-
-        return {
-          id: row.contactId,
-          userId: row.userId,
-          companyId: row.companyId,
-          name: row.userName,
-          companyName: row.companyName,
-          mobile: row.userMobile || '',
-          email: row.userEmail,
-          role: roleNormalized,
-          status: row.userStatus && row.companyStatus,
-          isVerified: row.isVerified,
-          trustScore: row.trustScore,
-          city: row.districtId,
-          state: row.stateId,
-          createdAt: row.createdAt.toISOString(),
-          openRequirementsCount: reqCountRes[0]?.count ?? 0,
-          availableOffersCount: availCountRes[0]?.count ?? 0,
-          activeDealsCount: dealsCountRes[0]?.count ?? 0,
-        };
-      })
-    );
-
-    // 3. Compute Authoritative Summary Stats across all contacts
-    const totalContacts = contacts.length;
-    const buyersCount = contacts.filter((c) => c.role === 'Buyer' && c.status).length;
-    const sellersCount = contacts.filter((c) => c.role === 'Seller' && c.status).length;
-    const activeMandatesCount = contacts.reduce(
-      (sum, c) => sum + c.openRequirementsCount + c.availableOffersCount + c.activeDealsCount,
-      0
-    );
-
-    const stats: DirectorySummaryStats = {
-      totalContacts,
-      buyersCount,
-      sellersCount,
-      activeMandatesCount,
-    };
-
-    // 4. Apply Filters (Server-authoritative)
-    let filtered = contacts;
-
-    if (filter?.role && filter.role !== 'all') {
-      const rMatch = filter.role === 'seller' ? 'Seller' : 'Buyer';
-      filtered = filtered.filter((c) => c.role === rMatch);
+          .catch(() => []),
+      ]);
+      for (const r of reqRows) reqMap.set(r.companyId, r.count);
+      for (const a of availRows) availMap.set(a.companyId, a.count);
+      for (const d of dealRows) {
+        dealsMap.set(d.buyerId, (dealsMap.get(d.buyerId) ?? 0) + 1);
+        if (d.sellerId !== d.buyerId) dealsMap.set(d.sellerId, (dealsMap.get(d.sellerId) ?? 0) + 1);
+      }
     }
 
-    if (filter?.status && filter.status !== 'all') {
-      const isActive = filter.status === 'active';
-      filtered = filtered.filter((c) => c.status === isActive);
-    }
+    const contacts: DirectoryContactItem[] = page.rows.map((row) => ({
+      id: row.contactId,
+      userId: row.userId,
+      companyId: row.companyId,
+      name: row.userName,
+      companyName: row.companyName,
+      mobile: row.userMobile || '',
+      email: row.userEmail,
+      role: (row.userRole || '').toLowerCase().trim() === 'seller' ? 'Seller' : 'Buyer',
+      status: row.userStatus && row.companyStatus,
+      isVerified: row.isVerified,
+      trustScore: row.trustScore,
+      city: row.districtId,
+      state: row.stateId,
+      createdAt: pgTimestampToIso(row.createdAt),
+      openRequirementsCount: reqMap.get(row.companyId) ?? 0,
+      availableOffersCount: availMap.get(row.companyId) ?? 0,
+      activeDealsCount: dealsMap.get(row.companyId) ?? 0,
+    }));
 
-    if (filter?.search && filter.search.trim()) {
-      const q = filter.search.toLowerCase().trim();
-      const cleanDigits = q.replace(/\D/g, '');
-
-      filtered = filtered.filter((c) => {
-        const nameMatch = c.name.toLowerCase().includes(q);
-        const compMatch = c.companyName.toLowerCase().includes(q);
-        const emailMatch = c.email ? c.email.toLowerCase().includes(q) : false;
-        const phoneMatch = cleanDigits.length >= 3 && c.mobile.replace(/\D/g, '').includes(cleanDigits);
-        const cityMatch = c.city ? c.city.toLowerCase().includes(q) : false;
-        return nameMatch || compMatch || emailMatch || phoneMatch || cityMatch;
-      });
-    }
+    // 3. Stats cover all of the broker's contacts; computed once per list
+    //    (first page), not again for each further page.
+    const stats = filter?.cursor ? undefined : await queryDirectoryStats(db, scope);
 
     return {
       success: true,
       data: {
-        contacts: filtered,
+        contacts,
         stats,
+        pageInfo: { hasMore: page.hasMore, nextCursor: page.nextCursor },
       },
     };
   } catch (error: any) {
     console.error('getBrokerDirectoryContactsAction error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to fetch directory contacts',
+      error: 'Failed to fetch directory contacts',
     };
   }
 }
@@ -485,11 +477,16 @@ export async function createBrokerContactAction(
       return { success: false, error: phoneRes.error || 'Invalid mobile number' };
     }
 
-    // Server-side Duplicate Prevention
-    const dupCheck = await checkContactDuplicateAction({
-      mobile: phoneRes.normalized,
-      companyName: parsed.companyName,
-    });
+    // Server-side Duplicate Prevention. The token must be passed on: without
+    // it a Bearer-only (mobile) caller has no session here and the check
+    // silently reported "no duplicate".
+    const dupCheck = await checkContactDuplicateAction(
+      {
+        mobile: phoneRes.normalized,
+        companyName: parsed.companyName,
+      },
+      authToken
+    );
 
     if (dupCheck.isDuplicate && dupCheck.matchType === 'exact_mobile') {
       return {
@@ -556,7 +553,7 @@ export async function createBrokerContactAction(
     console.error('createBrokerContactAction error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to create contact record',
+      error: publicDirectoryError(error, 'Failed to create contact record'),
     };
   }
 }
@@ -665,7 +662,7 @@ export async function updateBrokerContactAction(
     console.error('updateBrokerContactAction error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to update contact record',
+      error: publicDirectoryError(error, 'Failed to update contact record'),
     };
   }
 }

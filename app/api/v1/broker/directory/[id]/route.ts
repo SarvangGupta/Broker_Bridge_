@@ -4,6 +4,7 @@ import {
   updateBrokerContactAction,
   type UpdateContactInput,
 } from '@/src/server/actions/broker-directory-actions';
+import { directoryErrorStatus } from '@/src/server/utils/broker-directory-query';
 
 function extractAuthToken(req: NextRequest): string | undefined {
   const authHeader = req.headers.get('authorization');
@@ -24,18 +25,14 @@ export async function GET(
     const result = await getBrokerContactDetailsAction(id, token);
 
     if (!result.success) {
-      const isUnauth = result.error?.toLowerCase().includes('unauthorized');
-      const isNotFound = result.error?.toLowerCase().includes('not found');
-      return NextResponse.json(
-        result,
-        { status: isUnauth ? 401 : isNotFound ? 404 : 400 }
-      );
+      return NextResponse.json(result, { status: directoryErrorStatus(result.error) });
     }
 
     return NextResponse.json(result, { status: 200 });
   } catch (error: any) {
+    console.error('GET /broker/directory/[id] error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -53,18 +50,14 @@ export async function PUT(
     const result = await updateBrokerContactAction(id, body, token);
 
     if (!result.success) {
-      const isUnauth = result.error?.toLowerCase().includes('unauthorized');
-      const isNotFound = result.error?.toLowerCase().includes('not found');
-      return NextResponse.json(
-        result,
-        { status: isUnauth ? 401 : isNotFound ? 404 : 400 }
-      );
+      return NextResponse.json(result, { status: directoryErrorStatus(result.error) });
     }
 
     return NextResponse.json(result, { status: 200 });
   } catch (error: any) {
+    console.error('PUT /broker/directory/[id] error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }

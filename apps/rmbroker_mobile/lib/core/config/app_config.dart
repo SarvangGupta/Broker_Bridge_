@@ -30,6 +30,10 @@ class AppConfig {
         : 'https://rmbroker.example.com/api/v1',
   );
 
+  /// Mandi Support (administrator) WhatsApp number, 10-digit Indian mobile.
+  /// Not configured by default; set with --dart-define=SUPPORT_WHATSAPP=...
+  static const String supportWhatsApp = String.fromEnvironment('SUPPORT_WHATSAPP');
+
   /// Network timeouts
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 15);

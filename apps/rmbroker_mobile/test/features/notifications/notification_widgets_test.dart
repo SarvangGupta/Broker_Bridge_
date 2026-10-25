@@ -132,6 +132,11 @@ void main() {
     testWidgets('renders AppBar with titles, search bar, filter chips, and notification cards', (
       tester,
     ) async {
+      // Cards now carry message, record reference and context: use a tall phone
+      // viewport (360 dp wide) so all three fixtures are laid out by the lazy list.
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.reset);
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();
 

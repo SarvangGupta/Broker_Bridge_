@@ -209,7 +209,15 @@ void main() {
       final historyRepo = BroadcastHistoryRepository(authRepo: authRepo);
       historyRepo.enableMemoryFallbackForTesting();
 
-      final now = DateTime.now();
+      // The seeded fixture includes broadcasts at fixed times *today* (09:30,
+      // 14:45). Before 14:45 a `DateTime.now()` send is older than one of them
+      // and correctly sorts below it, so stamp the new send after every seeded
+      // record instead of depending on the clock.
+      final seeded = await historyRepo.getBroadcastHistory();
+      final latestSeeded = seeded
+          .map((b) => b.sentAt)
+          .reduce((a, b) => a.isAfter(b) ? a : b);
+      final now = latestSeeded.add(const Duration(minutes: 1));
       final newOffer = SellerOfferPriceRevision(
         offerId: 'off-wht-01',
         lotNumber: 'LOT-WHT-001',

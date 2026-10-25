@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -15,6 +16,8 @@ import '../widgets/negotiate_terms_sheet.dart';
 import '../widgets/record_party_confirmation_dialog.dart';
 import '../widgets/version_history_sheet.dart';
 
+const Color _pendingColor = Color(0xFFD97706);
+
 class DealDetailScreen extends ConsumerWidget {
   final String dealId;
 
@@ -28,7 +31,7 @@ class DealDetailScreen extends ConsumerWidget {
       case DealStatus.draft:
         return AppColors.textSecondaryLight;
       case DealStatus.negotiation:
-        return const Color(0xFFD97706);
+        return _pendingColor;
       case DealStatus.awaitingBuyerConfirmation:
       case DealStatus.awaitingSellerConfirmation:
         return const Color(0xFF7C3AED);
@@ -109,21 +112,22 @@ class DealDetailScreen extends ConsumerWidget {
       decimalDigits: 0,
     );
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
+    final detail = state.detail;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        title: Text(state.detail?.deal.ref ?? 'Deal Contract'),
+        title: Text(detail?.deal.ref ?? 'Deal Contract'),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.history, size: 20),
             tooltip: 'Version History',
             onPressed: () {
-              if (state.detail != null) {
+              if (detail != null) {
                 VersionHistorySheet.show(
                   context,
                   dealId: dealId,
-                  dealRef: state.detail!.deal.ref,
+                  dealRef: detail.deal.ref,
                 );
               }
             },
@@ -133,6 +137,32 @@ class DealDetailScreen extends ConsumerWidget {
             tooltip: 'Refresh',
             onPressed: () => ref.read(dealDetailProvider(dealId).notifier).loadDetail(),
           ),
+          if (detail != null && detail.deal.status.isOperational)
+            PopupMenuButton<String>(
+              key: const ValueKey('deal_more_menu'),
+              icon: const Icon(LucideIcons.moreVertical, size: 20),
+              onSelected: (v) {
+                if (v == 'cancel') _showCancelDealDialog(context, ref, detail.deal);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'cancel',
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.ban, size: 16, color: AppColors.error),
+                      SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Cancel Deal Record',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: AppColors.error),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
       body: state.isLoading
@@ -148,16 +178,25 @@ class DealDetailScreen extends ConsumerWidget {
                     ),
                   ),
                 )
-              : state.detail == null
+              : detail == null
                   ? AppEmptyState(
                       icon: LucideIcons.fileX,
                       title: 'Deal Record Pending',
                       description: state.contractNotice ??
                           'Deal information is currently synchronizing with authoritative backend.',
                     )
-                  : _buildDealBody(context, ref, state.detail!, currencyFormat, dateFormat),
+                  : _buildDealBody(context, ref, detail, currencyFormat, dateFormat),
     );
   }
+
+  static BoxDecoration get _cardDecoration => BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 2)),
+        ],
+      );
 
   Widget _buildDealBody(
     BuildContext context,
@@ -168,9 +207,10 @@ class DealDetailScreen extends ConsumerWidget {
   ) {
     final deal = detail.deal;
     final statusColor = _getStatusColor(deal.status);
+    final canRecordAcceptance = deal.status.isOperational && !detail.confirmations.canFinalize;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -179,7 +219,7 @@ class DealDetailScreen extends ConsumerWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
-              margin: const EdgeInsets.only(bottom: 14),
+              margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
                 color: AppColors.success.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
@@ -211,12 +251,9 @@ class DealDetailScreen extends ConsumerWidget {
                             letterSpacing: 0.8,
                           ),
                         ),
-                        Text(
+                        const Text(
                           'Contract terms immutable & locked with trade exchange.',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondaryLight,
-                          ),
+                          style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
                         ),
                       ],
                     ),
@@ -226,241 +263,52 @@ class DealDetailScreen extends ConsumerWidget {
             ),
           ],
 
-          // Header Status Card
+          // 1. Buyer | Seller with one confirmation chip each
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderLight),
-            ),
+            key: const ValueKey('deal_parties_card'),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+            decoration: _cardDecoration,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        deal.status.displayLabel,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: statusColor,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.backgroundLight,
-                        borderRadius: BorderRadius.circular(5),
-                        border: Border.all(color: AppColors.borderLight),
-                      ),
-                      child: Text(
-                        'Version ${deal.latestVersionNumber}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      deal.ref,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primaryDark,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                Text(
-                  deal.commodityName,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimaryLight,
-                  ),
-                ),
-                if (deal.gradeName != null && deal.gradeName!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Grade: ${deal.gradeName}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondaryLight,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 14),
-
-                // Key Commercial KPIs
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildMetricTile(
-                        'Agreed Volume',
-                        deal.formattedQuantity,
-                        AppColors.textPrimaryLight,
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildMetricTile(
-                        'Rate',
-                        '${currencyFormat.format(deal.agreedPrice)} / ${deal.unitSymbol}',
-                        AppColors.textPrimaryLight,
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildMetricTile(
-                        'Total Value',
-                        currencyFormat.format(deal.totalValuation),
-                        AppColors.primaryDark,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Counterparties Card
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderLight),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(LucideIcons.users, size: 16, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text(
-                      'Counterparties',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimaryLight,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 20),
-                _buildPartyInfoTile('Buyer Enterprise', deal.buyerCompanyName, LucideIcons.building2),
-                const SizedBox(height: 10),
-                _buildPartyInfoTile('Seller Enterprise', deal.sellerCompanyName, LucideIcons.store),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Dual Confirmation Status Card (CRITICAL PER SPRINT SCOPE)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderLight),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(LucideIcons.checkSquare, size: 16, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text(
-                      'Party Confirmation Verification',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimaryLight,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 20),
-                _buildConfirmationRow(
-                  'Buyer Confirmation',
-                  detail.confirmations.buyerConfirmed,
-                  detail.confirmations.buyerConfirmedAt != null
-                      ? dateFormat.format(detail.confirmations.buyerConfirmedAt!)
-                      : 'Pending buyer acceptance of v${detail.confirmations.latestVersionNumber}',
-                ),
-                const SizedBox(height: 10),
-                _buildConfirmationRow(
-                  'Seller Confirmation',
-                  detail.confirmations.sellerConfirmed,
-                  detail.confirmations.sellerConfirmedAt != null
-                      ? dateFormat.format(detail.confirmations.sellerConfirmedAt!)
-                      : 'Pending seller acceptance of v${detail.confirmations.latestVersionNumber}',
-                ),
-                const SizedBox(height: 14),
-
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundLight,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                IntrinsicHeight(
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        detail.confirmations.canFinalize
-                            ? LucideIcons.checkCircle2
-                            : LucideIcons.info,
-                        size: 15,
-                        color: detail.confirmations.canFinalize
-                            ? AppColors.success
-                            : AppColors.textSecondaryLight,
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          detail.confirmations.canFinalize
-                              ? 'Both parties have formally confirmed terms. Deal is ready for booking lock.'
-                              : 'Per business rules, deal cannot be marked Finalized until both Buyer and Seller confirm the exact same version terms.',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: detail.confirmations.canFinalize
-                                ? AppColors.success
-                                : AppColors.textSecondaryLight,
-                          ),
+                        child: _buildPartyColumn(
+                          role: 'Buyer',
+                          companyName: deal.buyerCompanyName,
+                          icon: LucideIcons.building2,
+                          iconColor: const Color(0xFF2563EB),
+                          confirmed: detail.confirmations.buyerConfirmed,
+                          chipKey: const ValueKey('buyer_confirmation_chip'),
+                        ),
+                      ),
+                      const VerticalDivider(width: 20, thickness: 1, color: AppColors.borderLight),
+                      Expanded(
+                        child: _buildPartyColumn(
+                          role: 'Seller',
+                          companyName: deal.sellerCompanyName,
+                          icon: LucideIcons.store,
+                          iconColor: AppColors.primary,
+                          confirmed: detail.confirmations.sellerConfirmed,
+                          chipKey: const ValueKey('seller_confirmation_chip'),
                         ),
                       ),
                     ],
                   ),
                 ),
-
-                // Record Confirmation Action Button
-                if (deal.status.isOperational && !detail.confirmations.canFinalize) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 38,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                if (canRecordAcceptance) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      key: const ValueKey('record_acceptance_button'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
-                      icon: const Icon(LucideIcons.checkSquare, size: 15, color: AppColors.primary),
+                      icon: const Icon(LucideIcons.checkSquare, size: 14, color: AppColors.primary),
                       label: const Text(
                         'Record Counterparty Acceptance',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
@@ -476,34 +324,115 @@ class DealDetailScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // Contract Specifications Card
+          // 2. Deal summary
           Container(
+            key: const ValueKey('deal_summary_card'),
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderLight),
-            ),
+            decoration: _cardDecoration,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(LucideIcons.fileText, size: 16, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text(
-                      'Contract Terms & Logistics',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimaryLight,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            deal.commodityName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimaryLight,
+                            ),
+                          ),
+                          if (deal.gradeName != null && deal.gradeName!.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Grade: ${deal.gradeName}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Bounded so the chips wrap under each other on narrow screens.
+                    Flexible(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          _chip(deal.status.displayLabel, statusColor),
+                          _chip('Version ${deal.latestVersionNumber}', AppColors.textSecondaryLight),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const Divider(height: 20),
+                const Divider(height: 24),
+                IntrinsicHeight(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildMetricTile(LucideIcons.package, 'Agreed Volume', deal.formattedQuantity,
+                            AppColors.textPrimaryLight),
+                      ),
+                      const VerticalDivider(width: 12, color: AppColors.borderLight),
+                      Expanded(
+                        child: _buildMetricTile(
+                          LucideIcons.coins,
+                          'Rate',
+                          '${currencyFormat.format(deal.agreedPrice)} / ${deal.unitSymbol}',
+                          AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      const VerticalDivider(width: 12, color: AppColors.borderLight),
+                      Expanded(
+                        child: _buildMetricTile(LucideIcons.calculator, 'Total Value',
+                            currencyFormat.format(deal.totalValuation), AppColors.primaryDark),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 3. Negotiation details (navigation)
+          _SectionHeaderCard(
+            key: const ValueKey('section_negotiation'),
+            icon: LucideIcons.messageSquareText,
+            title: 'Negotiation Details',
+            subtitle: 'Latest offer, counter offers and messages',
+            trailing: const Icon(LucideIcons.chevronRight, size: 20, color: AppColors.textSecondaryLight),
+            onTap: () => deal.requirementId.isNotEmpty
+                ? context.push('/requirements/${deal.requirementId}')
+                : VersionHistorySheet.show(context, dealId: dealId, dealRef: deal.ref),
+          ),
+          const SizedBox(height: 10),
+
+          // 4. Collapsible sections (each collapsed whenever the page opens)
+          _AccordionCard(
+            key: const ValueKey('section_terms'),
+            icon: LucideIcons.fileText,
+            title: 'Contract Terms & Logistics',
+            subtitle: 'Price basis, delivery, payment terms, packaging etc.',
+            child: Column(
+              children: [
                 _buildTermRow('Price Basis', deal.priceBasis),
                 _buildTermRow('Delivery Location', deal.deliveryLocation ?? 'FOR Mandi Warehouse'),
                 _buildTermRow('Delivery Terms', detail.deliveryTerms),
@@ -518,54 +447,14 @@ class DealDetailScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 14),
-
-          // Broker Commission & Settlement Ledger Card (Sprint RB-FL-11)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderLight),
-            ),
+          const SizedBox(height: 10),
+          _AccordionCard(
+            key: const ValueKey('section_commission'),
+            icon: LucideIcons.indianRupee,
+            title: 'Brokerage Commission Ledger',
+            subtitle: 'Commission details and payment ledger',
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(LucideIcons.indianRupee, size: 16, color: AppColors.primary),
-                        SizedBox(width: 8),
-                        Text(
-                          'Brokerage Commission Ledger',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimaryLight,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        '₹${detail.brokerCommissionRate.toStringAsFixed(0)} / ${detail.commissionBasis}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primaryDark,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 20),
                 _buildTermRow(
                   'Eligible Commission',
                   '₹${(deal.agreedQuantity * detail.brokerCommissionRate).toStringAsFixed(2)} (Delivery basis)',
@@ -583,11 +472,8 @@ class DealDetailScreen extends ConsumerWidget {
                     icon: const Icon(LucideIcons.fileSpreadsheet, size: 16, color: AppColors.primary),
                     label: const Text(
                       'View Commission Breakdown & Payment Ledger',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
                     ),
                     onPressed: () {
                       final record = CommissionRecord(
@@ -625,34 +511,14 @@ class DealDetailScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 14),
-
-          // Audit Traceability Card
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderLight),
-            ),
+          const SizedBox(height: 10),
+          _AccordionCard(
+            key: const ValueKey('section_audit'),
+            icon: LucideIcons.clock,
+            title: 'Traceability & Audit Record',
+            subtitle: 'Created on ${dateFormat.format(deal.createdAt)}',
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
-                  children: [
-                    Icon(LucideIcons.gitCommit, size: 16, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text(
-                      'Traceability & Audit Record',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimaryLight,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 20),
                 if (deal.allocationReference != null)
                   _buildTermRow('Linked Allocation', deal.allocationReference!),
                 _buildTermRow('Created On', dateFormat.format(deal.createdAt)),
@@ -660,11 +526,10 @@ class DealDetailScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-          // Operational Workflow Actions
+          // 5. Actions (end of the scroll, never over content)
           if (deal.status.isOperational) ...[
-            // 1. Finalize Contract (Pre-flight gate unlocked)
             if (detail.confirmations.canFinalize) ...[
               SizedBox(
                 width: double.infinity,
@@ -677,6 +542,7 @@ class DealDetailScreen extends ConsumerWidget {
                   icon: const Icon(LucideIcons.lock, size: 18, color: Colors.white),
                   label: const Text(
                     'Pre-Flight Finalization Gate (Lock Contract)',
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
                   ),
                   onPressed: () => FinalizeDealDialog.show(
@@ -688,19 +554,14 @@ class DealDetailScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
             ],
-
-            // 2. Propose Terms Amendment (Negotiation Engine)
             SizedBox(
               width: double.infinity,
-              height: 46,
+              height: 48,
               child: ElevatedButton.icon(
+                key: const ValueKey('negotiate_terms_button'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: detail.confirmations.canFinalize
-                      ? AppColors.backgroundLight
-                      : AppColors.primary,
-                  foregroundColor: detail.confirmations.canFinalize
-                      ? AppColors.primary
-                      : Colors.white,
+                  backgroundColor: detail.confirmations.canFinalize ? AppColors.surfaceLight : AppColors.primary,
+                  foregroundColor: detail.confirmations.canFinalize ? AppColors.primary : Colors.white,
                   elevation: detail.confirmations.canFinalize ? 0 : 1,
                   side: detail.confirmations.canFinalize ? const BorderSide(color: AppColors.primary) : null,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -714,7 +575,7 @@ class DealDetailScreen extends ConsumerWidget {
                   'Negotiate Terms (Propose v${deal.latestVersionNumber + 1})',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                    fontSize: 13.5,
                     color: detail.confirmations.canFinalize ? AppColors.primary : Colors.white,
                   ),
                 ),
@@ -726,111 +587,96 @@ class DealDetailScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 10),
-
-            // 3. Inspect Version History
-            SizedBox(
-              width: double.infinity,
-              height: 42,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.borderLight),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(LucideIcons.history, size: 16, color: AppColors.textPrimaryLight),
-                label: const Text(
-                  'Inspect Terms History & Diffs',
-                  style: TextStyle(color: AppColors.textPrimaryLight, fontWeight: FontWeight.w600, fontSize: 12.5),
-                ),
-                onPressed: () => VersionHistorySheet.show(
-                  context,
-                  dealId: dealId,
-                  dealRef: deal.ref,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // 4. Cancel Deal
-            SizedBox(
-              width: double.infinity,
-              height: 42,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.error),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(LucideIcons.ban, size: 16, color: AppColors.error),
-                label: const Text(
-                  'Cancel Deal Record',
-                  style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700, fontSize: 12.5),
-                ),
-                onPressed: () => _showCancelDealDialog(context, ref, deal),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ] else ...[
-            // For Finalized / Cancelled deals, allow viewing Version History
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.borderLight),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(LucideIcons.history, size: 16, color: AppColors.textPrimaryLight),
-                label: const Text(
-                  'Inspect Version History & Diffs',
-                  style: TextStyle(color: AppColors.textPrimaryLight, fontWeight: FontWeight.w600),
-                ),
-                onPressed: () => VersionHistorySheet.show(
-                  context,
-                  dealId: dealId,
-                  dealRef: deal.ref,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
           ],
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: OutlinedButton.icon(
+              key: const ValueKey('terms_history_button'),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: AppColors.surfaceLight,
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(LucideIcons.history, size: 16, color: AppColors.primary),
+              label: const Text(
+                'Inspect Terms History & Diffs',
+                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+              onPressed: () => VersionHistorySheet.show(
+                context,
+                dealId: dealId,
+                dealRef: deal.ref,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMetricTile(String label, String value, Color valueColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondaryLight)),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: valueColor),
-        ),
-      ],
+  Widget _chip(String label, Color color, {Key? key, IconData? icon}) {
+    return Container(
+      key: key,
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: color),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildPartyInfoTile(String role, String companyName, IconData icon) {
+  Widget _buildPartyColumn({
+    required String role,
+    required String companyName,
+    required IconData icon,
+    required Color iconColor,
+    required bool confirmed,
+    required Key chipKey,
+  }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.backgroundLight,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 16, color: AppColors.primary),
+          decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: Icon(icon, size: 18, color: iconColor),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(role, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondaryLight)),
+              Text(role, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
               Text(
                 companyName,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimaryLight),
+              ),
+              const SizedBox(height: 6),
+              _chip(
+                confirmed ? 'Confirmed' : 'Pending',
+                confirmed ? AppColors.success : _pendingColor,
+                key: chipKey,
+                icon: confirmed ? LucideIcons.checkCircle2 : LucideIcons.clock,
               ),
             ],
           ),
@@ -839,32 +685,25 @@ class DealDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildConfirmationRow(String label, bool isConfirmed, String subtitle) {
+  Widget _buildMetricTile(IconData icon, String label, String value, Color valueColor) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          isConfirmed ? LucideIcons.checkCircle2 : LucideIcons.clock,
-          size: 16,
-          color: isConfirmed ? AppColors.success : const Color(0xFFD97706),
-        ),
-        const SizedBox(width: 10),
+        Icon(icon, size: 16, color: AppColors.textSecondaryLight),
+        const SizedBox(width: 6),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '$label: ${isConfirmed ? "Confirmed" : "Pending"}',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: isConfirmed ? AppColors.success : const Color(0xFF92400E),
-                ),
-              ),
-              const SizedBox(height: 1),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondaryLight)),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: valueColor)),
               ),
             ],
           ),
@@ -890,6 +729,136 @@ class DealDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Icon, title and subtitle row used by every section card.
+class _SectionHeaderCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+  final VoidCallback onTap;
+  final Widget? body;
+
+  const _SectionHeaderCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    required this.onTap,
+    this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: DealDetailScreen._cardDecoration,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          children: [
+            InkWell(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, size: 18, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondaryLight),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    trailing,
+                  ],
+                ),
+              ),
+            ),
+            ?body,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A section that starts collapsed each time the page opens; its expanded
+/// state is local, so sections never affect one another.
+class _AccordionCard extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _AccordionCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  State<_AccordionCard> createState() => _AccordionCardState();
+}
+
+class _AccordionCardState extends State<_AccordionCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionHeaderCard(
+      icon: widget.icon,
+      title: widget.title,
+      subtitle: widget.subtitle,
+      onTap: () => setState(() => _expanded = !_expanded),
+      trailing: AnimatedRotation(
+        turns: _expanded ? 0.5 : 0,
+        duration: const Duration(milliseconds: 180),
+        child: const Icon(LucideIcons.chevronDown, size: 20, color: AppColors.textSecondaryLight),
+      ),
+      body: _expanded
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+              child: Column(
+                children: [
+                  const Divider(height: 1),
+                  const SizedBox(height: 8),
+                  widget.child,
+                ],
+              ),
+            )
+          : null,
     );
   }
 }

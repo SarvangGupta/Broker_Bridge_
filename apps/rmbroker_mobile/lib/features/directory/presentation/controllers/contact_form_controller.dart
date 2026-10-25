@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/directory_repository.dart';
@@ -59,6 +60,11 @@ class ContactFormState {
       companyName.trim().length >= 2 &&
       mobile.trim().isNotEmpty;
 
+  /// Error fields use [_keep] as "unchanged", so passing `null` clears an
+  /// error (previously `null` meant "keep", and corrected fields kept
+  /// showing stale errors).
+  static const Object _keep = Object();
+
   ContactFormState copyWith({
     String? name,
     String? companyName,
@@ -71,16 +77,18 @@ class ContactFormState {
     String? notes,
     bool? status,
     bool? isSubmitting,
-    String? nameError,
-    String? companyError,
-    String? mobileError,
-    String? emailError,
-    String? generalError,
-    String? duplicateWarning,
+    Object? nameError = _keep,
+    Object? companyError = _keep,
+    Object? mobileError = _keep,
+    Object? emailError = _keep,
+    Object? generalError = _keep,
+    Object? duplicateWarning = _keep,
     bool? isSuccess,
     String? createdContactId,
     bool clearErrors = false,
   }) {
+    String? pick(Object? next, String? current) =>
+        clearErrors ? null : (identical(next, _keep) ? current : next as String?);
     return ContactFormState(
       name: name ?? this.name,
       companyName: companyName ?? this.companyName,
@@ -93,12 +101,12 @@ class ContactFormState {
       notes: notes ?? this.notes,
       status: status ?? this.status,
       isSubmitting: isSubmitting ?? this.isSubmitting,
-      nameError: clearErrors ? null : (nameError ?? this.nameError),
-      companyError: clearErrors ? null : (companyError ?? this.companyError),
-      mobileError: clearErrors ? null : (mobileError ?? this.mobileError),
-      emailError: clearErrors ? null : (emailError ?? this.emailError),
-      generalError: clearErrors ? null : (generalError ?? this.generalError),
-      duplicateWarning: clearErrors ? null : (duplicateWarning ?? this.duplicateWarning),
+      nameError: pick(nameError, this.nameError),
+      companyError: pick(companyError, this.companyError),
+      mobileError: pick(mobileError, this.mobileError),
+      emailError: pick(emailError, this.emailError),
+      generalError: pick(generalError, this.generalError),
+      duplicateWarning: pick(duplicateWarning, this.duplicateWarning),
       isSuccess: isSuccess ?? this.isSuccess,
       createdContactId: createdContactId ?? this.createdContactId,
     );
@@ -114,11 +122,24 @@ class ContactFormController extends Notifier<ContactFormState> {
     return const ContactFormState();
   }
 
+  // Stored location values of the contact being edited, and the text shown
+  // for them, so an unchanged field is saved back exactly as stored.
+  String? _storedCity;
+  String? _storedState;
+  String _shownCity = '';
+  String _shownState = '';
+
   void initForCreate([ContactRole defaultRole = ContactRole.buyer]) {
+    _storedCity = _storedState = null;
+    _shownCity = _shownState = '';
     state = ContactFormState(role: defaultRole);
   }
 
   void initForEdit(DirectoryContact contact) {
+    _storedCity = contact.city;
+    _storedState = contact.state;
+    _shownCity = contact.cityLabel ?? '';
+    _shownState = contact.stateLabel ?? '';
     state = ContactFormState(
       name: contact.name,
       companyName: contact.companyName,
@@ -126,11 +147,17 @@ class ContactFormController extends Notifier<ContactFormState> {
       whatsapp: contact.whatsapp ?? '',
       email: contact.email ?? '',
       role: contact.role,
-      city: contact.city ?? '',
-      state: contact.state ?? '',
+      city: _shownCity,
+      state: _shownState,
       status: contact.status,
     );
   }
+
+  /// The value to save for an edited location field: the stored value when
+  /// the shown text was not changed, otherwise what the user typed.
+  @visibleForTesting
+  static String locationToSave(String typed, String shown, String? stored) =>
+      typed.trim() == shown.trim() && stored != null ? stored : typed;
 
   void updateName(String val) {
     state = state.copyWith(
@@ -240,8 +267,8 @@ class ContactFormController extends Notifier<ContactFormState> {
         whatsapp: state.whatsapp,
         email: state.email,
         role: state.role,
-        city: state.city,
-        state: state.state,
+        city: locationToSave(state.city, _shownCity, _storedCity),
+        state: locationToSave(state.state, _shownState, _storedState),
         notes: state.notes,
         status: state.status,
       );

@@ -517,6 +517,8 @@ class _MockDirectoryRepository extends DirectoryRepository {
     String? role,
     String? search,
     String? status,
+    int? limit,
+    String? cursor,
   }) async {
     return DirectorySuccess(
       DirectoryListPayload(

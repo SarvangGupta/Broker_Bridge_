@@ -33,174 +33,10 @@ class NotificationRepository {
     }
   }
 
-  // In-memory cache & audit-trailed storage
+  // In-memory cache of rows fetched from the backend. There is no sample data:
+  // an empty feed shows the empty state instead of fabricated alerts.
   final List<BrokerNotification> _cachedNotifications = [];
-  bool _initialized = false;
   RealtimeChannel? _realtimeSubscription;
-
-  void _seedDefaultNotifications() {
-    if (_initialized) return;
-    _initialized = true;
-
-    final now = DateTime.now();
-
-    _cachedNotifications.addAll([
-      BrokerNotification(
-        id: 'notif-2026-001',
-        userId: 'broker-demo-user',
-        channel: 'IN_APP',
-        eventType: 'FINAL_CONFIRMATION_REQUIRED',
-        category: NotificationCategory.dealsAndConfirmations,
-        title: 'Deal Awaiting Final Confirmation',
-        message: 'Deal DL-2026-0891 (50 MT Mustard Seed) requires your desk review and party confirmation.',
-        contextReason: 'Buyer Sharma Agro Mills Ltd confirmed terms. Awaiting seller confirmation sign-off.',
-        actionLabel: 'Review Deal',
-        actionUrl: '/deals/deal-bkg-0042',
-        idempotencyKey: 'idemp-deal-confirm-0891',
-        deliveryStatus: 'Sent',
-        isRead: false,
-        readAt: null,
-        createdAt: now.subtract(const Duration(minutes: 15)),
-        payload: {
-          'dealId': 'deal-bkg-0042',
-          'dealReference': 'DL-2026-0891',
-          'commodity': 'Mustard Seed (Sarson)',
-          'quantity': 50.0,
-        },
-      ),
-      BrokerNotification(
-        id: 'notif-2026-002',
-        userId: 'broker-demo-user',
-        channel: 'IN_APP',
-        eventType: 'MATCH_CREATED',
-        category: NotificationCategory.requirementsAndOffers,
-        title: 'New High-Score Mandate Match (96%)',
-        message: 'Buyer requirement REQ-2026-0104 matches Seller Offer OFF-2026-0219 for Grade-A Bold Mustard.',
-        contextReason: 'Quantity 50 MT and target price ₹5,450/Qtl align within 0.5% mandi tolerance.',
-        actionLabel: 'Inspect Match',
-        actionUrl: '/work',
-        idempotencyKey: 'idemp-match-req-0104',
-        deliveryStatus: 'Sent',
-        isRead: false,
-        readAt: null,
-        createdAt: now.subtract(const Duration(hours: 1, minutes: 20)),
-        payload: {
-          'requirementId': 'req-2026-0104',
-          'offerId': 'off-2026-0219',
-          'commodity': 'Mustard Seed (Sarson)',
-          'matchScore': 96,
-        },
-      ),
-      BrokerNotification(
-        id: 'notif-2026-003',
-        userId: 'broker-demo-user',
-        channel: 'IN_APP',
-        eventType: 'PAYMENT_RECORDED',
-        category: NotificationCategory.commissionAndInvoices,
-        title: 'Commission Payment Recorded',
-        message: '₹3,000 received for Invoice INV-2026-0042 (Deal DL-2026-0891).',
-        contextReason: 'Payment verified via UTR994827104921. Ledger balance updated to zero outstanding.',
-        actionLabel: 'View Invoice',
-        actionUrl: '/invoices/inv-2026-0042',
-        idempotencyKey: 'idemp-pay-inv-0042',
-        deliveryStatus: 'Sent',
-        isRead: false,
-        readAt: null,
-        createdAt: now.subtract(const Duration(hours: 3, minutes: 45)),
-        payload: {
-          'invoiceId': 'inv-2026-0042',
-          'amount': 3000.0,
-          'utr': 'UTR994827104921',
-        },
-      ),
-      BrokerNotification(
-        id: 'notif-2026-004',
-        userId: 'broker-demo-user',
-        channel: 'IN_APP',
-        eventType: 'DISPATCH_REMINDER',
-        category: NotificationCategory.dispatchAndDelivery,
-        title: 'Vehicle Dispatch Transit Update',
-        message: 'Truck RJ-14-GA-8821 dispatched from Kisan Krishi Mandi Yard to Sharma Agro Mills.',
-        contextReason: 'E-Way bill verified. Estimated arrival at destination in 4 hours.',
-        actionLabel: 'Track Dispatch',
-        actionUrl: '/orders',
-        idempotencyKey: 'idemp-disp-rj14-8821',
-        deliveryStatus: 'Sent',
-        isRead: true,
-        readAt: now.subtract(const Duration(hours: 4)),
-        createdAt: now.subtract(const Duration(hours: 6)),
-        payload: {
-          'dispatchId': 'disp-8821',
-          'vehicle': 'RJ-14-GA-8821',
-          'dealReference': 'DL-2026-0891',
-        },
-      ),
-      BrokerNotification(
-        id: 'notif-2026-005',
-        userId: 'broker-demo-user',
-        channel: 'IN_APP',
-        eventType: 'DISPUTE_RAISED',
-        category: NotificationCategory.disputesAndExceptions,
-        title: 'Moisture Deduction Review Held',
-        message: 'Deal DL-2026-0894: Buyer held payment pending moisture deduction arbitration.',
-        contextReason: 'Moisture reported at 8.4% vs 8.0% contracted FAQ standard. Broker review requested.',
-        actionLabel: 'Review Dispute',
-        actionUrl: '/disputes',
-        idempotencyKey: 'idemp-disp-0894-moist',
-        deliveryStatus: 'Sent',
-        isRead: false,
-        readAt: null,
-        createdAt: now.subtract(const Duration(hours: 18)),
-        payload: {
-          'dealId': 'deal-bkg-0045',
-          'dealReference': 'DL-2026-0894',
-          'disputeId': 'disp-moist-0045',
-        },
-      ),
-      BrokerNotification(
-        id: 'notif-2026-006',
-        userId: 'broker-demo-user',
-        channel: 'IN_APP',
-        eventType: 'AVAILABILITY_EXPIRING',
-        category: NotificationCategory.requirementsAndOffers,
-        title: 'Seller Offer Expiring in 2 Hours',
-        message: 'Offer OFF-2026-0220 (40 MT Yellow Soyabean) expires today at 5:00 PM.',
-        contextReason: 'Active counterparty inquiries pending. Refresh offer validity if stock remains.',
-        actionLabel: 'Inspect Offer',
-        actionUrl: '/work',
-        idempotencyKey: 'idemp-off-exp-0220',
-        deliveryStatus: 'Sent',
-        isRead: true,
-        readAt: now.subtract(const Duration(hours: 12)),
-        createdAt: now.subtract(const Duration(days: 1, hours: 2)),
-        payload: {
-          'offerId': 'off-2026-0220',
-          'commodity': 'Yellow Soyabean',
-        },
-      ),
-      BrokerNotification(
-        id: 'notif-2026-007',
-        userId: 'broker-demo-user',
-        channel: 'IN_APP',
-        eventType: 'KYC_STATUS',
-        category: NotificationCategory.system,
-        title: 'Mandi Trade Desk Compliance Active',
-        message: 'Broker APMC Mandi License and GST credentials verified successfully for FY 2026-27.',
-        contextReason: 'Annual compliance audit complete. All statutory trading desk rights confirmed.',
-        actionLabel: 'View Credentials',
-        actionUrl: null,
-        idempotencyKey: 'idemp-kyc-desk-2026',
-        deliveryStatus: 'Sent',
-        isRead: true,
-        readAt: now.subtract(const Duration(days: 2)),
-        createdAt: now.subtract(const Duration(days: 3)),
-        payload: {
-          'licenseType': 'APMC_CLASS_A',
-          'status': 'VERIFIED',
-        },
-      ),
-    ]);
-  }
 
   /// Fetches notifications with optional category and unread filters.
   /// Deduplicates items and sorts newest-first.
@@ -208,8 +44,6 @@ class NotificationRepository {
     NotificationCategory? category,
     bool? unreadOnly,
   }) async {
-    _seedDefaultNotifications();
-
     // 1. Attempt REST endpoint
     try {
       final queryParams = <String, dynamic>{};
@@ -333,8 +167,6 @@ class NotificationRepository {
   /// Marks a specific notification as read.
   /// Updates local state and propagates to backend.
   Future<bool> markAsRead(String notificationId) async {
-    _seedDefaultNotifications();
-
     final index = _cachedNotifications.indexWhere((n) => n.id == notificationId);
     if (index >= 0) {
       final existing = _cachedNotifications[index];
@@ -371,8 +203,6 @@ class NotificationRepository {
 
   /// Marks all unread notifications as read.
   Future<int> markAllAsRead() async {
-    _seedDefaultNotifications();
-
     int updatedCount = 0;
     final now = DateTime.now();
 

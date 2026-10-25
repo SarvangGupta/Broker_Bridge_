@@ -161,6 +161,8 @@ class BrokerNotification {
           payload!['requirementId'] != null ||
           payload!['requirement_id'] != null ||
           payload!['availabilityId'] != null ||
+          payload!['availability_id'] != null ||
+          payload!['offerId'] != null ||
           payload!['offer_id'] != null ||
           payload!['disputeId'] != null ||
           payload!['dispute_id'] != null ||
@@ -172,43 +174,103 @@ class BrokerNotification {
     return false;
   }
 
+  static final RegExp _safeId = RegExp(r'^[A-Za-z0-9_\-\.]{1,64}$');
+
+  /// First non-empty, path-safe payload value among [keys].
+  String? _payloadId(List<String> keys) {
+    for (final key in keys) {
+      final value = payload?[key]?.toString().trim();
+      if (value != null && value.isNotEmpty && _safeId.hasMatch(value)) return value;
+    }
+    return null;
+  }
+
+  /// Record id from a `/<segment>/<id>` path in [actionUrl].
+  String? _urlId(String singular) {
+    final url = actionUrl?.trim();
+    if (url == null || url.isEmpty) return null;
+    final match = RegExp('/${singular}s?/([a-zA-Z0-9_\\-\\.]+)', caseSensitive: false).firstMatch(url);
+    final id = match?.group(1);
+    if (id == null || id.isEmpty) return null;
+    final lower = id.toLowerCase();
+    if (lower == singular || lower == '${singular}s') return null;
+    return id;
+  }
+
+  /// Deal referenced by this notification (payload first, then URL).
+  String? get dealId => _payloadId(const ['dealId', 'deal_id']) ?? _urlId('deal');
+
+  /// Buyer requirement referenced by this notification (payload first, then URL).
+  String? get requirementId =>
+      _payloadId(const ['requirementId', 'requirement_id']) ?? _urlId('requirement');
+
+  /// Seller offer (availability lot) referenced by this notification.
+  String? get offerId =>
+      _payloadId(const ['availabilityId', 'availability_id', 'offerId', 'offer_id']);
+
+  /// Short human reference for the record, matching the refs shown on cards
+  /// (`#REQ-XXXXXX`, `DL-XXXXXX`, or the payload's own reference).
+  String? get recordReference {
+    String short(String id) => (id.length >= 6 ? id.substring(0, 6) : id).toUpperCase();
+    final dealRef = payload?['dealReference']?.toString() ?? payload?['bookingReference']?.toString();
+    if (dealRef != null && dealRef.isNotEmpty) return dealRef;
+    final deal = dealId;
+    if (deal != null) return 'DL-${short(deal)}';
+    final req = requirementId;
+    if (req != null) return '#REQ-${short(req)}';
+    final offer = offerId;
+    if (offer != null) return payload?['lotNumber']?.toString() ?? 'Offer ${short(offer)}';
+    return null;
+  }
+
+  /// One line of commercial context from the payload, e.g.
+  /// `#REQ-107DF7 · 35 MT · ₹28,000/MT · FOR Mill Delivery, Kota Mandi`.
+  String? get detailLine {
+    final parts = <String>[];
+    final ref = recordReference;
+    if (ref != null) parts.add(ref);
+    final qty = payload?['quantity'];
+    final unit = payload?['unit']?.toString() ?? payload?['unitSymbol']?.toString();
+    if (qty is num) {
+      final q = qty % 1 == 0 ? qty.toInt().toString() : qty.toString();
+      parts.add(unit != null && unit.isNotEmpty ? '$q $unit' : q);
+    }
+    final price = payload?['targetPrice'] ?? payload?['price'] ?? payload?['agreedPrice'];
+    if (price is num && price > 0) {
+      final formatted = NumberFormat.decimalPattern('en_IN').format(price);
+      parts.add(unit != null && unit.isNotEmpty ? '₹$formatted/$unit' : '₹$formatted');
+    }
+    final location = payload?['deliveryLocation']?.toString();
+    if (location != null && location.trim().isNotEmpty) parts.add(location.trim());
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
   /// Returns the target Flutter route path if resolved.
+  ///
+  /// Record ids win over the generic `action_url` (the requirement RPC writes
+  /// `/work?tab=0`, and web writers use `/buyer/...` or `/broker/...` URLs), so a
+  /// tap always opens the referenced record in its own section.
   String? get resolvedRoute {
+    final deal = dealId;
+    if (deal != null) return '/deals/$deal';
+    final requirement = requirementId;
+    if (requirement != null) return '/requirements/$requirement';
+    final offer = offerId;
+    if (offer != null) return '/work?tab=1&offerId=$offer';
+
     // 1. Direct recognized action URL - translate web URLs to mobile routes
     if (actionUrl != null && actionUrl!.trim().isNotEmpty && actionUrl != '/seller') {
       final url = actionUrl!.trim();
 
       if (url.contains('requirement')) {
-        final match = RegExp(r'/requirements?/([a-zA-Z0-9_\-\.]+)', caseSensitive: false).firstMatch(url);
-        final id = match?.group(1);
-        if (id != null && id.isNotEmpty && id.toLowerCase() != 'requirement' && id.toLowerCase() != 'requirements') {
-          return '/work?requirementId=$id';
-        }
-        final payloadReqId = payload?['requirementId'] ?? payload?['requirement_id'];
-        if (payloadReqId != null && payloadReqId.toString().trim().isNotEmpty) {
-          return '/work?requirementId=${payloadReqId.toString().trim()}';
-        }
         return '/work';
       }
 
       if (url.contains('deal')) {
-        // Extract deal ID from URL path segment (e.g. /deals/deal-bkg-0042, /broker/deals/DL-2026-0891, or UUID)
-        final match = RegExp(r'/deals?/([a-zA-Z0-9_\-\.]+)', caseSensitive: false).firstMatch(url);
-        if (match != null) {
-          final id = match.group(1);
-          if (id != null && id.isNotEmpty && id.toLowerCase() != 'deal' && id.toLowerCase() != 'deals') {
-            return '/deals/$id';
-          }
-        }
-        // Fallback to 36-char UUID regex in URL
+        // Fallback to 36-char UUID regex in URL (ids in /deals/<id> were handled above)
         final uuidMatch = RegExp(r'[0-9a-fA-F-]{36}').firstMatch(url);
         if (uuidMatch != null) {
           return '/deals/${uuidMatch.group(0)}';
-        }
-        // Check payload before defaulting to generic shell branch /deals
-        final payloadDealId = payload?['dealId'] ?? payload?['deal_id'];
-        if (payloadDealId != null && payloadDealId.toString().trim().isNotEmpty) {
-          return '/deals/${payloadDealId.toString().trim()}';
         }
         return '/deals';
       }
@@ -249,23 +311,10 @@ class BrokerNotification {
 
     // 2. Resolve from payload
     if (payload != null) {
-      final dealId = payload!['dealId'] ?? payload!['deal_id'];
-      if (dealId != null && dealId.toString().trim().isNotEmpty) {
-        return '/deals/${dealId.toString().trim()}';
-      }
-
       final invoiceId = payload!['invoiceId'] ?? payload!['invoice_id'];
       if (invoiceId != null && invoiceId.toString().trim().isNotEmpty) {
         return '/invoices/${invoiceId.toString().trim()}';
       }
-
-      final requirementId = payload!['requirementId'] ?? payload!['requirement_id'];
-      if (requirementId != null && requirementId.toString().trim().isNotEmpty) {
-        return '/work?requirementId=${requirementId.toString().trim()}';
-      }
-
-      final offerId = payload!['availabilityId'] ?? payload!['offer_id'];
-      if (offerId != null) return '/work';
 
       final disputeId = payload!['disputeId'] ?? payload!['dispute_id'];
       if (disputeId != null) return '/disputes';

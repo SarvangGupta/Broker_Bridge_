@@ -23,6 +23,15 @@ class DirectoryState {
   final String? errorMessage;
   final bool isRefreshing;
 
+  /// Pagination: [allContacts] holds the pages loaded so far for the current
+  /// tab/status/search; [nextCursor] continues the list while [hasMore].
+  final bool hasMore;
+  final String? nextCursor;
+  final bool isLoadingMore;
+
+  /// Set when loading a further page failed; the loaded pages stay visible.
+  final String? loadMoreError;
+
   const DirectoryState({
     this.status = DirectoryStatus.initial,
     this.allContacts = const [],
@@ -33,43 +42,28 @@ class DirectoryState {
     this.contractNotice,
     this.errorMessage,
     this.isRefreshing = false,
+    this.hasMore = false,
+    this.nextCursor,
+    this.isLoadingMore = false,
+    this.loadMoreError,
   });
 
-  /// Real-time client-filtered contacts based on active tab, status, and search query.
+  /// Loaded contacts matching the active tab, status and search. The list is
+  /// already fetched with these filters; filtering again keeps the view right
+  /// while a reload for a just-changed filter is in flight.
   List<DirectoryContact> get filteredContacts {
-    return allContacts.filter((c) {
-      // 1. Role tab filter
-      if (activeTab == 'buyer' && c.role != ContactRole.buyer) return false;
-      if (activeTab == 'seller' && c.role != ContactRole.seller) return false;
-
-      // 2. Status filter
-      if (statusFilter == 'active' && !c.status) return false;
-      if (statusFilter == 'inactive' && c.status) return false;
-
-      // 3. Search query filter
-      if (searchQuery.trim().isNotEmpty) {
-        final q = searchQuery.toLowerCase().trim();
-        final digits = q.replaceAll(RegExp(r'\D'), '');
-
-        final matchesName = c.name.toLowerCase().contains(q);
-        final matchesComp = c.companyName.toLowerCase().contains(q);
-        final matchesEmail = c.email?.toLowerCase().contains(q) ?? false;
-        final matchesCity = c.city?.toLowerCase().contains(q) ?? false;
-        final matchesState = c.state?.toLowerCase().contains(q) ?? false;
-        final matchesPhone = digits.length >= 3 &&
-            c.mobile.replaceAll(RegExp(r'\D'), '').contains(digits);
-
-        return matchesName ||
-            matchesComp ||
-            matchesEmail ||
-            matchesCity ||
-            matchesState ||
-            matchesPhone;
-      }
-
-      return true;
-    }).toList();
+    return allContacts
+        .filter(
+          (c) => c.matchesFilters(
+            role: activeTab,
+            status: statusFilter,
+            search: searchQuery,
+          ),
+        )
+        .toList();
   }
+
+  static const Object _keep = Object();
 
   DirectoryState copyWith({
     DirectoryStatus? status,
@@ -81,6 +75,10 @@ class DirectoryState {
     String? contractNotice,
     String? errorMessage,
     bool? isRefreshing,
+    bool? hasMore,
+    Object? nextCursor = _keep,
+    bool? isLoadingMore,
+    Object? loadMoreError = _keep,
   }) {
     return DirectoryState(
       status: status ?? this.status,
@@ -92,6 +90,10 @@ class DirectoryState {
       contractNotice: contractNotice ?? this.contractNotice,
       errorMessage: errorMessage ?? this.errorMessage,
       isRefreshing: isRefreshing ?? this.isRefreshing,
+      hasMore: hasMore ?? this.hasMore,
+      nextCursor: identical(nextCursor, _keep) ? this.nextCursor : nextCursor as String?,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      loadMoreError: identical(loadMoreError, _keep) ? this.loadMoreError : loadMoreError as String?,
     );
   }
 }
