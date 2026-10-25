@@ -12,6 +12,7 @@ import '../../requirements/domain/master_requirement_data.dart';
 import '../../requirements/presentation/commodity_picker_sheet.dart';
 import '../domain/nutrition_guide_data.dart';
 import 'raw_material_details_sheet.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Buyer guide to raw materials in the live Product Master: global search by
 /// name or code, and browsing by approved parent category.
@@ -126,7 +127,7 @@ class _NutritionGuideScreenState extends State<NutritionGuideScreen> {
                   tooltip: 'All categories',
                   onPressed: _closeCategory,
                 ),
-          title: Text(category?.name ?? 'Nutrition Guide'),
+          title: Text(category?.name ?? context.tr(Tr.titleNutrition)),
           actions: [
             IconButton(
               icon: const Icon(LucideIcons.rotateCw),

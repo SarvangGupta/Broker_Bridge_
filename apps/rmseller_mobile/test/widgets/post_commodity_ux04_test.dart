@@ -77,7 +77,7 @@ void main() {
         expect(find.byKey(const Key('quantity_field')), findsOneWidget);
         expect(find.text('Unit *'), findsOneWidget);
         expect(find.byKey(const Key('unit_dropdown')), findsOneWidget);
-        expect(find.text('Asking Price per Unit (₹) *'), findsOneWidget);
+        expect(find.text('Asking Price (₹ per MT) *'), findsOneWidget);
         expect(find.byKey(const Key('asking_price_field')), findsOneWidget);
         expect(find.text('Commercial Payment Terms *'), findsOneWidget);
         expect(find.byKey(const Key('payment_terms_dropdown')), findsOneWidget);

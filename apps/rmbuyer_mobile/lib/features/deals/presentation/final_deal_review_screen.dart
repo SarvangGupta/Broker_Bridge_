@@ -10,6 +10,7 @@ import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../data/buyer_deals_repository.dart';
 import '../domain/final_deal_review_model.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Screen presenting the final negotiated commercial proposal for explicit buyer confirmation.
 /// Enforces strict Counterparty Shield (zero seller data) and optimistic concurrency.
@@ -430,7 +431,7 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Final Deal Review'),
+        title: Text(context.tr(Tr.titleFinalDealReview)),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.rotateCw),

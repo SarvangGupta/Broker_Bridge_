@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Navigation shell hosting the persistent bottom navigation bar for RMBuyer.
 class NavigationShell extends StatelessWidget {
@@ -30,26 +31,26 @@ class NavigationShell extends StatelessWidget {
         unselectedItemColor: AppColors.textSecondaryLight,
         backgroundColor: AppColors.surfaceLight,
         type: BottomNavigationBarType.fixed,
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(LucideIcons.home),
-            label: 'Home',
+            icon: const Icon(LucideIcons.home),
+            label: context.tr(Tr.navHome),
           ),
           BottomNavigationBarItem(
-            icon: Icon(LucideIcons.clipboardList),
-            label: 'Requirements',
+            icon: const Icon(LucideIcons.clipboardList),
+            label: context.tr(Tr.navRequirements),
           ),
           BottomNavigationBarItem(
-            icon: Icon(LucideIcons.handshake),
-            label: 'Deals',
+            icon: const Icon(LucideIcons.handshake),
+            label: context.tr(Tr.navDeals),
           ),
           BottomNavigationBarItem(
-            icon: Icon(LucideIcons.leaf),
-            label: 'Nutrition Guide',
+            icon: const Icon(LucideIcons.leaf),
+            label: context.tr(Tr.navNutrition),
           ),
           BottomNavigationBarItem(
-            icon: Icon(LucideIcons.user),
-            label: 'Profile',
+            icon: const Icon(LucideIcons.user),
+            label: context.tr(Tr.navProfile),
           ),
         ],
       ),

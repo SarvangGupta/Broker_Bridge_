@@ -111,6 +111,13 @@ void main() {
       await tester.tap(find.byKey(const Key('commodity-option-$wheatId')));
       await tester.pumpAndSettle();
 
+      // Quantity and target price have no defaults; enter them.
+      for (final (key, value) in [('requirement-quantity-field', '30'), ('requirement-price-field', '5200')]) {
+        final field = find.descendant(of: find.byKey(Key(key)), matching: find.byType(TextField));
+        await tester.ensureVisible(field);
+        await tester.enterText(field, value);
+      }
+
       // Tap submit
       final submitBtn = find.text('Submit Requirement & Notify Brokers');
       await tester.ensureVisible(submitBtn);

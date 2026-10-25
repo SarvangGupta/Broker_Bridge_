@@ -242,20 +242,8 @@ class RequirementsRepository {
             throw Exception('Failed to save requirement to server: $e');
           }
         } else {
-          // Unauthenticated or mock test environment fallback
-          try {
-            final res = await client
-                .from('requirements')
-                .insert(insertPayload)
-                .select('id, created_at, status')
-                .single();
-
-            if (res['id'] != null) {
-              requirementId = res['id'].toString();
-            }
-          } catch (e) {
-            debugPrint('Local test environment insertion notice: $e');
-          }
+          // No valid session: never report a requirement the server did not save.
+          throw StateError('Your session has expired. Please sign in again to post this requirement.');
         }
       }
 

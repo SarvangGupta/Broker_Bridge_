@@ -12,6 +12,7 @@ import '../../../core/widgets/app_text_field.dart';
 import '../data/search_repository.dart';
 import '../domain/search_model.dart';
 import 'widgets/broker_result_card.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Interactive search screen for commodities and authorized brokers.
 /// Includes category filter chips, debouncing, broker contact cards, and requirement posting CTA.
@@ -139,7 +140,7 @@ class _BuyerSearchScreenState extends State<BuyerSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Search Commodities & Brokers'),
+        title: Text(context.tr(Tr.titleSearch)),
         leading: IconButton(
           icon: const Icon(LucideIcons.arrowLeft),
           onPressed: () => context.pop(),

@@ -53,7 +53,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump();
 
-    expect(find.text('Buyer Profile & Settings'), findsOneWidget);
+    expect(find.text('Profile & Settings'), findsOneWidget);
   });
 
   testWidgets('Five tabs fit a phone-width bar and Nutrition Guide opens', (WidgetTester tester) async {

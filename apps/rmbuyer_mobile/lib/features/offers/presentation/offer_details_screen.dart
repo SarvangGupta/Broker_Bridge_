@@ -13,6 +13,7 @@ import '../data/offers_repository.dart';
 import '../domain/buyer_offer_model.dart';
 import '../domain/offer_inputs.dart';
 import 'package:go_router/go_router.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Screen displaying complete commercial offer terms, immutable negotiation rounds history,
 /// and interactive counter-offer, accept, and reject actions.
@@ -564,7 +565,7 @@ class _OfferDetailsScreenState extends State<OfferDetailsScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Proposal Details')),
+        appBar: AppBar(title: Text(context.tr(Tr.titleProposalDetails))),
         body: const AppLoadingIndicator(
           message: 'Retrieving commercial terms and negotiation ledger...',
         ),
@@ -573,7 +574,7 @@ class _OfferDetailsScreenState extends State<OfferDetailsScreen> {
 
     if (_errorMessage != null || _offer == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Proposal Details')),
+        appBar: AppBar(title: Text(context.tr(Tr.titleProposalDetails))),
         body: AppErrorState(
           message: _errorMessage ?? 'Offer not found.',
           onRetry: _loadOfferDetails,

@@ -15,6 +15,7 @@ import '../../search/data/search_repository.dart';
 import '../../search/domain/broker_model.dart';
 import '../../search/domain/search_model.dart';
 import '../../search/presentation/widgets/broker_result_card.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Primary buyer dashboard home screen.
 /// Implements mobile-first broker discovery, debounced commodity/broker search,
@@ -152,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // Primary Search Field: "Search commodity or broker"
               AppTextField(
                 controller: _searchController,
-                hint: 'Search commodity or broker',
+                hint: context.tr(Tr.homeSearchHint),
                 prefixIcon: const Icon(LucideIcons.search, size: 20),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -202,10 +203,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            const Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   AppConfig.appName,
                   style: TextStyle(
                     fontSize: 18,
@@ -215,8 +216,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Text(
-                  'Buyer Procurement Workstation',
-                  style: TextStyle(
+                  context.tr(Tr.homeSubtitle),
+                  style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondaryLight,
                   ),
@@ -231,11 +232,13 @@ class _HomeScreenState extends State<HomeScreen> {
             IconButton(
               icon: const Icon(LucideIcons.bell),
               color: AppColors.textPrimaryLight,
+              tooltip: context.tr(Tr.tooltipNotifications),
               onPressed: () => context.push('/notifications'),
             ),
-            // Profile Shortcut
+            // Profile & Settings
             InkWell(
-              onTap: () => context.go('/profile'),
+              key: const Key('home-profile-settings'),
+              onTap: () => context.push('/settings'),
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 width: 36,

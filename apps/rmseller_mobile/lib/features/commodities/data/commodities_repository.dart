@@ -283,22 +283,10 @@ class CommoditiesRepository {
             throw Exception('Failed to save commodity listing to server: $e');
           }
         } else {
-          // Offline / test environment fallback
-          try {
-            final res = await client
-                .from('availabilities')
-                .insert(insertPayload)
-                .select('id, created_at, status')
-                .single();
-
-            if (res['id'] != null) {
-              listingId = res['id'].toString();
-            }
-          } catch (e) {
-            debugPrint(
-              'Local test environment availability insertion notice: $e',
-            );
-          }
+          // No valid session: never report a listing the server did not save.
+          throw StateError(
+            'Your session has expired. Please sign in again to post this listing.',
+          );
         }
       }
 

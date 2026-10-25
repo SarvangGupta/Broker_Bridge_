@@ -12,6 +12,7 @@ import '../../../core/widgets/status_badge.dart';
 import '../data/offers_repository.dart';
 import '../domain/buyer_offer_model.dart';
 import 'offer_details_screen.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Screen displaying broker-provided commercial offers and negotiation statuses for the buyer.
 /// Strict Counterparty Shield: All offers remain strictly broker-mediated; zero seller details are surfaced.
@@ -87,7 +88,7 @@ class _BuyerOffersScreenState extends State<BuyerOffersScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Broker Offers & Proposals'),
+        title: Text(context.tr(Tr.titleOffers)),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.rotateCw),

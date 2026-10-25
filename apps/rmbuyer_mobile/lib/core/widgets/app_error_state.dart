@@ -1,25 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../app/theme/app_colors.dart';
+import '../../l10n/app_localizations.dart';
 import 'app_button.dart';
 
 /// Standardized error state component with retry mechanism.
+/// [title] and [retryLabel] default to the localized common strings.
 class AppErrorState extends StatelessWidget {
-  final String title;
+  final String? title;
   final String message;
   final VoidCallback? onRetry;
-  final String retryLabel;
+  final String? retryLabel;
 
   const AppErrorState({
     super.key,
-    this.title = 'Unable to Load Data',
+    this.title,
     required this.message,
     this.onRetry,
-    this.retryLabel = 'Try Again',
+    this.retryLabel,
   });
 
   @override
   Widget build(BuildContext context) {
+    final title = this.title ?? context.tr(Tr.commonErrorTitle);
+    final retryLabel = this.retryLabel ?? context.tr(Tr.commonRetry);
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),

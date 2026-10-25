@@ -4,13 +4,15 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/preferences/app_settings_provider.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// Common accessible application settings section for RMBuyer.
 /// Provides real-time reactive controls for:
 /// - Theme Mode (Light, Dark, System Default)
-/// - Language Selection (English, Hindi)
 /// - Accessible Font Scaling (Small, Default, Large, Extra Large)
 /// - Accessibility Features (High Contrast UI Outlines, Semantic Readability)
+///
+/// Language has its own screen (Profile & Settings → Language).
 class AppSettingsSection extends ConsumerWidget {
   const AppSettingsSection({super.key});
 
@@ -60,18 +62,14 @@ class AppSettingsSection extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        settings.languagePref == AppLanguagePreference.hi
-                            ? 'एप्लिकेशन प्राथमिकताएं'
-                            : 'Application Preferences',
+                        context.tr(Tr.dispHeader),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        settings.languagePref == AppLanguagePreference.hi
-                            ? 'थीम, भाषा, फ़ॉन्ट आकार और एक्सेसिबिलिटी'
-                            : 'Theme, Language, Font Scaling & Accessibility',
+                        context.tr(Tr.dispHeaderSub),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: isDark
                               ? AppColors.textSecondaryDark
@@ -91,12 +89,8 @@ class AppSettingsSection extends ConsumerWidget {
             _buildSubHeader(
               context,
               icon: LucideIcons.palette,
-              title: settings.languagePref == AppLanguagePreference.hi
-                  ? 'थीम (रंग मोड)'
-                  : 'Appearance & Theme',
-              description: settings.languagePref == AppLanguagePreference.hi
-                  ? 'लाइट, डार्क या सिस्टम के अनुसार स्वचालित'
-                  : 'Choose light, dark, or follow device system settings',
+              title: context.tr(Tr.dispTheme),
+              description: context.tr(Tr.dispThemeSub),
             ),
             const SizedBox(height: 12),
             _buildThemeSelector(context, settings, notifier, isDark),
@@ -104,35 +98,12 @@ class AppSettingsSection extends ConsumerWidget {
             const Divider(height: 1),
             const SizedBox(height: 18),
 
-            // 2. LANGUAGE SELECTION
-            _buildSubHeader(
-              context,
-              icon: LucideIcons.globe,
-              title: settings.languagePref == AppLanguagePreference.hi
-                  ? 'भाषा / Language'
-                  : 'Language / भाषा',
-              description: settings.languagePref == AppLanguagePreference.hi
-                  ? 'प्रमाणित समर्थित भाषा चुनें'
-                  : 'Select from genuinely supported application languages',
-            ),
-            const SizedBox(height: 12),
-            _buildLanguageSelector(context, settings, notifier, isDark),
-            const SizedBox(height: 8),
-            _buildLanguageDisclosure(context, settings, isDark),
-            const SizedBox(height: 20),
-            const Divider(height: 1),
-            const SizedBox(height: 18),
-
-            // 3. ACCESSIBLE FONT SCALING
+            // 2. ACCESSIBLE FONT SCALING
             _buildSubHeader(
               context,
               icon: LucideIcons.type,
-              title: settings.languagePref == AppLanguagePreference.hi
-                  ? 'फ़ॉन्ट आकार (टेक्स्ट स्केलिंग)'
-                  : 'Font Size & Text Scaling',
-              description: settings.languagePref == AppLanguagePreference.hi
-                  ? 'सुलभ पठन के लिए आकार समायोजित करें'
-                  : 'Adjust typography scale for optimal legibility across all screens',
+              title: context.tr(Tr.dispFontSize),
+              description: context.tr(Tr.dispFontSizeSub),
             ),
             const SizedBox(height: 12),
             _buildFontSizeSelector(context, settings, notifier, isDark),
@@ -142,16 +113,12 @@ class AppSettingsSection extends ConsumerWidget {
             const Divider(height: 1),
             const SizedBox(height: 18),
 
-            // 4. ACCESSIBILITY CONTROLS
+            // 3. ACCESSIBILITY CONTROLS
             _buildSubHeader(
               context,
               icon: LucideIcons.contrast,
-              title: settings.languagePref == AppLanguagePreference.hi
-                  ? 'अभिगम्यता और उच्च कंट्रास्ट'
-                  : 'Accessibility & Contrast',
-              description: settings.languagePref == AppLanguagePreference.hi
-                  ? 'दृश्य स्पष्टता और स्क्रीन रीडर अनुकूलन'
-                  : 'Enhanced borders, minimum 48px touch targets & screen reader semantics',
+              title: context.tr(Tr.dispAccessibility),
+              description: context.tr(Tr.dispAccessibilitySub),
             ),
             const SizedBox(height: 10),
             _buildAccessibilityToggles(context, settings, notifier, isDark),
@@ -160,6 +127,13 @@ class AppSettingsSection extends ConsumerWidget {
       ),
     );
   }
+
+  static Tr _fontLabel(AppFontSizePreference size) => switch (size) {
+    AppFontSizePreference.small => Tr.dispFontSmall,
+    AppFontSizePreference.normal => Tr.dispFontDefault,
+    AppFontSizePreference.large => Tr.dispFontLarge,
+    AppFontSizePreference.extraLarge => Tr.dispFontXL,
+  };
 
   Widget _buildSubHeader(
     BuildContext context, {
@@ -218,34 +192,25 @@ class AppSettingsSection extends ConsumerWidget {
       runSpacing: 8,
       children: AppThemeModePreference.values.map((mode) {
         final isSelected = settings.themeModePref == mode;
-        IconData modeIcon;
-        String modeLabel;
-
-        switch (mode) {
-          case AppThemeModePreference.light:
-            modeIcon = LucideIcons.sun;
-            modeLabel = settings.languagePref == AppLanguagePreference.hi
-                ? 'लाइट'
-                : 'Light';
-            break;
-          case AppThemeModePreference.dark:
-            modeIcon = LucideIcons.moon;
-            modeLabel = settings.languagePref == AppLanguagePreference.hi
-                ? 'डार्क'
-                : 'Dark';
-            break;
-          case AppThemeModePreference.system:
-            modeIcon = LucideIcons.laptop;
-            modeLabel = settings.languagePref == AppLanguagePreference.hi
-                ? 'सिस्टम डिफ़ॉल्ट'
-                : 'System Default';
-            break;
-        }
+        final (IconData modeIcon, String modeLabel) = switch (mode) {
+          AppThemeModePreference.light => (
+            LucideIcons.sun,
+            context.tr(Tr.dispLight),
+          ),
+          AppThemeModePreference.dark => (
+            LucideIcons.moon,
+            context.tr(Tr.dispDark),
+          ),
+          AppThemeModePreference.system => (
+            LucideIcons.laptop,
+            context.tr(Tr.dispSystem),
+          ),
+        };
 
         return Semantics(
           button: true,
           selected: isSelected,
-          label: 'Set theme mode to $modeLabel',
+          label: modeLabel,
           child: Material(
             color: Colors.transparent,
             child: InkWell(
@@ -310,125 +275,6 @@ class AppSettingsSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildLanguageSelector(
-    BuildContext context,
-    AppSettingsState settings,
-    AppSettingsNotifier notifier,
-    bool isDark,
-  ) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: AppLanguagePreference.values.map((lang) {
-        final isSelected = settings.languagePref == lang;
-
-        return Semantics(
-          button: true,
-          selected: isSelected,
-          label: 'Select language ${lang.displayName}',
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => notifier.setLanguage(lang),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 48),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.primary
-                      : (isDark
-                            ? AppColors.surfaceDark
-                            : const Color(0xFFF1F5F9)),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isSelected
-                        ? AppColors.primary
-                        : (isDark
-                              ? AppColors.borderDark
-                              : AppColors.borderLight),
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      LucideIcons.globe,
-                      size: 16,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark
-                                ? Colors.white70
-                                : AppColors.textPrimaryLight),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      lang.displayName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: isSelected
-                            ? Colors.white
-                            : (isDark
-                                  ? Colors.white
-                                  : AppColors.textPrimaryLight),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildLanguageDisclosure(
-    BuildContext context,
-    AppSettingsState settings,
-    bool isDark,
-  ) {
-    final isHindi = settings.languagePref == AppLanguagePreference.hi;
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: (isDark ? AppColors.surfaceDark : const Color(0xFFF8FAFC)),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark ? AppColors.borderDark : AppColors.borderLight,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(LucideIcons.info, size: 14, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              isHindi
-                  ? 'अंग्रेजी पूरी तरह समर्थित है। हिन्दी मुख्य विनियामक प्रकटीकरण, मंडी शब्दावली और संचालन संदेशों के लिए उपलब्ध है।'
-                  : 'English is comprehensively supported across transactions. Hindi is supported for regulatory disclosures, mandi terms, and key notices.',
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFontSizeSelector(
     BuildContext context,
     AppSettingsState settings,
@@ -440,11 +286,12 @@ class AppSettingsSection extends ConsumerWidget {
       runSpacing: 8,
       children: AppFontSizePreference.values.map((size) {
         final isSelected = settings.fontSizePref == size;
+        final label = context.tr(_fontLabel(size));
 
         return Semantics(
           button: true,
           selected: isSelected,
-          label: 'Set font size to ${size.label} (${size.description})',
+          label: '$label ${(size.scaleFactor * 100).toInt()}%',
           child: Material(
             color: Colors.transparent,
             child: InkWell(
@@ -477,7 +324,7 @@ class AppSettingsSection extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      size.label,
+                      label,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: isSelected
@@ -516,8 +363,6 @@ class AppSettingsSection extends ConsumerWidget {
     AppSettingsState settings,
     bool isDark,
   ) {
-    final isHindi = settings.languagePref == AppLanguagePreference.hi;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -532,9 +377,7 @@ class AppSettingsSection extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isHindi
-                ? 'लाइव पूर्वावलोकन (Live Text Preview):'
-                : 'Live Text Preview:',
+            context.tr(Tr.dispPreviewLabel),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
@@ -545,9 +388,7 @@ class AppSettingsSection extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            isHindi
-                ? 'मंडी सौदे, जिंस भाव और दलाली अनुबंध स्पष्ट रूप से पढ़े जा सकते हैं।'
-                : 'Procurement requirements, commodity pricing & broker negotiations render with optimal readability.',
+            context.tr(Tr.dispPreviewText),
             style: TextStyle(
               fontSize: 13 * settings.fontScale,
               fontWeight: FontWeight.w500,
@@ -565,12 +406,10 @@ class AppSettingsSection extends ConsumerWidget {
     AppSettingsNotifier notifier,
     bool isDark,
   ) {
-    final isHindi = settings.languagePref == AppLanguagePreference.hi;
-
     return Column(
       children: [
         Semantics(
-          label: isHindi ? 'उच्च कंट्रास्ट रूपरेखा' : 'High Contrast Outlines',
+          label: context.tr(Tr.dispHighContrast),
           toggled: settings.highContrast,
           child: InkWell(
             onTap: () => notifier.setHighContrast(!settings.highContrast),
@@ -584,9 +423,7 @@ class AppSettingsSection extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isHindi
-                              ? 'उच्च कंट्रास्ट रूपरेखा (High Contrast)'
-                              : 'High Contrast Outlines',
+                          context.tr(Tr.dispHighContrast),
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -594,9 +431,7 @@ class AppSettingsSection extends ConsumerWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          isHindi
-                              ? 'कार्ड्स, बटन और बॉर्डर्स की दृश्यता बढ़ाएं'
-                              : 'Increases border contrast and interactive focus boundaries',
+                          context.tr(Tr.dispHighContrastSub),
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark
@@ -636,9 +471,7 @@ class AppSettingsSection extends ConsumerWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  isHindi
-                      ? 'सिस्टम सुलभता सेटिंग सक्रिय: 48px टच टारगेट और टॉकबैक समर्थित।'
-                      : 'Accessibility Compliant: Minimum 48px touch targets & screen-reader semantics active.',
+                  context.tr(Tr.dispA11yNote),
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,

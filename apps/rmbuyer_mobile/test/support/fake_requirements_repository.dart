@@ -111,9 +111,19 @@ class FakeRequirementsRepository extends RequirementsRepository {
     return productMasterGrades[commodityId] ?? const [];
   }
 
+  /// Units served instead of the offline list, e.g. the live row order (kg first).
+  List<MasterUnit>? units;
+  Object? submitError;
+  Future<void>? submitGate;
+
+  @override
+  Future<List<MasterUnit>> getMasterUnits() async => units ?? super.getMasterUnits();
+
   @override
   Future<BuyerRequirement> createRequirement(CreateRequirementDto dto) async {
     submitted.add(dto);
+    if (submitGate != null) await submitGate;
+    if (submitError != null) throw submitError!;
     return BuyerRequirement(
       id: 'REQ-TEST-${submitted.length}',
       commodityName: dto.commodityName,

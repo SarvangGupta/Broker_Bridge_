@@ -12,6 +12,7 @@ import '../data/requirements_repository.dart';
 import '../domain/master_requirement_data.dart';
 import '../domain/requirement_model.dart';
 import 'commodity_picker_sheet.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Screen allowing authenticated buyers to draft, configure commercial preferences,
 /// and submit authoritative commodity procurement requirements to the shared backend.
@@ -52,6 +53,41 @@ class PostRequirementScreen extends StatefulWidget {
       return name.contains(query) || query.contains(name);
     }).toList();
     return partial.length == 1 ? partial.single : null;
+  }
+
+  /// Unit preselected for a new requirement: the "Metric Ton" MT row, else any
+  /// MT row, else none (the buyer must choose). `master_units` has no defined
+  /// order and returns `kg` first, so the first row is never used. Quantity is
+  /// stored in the chosen unit; nothing is converted.
+  static MasterUnit? defaultUnit(List<MasterUnit> units) {
+    bool isMt(MasterUnit u) => u.symbol.trim().toUpperCase() == 'MT';
+    for (final u in units) {
+      if (isMt(u) && u.name.trim().toLowerCase() == 'metric ton') return u;
+    }
+    for (final u in units) {
+      if (isMt(u)) return u;
+    }
+    return null;
+  }
+
+  /// Existing rule: quantity is required and must be greater than zero.
+  static String? validateQuantity(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return 'Please enter the required quantity.';
+    final q = double.tryParse(text);
+    if (q == null || !q.isFinite || q <= 0) return 'Please enter a valid positive quantity.';
+    return null;
+  }
+
+  /// Target price is required (the field is marked "*") and may not be
+  /// negative, as before. An empty field is never submitted as ₹0.
+  static String? validatePrice(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return 'Please enter your target price.';
+    final p = double.tryParse(text);
+    if (p == null || !p.isFinite) return 'Please enter a valid target price.';
+    if (p < 0) return 'Target price cannot be negative.';
+    return null;
   }
 
   @override
@@ -95,8 +131,11 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
   String? _brokerSearchError;
 
   // Controllers
-  final _quantityController = TextEditingController(text: '50');
-  final _priceController = TextEditingController(text: '4800');
+  // Quantity and target price start empty; the buyer enters them.
+  final _quantityController = TextEditingController();
+  final _priceController = TextEditingController();
+  String? _quantityError;
+  String? _priceError;
   final _customLocationController = TextEditingController();
   final _packagingController = TextEditingController();
   final _notesController = TextEditingController();
@@ -192,7 +231,7 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
         _units = units;
         _savedLocations = locations;
         _paymentOptions = payments;
-        _selectedUnit = units.isNotEmpty ? units.first : null;
+        _selectedUnit = PostRequirementScreen.defaultUnit(units);
         if (!widget.blankCommercialTerms) {
           _selectedLocation = locations.isNotEmpty ? locations.first : 'FOR Mill Delivery';
           _selectedPaymentTerm = payments.isNotEmpty ? payments.first : 'Payment on Delivery (CAD)';
@@ -337,22 +376,24 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
       return;
     }
 
-    final quantity = double.tryParse(_quantityController.text.trim());
-    if (quantity == null || quantity <= 0) {
-      setState(() => _errorMessage = 'Please enter a valid positive quantity.');
+    final unit = _selectedUnit;
+    if (unit == null) {
+      setState(() => _errorMessage = 'Please select a quantity unit.');
       return;
     }
 
-    // A blank form must not turn an empty price into an implied ₹0 target.
-    if (widget.blankCommercialTerms && _priceController.text.trim().isEmpty) {
-      setState(() => _errorMessage = 'Please enter your target price.');
+    final quantityError = PostRequirementScreen.validateQuantity(_quantityController.text);
+    final priceError = PostRequirementScreen.validatePrice(_priceController.text);
+    setState(() {
+      _quantityError = quantityError;
+      _priceError = priceError;
+    });
+    if (quantityError != null || priceError != null) {
+      setState(() => _errorMessage = quantityError ?? priceError);
       return;
     }
-    final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
-    if (price < 0) {
-      setState(() => _errorMessage = 'Target price cannot be negative.');
-      return;
-    }
+    final quantity = double.parse(_quantityController.text.trim());
+    final price = double.parse(_priceController.text.trim());
 
     final deliveryLoc = _isCustomLocation
         ? _customLocationController.text.trim()
@@ -389,8 +430,8 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
       gradeId: grade.id,
       gradeName: grade.gradeName,
       quantity: quantity,
-      unitId: _selectedUnit?.id ?? '22000000-0000-0000-0000-000000000001',
-      unitSymbol: _selectedUnit?.symbol ?? 'MT',
+      unitId: unit.id,
+      unitSymbol: unit.symbol,
       targetPrice: price,
       deliveryLocation: deliveryLoc,
       targetDate: targetDate,
@@ -529,7 +570,7 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Post Procurement Requirement'),
+        title: Text(context.tr(Tr.titlePostRequirement)),
         leading: IconButton(
           icon: const Icon(LucideIcons.arrowLeft),
           onPressed: () => context.pop(),
@@ -578,11 +619,16 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
                               Expanded(
                                 flex: 3,
                                 child: AppTextField(
+                                  key: const Key('requirement-quantity-field'),
                                   controller: _quantityController,
                                   label: 'Required Quantity *',
-                                  hint: 'e.g. 100',
+                                  hint: 'Enter quantity',
+                                  errorText: _quantityError,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   prefixIcon: const Icon(LucideIcons.scale, size: 18),
+                                  onChanged: (_) {
+                                    if (_quantityError != null) setState(() => _quantityError = null);
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -596,11 +642,16 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
 
                           // 4. Expected Target Price
                           AppTextField(
+                            key: const Key('requirement-price-field'),
                             controller: _priceController,
-                            label: 'Target Price (₹/${_selectedUnit?.symbol ?? 'MT'}) *',
-                            hint: 'e.g. 4850',
+                            label: 'Target Price (₹/${_selectedUnit?.symbol ?? 'unit'}) *',
+                            hint: 'Enter target price',
+                            errorText: _priceError,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             prefixIcon: const Icon(LucideIcons.indianRupee, size: 18),
+                            onChanged: (_) {
+                              if (_priceError != null) setState(() => _priceError = null);
+                            },
                           ),
                           const SizedBox(height: 16),
 
@@ -1574,7 +1625,9 @@ class _PostRequirementScreenState extends State<PostRequirementScreen> {
           ),
           _buildSummaryRow(
             'Quantity & Price',
-            '${_quantityController.text} ${_selectedUnit?.symbol ?? "MT"} @ ₹${_priceController.text}/${_selectedUnit?.symbol ?? "MT"}',
+            _quantityController.text.trim().isEmpty || _priceController.text.trim().isEmpty
+                ? 'Not entered'
+                : '${_quantityController.text.trim()} ${_selectedUnit?.symbol ?? "(select unit)"} @ ₹${_priceController.text.trim()}/${_selectedUnit?.symbol ?? "(select unit)"}',
           ),
           _buildSummaryRow('Delivery Location', deliveryLoc),
           _buildSummaryRow(

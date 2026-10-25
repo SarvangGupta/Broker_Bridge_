@@ -74,29 +74,34 @@ enum AppFontSizePreference {
   }
 }
 
-/// Supported application languages.
+/// Supported application languages. [label] is the language's own name in its
+/// own script; [englishName] is shown alongside it so every option is findable.
 enum AppLanguagePreference {
-  en('en', 'English', 'English (Default)'),
-  hi('hi', 'हिन्दी', 'हिन्दी (Hindi)');
+  en('en', 'English', 'English'),
+  hi('hi', 'हिन्दी', 'Hindi'),
+  pa('pa', 'ਪੰਜਾਬੀ', 'Punjabi'),
+  ta('ta', 'தமிழ்', 'Tamil'),
+  te('te', 'తెలుగు', 'Telugu'),
+  kn('kn', 'ಕನ್ನಡ', 'Kannada'),
+  ml('ml', 'മലയാളം', 'Malayalam');
 
   final String code;
   final String label;
-  final String displayName;
+  final String englishName;
 
-  const AppLanguagePreference(this.code, this.label, this.displayName);
+  const AppLanguagePreference(this.code, this.label, this.englishName);
+
+  String get displayName => code == 'en' ? label : '$label ($englishName)';
 
   Locale toLocale() => Locale(code);
 
+  /// Accepts a stored language code or English name; anything else is English.
   static AppLanguagePreference fromString(String? value) {
-    switch (value?.toLowerCase()) {
-      case 'hi':
-      case 'hindi':
-        return AppLanguagePreference.hi;
-      case 'en':
-      case 'english':
-      default:
-        return AppLanguagePreference.en;
+    final v = value?.trim().toLowerCase();
+    for (final lang in AppLanguagePreference.values) {
+      if (lang.code == v || lang.englishName.toLowerCase() == v) return lang;
     }
+    return AppLanguagePreference.en;
   }
 }
 

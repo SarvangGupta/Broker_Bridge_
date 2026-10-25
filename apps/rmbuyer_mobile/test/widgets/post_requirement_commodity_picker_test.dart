@@ -38,7 +38,15 @@ Future<void> _pick(WidgetTester tester, String commodityId) async {
   await tester.pumpAndSettle();
 }
 
+/// Fills quantity and target price (the form has no defaults), then submits.
 Future<void> _submit(WidgetTester tester) async {
+  for (final (key, value) in [('requirement-quantity-field', '25'), ('requirement-price-field', '4850')]) {
+    final field = find.descendant(of: find.byKey(Key(key)), matching: find.byType(TextField));
+    if (field.evaluate().isNotEmpty && tester.widget<TextField>(field).controller!.text.isEmpty) {
+      await tester.ensureVisible(field);
+      await tester.enterText(field, value);
+    }
+  }
   final submit = find.text('Submit Procurement Requirement');
   await tester.ensureVisible(submit);
   await tester.tap(submit);

@@ -9,6 +9,7 @@ import '../../../core/widgets/app_error_state.dart';
 import '../../../core/widgets/app_loading_indicator.dart';
 import '../data/search_repository.dart';
 import '../domain/broker_model.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Screen presenting verified broker desk profile details and supported contact actions.
 /// Enforces Counterparty Shield: seller identities and direct contact are never permitted.
@@ -85,7 +86,7 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Broker Desk Profile'),
+        title: Text(context.tr(Tr.titleBrokerProfile)),
         leading: IconButton(
           icon: const Icon(LucideIcons.arrowLeft),
           onPressed: () => context.pop(),

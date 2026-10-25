@@ -12,6 +12,7 @@ import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../data/requirements_repository.dart';
 import '../domain/requirement_model.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Screen listing buyer's commodity procurement requirements with status filters,
 /// detailed mandate view, and authorized cancellation workflow.
@@ -417,7 +418,7 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Procurement Requirements'),
+        title: Text(context.tr(Tr.titleRequirements)),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.rotateCw),

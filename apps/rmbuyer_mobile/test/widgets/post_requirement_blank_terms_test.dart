@@ -58,8 +58,8 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(_fieldText(tester, 'e.g. 100'), isEmpty);
-      expect(_fieldText(tester, 'e.g. 4850'), isEmpty);
+      expect(_fieldText(tester, 'Enter quantity'), isEmpty);
+      expect(_fieldText(tester, 'Enter target price'), isEmpty);
       expect(find.text('Select delivery location'), findsOneWidget);
       expect(find.text('Select delivery date'), findsOneWidget);
       expect(find.text('Select payment terms'), findsOneWidget);
@@ -71,12 +71,15 @@ void main() {
   );
 
   testWidgets(
-    'default entry keeps its existing defaults (unchanged behaviour)',
+    'default entry keeps its other defaults but has no quantity or price',
     (tester) async {
       await _pump(tester, FakeRequirementsRepository(), blank: false);
 
-      expect(find.text('50'), findsOneWidget);
-      expect(find.text('4800'), findsOneWidget);
+      // RMBUYER-SELLER-QUANTITY-PRICE-01: quantity and price never have defaults.
+      expect(_fieldText(tester, 'Enter quantity'), isEmpty);
+      expect(_fieldText(tester, 'Enter target price'), isEmpty);
+      expect(find.text('50'), findsNothing);
+      expect(find.text('4800'), findsNothing);
       expect(find.text('Select delivery date'), findsNothing);
       expect(find.text('Select payment terms'), findsNothing);
     },

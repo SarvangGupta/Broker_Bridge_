@@ -1,376 +1,403 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../app/router/app_router.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/config/app_config.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
-import '../../authentication/data/auth_repository.dart';
-import '../../authentication/domain/buyer_user.dart';
-import 'widgets/app_settings_section.dart';
+import '../../../core/widgets/app_error_state.dart';
+import '../../../l10n/app_localizations.dart';
+import '../data/buyer_profile_repository.dart';
+import '../domain/buyer_profile.dart';
 
-/// Buyer profile and account settings screen.
-/// Surfaces buyer company info and counterparty shield status with zero seller exposure.
+/// Edit Profile: the buyer's own name and mobile number are editable and saved
+/// to `public.users`; email, role and the company record are read-only.
 class BuyerProfileScreen extends StatefulWidget {
-  final BuyerUser? user;
-  final AuthRepository? authRepository;
+  final BuyerProfileRepository? repository;
 
-  const BuyerProfileScreen({super.key, this.user, this.authRepository});
+  const BuyerProfileScreen({super.key, this.repository});
 
   @override
   State<BuyerProfileScreen> createState() => _BuyerProfileScreenState();
 }
 
 class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
-  late final AuthRepository _authRepo;
-  BuyerUser? _user;
+  late final BuyerProfileRepository _repo;
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _mobileController = TextEditingController();
+
+  BuyerProfile? _profile;
   bool _isLoading = true;
+  bool _loadFailed = false;
+  bool _isSaving = false;
+  bool _saveFailed = false;
 
   @override
   void initState() {
     super.initState();
-    _authRepo = widget.authRepository ?? AuthRepository();
-    if (widget.user != null) {
-      _user = widget.user;
-      _isLoading = false;
-    } else {
-      _loadProfile();
-    }
+    _repo = widget.repository ?? BuyerProfileRepository();
+    _load();
   }
 
-  Future<void> _loadProfile() async {
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _mobileController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _loadFailed = false;
+    });
     try {
-      final user = await _authRepo.getCurrentBuyer();
+      final profile = await _repo.getProfile();
       if (!mounted) return;
+      _nameController.text = profile.name;
+      _mobileController.text = profile.mobile ?? '';
       setState(() {
-        _user = user;
+        _profile = profile;
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Profile load failed: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
+        _loadFailed = true;
       });
     }
   }
 
-  Future<void> _handleLogout() async {
-    final confirmed = await showDialog<bool>(
+  /// Only fields whose value differs from the saved profile.
+  Map<String, Object?> _changes() {
+    final profile = _profile;
+    if (profile == null) return const {};
+    final changes = <String, Object?>{};
+    final name = _nameController.text.trim();
+    if (name != profile.name) changes['name'] = name;
+
+    final mobileText = _mobileController.text.trim();
+    final mobile = mobileText.isEmpty
+        ? null
+        : BuyerProfileValidation.normalizeMobile(mobileText);
+    if (mobile != profile.mobile) changes['mobile'] = mobile;
+    return changes;
+  }
+
+  bool get _isDirty => _changes().isNotEmpty;
+
+  Future<void> _save() async {
+    if (_isSaving) return;
+    setState(() => _saveFailed = false);
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final changes = _changes();
+    final messenger = ScaffoldMessenger.of(context);
+    if (changes.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(context.tr(Tr.profNoChanges))),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final saved = await _repo.updateProfile(_profile!, changes);
+      if (!mounted) return;
+      _nameController.text = saved.name;
+      _mobileController.text = saved.mobile ?? '';
+      setState(() {
+        _profile = saved;
+        _isSaving = false;
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(context.tr(Tr.profSaveSuccess)),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Profile save failed: $e');
+      if (!mounted) return;
+      // The typed values stay in the fields so nothing is lost.
+      setState(() {
+        _isSaving = false;
+        _saveFailed = true;
+      });
+    }
+  }
+
+  Future<bool> _confirmDiscard() async {
+    final discard = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text(
-          'Confirm Sign Out',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        content: const Text(
-          'Are you sure you want to end your RMBuyer procurement session?',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
-        ),
+        title: Text(ctx.tr(Tr.profUnsavedTitle)),
+        content: Text(ctx.tr(Tr.profUnsavedBody)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(ctx.tr(Tr.commonKeepEditing)),
           ),
-          ElevatedButton(
+          TextButton(
+            key: const Key('profile-discard'),
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Sign Out'),
+            child: Text(ctx.tr(Tr.commonDiscard)),
           ),
         ],
       ),
     );
-
-    if (confirmed == true) {
-      await _authRepo.signOut();
-      AppRouter.authNotifier.setUnauthenticated();
-      if (mounted) {
-        context.go('/login');
-      }
-    }
+    return discard == true;
   }
 
   @override
   Widget build(BuildContext context) {
-    final fullName = _user?.fullName ?? 'Buyer Procurement Lead';
-    final email = _user?.email ?? 'buyer@company.com';
-    final companyName = _user?.companyName ?? 'Apex Grain Processors Pvt Ltd';
-    final companyGst = _user?.companyGst ?? '08AABCA1234F1Z8';
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Buyer Profile & Settings')),
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                ),
-              )
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // User Identity Card
-                    AppCard(
-                      padding: const EdgeInsets.all(20),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                fullName.isNotEmpty
-                                    ? fullName[0].toUpperCase()
-                                    : 'B',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  fullName,
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimaryLight,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  email,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.textSecondaryLight,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primaryContainer,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    'BUYER PROCUREMENT ADMIN',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primaryDark,
-                                      letterSpacing: 0.4,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Company Organization Profile
-                    AppCard(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                LucideIcons.building2,
-                                size: 20,
-                                color: AppColors.primary,
-                              ),
-                              const SizedBox(width: 10),
-                              const Expanded(
-                                child: Text(
-                                  'Procuring Enterprise',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimaryLight,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.successBackground,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'GST VERIFIED',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.success,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          const Divider(),
-                          const SizedBox(height: 12),
-                          _buildInfoRow('Enterprise Name', companyName),
-                          _buildInfoRow('Registered GSTIN', companyGst),
-                          _buildInfoRow(
-                            'Business Type',
-                            'Commodity Processor & Manufacturer',
-                          ),
-                          _buildInfoRow('Enterprise Trust Score', '98 / 100'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Counterparty Isolation Shield Notice
-                    AppCard(
-                      color: AppColors.primaryContainer.withValues(alpha: 0.6),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.2),
-                      ),
-                      padding: const EdgeInsets.all(18),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                LucideIcons.shieldCheck,
-                                size: 20,
-                                color: AppColors.primary,
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Counterparty Isolation Shield',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primaryDark,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'RMBuyer guarantees strict fiduciary separation. All seller communications, warehouse visits, and negotiation counter-proposals are verified through licensed mandi brokers. Seller direct contact details remain confidential to prevent off-platform transaction exposure.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.primaryDark,
-                              height: 1.45,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Application Preferences (Theme, Language, Font Size, Accessibility)
-                    const AppSettingsSection(),
-                    const SizedBox(height: 16),
-
-                    // Environment & App Specs
-                    AppCard(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Ecosystem Configuration',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildInfoRow(
-                            'Application',
-                            '${AppConfig.appName} (${AppConfig.appVersion})',
-                          ),
-                          _buildInfoRow(
-                            'Environment',
-                            'Shared RMBroker Ecosystem',
-                          ),
-                          _buildInfoRow(
-                            'Mobile Engine',
-                            'Flutter 3.47.6 • Dart 3.13.5',
-                          ),
-                          _buildInfoRow(
-                            'Database Ref',
-                            'Shared Supabase DBaaS (imztlkvkxzeaekxvmcfe)',
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Sign Out Button
-                    AppButton(
-                      label: 'Sign Out of RMBuyer',
-                      onPressed: _handleLogout,
-                      variant: AppButtonVariant.outline,
-                      icon: LucideIcons.logOut,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
+    return PopScope(
+      canPop: _isLoading || _loadFailed || !_isDirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        if (await _confirmDiscard() && mounted) {
+          _nameController.text = _profile?.name ?? '';
+          _mobileController.text = _profile?.mobile ?? '';
+          navigator.pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr(Tr.titleEditProfile))),
+        body: SafeArea(child: _buildBody()),
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
+    }
+    final profile = _profile;
+    if (_loadFailed || profile == null) {
+      return AppErrorState(
+        message: context.tr(Tr.profileLoadError),
+        onRetry: _load,
+      );
+    }
+
+    return Form(
+      key: _formKey,
+      onChanged: () => setState(() {}),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          SizedBox(
-            width: 130,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondaryLight,
+          if (_saveFailed) ...[
+            Container(
+              key: const Key('profile-save-error'),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.errorBackground,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    LucideIcons.circleAlert,
+                    size: 18,
+                    color: AppColors.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      context.tr(Tr.profSaveError),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimaryLight,
+            const SizedBox(height: 12),
+          ],
+          _section(
+            icon: LucideIcons.user,
+            title: context.tr(Tr.profPersonal),
+            children: [
+              _label(context.tr(Tr.profName)),
+              TextFormField(
+                key: const Key('profile-name-field'),
+                controller: _nameController,
+                enabled: !_isSaving,
+                textCapitalization: TextCapitalization.words,
+                maxLength: BuyerProfileValidation.nameMax,
+                decoration: const InputDecoration(counterText: ''),
+                validator: (v) =>
+                    switch (BuyerProfileValidation.validateName(v ?? '')) {
+                      NameError.required => context.tr(Tr.valNameRequired),
+                      NameError.length => context.tr(Tr.valNameLength),
+                      null => null,
+                    },
               ),
+              const SizedBox(height: 14),
+              _label(context.tr(Tr.profMobile)),
+              TextFormField(
+                key: const Key('profile-mobile-field'),
+                controller: _mobileController,
+                enabled: !_isSaving,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  hintText: context.tr(Tr.profMobileHint),
+                  prefixIcon: const Icon(LucideIcons.phone, size: 18),
+                ),
+                validator: (v) {
+                  final text = v?.trim() ?? '';
+                  if (text.isEmpty) return null;
+                  return BuyerProfileValidation.normalizeMobile(text) == null
+                      ? context.tr(Tr.valMobileInvalid)
+                      : null;
+                },
+              ),
+              const SizedBox(height: 14),
+              _readOnly(
+                context.tr(Tr.profEmail),
+                profile.email,
+                key: const Key('profile-email'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _section(
+            icon: LucideIcons.building2,
+            title: context.tr(Tr.profCompany),
+            children: [
+              _readOnly(context.tr(Tr.profCompanyName), profile.companyName),
+              _readOnly(context.tr(Tr.profGstin), profile.companyGst),
+              _readOnly(
+                context.tr(Tr.profVerification),
+                switch (profile.companyVerified) {
+                  true => context.tr(Tr.profVerified),
+                  false => context.tr(Tr.profNotVerified),
+                  null => null,
+                },
+                key: const Key('profile-verification'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _section(
+            icon: LucideIcons.shieldCheck,
+            title: context.tr(Tr.profAccount),
+            children: [
+              _readOnly(context.tr(Tr.profRole), switch (profile.role) {
+                'buyer' => context.tr(Tr.profRoleBuyer),
+                'admin' => context.tr(Tr.profRoleAdmin),
+                _ => null,
+              }),
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    LucideIcons.lock,
+                    size: 14,
+                    color: AppColors.textMutedLight,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      context.tr(Tr.profProtectedNote),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMutedLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          AppButton(
+            key: const Key('profile-save'),
+            label: _isSaving
+                ? context.tr(Tr.commonSaving)
+                : context.tr(Tr.commonSave),
+            isLoading: _isSaving,
+            icon: LucideIcons.save,
+            onPressed: _isSaving ? null : _save,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _section({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimaryLight,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimaryLight,
+      ),
+    ),
+  );
+
+  Widget _readOnly(String label, String? value, {Key? key}) {
+    final shown = value ?? context.tr(Tr.commonNotProvided);
+    return Padding(
+      key: key,
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondaryLight,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            shown,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: value == null
+                  ? AppColors.textMutedLight
+                  : AppColors.textPrimaryLight,
             ),
           ),
         ],

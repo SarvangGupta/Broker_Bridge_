@@ -81,6 +81,16 @@ void main() {
       await tester.tap(find.byKey(const Key('commodity-option-$maizeId')));
       await tester.pumpAndSettle();
 
+      // Quantity and target price have no defaults; enter them.
+      await tester.enterText(
+        find.descendant(of: find.byKey(const Key('requirement-quantity-field')), matching: find.byType(TextField)),
+        '50',
+      );
+      await tester.enterText(
+        find.descendant(of: find.byKey(const Key('requirement-price-field')), matching: find.byType(TextField)),
+        '4800',
+      );
+
       // Tap Submit button
       final submitButton = find.text('Submit Procurement Requirement');
       await tester.ensureVisible(submitButton);

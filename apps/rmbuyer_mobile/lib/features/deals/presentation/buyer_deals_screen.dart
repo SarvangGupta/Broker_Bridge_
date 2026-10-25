@@ -11,6 +11,7 @@ import '../data/buyer_deals_repository.dart';
 import '../domain/buyer_deal_model.dart';
 import 'package:go_router/go_router.dart';
 import 'final_deal_review_screen.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Screen displaying buyer's executed deals and shipment tracking status.
 class BuyerDealsScreen extends StatefulWidget {
@@ -84,7 +85,7 @@ class _BuyerDealsScreenState extends State<BuyerDealsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Procurement Deals'),
+        title: Text(context.tr(Tr.titleDeals)),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.rotateCw),

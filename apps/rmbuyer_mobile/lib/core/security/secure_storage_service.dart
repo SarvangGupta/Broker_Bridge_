@@ -54,6 +54,9 @@ class SecureStorageService {
     }
   }
 
+  Future<void> saveUserName(String fullName) async =>
+      _storage.write(key: _keyUserName, value: fullName);
+
   Future<String?> getUserId() async => _storage.read(key: _keyUserId);
   Future<String?> getUserRole() async => _storage.read(key: _keyUserRole);
   Future<String?> getUserEmail() async => _storage.read(key: _keyUserEmail);

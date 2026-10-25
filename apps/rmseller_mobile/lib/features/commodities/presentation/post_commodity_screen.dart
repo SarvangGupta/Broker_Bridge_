@@ -36,6 +36,34 @@ class PostCommodityScreen extends StatefulWidget {
     this.commoditiesRepository,
   });
 
+  /// Unit preselected for a new lot: the "Metric Ton" MT row, else any MT row,
+  /// else none (the seller must choose). Quantities are stored in the chosen
+  /// unit, so preselecting never converts or relabels a value.
+  static MasterUnit? defaultUnit(List<MasterUnit> units) {
+    bool isMt(MasterUnit u) => u.symbol.trim().toUpperCase() == 'MT';
+    for (final u in units) {
+      if (isMt(u) && u.name.trim().toLowerCase() == 'metric ton') return u;
+    }
+    for (final u in units) {
+      if (isMt(u)) return u;
+    }
+    return null;
+  }
+
+  /// The unit a saved lot was stored in, matched by ID, then by symbol.
+  /// Returns null rather than substituting another unit, so a saved quantity
+  /// is never shown under a different unit.
+  static MasterUnit? unitForLot(List<MasterUnit> units, SellerCommodity lot) {
+    for (final u in units) {
+      if (lot.unitId != null && u.id == lot.unitId) return u;
+    }
+    final symbol = lot.unit.trim().toLowerCase();
+    for (final u in units) {
+      if (u.symbol.trim().toLowerCase() == symbol) return u;
+    }
+    return null;
+  }
+
   @override
   State<PostCommodityScreen> createState() => _PostCommodityScreenState();
 }
@@ -301,7 +329,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         _grades = grades;
         _gradeLoadError = gradeError;
         _selectedGrade = initialGrade;
-        _selectedUnit = units.isNotEmpty ? units.first : null;
+        _selectedUnit = widget.initialLot != null
+            ? PostCommodityScreen.unitForLot(units, widget.initialLot!)
+            : PostCommodityScreen.defaultUnit(units);
         _selectedState = initState;
         _districts = districts;
         _selectedDistrict = initDistrict;
@@ -1987,7 +2017,7 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         ? double.tryParse(_confidentialPriceController.text.trim())
         : widget.initialLot?.confidentialMinimumPrice;
 
-    if (totalQty <= 0) {
+    if (totalQty <= 0 || !totalQty.isFinite) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Total quantity must be greater than zero'),
@@ -1996,7 +2026,7 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       return;
     }
 
-    if (askingPrice <= 0) {
+    if (askingPrice <= 0 || !askingPrice.isFinite) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Asking price must be positive')),
       );
@@ -3451,7 +3481,7 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    hintText: '100',
+                    hintText: 'Enter quantity',
                     contentPadding: EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 12,
@@ -3489,7 +3519,8 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
               // Asking Price field
               final askingPriceField = _buildFormFieldWrapper(
-                label: 'Asking Price per Unit (₹) *',
+                label:
+                    'Asking Price (₹ per ${_selectedUnit?.symbol ?? 'unit'}) *',
                 child: TextFormField(
                   key: const Key('asking_price_field'),
                   controller: _askingPriceController,
@@ -3497,7 +3528,7 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    hintText: '4800',
+                    hintText: 'Enter price',
                     prefixIcon: Icon(
                       LucideIcons.indianRupee,
                       size: 16,
@@ -3694,11 +3725,15 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
           _buildReviewRow(
             'Supply Quantity',
-            '${_quantityController.text.trim().isEmpty ? "0" : _quantityController.text.trim()} ${_selectedUnit?.symbol ?? "MT"}',
+            _quantityController.text.trim().isEmpty
+                ? 'Not entered'
+                : '${_quantityController.text.trim()} ${_selectedUnit?.symbol ?? "(select unit)"}',
           ),
           _buildReviewRow(
             'Asking Price',
-            '₹${_askingPriceController.text.trim().isEmpty ? "0" : _askingPriceController.text.trim()} per ${_selectedUnit?.symbol ?? "MT"}',
+            _askingPriceController.text.trim().isEmpty
+                ? 'Not entered'
+                : '₹${_askingPriceController.text.trim()} per ${_selectedUnit?.symbol ?? "(select unit)"}',
           ),
           if (totalVal > 0)
             _buildReviewRow(

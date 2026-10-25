@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rmbuyer_mobile/app/theme/app_theme.dart';
 import 'package:rmbuyer_mobile/core/preferences/app_settings_provider.dart';
 import 'package:rmbuyer_mobile/core/security/secure_storage_service.dart';
-import 'package:rmbuyer_mobile/features/authentication/domain/buyer_user.dart';
-import 'package:rmbuyer_mobile/features/profile/presentation/buyer_profile_screen.dart';
+import 'package:rmbuyer_mobile/features/profile/presentation/display_settings_screen.dart';
 import 'package:rmbuyer_mobile/features/profile/presentation/widgets/app_settings_section.dart';
+import 'package:rmbuyer_mobile/l10n/app_localizations.dart';
 
 void main() {
   setUp(() async {
@@ -48,7 +49,7 @@ void main() {
   });
 
   group('RB-APP-SETTINGS-01: RMBuyer AppSettingsSection UI Tests', () {
-    testWidgets('Renders all four preferences: Theme, Language, Font Size & Accessibility',
+    testWidgets('Renders Theme, Font Size & Accessibility (language has its own screen)',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1400);
       tester.view.devicePixelRatio = 1.0;
@@ -77,9 +78,8 @@ void main() {
       expect(find.text('Dark'), findsOneWidget);
       expect(find.text('System Default'), findsOneWidget);
 
-      // Verify Languages
-      expect(find.text('English (Default)'), findsOneWidget);
-      expect(find.text('हिन्दी (Hindi)'), findsOneWidget);
+      // Language moved to Profile & Settings → Language
+      expect(find.text('हिन्दी (Hindi)'), findsNothing);
 
       // Verify Font sizes
       expect(find.text('Small'), findsOneWidget);
@@ -128,42 +128,34 @@ void main() {
       expect(currentSettings.themeMode, ThemeMode.dark);
     });
 
-    testWidgets('Tapping Hindi updates language and interface labels dynamically',
-        (WidgetTester tester) async {
+    testWidgets('Section labels follow the app locale (Hindi)', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
+        ProviderScope(
           child: MaterialApp(
             theme: AppTheme.lightTheme,
+            locale: const Locale('hi'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             home: const Scaffold(
-              body: SingleChildScrollView(
-                child: AppSettingsSection(),
-              ),
+              body: SingleChildScrollView(child: AppSettingsSection()),
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      // Tap on Hindi button
-      final hindiButton = find.text('हिन्दी (Hindi)');
-      expect(hindiButton, findsOneWidget);
-      await tester.tap(hindiButton);
-      await tester.pumpAndSettle();
-
-      final currentSettings = container.read(appSettingsProvider);
-      expect(currentSettings.languagePref, AppLanguagePreference.hi);
-      expect(currentSettings.locale, const Locale('hi'));
-
-      // Localized header rendered
-      expect(find.text('एप्लिकेशन प्राथमिकताएं'), findsOneWidget);
+      expect(find.text('एप्लिकेशन प्राथमिकताएँ'), findsOneWidget);
+      expect(find.text('डार्क'), findsOneWidget);
+      expect(find.text('Application Preferences'), findsNothing);
     });
 
     testWidgets('Tapping Extra Large font size scales live preview without overflow',
@@ -214,7 +206,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('BuyerProfileScreen integrates AppSettingsSection and buyer details cleanly',
+    testWidgets('Display & Accessibility screen hosts the settings section',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1800);
       tester.view.devicePixelRatio = 1.0;
@@ -222,26 +214,14 @@ void main() {
 
       await tester.pumpWidget(
         const ProviderScope(
-          child: MaterialApp(
-            home: BuyerProfileScreen(
-              user: BuyerUser(
-                id: 'b-001',
-                email: 'buyer@apexprocurement.com',
-                fullName: 'Rajesh Singhal',
-                role: 'buyer',
-                companyName: 'Apex Grain Processors Pvt Ltd',
-                companyGst: '08AABCA1234F1Z8',
-              ),
-            ),
-          ),
+          child: MaterialApp(home: DisplaySettingsScreen()),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Buyer Profile & Settings'), findsOneWidget);
+      expect(find.text('Display & Accessibility'), findsOneWidget);
       expect(find.byType(AppSettingsSection), findsOneWidget);
       expect(find.text('Application Preferences'), findsOneWidget);
-      expect(find.text('Sign Out of RMBuyer'), findsOneWidget);
     });
   });
 }
