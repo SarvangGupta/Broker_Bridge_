@@ -7,6 +7,8 @@ import 'package:rmbroker_mobile/app/router/app_router.dart';
 import 'package:rmbroker_mobile/core/widgets/module_placeholder_screen.dart';
 import 'package:rmbroker_mobile/features/more/presentation/more_screen.dart';
 import 'package:rmbroker_mobile/features/profile/presentation/broker_profile_screen.dart';
+import 'package:rmbroker_mobile/features/work/presentation/widgets/create_offer_sheet.dart';
+import 'package:rmbroker_mobile/features/work/presentation/widgets/create_requirement_sheet.dart';
 import 'package:rmbroker_mobile/core/widgets/status_badge.dart';
 import 'package:rmbroker_mobile/features/authentication/domain/broker_user.dart';
 import 'package:rmbroker_mobile/features/dashboard/data/dashboard_repository.dart';
@@ -263,6 +265,33 @@ void main() {
       await tester.tap(find.text('Home'));
       await tester.pumpAndSettle();
       expect(selectedTab(), 0);
+
+      // Bottom navigation unchanged: Home | Work Desk | Deals | Directory | More,
+      // with the "+" FAB on Home above it.
+      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+      expect(bar.destinations.length, 5);
+      expect(find.byKey(const ValueKey('home_add_fab')), findsOneWidget);
+      expect(
+        tester.getBottomLeft(find.byKey(const ValueKey('home_add_fab'))).dy,
+        lessThanOrEqualTo(tester.getTopLeft(find.byType(NavigationBar)).dy),
+        reason: 'FAB sits above the bottom navigation',
+      );
+      final labels = ['Home', 'Work Desk', 'Deals', 'Directory', 'More'];
+      for (var i = 1; i < labels.length; i++) {
+        expect(
+          tester.getCenter(find.descendant(of: find.byType(NavigationBar), matching: find.text(labels[i - 1]))).dx,
+          lessThan(tester.getCenter(find.descendant(of: find.byType(NavigationBar), matching: find.text(labels[i]))).dx),
+          reason: '${labels[i - 1]} before ${labels[i]}',
+        );
+      }
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Directory')));
+      // The Directory list shows a loading spinner; pump fixed frames.
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(selectedTab(), 3, reason: 'Directory tab works');
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Home')));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.tap(find.text('More'));
       await tester.pumpAndSettle();
       expectMorePage();
@@ -277,7 +306,7 @@ void main() {
       expect(find.byType(BrokerProfileScreen), findsOneWidget, reason: 'existing profile screen');
     });
 
-    testWidgets('tapping quick dial FAB opens broker communication desk sheet', (
+    testWidgets('"+" FAB shows exactly Add Requirement and Add Offer; dismissible', (
       tester,
     ) async {
       final repo = MockDashboardRepository(
@@ -288,8 +317,78 @@ void main() {
       await tester.pumpWidget(createTestWidget(repository: repo));
       await tester.pumpAndSettle();
 
-      // Tap phone call FAB
-      await tester.tap(find.byType(FloatingActionButton));
+      expect(find.byType(FloatingActionButton), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(FloatingActionButton), matching: find.byIcon(LucideIcons.plus)),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('home_add_fab')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('home_add_requirement')), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_add_offer')), findsOneWidget);
+      expect(find.text('Add Requirement'), findsOneWidget);
+      expect(find.text('Add Offer'), findsWidgets); // also a dashboard quick action
+      expect(
+        find.descendant(of: find.byType(BottomSheet), matching: find.byType(ListTile)),
+        findsNWidgets(2),
+        reason: 'exactly two actions, no combined option',
+      );
+      expect(find.textContaining('Both'), findsNothing);
+      final tileHeight = tester.getSize(find.byKey(const ValueKey('home_add_offer'))).height;
+      expect(tileHeight, greaterThanOrEqualTo(48));
+
+      // Dismiss by tapping outside, then by Back.
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('home_add_fab')));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+    });
+
+    testWidgets('Add Requirement / Add Offer close the menu and open the existing forms', (
+      tester,
+    ) async {
+      final repo = MockDashboardRepository(
+        brokerUser: testBroker,
+        resultData: DashboardDataMetricsTestResult.empty(),
+      );
+      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpAndSettle();
+
+      for (final (key, sheet) in [
+        ('home_add_requirement', CreateRequirementSheet),
+        ('home_add_offer', CreateOfferSheet),
+      ]) {
+        await tester.tap(find.byKey(const ValueKey('home_add_fab')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey(key)));
+        // The forms load master data with a spinner; pump fixed frames.
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(find.byKey(ValueKey(key)), findsNothing, reason: 'menu closed first');
+        expect(find.byType(sheet), findsOneWidget, reason: key);
+        Navigator.of(tester.element(find.byType(sheet))).pop();
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+    });
+
+    testWidgets('Broker Desk moved to the header still opens the desk sheet', (
+      tester,
+    ) async {
+      final repo = MockDashboardRepository(
+        brokerUser: testBroker,
+        resultData: DashboardDataMetricsTestResult.empty(),
+      );
+
+      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('header_broker_desk_button')));
       await tester.pumpAndSettle();
 
       // Verify communication desk sheet

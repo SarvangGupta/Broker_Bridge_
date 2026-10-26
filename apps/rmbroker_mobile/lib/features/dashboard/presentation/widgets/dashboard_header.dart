@@ -9,6 +9,8 @@ import 'package:rmbroker_mobile/features/authentication/domain/broker_user.dart'
 import 'package:rmbroker_mobile/features/notifications/presentation/controllers/notification_controller.dart';
 import 'package:rmbroker_mobile/features/notifications/presentation/widgets/notification_badge.dart';
 
+import 'broker_desk_sheet.dart';
+
 /// Top branding bar and profile access header for RMBroker Dashboard.
 class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
   final BrokerUser? broker;
@@ -102,6 +104,14 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
             icon: const Icon(LucideIcons.bell, size: 21, color: Color(0xFF0F172A)),
             onPressed: () => context.push('/notifications'),
           ),
+        ),
+        // Broker Desk (call / WhatsApp / directory shortcuts), formerly the Home FAB.
+        IconButton(
+          key: const ValueKey('header_broker_desk_button'),
+          visualDensity: VisualDensity.compact,
+          tooltip: 'Broker Desk',
+          icon: const Icon(LucideIcons.phoneCall, size: 20, color: Color(0xFF0F172A)),
+          onPressed: () => BrokerDeskSheet.show(context),
         ),
         // Same destination as the bottom-navigation More tab.
         Padding(

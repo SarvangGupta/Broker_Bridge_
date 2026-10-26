@@ -8,18 +8,16 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_loading_indicator.dart';
 import '../domain/dashboard_state.dart';
 import 'controllers/dashboard_controller.dart';
-import 'widgets/broker_desk_sheet.dart';
 import 'widgets/broker_welcome_banner.dart';
 import 'widgets/dashboard_header.dart';
 import 'widgets/dashboard_kpi_grid.dart';
+import 'widgets/home_add_sheet.dart';
 import 'widgets/quick_actions_section.dart';
 import 'widgets/recent_activity_section.dart';
 
 /// Operational command center overview for the broker desk.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
-
-  void _showQuickDialSheet(BuildContext context) => BrokerDeskSheet.show(context);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -129,14 +127,21 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.small(
-        onPressed: () => _showQuickDialSheet(context),
+      // "+" opens Add Requirement / Add Offer (Broker Desk moved to the header).
+      floatingActionButton: FloatingActionButton(
+        key: const ValueKey('home_add_fab'),
+        // Own hero tag: tab branches stay alive, and the default tag would
+        // clash with other tabs' FABs when a full-screen route is pushed.
+        heroTag: 'home_add_fab',
+        onPressed: () => HomeAddSheet.show(context),
         backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         elevation: 4,
-        tooltip: 'Broker Desk',
-        child: const Icon(LucideIcons.phoneCall, color: Colors.white, size: 18),
+        shape: const CircleBorder(),
+        tooltip: 'Add Requirement or Offer',
+        child: const Icon(LucideIcons.plus, size: 26),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }
