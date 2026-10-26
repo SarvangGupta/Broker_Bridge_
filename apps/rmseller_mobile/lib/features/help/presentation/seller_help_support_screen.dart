@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
@@ -18,169 +19,6 @@ class SellerHelpSupportScreen extends StatefulWidget {
 }
 
 class _SellerHelpSupportScreenState extends State<SellerHelpSupportScreen> {
-  final TextEditingController _issueTypeController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-
-  @override
-  void dispose() {
-    _issueTypeController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  void _showReportIssueDialog() {
-    String selectedCategory = 'Listing & Commodity Management';
-    final categories = [
-      'Listing & Commodity Management',
-      'Broker Coordination & Mandate',
-      'Negotiation & Counter-Offers',
-      'Deal Contract & Invoicing',
-      'Profile & Account Details',
-      'Technical / App Performance',
-    ];
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: const [
-                Icon(LucideIcons.lifeBuoy, color: AppColors.primary, size: 22),
-                SizedBox(width: 8),
-                Text(
-                  'Submit Support Request',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Select Issue Category:',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedCategory,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    items: categories.map((cat) {
-                      return DropdownMenuItem(
-                        value: cat,
-                        child: Text(cat, style: const TextStyle(fontSize: 12)),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedCategory = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Describe the Issue:',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _descriptionController,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText:
-                          'Provide details regarding your issue or inquiry...',
-                      hintStyle: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMutedLight,
-                      ),
-                      contentPadding: const EdgeInsets.all(10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.infoBackground,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Icon(LucideIcons.info, size: 14, color: AppColors.info),
-                        SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Support queries are logged with your authenticated seller ID and routed to the mandi desk administrator.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.info,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () {
-                  final description = _descriptionController.text.trim();
-                  if (description.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter an issue description'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.of(ctx).pop();
-                  _descriptionController.clear();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Support request logged under category: $selectedCategory',
-                      ),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                },
-                child: const Text('Submit Request'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -325,11 +163,21 @@ class _SellerHelpSupportScreenState extends State<SellerHelpSupportScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
+                const Text(
+                  'In-app support tickets are not available yet.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.textMutedLight,
+                  ),
+                ),
+                const SizedBox(height: 10),
                 AppButton(
-                  label: 'Submit Support Ticket',
-                  icon: LucideIcons.messageSquarePlus,
+                  key: const Key('help_contact_broker_button'),
+                  label: 'Contact My Broker Desk',
+                  icon: LucideIcons.users,
                   variant: ButtonVariant.primary,
-                  onPressed: _showReportIssueDialog,
+                  onPressed: () => context.go('/brokers'),
                 ),
               ],
             ),

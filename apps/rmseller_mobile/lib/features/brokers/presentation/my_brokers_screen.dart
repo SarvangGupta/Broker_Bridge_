@@ -1337,7 +1337,7 @@ class _MyBrokersScreenState extends State<MyBrokersScreen> {
                     color: AppColors.primary,
                     child: ListView.builder(
                       // Bottom padding to avoid FAB overlap
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 84),
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
                       itemCount: _brokers.length,
                       itemBuilder: (context, index) {
                         final broker = _brokers[index];
@@ -1351,361 +1351,290 @@ class _MyBrokersScreenState extends State<MyBrokersScreen> {
     );
   }
 
-  Widget _buildBrokerCard(BuildContext context, SellerBrokerModel broker) {
+  Widget _buildBadge({
+    required String label,
+    required Color color,
+    required Color background,
+    IconData? icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 3),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactIcon({
+    required Key key,
+    required IconData icon,
+    required String tooltip,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(left: 6),
+      child: Material(
+        color: color.withValues(alpha: 0.1),
+        shape: const CircleBorder(),
+        child: IconButton(
+          key: key,
+          icon: Icon(icon, size: 17, color: color),
+          tooltip: tooltip,
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrokerCard(BuildContext context, SellerBrokerModel broker) {
+    final statusBadges = <Widget>[
+      if (broker.isRegisteredVerified)
+        _buildBadge(
+          label: 'Verified',
+          icon: LucideIcons.badgeCheck,
+          color: AppColors.success,
+          background: AppColors.success.withValues(alpha: 0.1),
+        )
+      else if (broker.isPendingVerification)
+        _buildBadge(
+          label: 'Pending Verification',
+          icon: LucideIcons.clock,
+          color: Colors.amber.shade900,
+          background: Colors.amber.shade100,
+        )
+      else if (broker.isInvitationPending) ...[
+        _buildBadge(
+          label: 'Invitation Pending',
+          color: Colors.blue.shade800,
+          background: Colors.blue.shade50,
+        ),
+        _buildBadge(
+          label: 'Unregistered',
+          color: AppColors.textMutedLight,
+          background: Colors.grey.shade100,
+        ),
+      ],
+      if (!broker.isInvitationPending) ...[
+        _buildBadge(
+          label: '${broker.trustScore}%',
+          icon: LucideIcons.shieldCheck,
+          color: AppColors.secondaryDark,
+          background: AppColors.secondaryContainer,
+        ),
+        if (broker.hasRatings)
+          _buildBadge(
+            label:
+                '${broker.averageRating!.toStringAsFixed(1)} (${broker.reviewCount})',
+            icon: Icons.star,
+            color: Colors.amber.shade900,
+            background: Colors.amber.shade50,
+          )
+        else
+          _buildBadge(
+            label: 'Unrated',
+            icon: Icons.star_border,
+            color: AppColors.textMutedLight,
+            background: Colors.grey.shade100,
+          ),
+      ],
+    ];
+
+    final contactButtons = <Widget>[
+      if (broker.hasPhone)
+        _buildContactIcon(
+          key: Key('broker_call_${broker.id}'),
+          icon: LucideIcons.phone,
+          tooltip: broker.isInvitationPending ? 'Call Contact' : 'Call Desk',
+          color: AppColors.primary,
+          onPressed: () => _contactLauncher.launchPhone(broker.mobile),
+        ),
+      if (broker.hasWhatsApp)
+        _buildContactIcon(
+          key: Key('broker_whatsapp_${broker.id}'),
+          icon: LucideIcons.messageCircle,
+          tooltip: broker.isInvitationPending ? 'WhatsApp Invite' : 'WhatsApp',
+          color: Colors.green.shade700,
+          onPressed: () {
+            if (broker.isInvitationPending) {
+              final message =
+                  'Hello ${broker.name}, I would like to add you as my trusted commodity broker on RMBroker. Please connect with RMBroker Platform Administration to verify your licensed broker desk: https://brokerbridge.in/login';
+              _contactLauncher.launchWhatsApp(
+                broker.mobile,
+                defaultMessage: message,
+              );
+            } else {
+              _contactLauncher.launchWhatsApp(
+                broker.mobile,
+                defaultMessage:
+                    'Hello ${broker.name}, I have commodity lots ready for trade on RMSeller.',
+              );
+            }
+          },
+        ),
+      if (!broker.isInvitationPending)
+        _buildContactIcon(
+          key: Key('broker_chat_${broker.id}'),
+          icon: LucideIcons.messageSquare,
+          tooltip: 'Broker Chat & Commission Terms',
+          color: Colors.indigo.shade400,
+          onPressed: () => context.push(
+            '/communication/broker/${broker.id}',
+            extra: broker,
+          ),
+        ),
+    ];
+
+    final location = [
+      broker.location ?? 'Mandi Trading Floor',
+      if (broker.companyName != null && broker.companyName!.isNotEmpty)
+        broker.companyName!,
+    ].join(' • ');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
+        padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
         onTap: () {
           if (!broker.isInvitationPending) {
             context.push('/brokers/${broker.id}', extra: broker);
           }
         },
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  backgroundColor: broker.isInvitationPending
-                      ? Colors.blue.shade100
-                      : AppColors.primaryContainer,
-                  child: Text(
-                    broker.name.substring(0, 1).toUpperCase(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: broker.isInvitationPending
-                          ? Colors.blue.shade800
-                          : AppColors.primary,
-                    ),
-                  ),
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: broker.isInvitationPending
+                  ? Colors.blue.shade100
+                  : AppColors.primaryContainer,
+              child: Text(
+                broker.name.substring(0, 1).toUpperCase(),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: broker.isInvitationPending
+                      ? Colors.blue.shade800
+                      : AppColors.primary,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Row 1: name + verification, trust, rating
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              broker.name,
-                              style: AppTypography.titleSmall,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (broker.isRegisteredVerified) ...[
-                            const SizedBox(width: 6),
-                            const Icon(
-                              LucideIcons.badgeCheck,
-                              size: 16,
-                              color: AppColors.success,
-                            ),
-                          ] else if (broker.isPendingVerification) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade100,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Pending Verification',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.amber.shade900,
-                                ),
-                              ),
-                            ),
-                          ] else if (broker.isInvitationPending) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                border: Border.all(color: Colors.blue.shade200),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Invitation Pending',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.blue.shade800,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
                       Text(
-                        broker.companyName ?? 'Licensed Mandi Desk',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondaryLight,
-                        ),
+                        broker.name,
+                        style: AppTypography.titleSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      ...statusBadges,
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (!broker.isInvitationPending) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondaryContainer,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              LucideIcons.shieldCheck,
-                              size: 12,
-                              color: AppColors.secondaryDark,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${broker.trustScore}%',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.secondaryDark,
-                              ),
-                            ),
-                          ],
-                        ),
+                  const SizedBox(height: 4),
+
+                  // Row 2: location, or invitation notice
+                  if (broker.isInvitationPending)
+                    Text(
+                      'Nominated by you. Pending broker self-registration and profile confirmation.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.blue.shade900,
                       ),
-                      const SizedBox(height: 4),
-                      if (broker.hasRatings) ...[
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              size: 12,
-                              color: Colors.amber,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${broker.averageRating!.toStringAsFixed(1)} (${broker.reviewCount})',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.amber.shade900,
-                              ),
-                            ),
-                          ],
+                    )
+                  else
+                    Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.mapPin,
+                          size: 13,
+                          color: AppColors.textMutedLight,
                         ),
-                      ] else ...[
-                        const Text(
-                          'Unrated',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: AppColors.textMutedLight,
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryLight,
+                            ),
                           ),
                         ),
                       ],
-                    ] else ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Unregistered',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textMutedLight,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-            const Divider(height: 20),
+                    ),
+                  const SizedBox(height: 8),
 
-            // Mandi Location / Invitation notice
-            if (broker.isInvitationPending) ...[
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.info,
-                      size: 13,
-                      color: Colors.blue.shade800,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Nominated by you. Pending broker self-registration and profile confirmation.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.blue.shade900,
+                  // Row 3: commodity chips + icon-only contact actions
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: broker.isInvitationPending
+                              ? const []
+                              : broker.commoditiesHandled.map((c) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryContainer
+                                          .withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      c,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-            ] else ...[
-              Row(
-                children: [
-                  const Icon(
-                    LucideIcons.mapPin,
-                    size: 14,
-                    color: AppColors.textMutedLight,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    broker.location ?? 'Mandi Trading Floor',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondaryLight,
-                    ),
+                      ...contactButtons,
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-
-              // Commodities Handled Chips
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: broker.commoditiesHandled.map((c) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      c,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondaryLight,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 14),
-            ],
-
-            // 1-Tap Broker Communication Triggers
-            Row(
-              children: [
-                if (broker.hasPhone)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          _contactLauncher.launchPhone(broker.mobile),
-                      icon: const Icon(LucideIcons.phone, size: 15),
-                      label: Text(
-                        broker.isInvitationPending
-                            ? 'Call Contact'
-                            : 'Call Desk',
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-                if (broker.hasPhone && broker.hasWhatsApp)
-                  const SizedBox(width: 10),
-                if (broker.hasWhatsApp)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        if (broker.isInvitationPending) {
-                          final message =
-                              'Hello ${broker.name}, I would like to add you as my trusted commodity broker on RMBroker. Please connect with RMBroker Platform Administration to verify your licensed broker desk: https://brokerbridge.in/login';
-                          _contactLauncher.launchWhatsApp(
-                            broker.mobile,
-                            defaultMessage: message,
-                          );
-                        } else {
-                          _contactLauncher.launchWhatsApp(
-                            broker.mobile,
-                            defaultMessage:
-                                'Hello ${broker.name}, I have commodity lots ready for trade on RMSeller.',
-                          );
-                        }
-                      },
-                      icon: const Icon(LucideIcons.messageCircle, size: 15),
-                      label: Text(
-                        broker.isInvitationPending
-                            ? 'WhatsApp Invite'
-                            : 'WhatsApp',
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.green.shade700,
-                        side: BorderSide(color: Colors.green.shade700),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-              ],
             ),
-            if (!broker.isInvitationPending) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton.icon(
-                  onPressed: () => context.push(
-                    '/communication/broker/${broker.id}',
-                    extra: broker,
-                  ),
-                  icon: const Icon(
-                    LucideIcons.messageSquare,
-                    size: 14,
-                    color: AppColors.primary,
-                  ),
-                  label: const Text(
-                    'Broker Chat & Commission Terms',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),
     );
   }
 }
+

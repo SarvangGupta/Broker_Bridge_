@@ -216,25 +216,32 @@ void main() {
       },
     );
 
-    testWidgets('SellerProfileScreen integrates AppSettingsSection cleanly', (
-      WidgetTester tester,
-    ) async {
-      tester.view.physicalSize = const Size(800, 2200);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    testWidgets(
+      'SellerProfileScreen links App Preferences to Settings and keeps Sign Out',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 2200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(
-        const ProviderScope(child: MaterialApp(home: SellerProfileScreen())),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pump();
+        await tester.pumpWidget(
+          const ProviderScope(child: MaterialApp(home: SellerProfileScreen())),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
 
-      // Verify Profile and Settings both present
-      expect(find.text('Seller Profile & Mandi Desk'), findsOneWidget);
-      expect(find.byType(AppSettingsSection), findsOneWidget);
-      expect(find.text('Application Preferences'), findsOneWidget);
-      expect(find.text('Sign Out of Seller Desk'), findsOneWidget);
-    });
+        // Preferences are a link to the real Settings screen, not a duplicate
+        expect(find.text('Profile'), findsOneWidget);
+        expect(find.byType(AppSettingsSection), findsNothing);
+        await tester.tap(find.text('App Preferences'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('profile_open_settings')), findsOneWidget);
+
+        // Sign Out lives in the overflow menu
+        await tester.tap(find.byKey(const Key('profile_overflow_menu')));
+        await tester.pumpAndSettle();
+        expect(find.text('Sign Out of Seller Desk'), findsOneWidget);
+      },
+    );
   });
 }

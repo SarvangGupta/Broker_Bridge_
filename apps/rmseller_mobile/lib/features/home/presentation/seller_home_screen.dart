@@ -281,106 +281,64 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         onRefresh: _loadDashboardData,
         color: AppColors.primary,
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           children: [
-            // 4 Authoritative Metric Cards
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMetricCard(
-                    title: 'Active Lots',
-                    value: '$activeLotsCount',
-                    subtitle: 'Listed Supply',
-                    icon: LucideIcons.packageCheck,
-                    color: AppColors.primary,
-                    onTap: () => context.go('/commodities'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildMetricCard(
-                    title: 'In Negotiation',
-                    value: '$inNegotiationCount',
-                    subtitle: 'Broker Rounds',
-                    icon: LucideIcons.handshake,
-                    color: AppColors.secondary,
-                    onTap: () => context.go('/deals'),
-                  ),
-                ),
-              ],
-            ),
+            _buildGreetingCard(context),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMetricCard(
-                    title: 'Booked Deals',
-                    value: '$bookedDealsCount',
-                    subtitle: 'Contracts Finalized',
-                    icon: LucideIcons.fileText,
-                    color: AppColors.success,
-                    onTap: () => context.go('/deals'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildMetricCard(
-                    title: 'Ready to Load',
-                    value: '$readyLotsCount',
-                    subtitle: 'Physical Stock',
-                    icon: LucideIcons.truck,
-                    color: AppColors.info,
-                    onTap: () => context.go('/commodities'),
-                  ),
-                ),
-              ],
-            ),
+
+            // 4 Authoritative Metric Cards — single horizontal row
+            _buildMetricsRow([
+              _buildMetricCard(
+                title: 'Active Lots',
+                value: '$activeLotsCount',
+                icon: LucideIcons.packageCheck,
+                color: AppColors.primary,
+                onTap: () => context.go('/commodities'),
+              ),
+              _buildMetricCard(
+                title: 'In Negotiation',
+                value: '$inNegotiationCount',
+                icon: LucideIcons.handshake,
+                color: AppColors.secondary,
+                onTap: () => context.go('/deals'),
+              ),
+              _buildMetricCard(
+                title: 'Booked Deals',
+                value: '$bookedDealsCount',
+                icon: LucideIcons.fileText,
+                color: AppColors.success,
+                onTap: () => context.go('/deals'),
+              ),
+              _buildMetricCard(
+                title: 'Ready to Load',
+                value: '$readyLotsCount',
+                icon: LucideIcons.truck,
+                color: AppColors.info,
+                onTap: () => context.go('/commodities'),
+              ),
+            ]),
             const SizedBox(height: 20),
 
-            // Quick Operational Actions
-            Text('Quick Operations', style: AppTypography.titleMedium),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQuickActionBtn(
-                    label: '+ Post Commodity',
-                    icon: LucideIcons.plusCircle,
-                    color: AppColors.primary,
-                    onTap: () => context.push('/commodities/new'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildQuickActionBtn(
-                    label: 'Discover Brokers',
-                    icon: LucideIcons.users,
-                    color: AppColors.secondary,
-                    onTap: () => context.go('/brokers'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Recent Commodity Listings Section
+            // Commodity Lots Section
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
-                    'Active Commodity Lots',
+                    'My Commodity Lots',
                     style: AppTypography.titleMedium,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                TextButton(
+                TextButton.icon(
                   onPressed: () => context.go('/commodities'),
-                  child: const Text('View All'),
+                  iconAlignment: IconAlignment.end,
+                  icon: const Icon(LucideIcons.chevronRight, size: 16),
+                  label: const Text('View All'),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
 
             if (_activeLots.isEmpty)
               const AppEmptyState(
@@ -567,203 +525,334 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     );
   }
 
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning,';
+    if (hour < 17) return 'Good Afternoon,';
+    return 'Good Evening,';
+  }
+
+  Widget _buildGreetingCard(BuildContext context) {
+    return Container(
+      key: const Key('home_greeting_card'),
+      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _greeting(),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _companyName,
+                  style: AppTypography.titleMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton.icon(
+            key: const Key('home_post_commodity_button'),
+            onPressed: () => context.push('/commodities/new'),
+            icon: const Icon(LucideIcons.plusCircle, size: 16),
+            label: const Text('Post Commodity'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Lays the metric cards out in one equal-width row; falls back to
+  /// horizontal scrolling only when each card would be narrower than 72px.
+  Widget _buildMetricsRow(List<Widget> cards) {
+    const gap = 8.0;
+    const minCardWidth = 72.0;
+    const cardHeight = 92.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxWidth - gap * (cards.length - 1);
+        final fits = available / cards.length >= minCardWidth;
+        final cardWidth = fits ? available / cards.length : minCardWidth;
+
+        final row = Row(
+          key: const Key('home_metrics_row'),
+          children: [
+            for (var i = 0; i < cards.length; i++) ...[
+              if (i > 0) const SizedBox(width: gap),
+              SizedBox(width: cardWidth, height: cardHeight, child: cards[i]),
+            ],
+          ],
+        );
+
+        return fits
+            ? row
+            : SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: row,
+              );
+      },
+    );
+  }
+
   Widget _buildMetricCard({
     required String title,
     required String value,
-    required String subtitle,
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: color.withValues(alpha: 0.06),
       borderRadius: BorderRadius.circular(12),
-      child: AppCard(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondaryLight,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 8, 6, 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.15)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    overflow: TextOverflow.ellipsis,
+                    child: Icon(icon, size: 14, color: color),
+                  ),
+                  const Spacer(),
+                  const Icon(
+                    LucideIcons.chevronRight,
+                    size: 14,
+                    color: AppColors.textMutedLight,
+                  ),
+                ],
+              ),
+              const Spacer(),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                    color: color,
                   ),
                 ),
-                const SizedBox(width: 4),
-                Icon(icon, size: 18, color: color),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: AppTypography.displayLarge.copyWith(
-                fontSize: 26,
-                color: color,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textMutedLight,
+              const SizedBox(height: 2),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondaryLight,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildQuickActionBtn({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 18, color: color),
-      label: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
+  String _timeAgo(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  String _formatQty(double q) =>
+      q == q.roundToDouble() ? q.toStringAsFixed(0) : q.toStringAsFixed(1);
+
+  Widget _buildLotMeta(IconData icon, String text, {Color? color}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: color ?? AppColors.textMutedLight),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: color != null ? FontWeight.w700 : FontWeight.w600,
+              color: color ?? AppColors.textPrimaryLight,
+            ),
+          ),
         ),
-      ),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        side: BorderSide(color: color.withValues(alpha: 0.5)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+      ],
     );
   }
 
   Widget _buildCommodityLotCard(BuildContext context, SellerCommodity lot) {
+    final qty = lot.availableQuantity == lot.totalQuantity
+        ? '${_formatQty(lot.totalQuantity)} ${lot.unit}'
+        : '${_formatQty(lot.availableQuantity)} / ${_formatQty(lot.totalQuantity)} ${lot.unit}';
+    final location = lot.mandiName?.isNotEmpty == true
+        ? lot.mandiName!
+        : '${lot.districtName}, ${lot.stateName}';
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
+        padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
         onTap: () => context.push('/commodities/${lot.id}'),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(lot.commodityName, style: AppTypography.titleSmall),
-                      Text(
-                        lot.gradeName,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                StatusBadge(status: lot.status),
-              ],
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                LucideIcons.wheat,
+                size: 22,
+                color: AppColors.primary,
+              ),
             ),
-            const Divider(height: 18),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Available Supply',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textMutedLight,
+                      Expanded(
+                        child: Text(
+                          lot.commodityName,
+                          style: AppTypography.titleSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Text(
-                        '${lot.availableQuantity} / ${lot.totalQuantity} ${lot.unit}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
+                      const SizedBox(width: 6),
+                      StatusBadge(status: lot.status),
                     ],
                   ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text(
-                        'Asking Price',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textMutedLight,
-                        ),
+                  if (lot.gradeName.isNotEmpty)
+                    Text(
+                      lot.gradeName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondaryLight,
                       ),
-                      Text(
+                    ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 14,
+                    runSpacing: 4,
+                    children: [
+                      _buildLotMeta(LucideIcons.package, qty),
+                      _buildLotMeta(
+                        LucideIcons.indianRupee,
                         '₹${lot.askingPrice.toStringAsFixed(0)} / ${lot.unit}',
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  _buildLotMeta(LucideIcons.mapPin, location),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'Lot ${lot.lotNumber}',
                         style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: AppColors.primary,
+                          fontSize: 11,
+                          color: AppColors.textMutedLight,
+                        ),
+                      ),
+                      Text(
+                        'Listed ${_timeAgo(lot.createdAt)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMutedLight,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.info.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          lot.loadingStatus,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.info,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(
-                  LucideIcons.mapPin,
-                  size: 13,
-                  color: AppColors.textMutedLight,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    '${lot.districtName}, ${lot.stateName}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondaryLight,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    lot.loadingStatus,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Icon(
+                LucideIcons.chevronRight,
+                size: 18,
+                color: AppColors.textMutedLight,
+              ),
             ),
           ],
         ),

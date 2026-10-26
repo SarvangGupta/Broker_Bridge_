@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
-import '../../../app/theme/app_typography.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/app_loading_indicator.dart';
@@ -12,7 +11,9 @@ import '../data/notifications_repository.dart';
 import '../domain/notification_model.dart';
 
 class SellerNotificationsScreen extends StatefulWidget {
-  const SellerNotificationsScreen({super.key});
+  final NotificationsRepository? repository;
+
+  const SellerNotificationsScreen({super.key, this.repository});
 
   @override
   State<SellerNotificationsScreen> createState() =>
@@ -20,7 +21,8 @@ class SellerNotificationsScreen extends StatefulWidget {
 }
 
 class _SellerNotificationsScreenState extends State<SellerNotificationsScreen> {
-  final NotificationsRepository _repository = NotificationsRepository();
+  late final NotificationsRepository _repository =
+      widget.repository ?? NotificationsRepository();
 
   bool _isLoading = true;
   String _selectedFilter = 'ALL';
@@ -54,26 +56,78 @@ class _SellerNotificationsScreenState extends State<SellerNotificationsScreen> {
     }
   }
 
+  List<SellerNotification> _applyFilter(String filter) {
+    switch (filter) {
+      case 'Unread':
+        return _notifications.where((n) => !n.isRead).toList();
+      case 'Commission':
+        return _notifications.where((n) => n.isCommissionAlert).toList();
+      case 'Messages':
+        return _notifications.where((n) => n.isMessageAlert).toList();
+      default:
+        return _notifications;
+    }
+  }
+
+  /// Section label for a notification, relative to today.
+  String _groupLabel(DateTime createdAt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(createdAt.year, createdAt.month, createdAt.day);
+    final diff = today.difference(day).inDays;
+    if (diff <= 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    if (diff < 7) return 'This Week';
+    return 'Earlier';
+  }
+
+  ({IconData icon, Color color}) _categoryStyle(SellerNotification n) {
+    final type = n.eventType.toUpperCase();
+    if (n.isCommissionAlert) {
+      return (icon: LucideIcons.scale, color: AppColors.primary);
+    }
+    if (n.isMessageAlert) {
+      return (icon: LucideIcons.messageSquare, color: Colors.blue.shade700);
+    }
+    if (type.contains('DISPATCH') || type.contains('VEHICLE')) {
+      return (icon: LucideIcons.truck, color: Colors.purple.shade600);
+    }
+    if (type.contains('INVOICE')) {
+      return (icon: LucideIcons.receipt, color: AppColors.success);
+    }
+    if (type.contains('LAB') || type.contains('QUALITY')) {
+      return (icon: LucideIcons.flaskConical, color: Colors.amber.shade800);
+    }
+    if (type.contains('DEAL') || type.contains('BOOKING')) {
+      return (icon: LucideIcons.fileText, color: AppColors.success);
+    }
+    return (icon: LucideIcons.info, color: AppColors.textSecondaryLight);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd MMM, hh:mm a');
+    final filtered = _applyFilter(_selectedFilter);
 
-    var filtered = _notifications;
-    if (_selectedFilter == 'Unread') {
-      filtered = filtered.where((n) => !n.isRead).toList();
-    } else if (_selectedFilter == 'Commission') {
-      filtered = filtered.where((n) => n.isCommissionAlert).toList();
-    } else if (_selectedFilter == 'Messages') {
-      filtered = filtered.where((n) => n.isMessageAlert).toList();
+    // Flatten into headers + cards, keeping the repository's order.
+    final rows = <Object>[];
+    String? currentGroup;
+    for (final n in filtered) {
+      final label = _groupLabel(n.createdAt);
+      if (label != currentGroup) {
+        rows.add(label);
+        currentGroup = label;
+      }
+      rows.add(n);
     }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        title: const Text('Notifications Center'),
+        title: const Text('Notifications'),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.refreshCw),
+            tooltip: 'Refresh',
             onPressed: _loadNotifications,
           ),
         ],
@@ -82,47 +136,19 @@ class _SellerNotificationsScreenState extends State<SellerNotificationsScreen> {
           ? const AppLoadingIndicator(message: 'Loading Mandi alerts...')
           : Column(
               children: [
-                // Filter Chips Row
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: SingleChildScrollView(
+                // Filter chips with counts
+                SizedBox(
+                  height: 52,
+                  child: ListView(
+                    key: const Key('notification_filters'),
                     scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _filters.map((filter) {
-                        final isSelected = _selectedFilter == filter;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(
-                              filter == 'ALL' ? 'All Alerts' : filter,
-                            ),
-                            selected: isSelected,
-                            selectedColor: AppColors.primaryContainer,
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textPrimaryLight,
-                            ),
-                            onSelected: (val) {
-                              if (val) setState(() => _selectedFilter = filter);
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                    children: _filters
+                        .map((filter) => _buildFilterChip(filter))
+                        .toList(),
                   ),
                 ),
-                const Divider(height: 1),
 
-                // Notifications List
                 Expanded(
                   child: filtered.isEmpty
                       ? const AppEmptyState(
@@ -130,132 +156,208 @@ class _SellerNotificationsScreenState extends State<SellerNotificationsScreen> {
                           message: 'You have no notifications matching this category.',
                           icon: LucideIcons.bellOff,
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, index) {
-                            final notif = filtered[index];
-
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: AppCard(
-                                onTap: () => _onNotificationTap(notif),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 18,
-                                      backgroundColor: notif.isCommissionAlert
-                                          ? AppColors.primaryContainer
-                                          : (notif.isMessageAlert
-                                                ? Colors.blue.shade50
-                                                : Colors.grey.shade100),
-                                      child: Icon(
-                                        notif.isCommissionAlert
-                                            ? LucideIcons.scale
-                                            : (notif.isMessageAlert
-                                                  ? LucideIcons.messageSquare
-                                                  : LucideIcons.bell),
-                                        size: 18,
-                                        color: notif.isCommissionAlert
-                                            ? AppColors.primary
-                                            : (notif.isMessageAlert
-                                                  ? Colors.blue.shade700
-                                                  : AppColors
-                                                        .textSecondaryLight),
-                                      ),
+                      : RefreshIndicator(
+                          onRefresh: _loadNotifications,
+                          color: AppColors.primary,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                            itemCount: rows.length,
+                            itemBuilder: (context, index) {
+                              final row = rows[index];
+                              if (row is String) {
+                                return Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    4,
+                                    10,
+                                    4,
+                                    6,
+                                  ),
+                                  child: Text(
+                                    row,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textSecondaryLight,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  notif.title,
-                                                  style: TextStyle(
-                                                    fontWeight: notif.isRead
-                                                        ? FontWeight.w500
-                                                        : FontWeight.w700,
-                                                    fontSize: 13,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (!notif.isRead)
-                                                Container(
-                                                  width: 8,
-                                                  height: 8,
-                                                  decoration:
-                                                      const BoxDecoration(
-                                                        color:
-                                                            AppColors.primary,
-                                                        shape: BoxShape.circle,
-                                                      ),
-                                                ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            notif.message,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color:
-                                                  AppColors.textSecondaryLight,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                dateFormat.format(
-                                                  notif.createdAt,
-                                                ),
-                                                style: const TextStyle(
-                                                  fontSize: 10,
-                                                  color:
-                                                      AppColors.textMutedLight,
-                                                ),
-                                              ),
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    notif.actionLabel,
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: AppColors.primary,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 2),
-                                                  const Icon(
-                                                    LucideIcons.chevronRight,
-                                                    size: 12,
-                                                    color: AppColors.primary,
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
+                                  ),
+                                );
+                              }
+                              return _buildNotificationCard(
+                                row as SellerNotification,
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildFilterChip(String filter) {
+    final isSelected = _selectedFilter == filter;
+    final count = _applyFilter(filter).length;
+    final icon = switch (filter) {
+      'Unread' => LucideIcons.mail,
+      'Commission' => LucideIcons.scale,
+      'Messages' => LucideIcons.messageSquare,
+      _ => LucideIcons.bell,
+    };
+    final label = filter == 'ALL' ? 'All' : filter;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: isSelected
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          key: Key('notification_filter_$filter'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _selectedFilter = filter),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected
+                    ? AppColors.primary.withValues(alpha: 0.3)
+                    : AppColors.borderLight,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 16,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondaryLight,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+                if (count > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 18),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Text(
+                      '$count',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationCard(SellerNotification notif) {
+    final style = _categoryStyle(notif);
+    final group = _groupLabel(notif.createdAt);
+    final isRecent = group == 'Today' || group == 'Yesterday';
+    final time = DateFormat(
+      isRecent ? 'hh:mm a' : 'dd MMM, hh:mm a',
+    ).format(notif.createdAt);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        key: Key('notification_card_${notif.id}'),
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        onTap: () => _onNotificationTap(notif),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: style.color.withValues(alpha: 0.1),
+              child: Icon(style.icon, size: 19, color: style.color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    notif.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: notif.isRead
+                          ? FontWeight.w600
+                          : FontWeight.w800,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    notif.message,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              time,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textMutedLight,
+              ),
+            ),
+            const SizedBox(width: 6),
+            if (!notif.isRead)
+              Container(
+                key: Key('notification_unread_${notif.id}'),
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppColors.error,
+                  shape: BoxShape.circle,
+                ),
+              )
+            else
+              const SizedBox(width: 8),
+            const Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: AppColors.textSecondaryLight,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

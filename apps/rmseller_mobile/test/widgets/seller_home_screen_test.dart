@@ -88,10 +88,16 @@ void main() {
           findsNWidgets(2),
         ); // 1 Metric card + 1 lot status tag
 
-        // 3. Quick Operations intact
-        expect(find.text('Quick Operations'), findsOneWidget);
-        expect(find.text('+ Post Commodity'), findsOneWidget);
-        expect(find.text('Discover Brokers'), findsOneWidget);
+        // 3. Greeting card with Post Commodity, metrics in a single row
+        expect(find.byKey(const Key('home_greeting_card')), findsOneWidget);
+        expect(find.text('Post Commodity'), findsOneWidget);
+        expect(find.text('My Commodity Lots'), findsOneWidget);
+        final rowFinder = find.byKey(const Key('home_metrics_row'));
+        expect(rowFinder, findsOneWidget);
+        final dy = tester.getTopLeft(find.text('Active Lots')).dy;
+        for (final label in ['In Negotiation', 'Booked Deals']) {
+          expect(tester.getTopLeft(find.text(label)).dy, closeTo(dy, 1));
+        }
       },
     );
 
@@ -104,7 +110,13 @@ void main() {
         await tester.pump(const Duration(milliseconds: 50));
 
         // Verify dashboard heading is present
-        expect(find.text('Bikaner Agro Traders'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.text('Bikaner Agro Traders'),
+          ),
+          findsOneWidget,
+        );
         expect(find.text('Seller Desk • Seller Desk'), findsOneWidget);
 
         // Verify compact information button

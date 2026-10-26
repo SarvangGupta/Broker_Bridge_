@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:rmseller_mobile/app/theme/app_theme.dart';
 import 'package:rmseller_mobile/features/commodities/domain/commodity_model.dart';
 import 'package:rmseller_mobile/features/commodities/presentation/commodity_details_screen.dart';
@@ -36,80 +35,112 @@ void main() {
       createdAt: DateTime.now(),
     );
 
+    Widget buildScreen() => MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: CommodityDetailsScreen(
+        commodityId: testCommodity.id,
+        initialCommodity: testCommodity,
+      ),
+    );
+
+    Future<void> tapSection(WidgetTester tester, String title) async {
+      await tester.ensureVisible(find.text(title));
+      await tester.tap(find.text(title));
+      await tester.pumpAndSettle();
+    }
+
     testWidgets(
-      'Renders complete lot details, volumes, pricing, and locations',
+      'Renders summary card and inventory; pricing and dispatch expand on tap',
       (tester) async {
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: CommodityDetailsScreen(
-              commodityId: testCommodity.id,
-              initialCommodity: testCommodity,
-            ),
-          ),
-        );
+        await tester.pumpWidget(buildScreen());
 
         expect(find.text('LOT-CHANA-01'), findsAtLeastNWidgets(1));
         expect(find.text('Desi Chana (Gram)'), findsOneWidget);
         expect(find.text('Bold Size FAQ (Count 60-65)'), findsOneWidget);
         expect(find.text('Ready to Load'), findsOneWidget);
 
-        // Inventory Pills
+        // Inventory summary visible while collapsed
+        expect(find.text('Inventory & Asking Price'), findsOneWidget);
         expect(find.text('Total Lot'), findsOneWidget);
         expect(find.text('100 MT'), findsOneWidget);
         expect(find.text('Available'), findsOneWidget);
         expect(find.text('75 MT'), findsOneWidget);
+        expect(find.textContaining('5,850'), findsNothing);
+        expect(find.text('Bikaner Commercial Head Office'), findsNothing);
 
-        // Pricing & Terms
+        await tapSection(tester, 'Inventory & Asking Price');
         expect(find.textContaining('5,850'), findsOneWidget);
         expect(find.text('Payment on Delivery (CAD)'), findsOneWidget);
+
+        await tapSection(tester, 'Dispatch & Warehouse Location');
         expect(
           find.text('Krishi Upaj Mandi Yard Warehouse A-4'),
-          findsOneWidget,
+          findsAtLeastNWidgets(1),
         );
         expect(find.text('Bikaner Commercial Head Office'), findsOneWidget);
         expect(find.text('AGMARK-RAL-2026-9021'), findsOneWidget);
+
+        await tapSection(tester, 'Dispatch & Warehouse Location');
+        expect(find.text('Bikaner Commercial Head Office'), findsNothing);
       },
     );
 
-    testWidgets(
-      'Renders assigned broker desk with mediated communication actions',
-      (tester) async {
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: CommodityDetailsScreen(
-              commodityId: testCommodity.id,
-              initialCommodity: testCommodity,
-            ),
-          ),
-        );
+    testWidgets('Quality Document section is collapsible', (tester) async {
+      await tester.pumpWidget(buildScreen());
 
-        expect(find.text('Mandi Broker Desk'), findsOneWidget);
+      expect(find.text('Quality Document'), findsOneWidget);
+      expect(find.text('Quality & Assay Document'), findsNothing);
+      expect(find.text('Certificate Reference'), findsNothing);
+
+      await tapSection(tester, 'Quality Document');
+      expect(find.text('Certificate Reference'), findsOneWidget);
+    });
+
+    testWidgets(
+      'Broker card uses broker name heading and icon-only contact actions',
+      (tester) async {
+        await tester.pumpWidget(buildScreen());
+
+        expect(find.text('My Trusted Broker'), findsNothing);
         expect(find.text('Bikaner Mandi Broker Desk'), findsOneWidget);
-        expect(find.text('Call Broker'), findsOneWidget);
-        expect(find.text('WhatsApp'), findsOneWidget);
-        expect(find.textContaining('Counterparty Shield'), findsOneWidget);
+        expect(find.text('Licensed Broker'), findsOneWidget);
+        expect(find.textContaining('Counterparty Shield'), findsNothing);
+        expect(find.byKey(const Key('lot_broker_call')), findsOneWidget);
+        expect(find.byKey(const Key('lot_broker_whatsapp')), findsOneWidget);
+        expect(find.byKey(const Key('lot_broker_chat')), findsOneWidget);
+        expect(find.byTooltip('Call Broker'), findsOneWidget);
+        expect(find.text('Change Broker'), findsOneWidget);
       },
     );
 
     testWidgets(
-      'Active lot displays management actions (Price edit, Fulfill, Cancel)',
+      'Active lot shows Update Price, Mark Fulfilled, Withdraw Lot in one row',
       (tester) async {
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: CommodityDetailsScreen(
-              commodityId: testCommodity.id,
-              initialCommodity: testCommodity,
-            ),
-          ),
-        );
+        await tester.pumpWidget(buildScreen());
 
-        expect(find.text('Update Asking Price'), findsOneWidget);
-        expect(find.text('Mark as Fulfilled / Dispatched'), findsOneWidget);
-        expect(find.text('Withdraw / Cancel Lot'), findsOneWidget);
+        final labels = ['Update Price', 'Mark Fulfilled', 'Withdraw Lot'];
+        for (final label in labels) {
+          expect(find.text(label), findsOneWidget);
+        }
+        final y = tester.getCenter(find.text(labels.first)).dy;
+        for (final label in labels.skip(1)) {
+          expect(tester.getCenter(find.text(label)).dy, closeTo(y, 1));
+        }
       },
     );
+
+    testWidgets('No overflow on a narrow 320dp screen', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(buildScreen());
+      await tapSection(tester, 'Inventory & Asking Price');
+      await tester.drag(find.byType(ListView), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+
+      // Any RenderFlex overflow is reported by the framework and fails here.
+      expect(find.text('Withdraw Lot'), findsOneWidget);
+    });
   });
 }

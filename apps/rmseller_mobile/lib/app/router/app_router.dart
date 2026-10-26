@@ -23,6 +23,7 @@ import '../../features/invoices/presentation/invoice_details_screen.dart';
 import '../../features/negotiation/presentation/broker_communication_screen.dart';
 import '../../features/notifications/presentation/seller_notifications_screen.dart';
 import '../../features/help/presentation/seller_help_support_screen.dart';
+import '../../features/profile/presentation/seller_more_screen.dart';
 import '../../features/profile/presentation/seller_profile_screen.dart';
 import '../../features/profile/presentation/seller_settings_screen.dart';
 import '../../features/ratings/presentation/rate_broker_screen.dart';
@@ -296,6 +297,10 @@ class AppRouter {
         builder: (context, state) => const SellerHelpSupportScreen(),
       ),
 
+      // Legacy Profile path now lives under the More tab
+      GoRoute(path: '/profile', redirect: (context, state) => '/more/profile'),
+      GoRoute(path: '/reports', redirect: (context, state) => '/more/reports'),
+
       // Direct Profile Edit Route (Protected)
       GoRoute(
         path: '/profile/edit',
@@ -305,13 +310,13 @@ class AppRouter {
             const SellerProfileScreen(isInitialEdit: true),
       ),
 
-      // Core Stateful Navigation Shell with 6 branches
+      // Core Stateful Navigation Shell with 5 branches
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return NavigationShell(navigationShell: navigationShell);
         },
         branches: [
-          // Branch 0: Dashboard
+          // Branch 0: Home
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -351,23 +356,25 @@ class AppRouter {
               ),
             ],
           ),
-          // Branch 4: Sales History & Reports
+          // Branch 4: More (Profile, Settings, Reports, Help & Support)
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/reports',
-                name: 'reports',
-                builder: (context, state) => const SalesHistoryScreen(),
-              ),
-            ],
-          ),
-          // Branch 5: My Profile
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/profile',
-                name: 'profile',
-                builder: (context, state) => const SellerProfileScreen(),
+                path: '/more',
+                name: 'more',
+                builder: (context, state) => const SellerMoreScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'profile',
+                    name: 'profile',
+                    builder: (context, state) => const SellerProfileScreen(),
+                  ),
+                  GoRoute(
+                    path: 'reports',
+                    name: 'reports',
+                    builder: (context, state) => const SalesHistoryScreen(),
+                  ),
+                ],
               ),
             ],
           ),

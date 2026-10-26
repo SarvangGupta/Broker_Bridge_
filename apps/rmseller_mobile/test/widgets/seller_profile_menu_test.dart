@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:rmseller_mobile/core/security/secure_storage_service.dart';
 import 'package:rmseller_mobile/features/commodities/domain/master_commodity_data.dart';
@@ -9,6 +10,7 @@ import 'package:rmseller_mobile/features/home/presentation/seller_home_screen.da
 import 'package:rmseller_mobile/features/profile/data/business_location_service.dart';
 import 'package:rmseller_mobile/features/profile/data/seller_profile_repository.dart';
 import 'package:rmseller_mobile/features/profile/domain/business_location_model.dart';
+import 'package:rmseller_mobile/features/profile/presentation/seller_more_screen.dart';
 import 'package:rmseller_mobile/features/profile/presentation/seller_profile_screen.dart';
 import 'package:rmseller_mobile/features/profile/presentation/seller_settings_screen.dart';
 import 'package:rmseller_mobile/features/profile/presentation/widgets/app_settings_section.dart';
@@ -200,36 +202,44 @@ void main() {
         await tester.pumpAndSettle();
 
         // View mode header
-        expect(find.text('Seller Profile & Mandi Desk'), findsOneWidget);
+        expect(find.text('Profile'), findsOneWidget);
         expect(find.text('Bikaner Grain Processing Ltd'), findsOneWidget);
-        expect(find.text('Ramesh Agro Traders'), findsNWidgets(2));
+        expect(find.text('Ramesh Agro Traders'), findsOneWidget);
         expect(find.text('Verified Seller Enterprise'), findsOneWidget);
-
-        // Edit Profile buttons
         expect(find.byKey(const Key('edit_profile_button')), findsOneWidget);
-        expect(
-          find.byKey(const Key('appbar_edit_profile_button')),
-          findsOneWidget,
-        );
 
-        // Business Information section
-        expect(find.text('Business Information'), findsOneWidget);
-        expect(find.text('Contact Person:'), findsOneWidget);
-        expect(find.text('Mobile Number:'), findsOneWidget);
+        // Sections start collapsed
+        for (final title in [
+          'Business Info',
+          'Shop & Godown',
+          'Trading Desk Rules',
+          'App Preferences',
+        ]) {
+          expect(find.text(title), findsOneWidget);
+        }
+        expect(find.text('9829012345'), findsNothing);
+
+        // Business Info expands
+        await tester.tap(find.text('Business Info'));
+        await tester.pumpAndSettle();
+        expect(find.text('Contact'), findsOneWidget);
+        expect(find.text('Ramesh Agro Traders'), findsNWidgets(2));
+        expect(find.text('Mobile'), findsOneWidget);
         expect(find.text('9829012345'), findsOneWidget);
-        expect(find.text('Business Email:'), findsOneWidget);
+        expect(find.text('Email'), findsOneWidget);
         expect(find.text('seller@agroenterprises.com'), findsOneWidget);
-        expect(find.text('GSTIN:'), findsOneWidget);
+        expect(find.text('GSTIN'), findsOneWidget);
         expect(find.text('08AAAAA0000A1Z5'), findsOneWidget);
-        expect(find.text('Corporate HQ:'), findsOneWidget);
+        expect(find.text('Office'), findsOneWidget);
         expect(
           find.text('Commercial Tower 4, Bikaner Corporate Hub'),
           findsOneWidget,
         );
 
-        // Business Location (Shop / Godown) section
+        // Shop & Godown expands, and collapses again
         expect(find.byKey(const Key('business_location_view_card')), findsOneWidget);
-        expect(find.text('Business Location (Shop / Godown)'), findsOneWidget);
+        await tester.tap(find.text('Shop & Godown'));
+        await tester.pumpAndSettle();
         expect(
           find.text('Bikaner Krishi Upaj Mandi Yard Godown A-4'),
           findsOneWidget,
@@ -240,6 +250,9 @@ void main() {
         );
         expect(find.text('Bikaner Mandi Hub, Rajasthan'), findsOneWidget);
         expect(find.text('334001'), findsOneWidget);
+        await tester.tap(find.text('Shop & Godown'));
+        await tester.pumpAndSettle();
+        expect(find.text('334001'), findsNothing);
 
         // VERIFY: Cryptographic UUIDs, Supabase references, and technical role lines are REMOVED
         expect(find.text('Protected Account Identifiers (Read-Only)'), findsNothing);
@@ -276,7 +289,14 @@ void main() {
         await tester.pumpAndSettle();
 
         // Verify Edit View is active
-        expect(find.text('Edit Business Profile'), findsOneWidget);
+        expect(find.text('Edit Profile'), findsOneWidget);
+        expect(find.text('Business Details'), findsOneWidget);
+        expect(find.text('Contact Info'), findsOneWidget);
+        expect(find.text('Business Identifiers'), findsOneWidget);
+        expect(
+          find.byKey(const Key('edit_email_field_readonly')),
+          findsOneWidget,
+        );
         expect(find.byKey(const Key('edit_full_name_field')), findsOneWidget);
         expect(
           find.byKey(const Key('edit_company_name_field')),
@@ -471,13 +491,18 @@ void main() {
           'Discarded Warehouse Name',
         );
 
-        // Tap Cancel
+        // Tap Cancel: unsaved edits trigger a discard confirmation
         await tester.tap(find.byKey(const Key('cancel_profile_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('Discard changes?'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('discard_changes_button')));
         await tester.pumpAndSettle();
 
         // Back in view mode with original unsaved name and location
-        expect(find.text('Seller Profile & Mandi Desk'), findsOneWidget);
-        expect(find.text('Ramesh Agro Traders'), findsNWidgets(2));
+        expect(find.text('Profile'), findsOneWidget);
+        expect(find.text('Ramesh Agro Traders'), findsOneWidget);
+        await tester.tap(find.text('Shop & Godown'));
+        await tester.pumpAndSettle();
         expect(find.text('Bikaner Krishi Upaj Mandi Yard Godown A-4'), findsOneWidget);
         expect(find.text('Discarded Name Edit'), findsNothing);
         expect(find.text('Discarded Warehouse Name'), findsNothing);
@@ -539,9 +564,11 @@ void main() {
         expect(find.text('Business profile updated successfully'), findsOneWidget);
 
         // Returns to view mode with refreshed values
-        expect(find.text('Seller Profile & Mandi Desk'), findsOneWidget);
+        expect(find.text('Profile'), findsOneWidget);
         expect(find.text('Goyal Agro Mills Pvt Ltd'), findsOneWidget);
-        expect(find.text('Ramesh Kumar Goyal'), findsNWidgets(2));
+        expect(find.text('Ramesh Kumar Goyal'), findsOneWidget);
+        await tester.tap(find.text('Shop & Godown'));
+        await tester.pumpAndSettle();
         expect(find.text('Goyal Mandi Godown Shed 7'), findsOneWidget);
         expect(find.text('Gate 4, Krishi Upaj Mandi, Bikaner'), findsOneWidget);
 
@@ -609,20 +636,70 @@ void main() {
         // Verify honest support channel disclosure
         expect(find.text('Verified Support Channels'), findsOneWidget);
 
-        // Tap Submit Support Ticket
-        await tester.tap(find.text('Submit Support Ticket'));
-        await tester.pumpAndSettle();
-
-        // Verify Support Dialog opens with issue categories
-        expect(find.text('Submit Support Request'), findsOneWidget);
-        expect(find.text('Select Issue Category:'), findsOneWidget);
-        expect(find.text('Describe the Issue:'), findsOneWidget);
-
-        // Dismiss dialog
-        await tester.tap(find.text('Cancel'));
-        await tester.pumpAndSettle();
-        expect(find.text('Submit Support Request'), findsNothing);
+        // No fake ticket submission; real broker-desk route instead
+        expect(find.text('Submit Support Ticket'), findsNothing);
+        expect(
+          find.text('In-app support tickets are not available yet.'),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('help_contact_broker_button')),
+          findsOneWidget,
+        );
       },
     );
+
+    testWidgets('SellerMoreScreen lists Profile, Settings and Help & Support', (
+      WidgetTester tester,
+    ) async {
+      final visited = <String>[];
+      final router = GoRouter(
+        initialLocation: '/more',
+        routes: [
+          GoRoute(
+            path: '/more',
+            builder: (context, state) => const SellerMoreScreen(),
+            routes: [
+              GoRoute(
+                path: 'profile',
+                builder: (context, state) {
+                  visited.add('profile');
+                  return const Scaffold(body: Text('PROFILE'));
+                },
+              ),
+            ],
+          ),
+          for (final path in ['settings', 'help'])
+            GoRoute(
+              path: '/$path',
+              builder: (context, state) {
+                visited.add(path);
+                return Scaffold(body: Text(path.toUpperCase()));
+              },
+            ),
+        ],
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+
+      expect(find.text('More'), findsOneWidget);
+      expect(find.text('Profile'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Help & Support'), findsOneWidget);
+
+      for (final entry in {
+        'more_menu_profile': 'PROFILE',
+        'more_menu_settings': 'SETTINGS',
+        'more_menu_help': 'HELP',
+      }.entries) {
+        await tester.tap(find.byKey(Key(entry.key)));
+        await tester.pumpAndSettle();
+        expect(find.text(entry.value), findsOneWidget);
+        router.go('/more');
+        await tester.pumpAndSettle();
+      }
+      expect(visited, containsAll(['profile', 'settings', 'help']));
+    });
   });
 }

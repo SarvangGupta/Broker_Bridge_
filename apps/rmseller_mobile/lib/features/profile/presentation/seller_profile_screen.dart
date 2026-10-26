@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/router/app_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
 import '../../../core/security/secure_storage_service.dart';
-import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../authentication/data/auth_repository.dart';
 import '../../commodities/domain/master_commodity_data.dart';
 import '../data/business_location_service.dart';
 import '../data/seller_profile_repository.dart';
 import '../domain/seller_profile_model.dart';
-import 'widgets/app_settings_section.dart';
 
 class SellerProfileScreen extends StatefulWidget {
   final SellerProfileRepository? profileRepository;
@@ -47,6 +46,7 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
   String? _saveErrorMessage;
   String? _locationStatusMessage;
   bool _locationCertainty = true;
+  final Set<String> _expandedSections = {};
 
   final _formKey = GlobalKey<FormState>();
 
@@ -515,313 +515,438 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
           role: 'seller',
         );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _isEditing ? 'Edit Business Profile' : 'Seller Profile & Mandi Desk',
+    return PopScope(
+      canPop: !_isEditing,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmDiscardChanges();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        appBar: AppBar(
+          title: Text(_isEditing ? 'Edit Profile' : 'Profile'),
+          actions: _isEditing
+              ? [
+                  OutlinedButton(
+                    key: const Key('cancel_profile_button'),
+                    onPressed: _isSaving ? null : _confirmDiscardChanges,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 34),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    key: const Key('save_profile_button'),
+                    onPressed: _isSaving ? null : _handleSaveProfile,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(0, 34),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Save'),
+                  ),
+                  const SizedBox(width: 12),
+                ]
+              : [
+                  PopupMenuButton<String>(
+                    key: const Key('profile_overflow_menu'),
+                    icon: const Icon(LucideIcons.ellipsisVertical),
+                    tooltip: 'More options',
+                    onSelected: (value) {
+                      if (value == 'logout') _handleSignOut();
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem<String>(
+                        key: Key('profile_menu_logout'),
+                        value: 'logout',
+                        child: Row(
+                          children: [
+                            Icon(
+                              LucideIcons.logOut,
+                              size: 18,
+                              color: AppColors.error,
+                            ),
+                            SizedBox(width: 12),
+                            Flexible(
+                              child: Text(
+                                'Sign Out of Seller Desk',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
         ),
+        body: _isEditing ? _buildEditView(profile) : _buildProfileView(profile),
+      ),
+    );
+  }
+
+  bool get _hasUnsavedChanges {
+    final p = _profile;
+    if (p == null) return false;
+    final loc = p.businessLocation;
+    return _nameController.text.trim() != p.fullName ||
+        _companyController.text.trim() != p.companyName ||
+        _mobileController.text.trim() != p.mobile ||
+        _gstController.text.trim().toUpperCase() !=
+            p.companyGst.toUpperCase() ||
+        _officeAddressController.text.trim() != p.officeAddress ||
+        _locationNameController.text.trim() != loc.name ||
+        _locationAddressController.text.trim() != loc.addressLine ||
+        _locationLocalityController.text.trim() != loc.locality ||
+        _locationPinCodeController.text.trim() != loc.pinCode ||
+        (_selectedDistrict != null &&
+            _selectedDistrict!.id != loc.districtId &&
+            _selectedDistrict!.name != loc.districtName);
+  }
+
+  /// Leaves edit mode, asking first if there are unsaved edits.
+  Future<void> _confirmDiscardChanges() async {
+    if (!_hasUnsavedChanges) {
+      _cancelEdit();
+      return;
+    }
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard changes?'),
+        content: const Text('Your unsaved profile edits will be lost.'),
         actions: [
-          if (!_isEditing)
-            IconButton(
-              key: const Key('appbar_edit_profile_button'),
-              icon: const Icon(LucideIcons.pencil),
-              tooltip: 'Edit Profile',
-              onPressed: _enterEditMode,
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep Editing'),
+          ),
+          TextButton(
+            key: const Key('discard_changes_button'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Discard',
+              style: TextStyle(color: AppColors.error),
             ),
+          ),
         ],
       ),
-      body: _isEditing ? _buildEditView(profile) : _buildProfileView(profile),
     );
+    if (discard == true && mounted) _cancelEdit();
   }
 
   Widget _buildProfileView(SellerProfileModel profile) {
     final loc = profile.businessLocation;
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: [
-        // Enterprise Entity Overview Card
+        // Compact business header
         AppCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Column(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
-                radius: 28,
+                radius: 26,
                 backgroundColor: AppColors.primaryContainer,
                 child: const Icon(
                   LucideIcons.store,
-                  size: 28,
+                  size: 24,
                   color: AppColors.primary,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                profile.companyName.isNotEmpty
-                    ? profile.companyName
-                    : 'Bikaner Agro Processing Ltd',
-                style: AppTypography.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                profile.fullName.isNotEmpty ? profile.fullName : 'Seller Lead',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondaryLight,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.companyName.isNotEmpty
+                          ? profile.companyName
+                          : 'Bikaner Agro Processing Ltd',
+                      style: AppTypography.titleMedium,
                     ),
-                    decoration: BoxDecoration(
-                      color: profile.isVerified
-                          ? AppColors.successBackground
-                          : AppColors.warningBackground,
-                      borderRadius: BorderRadius.circular(16),
+                    const SizedBox(height: 2),
+                    Text(
+                      profile.fullName.isNotEmpty
+                          ? profile.fullName
+                          : 'Seller Lead',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondaryLight,
+                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          profile.isVerified
-                              ? LucideIcons.shieldCheck
-                              : LucideIcons.alertTriangle,
-                          size: 13,
-                          color: profile.isVerified
-                              ? AppColors.success
-                              : AppColors.warning,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          profile.isVerified
-                              ? 'Verified Seller Enterprise'
-                              : 'Pending Desk Verification',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: profile.isVerified
-                                ? AppColors.success
-                                : AppColors.warning,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    key: const Key('edit_profile_button'),
-                    onTap: _enterEditMode,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
+                    const SizedBox(height: 8),
+                    Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.primary),
+                        color: profile.isVerified
+                            ? AppColors.successBackground
+                            : AppColors.warningBackground,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(
-                            LucideIcons.pencil,
-                            size: 11,
-                            color: AppColors.primary,
+                            profile.isVerified
+                                ? LucideIcons.shieldCheck
+                                : LucideIcons.alertTriangle,
+                            size: 13,
+                            color: profile.isVerified
+                                ? AppColors.success
+                                : AppColors.warning,
                           ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Edit Profile',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              profile.isVerified
+                                  ? 'Verified Seller Enterprise'
+                                  : 'Pending Desk Verification',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: profile.isVerified
+                                    ? AppColors.success
+                                    : AppColors.warning,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                key: const Key('edit_profile_button'),
+                onPressed: _enterEditMode,
+                icon: const Icon(LucideIcons.pencil, size: 14),
+                label: const Text('Edit'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 34),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // Business Information (Clean & Human-Readable)
-        AppCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: const [
-                  Icon(
-                    LucideIcons.building,
-                    size: 16,
-                    color: AppColors.primary,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Business Information',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _buildInfoRow('Contact Person:', profile.fullName),
-              const SizedBox(height: 6),
-              _buildInfoRow(
-                'Mobile Number:',
-                profile.mobile.isNotEmpty ? profile.mobile : 'Not provided',
-              ),
-              const SizedBox(height: 6),
-              _buildInfoRow(
-                'Business Email:',
-                profile.email.isNotEmpty ? profile.email : 'Not provided',
-              ),
-              const SizedBox(height: 6),
-              _buildInfoRow(
-                'GSTIN:',
-                profile.companyGst.isNotEmpty
-                    ? profile.companyGst
-                    : 'Not provided',
-              ),
-              const SizedBox(height: 6),
-              _buildInfoRow('Corporate HQ:', profile.officeAddress),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // Business Location (Shop, Warehouse, or Godown)
-        AppCard(
-          key: const Key('business_location_view_card'),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(
-                        LucideIcons.warehouse,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Business Location (Shop / Godown)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (loc.isGpsDetected)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.successBackground,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            LucideIcons.mapPin,
-                            size: 9,
-                            color: AppColors.success,
-                          ),
-                          SizedBox(width: 3),
-                          Text(
-                            'GPS Linked',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.success,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _buildInfoRow('Facility Name:', loc.name),
-              const SizedBox(height: 6),
-              _buildInfoRow('Premises Address:', loc.addressLine),
-              const SizedBox(height: 6),
-              _buildInfoRow('Mandi Area / Locality:', loc.locality),
-              const SizedBox(height: 6),
-              _buildInfoRow(
-                'State & District:',
-                '${loc.districtName}, ${loc.stateName}',
-              ),
-              const SizedBox(height: 6),
-              _buildInfoRow(
-                'Postal PIN Code:',
-                loc.pinCode.isNotEmpty ? loc.pinCode : 'Not provided',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // Trading Desk Regulations
-        AppCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Trading Desk Regulations',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                '1. All commodity sales are mediated exclusively through authorized regional brokers.\n'
-                '2. Direct buyer communications and directory searches are prohibited under counterparty shield policies.\n'
-                '3. Sellers are responsible for physical loading readiness at registered warehouse locations.',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondaryLight,
-                  height: 1.35,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
-        // Application Preferences (Theme, Language, Font Size, Accessibility)
-        const AppSettingsSection(),
-        const SizedBox(height: 16),
-
-        // Sign Out Action
-        AppButton(
-          label: 'Sign Out of Seller Desk',
-          icon: LucideIcons.logOut,
-          variant: ButtonVariant.danger,
-          onPressed: _handleSignOut,
+        _buildAccordion(
+          id: 'business',
+          key: const Key('profile_section_business'),
+          icon: LucideIcons.building,
+          title: 'Business Info',
+          subtitle: 'Contact, GSTIN, office',
+          children: [
+            _buildInfoRow(LucideIcons.user, 'Contact', profile.fullName),
+            _buildInfoRow(LucideIcons.phone, 'Mobile', profile.mobile),
+            _buildInfoRow(LucideIcons.mail, 'Email', profile.email),
+            _buildInfoRow(LucideIcons.receipt, 'GSTIN', profile.companyGst),
+            _buildInfoRow(
+              LucideIcons.building2,
+              'Office',
+              profile.officeAddress,
+            ),
+          ],
         ),
-        const SizedBox(height: 24),
+        _buildAccordion(
+          id: 'location',
+          key: const Key('business_location_view_card'),
+          icon: LucideIcons.mapPin,
+          title: 'Shop & Godown',
+          subtitle: 'Facility name, address, area',
+          trailing: loc.isGpsDetected
+              ? Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.successBackground,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'GPS Linked',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.success,
+                    ),
+                  ),
+                )
+              : null,
+          children: [
+            _buildInfoRow(LucideIcons.warehouse, 'Facility', loc.name),
+            _buildInfoRow(LucideIcons.map, 'Address', loc.addressLine),
+            _buildInfoRow(LucideIcons.navigation, 'Area', loc.locality),
+            _buildInfoRow(
+              LucideIcons.landmark,
+              'District',
+              '${loc.districtName}, ${loc.stateName}',
+            ),
+            _buildInfoRow(LucideIcons.hash, 'PIN', loc.pinCode),
+          ],
+        ),
+        _buildAccordion(
+          id: 'rules',
+          key: const Key('profile_section_rules'),
+          icon: LucideIcons.fileText,
+          title: 'Trading Desk Rules',
+          subtitle: 'Key guidelines',
+          children: const [
+            Text(
+              '1. All commodity sales are mediated exclusively through authorized regional brokers.\n'
+              '2. Direct buyer communications and directory searches are prohibited under counterparty shield policies.\n'
+              '3. Sellers are responsible for physical loading readiness at registered warehouse locations.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondaryLight,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        _buildAccordion(
+          id: 'prefs',
+          key: const Key('profile_section_preferences'),
+          icon: LucideIcons.settings,
+          title: 'App Preferences',
+          subtitle: 'Theme, language, accessibility',
+          children: [
+            const Text(
+              'Theme, language, font size and high-contrast options are managed in Settings.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const Key('profile_open_settings'),
+                onPressed: () => context.push('/settings'),
+                icon: const Icon(LucideIcons.settings, size: 16),
+                label: const Text('Open Settings'),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
+
+  Widget _buildAccordion({
+    required String id,
+    required Key key,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+    Widget? trailing,
+  }) {
+    final expanded = _expandedSections.contains(id);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(
+        key: key,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () => setState(() {
+                expanded
+                    ? _expandedSections.remove(id)
+                    : _expandedSections.add(id);
+              }),
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 20, color: AppColors.info),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: AppTypography.titleSmall),
+                        if (!expanded)
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (trailing != null) ...[
+                    trailing,
+                    const SizedBox(width: 6),
+                  ],
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(
+                      LucideIcons.chevronDown,
+                      size: 20,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: expanded
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [const Divider(height: 20), ...children],
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildEditView(SellerProfileModel profile) {
     return Form(
@@ -829,34 +954,6 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Edit Banner
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primaryContainer.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Row(
-              children: const [
-                Icon(LucideIcons.fileEdit, color: AppColors.primary, size: 20),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Update your business contact details and shop/godown facility location.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.primaryDark,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
           if (_saveErrorMessage != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
@@ -890,121 +987,121 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Business Information Card
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Business & Enterprise Details',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          _buildEditGroup(
+            icon: LucideIcons.store,
+            title: 'Business Details',
+            children: [
+              TextFormField(
+                key: const Key('edit_company_name_field'),
+                controller: _companyController,
+                decoration: const InputDecoration(
+                  labelText: 'Business Name *',
+                  hintText: 'e.g. Bikaner Agro Processing Ltd',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(height: 14),
-
-                // Full Name
-                TextFormField(
-                  key: const Key('edit_full_name_field'),
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Seller Full Name (Contact Person) *',
-                    hintText: 'e.g. Ramesh Kumar Sharma',
-                    prefixIcon: Icon(LucideIcons.user, size: 18),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().length < 2) {
-                      return 'Full name is required (minimum 2 characters)';
-                    }
-                    return null;
-                  },
+                validator: (val) {
+                  if (val == null || val.trim().length < 2) {
+                    return 'Business name is required (minimum 2 characters)';
+                  }
+                  return null;
+                },
+              ),
+              TextFormField(
+                key: const Key('edit_office_address_field'),
+                controller: _officeAddressController,
+                maxLines: null,
+                decoration: const InputDecoration(
+                  labelText: 'Office Address',
+                  hintText: 'e.g. Commercial Tower 4, Bikaner HQ',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(height: 14),
-
-                // Company Name
-                TextFormField(
-                  key: const Key('edit_company_name_field'),
-                  controller: _companyController,
-                  decoration: const InputDecoration(
-                    labelText: 'Company / Business Name *',
-                    hintText: 'e.g. Bikaner Agro Processing Ltd',
-                    prefixIcon: Icon(LucideIcons.building, size: 18),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().length < 2) {
-                      return 'Business name is required (minimum 2 characters)';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-
-                // Mobile
-                TextFormField(
-                  key: const Key('edit_mobile_field'),
-                  controller: _mobileController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Registered Mobile Number *',
-                    hintText: 'e.g. 9829012345',
-                    prefixIcon: Icon(LucideIcons.phone, size: 18),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'Mobile number is required';
-                    }
-                    final clean = val.replaceAll(RegExp(r'[\s\-+]'), '');
-                    final phoneRegex = RegExp(r'^(?:91)?[6-9]\d{9}$');
-                    if (!phoneRegex.hasMatch(clean)) {
-                      return 'Enter a valid 10-digit Indian mobile number';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-
-                // GSTIN
-                TextFormField(
-                  key: const Key('edit_gstin_field'),
-                  controller: _gstController,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                    labelText: 'GSTIN (Tax Registration)',
-                    hintText: 'e.g. 08AAAAA0000A1Z5',
-                    prefixIcon: Icon(LucideIcons.receipt, size: 18),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (val) {
-                    if (val != null && val.trim().isNotEmpty) {
-                      final clean = val.trim().toUpperCase();
-                      final gstRegex = RegExp(
-                        r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
-                      );
-                      if (!gstRegex.hasMatch(clean)) {
-                        return 'Enter a valid 15-character GSTIN (e.g. 08AAAAA0000A1Z5)';
-                      }
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-
-                // Corporate HQ Office Address (Preserved strictly distinct from Godown)
-                TextFormField(
-                  key: const Key('edit_office_address_field'),
-                  controller: _officeAddressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Corporate HQ Address (Office)',
-                    hintText: 'e.g. Commercial Tower 4, Bikaner HQ',
-                    prefixIcon: Icon(LucideIcons.mapPinned, size: 18),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+
+          _buildEditGroup(
+            icon: LucideIcons.contact,
+            title: 'Contact Info',
+            children: [
+              TextFormField(
+                key: const Key('edit_full_name_field'),
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Contact Person *',
+                  hintText: 'e.g. Ramesh Kumar Sharma',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().length < 2) {
+                    return 'Full name is required (minimum 2 characters)';
+                  }
+                  return null;
+                },
+              ),
+              TextFormField(
+                key: const Key('edit_mobile_field'),
+                controller: _mobileController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Mobile Number *',
+                  hintText: 'e.g. 9829012345',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Mobile number is required';
+                  }
+                  final clean = val.replaceAll(RegExp(r'[\s\-+]'), '');
+                  final phoneRegex = RegExp(r'^(?:91)?[6-9]\d{9}$');
+                  if (!phoneRegex.hasMatch(clean)) {
+                    return 'Enter a valid 10-digit Indian mobile number';
+                  }
+                  return null;
+                },
+              ),
+              // Login email is the auth identity; it is not editable here.
+              TextFormField(
+                key: const Key('edit_email_field_readonly'),
+                initialValue: profile.email,
+                enabled: false,
+                decoration: const InputDecoration(
+                  labelText: 'Business Email',
+                  helperText: 'Login email — cannot be changed here',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+
+          _buildEditGroup(
+            icon: LucideIcons.fileText,
+            title: 'Business Identifiers',
+            children: [
+              TextFormField(
+                key: const Key('edit_gstin_field'),
+                controller: _gstController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'GSTIN',
+                  hintText: 'e.g. 08AAAAA0000A1Z5',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) {
+                  if (val != null && val.trim().isNotEmpty) {
+                    final clean = val.trim().toUpperCase();
+                    final gstRegex = RegExp(
+                      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
+                    );
+                    if (!gstRegex.hasMatch(clean)) {
+                      return 'Enter a valid 15-character GSTIN (e.g. 08AAAAA0000A1Z5)';
+                    }
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+
 
           // Business Location (Shop, Warehouse, or Godown)
           AppCard(
@@ -1016,7 +1113,7 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Business Location (Shop / Godown)',
+                      'Shop & Godown',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -1313,61 +1410,73 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Action Buttons: Save & Cancel
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  key: const Key('cancel_profile_button'),
-                  label: 'Cancel',
-                  variant: ButtonVariant.outline,
-                  onPressed: _isSaving ? null : _cancelEdit,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppButton(
-                  key: const Key('save_profile_button'),
-                  label: _isSaving ? 'Saving...' : 'Save Changes',
-                  isLoading: _isSaving,
-                  variant: ButtonVariant.primary,
-                  onPressed: _isSaving ? null : _handleSaveProfile,
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 135,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondaryLight,
+  Widget _buildEditGroup({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(title, style: AppTypography.titleSmall),
+              ],
+            ),
+            const SizedBox(height: 12),
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) const SizedBox(height: 12),
+              children[i],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Short label + full value; long values wrap rather than truncate.
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textMutedLight),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 64,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondaryLight,
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: Text(
-            value.isNotEmpty ? value : 'Not provided',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimaryLight,
+          Expanded(
+            child: Text(
+              value.isNotEmpty ? value : 'Not provided',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimaryLight,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -44,6 +44,9 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
   SellerCommodity? _commodity;
   bool _isLoading = true;
   bool _isActionInProgress = false;
+  bool _inventoryExpanded = false;
+  bool _dispatchExpanded = false;
+  bool _qualityExpanded = false;
 
   // Lab Testing State (RB-SELLER-LAB-01)
   LabTestingRequest? _labRequest;
@@ -691,54 +694,63 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
         children: [
           // Header Card
           AppCard(
-            child: Column(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        lot.commodityName,
-                        style: AppTypography.titleLarge,
+                _buildSectionIcon(LucideIcons.layers, AppColors.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(lot.commodityName, style: AppTypography.titleMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        lot.gradeName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondaryLight,
+                        ),
                       ),
-                    ),
-                    StatusBadge(status: lot.status),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  lot.gradeName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondaryLight,
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(
+                            LucideIcons.mapPin,
+                            size: 13,
+                            color: AppColors.textSecondaryLight,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${lot.districtName}, ${lot.stateName}',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                Row(
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Icon(
-                      LucideIcons.mapPin,
-                      size: 14,
-                      color: AppColors.textSecondaryLight,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${lot.districtName}, ${lot.stateName}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondaryLight,
-                      ),
-                    ),
-                    const Spacer(),
+                    StatusBadge(status: lot.status),
+                    const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
-                        vertical: 4,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.primaryContainer,
@@ -758,48 +770,52 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // Inventory & Commercial Breakdown Card
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Inventory & Pricing Breakdown',
-                  style: AppTypography.titleMedium,
-                ),
-                const SizedBox(height: 14),
-
-                // Volume Progress Indicators
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildVolumePill(
+          // Inventory & Asking Price — summary always visible, pricing expands
+          _buildAccordion(
+            key: const Key('lot_inventory_section'),
+            icon: LucideIcons.barChart3,
+            title: 'Inventory & Asking Price',
+            expanded: _inventoryExpanded,
+            onToggle: () =>
+                setState(() => _inventoryExpanded = !_inventoryExpanded),
+            summary: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildVolumePill(
                       'Total Lot',
                       '${lot.totalQuantity.toInt()} ${lot.unit}',
                       AppColors.primary,
                     ),
-                    _buildVolumePill(
+                  ),
+                  Expanded(
+                    child: _buildVolumePill(
                       'Available',
                       '${lot.availableQuantity.toInt()} ${lot.unit}',
                       AppColors.success,
                     ),
-                    _buildVolumePill(
+                  ),
+                  Expanded(
+                    child: _buildVolumePill(
                       'Reserved',
                       '${lot.reservedQuantity.toInt()} ${lot.unit}',
                       AppColors.warning,
                     ),
-                    _buildVolumePill(
+                  ),
+                  Expanded(
+                    child: _buildVolumePill(
                       'Sold',
                       '${lot.soldQuantity.toInt()} ${lot.unit}',
-                      AppColors.textMutedLight,
+                      AppColors.info,
                     ),
-                  ],
-                ),
-                const Divider(height: 24),
-
-                // Price Rows
+                  ),
+                ],
+              ),
+            ),
+            children: [
                 _buildInfoRow(
                   'Asking Price',
                   '₹${currencyFormat.format(lot.askingPrice)} / ${lot.unit}',
@@ -821,21 +837,19 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                   'Payment Terms',
                   lot.paymentTerms ?? 'Payment on Delivery (CAD)',
                 ),
-              ],
-            ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // Physical Dispatch & Facility Card
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Dispatch & Warehouse Location',
-                  style: AppTypography.titleMedium,
-                ),
-                const SizedBox(height: 12),
+          // Physical Dispatch & Facility — collapsible
+          _buildAccordion(
+            key: const Key('lot_dispatch_section'),
+            icon: LucideIcons.truck,
+            title: 'Dispatch & Warehouse Location',
+            expanded: _dispatchExpanded,
+            onToggle: () =>
+                setState(() => _dispatchExpanded = !_dispatchExpanded),
+            children: [
                 if (lot.warehouseName != null &&
                     lot.warehouseName!.isNotEmpty) ...[
                   _buildInfoRow('Warehouse Address', lot.warehouseName!),
@@ -874,24 +888,46 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                   'Lab Certificate',
                   lot.labReportNumber ?? 'AGMARK-RAL-2026-9021',
                 ),
-              ],
-            ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // Laboratory Testing & Report Card (RB-SELLER-LAB-01)
+          // Quality Document / Laboratory Testing (RB-SELLER-LAB-01)
           _buildLabTestingCard(lot),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
           // Assigned Mandi Broker Card
           AppCard(
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('My Trusted Broker', style: AppTypography.titleMedium),
+                    _buildSectionIcon(LucideIcons.user, AppColors.info),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            lot.brokerName ?? 'Regional Mandi Broadcast Desk',
+                            style: AppTypography.titleMedium,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            lot.brokerLocation ??
+                                'Krishi Upaj Mandi Yard B-Block',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -899,7 +935,7 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.successContainer,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
                         'Licensed Broker',
@@ -912,111 +948,111 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  lot.brokerName ?? 'Regional Mandi Broadcast Desk',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
-                ),
-                Text(
-                  lot.brokerLocation ?? 'Krishi Upaj Mandi Yard B-Block',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondaryLight,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Counterparty Shield: All buyer negotiations and trade contracts are strictly broker-mediated. Direct buyer access is prohibited.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondaryLight,
-                  ),
-                ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () =>
-                            _contactLauncher.launchPhone(effectiveBrokerPhone),
-                        icon: const Icon(LucideIcons.phone, size: 16),
-                        label: const Text('Call Broker'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
-                        ),
+                    _buildContactIcon(
+                      key: const Key('lot_broker_call'),
+                      icon: LucideIcons.phone,
+                      tooltip: 'Call Broker',
+                      color: AppColors.primary,
+                      onPressed: () =>
+                          _contactLauncher.launchPhone(effectiveBrokerPhone),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildContactIcon(
+                      key: const Key('lot_broker_whatsapp'),
+                      icon: LucideIcons.messageCircle,
+                      tooltip: 'WhatsApp',
+                      color: Colors.green.shade700,
+                      onPressed: () =>
+                          _contactLauncher.launchWhatsApp(effectiveBrokerPhone),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildContactIcon(
+                      key: const Key('lot_broker_chat'),
+                      icon: LucideIcons.messageSquare,
+                      tooltip: 'Broker Chat & Commission Desk',
+                      color: AppColors.info,
+                      onPressed: () => context.push(
+                        '/commodities/${lot.id}/negotiate',
+                        extra: lot,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _contactLauncher.launchWhatsApp(
-                          effectiveBrokerPhone,
-                        ),
-                        icon: const Icon(LucideIcons.messageCircle, size: 16),
-                        label: const Text('WhatsApp'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.green.shade700,
-                          side: BorderSide(color: Colors.green.shade700),
+                    if (lot.isActive) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          key: const Key('lot_change_broker'),
+                          onPressed: _isActionInProgress
+                              ? null
+                              : () => _openChangeBrokersSheet(lot),
+                          icon: const Icon(LucideIcons.repeat, size: 16),
+                          label: const Text(
+                            'Change Broker',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            foregroundColor: AppColors.textPrimaryLight,
+                            side: const BorderSide(color: AppColors.borderLight),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 12),
-                AppButton(
-                  label: 'Broker Chat & Commission Desk',
-                  onPressed: () => context.push(
-                    '/commodities/${lot.id}/negotiate',
-                    extra: lot,
-                  ),
-                  variant: ButtonVariant.primary,
-                  icon: LucideIcons.messageSquare,
-                ),
-                if (lot.isActive) ...[
-                  const SizedBox(height: 10),
-                  AppButton(
-                    label: 'Change Brokers',
-                    onPressed: _isActionInProgress
-                        ? null
-                        : () => _openChangeBrokersSheet(lot),
-                    variant: ButtonVariant.outline,
-                    icon: LucideIcons.repeat,
-                  ),
-                ],
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
 
-          // Supported Management Actions
+          // Supported Management Actions — one row
           if (lot.isActive) ...[
-            AppButton(
-              label: 'Update Asking Price',
-              onPressed: _isActionInProgress ? null : _showUpdatePriceDialog,
-              variant: ButtonVariant.primary,
-              icon: LucideIcons.indianRupee,
-            ),
-            const SizedBox(height: 12),
-            AppButton(
-              label: 'Mark as Fulfilled / Dispatched',
-              onPressed: _isActionInProgress
-                  ? null
-                  : () => _confirmStatusUpdate('Fulfilled', 'Fulfill'),
-              variant: ButtonVariant.outline,
-              icon: LucideIcons.checkCheck,
-            ),
-            const SizedBox(height: 12),
-            AppButton(
-              label: 'Withdraw / Cancel Lot',
-              onPressed: _isActionInProgress
-                  ? null
-                  : () => _confirmStatusUpdate('Cancelled', 'Cancel'),
-              variant: ButtonVariant.outline,
-              icon: LucideIcons.trash2,
+            Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    key: const Key('lot_action_update_price'),
+                    label: 'Update Price',
+                    icon: LucideIcons.indianRupee,
+                    color: AppColors.primary,
+                    filled: true,
+                    onPressed: _isActionInProgress
+                        ? null
+                        : _showUpdatePriceDialog,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildActionButton(
+                    key: const Key('lot_action_fulfill'),
+                    label: 'Mark Fulfilled',
+                    icon: LucideIcons.checkCheck,
+                    color: AppColors.success,
+                    onPressed: _isActionInProgress
+                        ? null
+                        : () => _confirmStatusUpdate('Fulfilled', 'Fulfill'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildActionButton(
+                    key: const Key('lot_action_withdraw'),
+                    label: 'Withdraw Lot',
+                    icon: LucideIcons.trash2,
+                    color: AppColors.error,
+                    onPressed: _isActionInProgress
+                        ? null
+                        : () => _confirmStatusUpdate('Cancelled', 'Cancel'),
+                  ),
+                ),
+              ],
             ),
           ] else ...[
             Container(
@@ -1041,6 +1077,158 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
     );
   }
 
+  Widget _buildSectionIcon(IconData icon, Color color) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: 20, color: color),
+    );
+  }
+
+  /// Card with a tappable header (icon, title, chevron). [summary] stays
+  /// visible; [children] are shown only while [expanded].
+  Widget _buildAccordion({
+    required Key key,
+    required IconData icon,
+    required String title,
+    required bool expanded,
+    required VoidCallback onToggle,
+    required List<Widget> children,
+    Widget? trailing,
+    Widget? summary,
+  }) {
+    return AppCard(
+      key: key,
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                _buildSectionIcon(icon, AppColors.info),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(title, style: AppTypography.titleSmall),
+                ),
+                if (trailing != null) ...[
+                  trailing,
+                  const SizedBox(width: 6),
+                ],
+                AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    LucideIcons.chevronDown,
+                    size: 20,
+                    color: AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ?summary,
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: expanded
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [const Divider(height: 20), ...children],
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactIcon({
+    required Key key,
+    required IconData icon,
+    required String tooltip,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Material(
+      color: color.withValues(alpha: 0.1),
+      shape: const CircleBorder(),
+      child: IconButton(
+        key: key,
+        icon: Icon(icon, size: 18, color: color),
+        tooltip: tooltip,
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required Key key,
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback? onPressed,
+    bool filled = false,
+  }) {
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
+    const padding = EdgeInsets.symmetric(horizontal: 6);
+    final child = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 16),
+        const SizedBox(width: 4),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ],
+    );
+    return SizedBox(
+      height: 46,
+      child: filled
+          ? ElevatedButton(
+              key: key,
+              onPressed: onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 46),
+                padding: padding,
+                shape: shape,
+              ),
+              child: child,
+            )
+          : OutlinedButton(
+              key: key,
+              onPressed: onPressed,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: color,
+                backgroundColor: color.withValues(alpha: 0.05),
+                side: BorderSide(color: color.withValues(alpha: 0.6)),
+                minimumSize: const Size(0, 46),
+                padding: padding,
+                shape: shape,
+              ),
+              child: child,
+            ),
+    );
+  }
+
   Widget _buildVolumePill(String label, String value, Color color) {
     return Column(
       children: [
@@ -1053,11 +1241,15 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondaryLight,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondaryLight,
+                ),
               ),
             ),
           ],
@@ -1079,32 +1271,24 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
         _isReportAvailable;
 
     if (!hasLabTesting) {
-      return AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Quality & Assay Document',
-                  style: AppTypography.titleMedium,
-                ),
-                const StatusBadge(status: 'Self-Declared'),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _buildInfoRow(
-              'Document Type',
-              lot.labName ?? 'Visual Mandi Inspection',
-            ),
-            const SizedBox(height: 6),
-            _buildInfoRow(
-              'Certificate Reference',
-              lot.labReportNumber ?? 'None',
-            ),
-          ],
-        ),
+      return _buildAccordion(
+        key: const Key('lot_quality_section'),
+        icon: LucideIcons.fileText,
+        title: 'Quality Document',
+        trailing: const StatusBadge(status: 'Self-Declared'),
+        expanded: _qualityExpanded,
+        onToggle: () => setState(() => _qualityExpanded = !_qualityExpanded),
+        children: [
+          _buildInfoRow(
+            'Document Type',
+            lot.labName ?? 'Visual Mandi Inspection',
+          ),
+          const SizedBox(height: 6),
+          _buildInfoRow(
+            'Certificate Reference',
+            lot.labReportNumber ?? 'None',
+          ),
+        ],
       );
     }
 
@@ -1287,12 +1471,15 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
   Widget _buildInfoRow(String label, String value, {bool isHighlight = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondaryLight,
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondaryLight,
+            ),
           ),
         ),
         const SizedBox(width: 8),

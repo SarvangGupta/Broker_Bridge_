@@ -436,16 +436,34 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
+        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(effectiveBrokerName, style: AppTypography.titleMedium),
             Text(
-              '$effectiveLocation • Trust $trust%',
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondaryLight,
-              ),
+              effectiveBrokerName,
+              style: AppTypography.titleMedium,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Row(
+              children: [
+                const Icon(
+                  LucideIcons.shieldCheck,
+                  size: 12,
+                  color: AppColors.success,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    '$effectiveLocation • Trust $trust%',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -455,27 +473,80 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
             tooltip: 'Call Broker',
             onPressed: () => _contactLauncher.launchPhone(effectivePhone),
           ),
-          IconButton(
-            icon: const Icon(LucideIcons.messageCircle, size: 20),
-            tooltip: 'Broker WhatsApp',
-            onPressed: () => _contactLauncher.launchWhatsApp(effectivePhone),
+          PopupMenuButton<String>(
+            key: const Key('broker_chat_menu'),
+            icon: const Icon(LucideIcons.ellipsisVertical, size: 20),
+            tooltip: 'More options',
+            onSelected: (value) {
+              if (value == 'whatsapp') {
+                _contactLauncher.launchWhatsApp(effectivePhone);
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'whatsapp',
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.messageCircle, size: 18),
+                    SizedBox(width: 12),
+                    Text('WhatsApp Broker'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondaryLight,
-          indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(
-              icon: Icon(LucideIcons.messageSquare, size: 16),
-              text: 'Broker Chat',
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textSecondaryLight,
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                indicator: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                tabs: const [
+                  Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.messageSquare, size: 16),
+                        SizedBox(width: 8),
+                        Text('Chat'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.scale, size: 16),
+                        SizedBox(width: 8),
+                        Text('Terms'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Tab(
-              icon: Icon(LucideIcons.scale, size: 16),
-              text: 'Commission Terms',
-            ),
-          ],
+          ),
         ),
       ),
       body: _isLoading
@@ -484,13 +555,19 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
             )
           : Column(
               children: [
-                // Commodity Context & Privacy Shield Bar
+                // Commodity context & counterparty shield
                 Container(
+                  key: const Key('broker_mediated_bar'),
                   width: double.infinity,
-                  color: Colors.white,
+                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: 12,
                     vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderLight),
                   ),
                   child: Row(
                     children: [
@@ -503,10 +580,10 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                       Expanded(
                         child: Text(
                           widget.commodityContext != null
-                              ? '${widget.commodityContext} • Counterparty Shield Active (Broker-mediated)'
-                              : 'Commodity Mandate • Counterparty Shield Active (Broker-mediated)',
+                              ? '${widget.commodityContext} • Broker-mediated trading'
+                              : 'Broker-mediated trading',
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimaryLight,
                           ),
@@ -516,7 +593,6 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                     ],
                   ),
                 ),
-                const Divider(height: 1),
 
                 // Tab Content
                 Expanded(
@@ -559,123 +635,181 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                 )
               : ListView.builder(
                   controller: _chatScrollController,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
                     final msg = _messages[index];
 
+                    // Commission/system events: compact card opening Terms
                     if (msg.isSystemEvent) {
-                      return Center(
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade50,
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Material(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.amber.shade300),
-                          ),
-                          child: Text(
-                            msg.text,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.amber.shade900,
+                            onTap: () => _tabController.animateTo(1),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.amber.shade200,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    LucideIcons.scale,
+                                    size: 22,
+                                    color: Colors.amber.shade800,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      msg.text,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimaryLight,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    timeFormat.format(msg.timestamp),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.textMutedLight,
+                                    ),
+                                  ),
+                                  const Icon(
+                                    LucideIcons.chevronRight,
+                                    size: 18,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       );
                     }
 
-                    return Align(
-                      alignment: msg.isMine
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.78,
+                    final bubble = Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.72,
+                      ),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                      decoration: BoxDecoration(
+                        color: msg.isMine ? AppColors.primary : Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(14),
+                          topRight: const Radius.circular(14),
+                          bottomLeft: Radius.circular(msg.isMine ? 14 : 4),
+                          bottomRight: Radius.circular(msg.isMine ? 4 : 14),
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: msg.isMine ? AppColors.primary : Colors.white,
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(12),
-                            topRight: const Radius.circular(12),
-                            bottomLeft: Radius.circular(msg.isMine ? 12 : 2),
-                            bottomRight: Radius.circular(msg.isMine ? 2 : 12),
+                        border: msg.isMine
+                            ? null
+                            : Border.all(color: AppColors.borderLight),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  msg.isMine ? 'You' : msg.senderName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: msg.isMine
+                                        ? Colors.white
+                                        : AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                timeFormat.format(msg.timestamp),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: msg.isMine
+                                      ? Colors.white70
+                                      : AppColors.textMutedLight,
+                                ),
+                              ),
+                            ],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+                          const SizedBox(height: 4),
+                          Text(
+                            msg.text,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.35,
+                              color: msg.isMine
+                                  ? Colors.white
+                                  : AppColors.textPrimaryLight,
                             ),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        mainAxisAlignment: msg.isMine
+                            ? MainAxisAlignment.end
+                            : MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!msg.isMine) ...[
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: AppColors.primaryContainer,
+                              child: const Icon(
+                                LucideIcons.landmark,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                           ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: msg.isMine
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              msg.senderName,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: msg.isMine
-                                    ? Colors.white70
-                                    : AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              msg.text,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: msg.isMine
-                                    ? Colors.white
-                                    : AppColors.textPrimaryLight,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              timeFormat.format(msg.timestamp),
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: msg.isMine
-                                    ? Colors.white60
-                                    : AppColors.textMutedLight,
-                              ),
-                            ),
-                          ],
-                        ),
+                          Flexible(child: bubble),
+                        ],
                       ),
                     );
                   },
                 ),
         ),
 
-        // Chat Input Bar
+        // Chat input bar — stays pinned above the keyboard / system bar
         Container(
-          color: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: AppColors.borderLight)),
+          ),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
           child: SafeArea(
+            top: false,
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
+                    key: const Key('broker_chat_input'),
                     controller: _messageController,
                     textCapitalization: TextCapitalization.sentences,
+                    minLines: 1,
+                    maxLines: 4,
                     decoration: InputDecoration(
-                      hintText: 'Type a message to broker...',
+                      hintText: 'Type a message...',
                       hintStyle: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 14,
                         color: AppColors.textSecondaryLight,
                       ),
                       contentPadding: const EdgeInsets.symmetric(
@@ -683,7 +817,7 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                         vertical: 10,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: const BorderSide(
                           color: AppColors.borderLight,
                         ),
@@ -695,15 +829,32 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _isSending ? null : _handleSendMessage,
-                  icon: _isSending
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(LucideIcons.send, color: AppColors.primary),
+                Material(
+                  color: AppColors.primary,
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    key: const Key('broker_chat_send'),
+                    tooltip: 'Send',
+                    onPressed: _isSending ? null : _handleSendMessage,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 46,
+                      height: 46,
+                    ),
+                    icon: _isSending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(
+                            LucideIcons.send,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                  ),
                 ),
               ],
             ),
@@ -721,14 +872,23 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
     final summary = _commissionSummary;
     final isAgreed = summary?.isAgreed == true;
     final hasActiveProposal = summary?.hasActiveProposal == true;
+    final canAccept = summary?.canSellerAccept == true;
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
+    final historyFormat = DateFormat('dd MMM, hh:mm a');
+
+    final Color tone = isAgreed
+        ? AppColors.success
+        : (hasActiveProposal
+              ? Colors.amber.shade800
+              : AppColors.textSecondaryLight);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
       children: [
-        // Status Card
+        // Status
         Container(
-          padding: const EdgeInsets.all(16),
+          key: const Key('terms_status_card'),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isAgreed
                 ? AppColors.successContainer
@@ -736,13 +896,7 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                       ? Colors.amber.shade50
                       : Colors.grey.shade100),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isAgreed
-                  ? AppColors.success
-                  : (hasActiveProposal
-                        ? Colors.amber.shade400
-                        : AppColors.borderLight),
-            ),
+            border: Border.all(color: tone.withValues(alpha: 0.35)),
           ),
           child: Row(
             children: [
@@ -750,43 +904,37 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                 isAgreed
                     ? LucideIcons.checkCircle2
                     : (hasActiveProposal
-                          ? LucideIcons.scale
+                          ? LucideIcons.hourglass
                           : LucideIcons.helpCircle),
-                size: 28,
-                color: isAgreed
-                    ? AppColors.success
-                    : (hasActiveProposal
-                          ? Colors.amber.shade800
-                          : AppColors.textSecondaryLight),
+                size: 26,
+                color: tone,
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       isAgreed
-                          ? 'Commission Agreed & Confirmed'
+                          ? 'Commission Agreed'
                           : (hasActiveProposal
                                 ? 'Negotiation in Progress'
                                 : 'No Commission Agreement Yet'),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: isAgreed
-                            ? AppColors.success
-                            : (hasActiveProposal
-                                  ? Colors.amber.shade900
-                                  : AppColors.textPrimaryLight),
+                        color: isAgreed ? AppColors.success : AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       isAgreed
-                          ? 'Agreed Rate: ₹${summary!.agreedRate!.toStringAsFixed(0)} (${summary.agreedBasis})'
+                          ? 'Agreed rate: ₹${summary!.agreedRate!.toStringAsFixed(0)} (${summary.agreedBasis})'
                           : (hasActiveProposal
-                                ? 'Active terms proposal awaiting party acceptance'
-                                : 'Propose commission terms below to align broker mandate.'),
+                                ? (canAccept
+                                      ? 'Waiting for your response.'
+                                      : 'Waiting for broker response.')
+                                : 'Send an offer to start.'),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondaryLight,
@@ -798,192 +946,253 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
             ],
           ),
         ),
-        const SizedBox(height: 16),
-
-        // Active Proposal Card (if negotiating)
-        if (hasActiveProposal && summary?.latestProposal != null) ...[
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Current Active Proposal',
-                      style: AppTypography.titleMedium,
-                    ),
-                    StatusBadge(status: summary!.latestProposal!.status),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '₹${summary.latestProposal!.commissionRate?.toStringAsFixed(0)} ${summary.latestProposal!.commissionBasis}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Proposed by: ${summary.latestProposal!.senderName} (${summary.latestProposal!.senderRole.toUpperCase()})',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondaryLight,
-                  ),
-                ),
-                if (summary.latestProposal!.notes != null &&
-                    summary.latestProposal!.notes!.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Notes: "${summary.latestProposal!.notes}"',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-
-                // Action buttons: If proposed by broker, seller can accept or counter
-                if (summary.canSellerAccept) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _handleAcceptProposal,
-                          icon: const Icon(LucideIcons.check, size: 16),
-                          label: const Text('Accept Terms'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.success,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () =>
-                              _openProposeCommissionDialog(isCounter: true),
-                          icon: const Icon(LucideIcons.rotateCcw, size: 16),
-                          label: const Text('Counter'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            side: const BorderSide(color: AppColors.primary),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'Your proposal is pending Mandi Broker review. You will receive an alert once accepted or countered.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondaryLight,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-
-        // Propose New Terms Button
-        if (!isAgreed) ...[
-          AppButton(
-            label: hasActiveProposal
-                ? 'Submit Revised Proposal'
-                : 'Propose Commission Rate',
-            onPressed: () => _openProposeCommissionDialog(isCounter: false),
-            variant: ButtonVariant.primary,
-            icon: LucideIcons.plus,
-          ),
-          const SizedBox(height: 24),
-        ],
-
-        // Negotiation History Timeline
-        Text(
-          'Negotiation History & Audit Trail',
-          style: AppTypography.titleMedium,
-        ),
         const SizedBox(height: 10),
 
-        if (summary?.history.isEmpty ?? true)
-          const Text(
-            'No prior negotiation events.',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
-          )
-        else
-          ...summary!.history.map(
-            (event) => _buildTimelineItem(event, dateFormat),
+        // Current Offer + actions
+        if (hasActiveProposal && summary?.latestProposal != null)
+          _buildCurrentOfferCard(summary!, dateFormat, canAccept)
+        else if (!isAgreed)
+          SizedBox(
+            width: double.infinity,
+            child: _sendNewOfferButton(label: 'Send Offer'),
           ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 10),
+
+        // Offer History
+        AppCard(
+          key: const Key('terms_offer_history'),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Offer History', style: AppTypography.titleSmall),
+              const SizedBox(height: 8),
+              if (summary?.history.isEmpty ?? true)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'No offers yet.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                )
+              else
+                for (var i = 0; i < summary!.history.length; i++)
+                  _buildTimelineItem(
+                    summary.history[i],
+                    historyFormat,
+                    isLast: i == summary.history.length - 1,
+                  ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildTimelineItem(NegotiationEvent event, DateFormat dateFormat) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: AppColors.borderLight),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 14,
-              backgroundColor:
-                  event.actionType == NegotiationActionType.accept ||
-                      event.actionType == NegotiationActionType.commissionAccept
-                  ? AppColors.successContainer
-                  : AppColors.primaryContainer,
-              child: Icon(
-                event.actionType == NegotiationActionType.accept ||
-                        event.actionType ==
-                            NegotiationActionType.commissionAccept
-                    ? LucideIcons.check
-                    : LucideIcons.scale,
-                size: 14,
-                color:
-                    event.actionType == NegotiationActionType.accept ||
-                        event.actionType ==
-                            NegotiationActionType.commissionAccept
-                    ? AppColors.success
-                    : AppColors.primary,
+  Widget _buildCurrentOfferCard(
+    CommissionSummary summary,
+    DateFormat dateFormat,
+    bool canAccept,
+  ) {
+    final proposal = summary.latestProposal!;
+    return AppCard(
+      key: const Key('terms_current_offer'),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('Current Offer', style: AppTypography.titleSmall),
+              ),
+              StatusBadge(status: proposal.status),
+            ],
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '₹${proposal.commissionRate?.toStringAsFixed(0)} ${_shortBasis(proposal.commissionBasis)}',
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'By ${proposal.senderName} • ${dateFormat.format(proposal.createdAt)}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondaryLight,
+            ),
+          ),
+          if (proposal.notes != null && proposal.notes!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              '"${proposal.notes}"',
+              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (canAccept) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    key: const Key('terms_accept_button'),
+                    onPressed: _handleAcceptProposal,
+                    icon: const Icon(LucideIcons.check, size: 16),
+                    label: const Text('Accept'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(0, 44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('terms_counter_button'),
+                    onPressed: () =>
+                        _openProposeCommissionDialog(isCounter: true),
+                    icon: const Icon(LucideIcons.rotateCcw, size: 16),
+                    label: const Text('Counter'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textPrimaryLight,
+                      minimumSize: const Size(0, 44),
+                      side: const BorderSide(color: AppColors.borderLight),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ] else ...[
+            const Text(
+              'Your offer is with the broker. You will be alerted on a reply.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+            ),
+            const SizedBox(height: 10),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: _sendNewOfferButton(label: 'Send New Offer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sendNewOfferButton({required String label}) {
+    return ElevatedButton.icon(
+      key: const Key('terms_send_offer_button'),
+      onPressed: () => _openProposeCommissionDialog(isCounter: false),
+      icon: const Icon(LucideIcons.plus, size: 18),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(0, 46),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  /// '₹/MT' → '/ MT'; other bases are shown as-is in brackets.
+  String _shortBasis(String? basis) {
+    if (basis == null || basis.isEmpty) return '';
+    if (basis.startsWith('₹/')) return '/ ${basis.substring(2)}';
+    return '($basis)';
+  }
+
+  Widget _buildTimelineItem(
+    NegotiationEvent event,
+    DateFormat dateFormat, {
+    required bool isLast,
+  }) {
+    final isAccept =
+        event.actionType == NegotiationActionType.accept ||
+        event.actionType == NegotiationActionType.commissionAccept;
+    final color = isAccept
+        ? AppColors.success
+        : (event.isFromSeller ? AppColors.primary : Colors.amber.shade800);
+    final title = isAccept
+        ? '${event.isFromSeller ? 'You' : 'Broker'} accepted'
+        : (event.isFromSeller ? 'Your offer' : 'Broker offer');
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 32,
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: color.withValues(alpha: 0.12),
+                  child: Icon(
+                    isAccept ? LucideIcons.check : LucideIcons.scale,
+                    size: 14,
+                    color: color,
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(width: 2, color: AppColors.borderLight),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${event.actionType.value} • ${event.senderName}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                      Expanded(
+                        child: Wrap(
+                          spacing: 8,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            if (event.commissionRate != null)
+                              Text(
+                                '₹${event.commissionRate!.toStringAsFixed(0)} ${_shortBasis(event.commissionBasis)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: color,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         dateFormat.format(event.createdAt),
                         style: const TextStyle(
@@ -993,29 +1202,26 @@ class _BrokerCommunicationScreenState extends State<BrokerCommunicationScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  if (event.commissionRate != null)
-                    Text(
-                      'Rate: ₹${event.commissionRate?.toStringAsFixed(0)} (${event.commissionBasis})',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
+                  Text(
+                    event.senderName,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textMutedLight,
                     ),
+                  ),
                   if (event.notes != null && event.notes!.isNotEmpty)
                     Text(
                       event.notes!,
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppColors.textSecondaryLight,
                       ),
                     ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
