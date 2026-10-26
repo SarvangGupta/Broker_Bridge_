@@ -8,6 +8,7 @@ import '../../features/authentication/presentation/access_denied_screen.dart';
 import '../../features/authentication/presentation/login_screen.dart';
 import '../../features/authentication/presentation/splash_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
+import '../../features/dashboard/presentation/dashboard_section_screens.dart';
 import '../../features/dashboard/presentation/navigation_shell.dart';
 import '../../features/commission/presentation/screens/earnings_dashboard_screen.dart';
 import '../../features/invoices/presentation/screens/invoice_detail_screen.dart';
@@ -284,6 +285,19 @@ class AppRouter {
                 path: '/dashboard',
                 name: 'dashboard',
                 builder: (context, state) => const DashboardScreen(),
+                // Home shortcut destinations stay in the Home branch.
+                routes: [
+                  GoRoute(
+                    path: 'summary',
+                    name: 'dashboard_summary',
+                    builder: (context, state) => const DashboardSummaryScreen(),
+                  ),
+                  GoRoute(
+                    path: 'actions',
+                    name: 'dashboard_actions',
+                    builder: (context, state) => const DashboardActionsScreen(),
+                  ),
+                ],
               ),
             ],
           ),

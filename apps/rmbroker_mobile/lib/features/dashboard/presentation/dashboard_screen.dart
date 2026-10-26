@@ -8,12 +8,12 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_loading_indicator.dart';
 import '../domain/dashboard_state.dart';
 import 'controllers/dashboard_controller.dart';
+import '../../../core/config/app_config.dart';
 import 'widgets/broker_welcome_banner.dart';
 import 'widgets/dashboard_header.dart';
-import 'widgets/dashboard_kpi_grid.dart';
 import 'widgets/home_add_sheet.dart';
-import 'widgets/quick_actions_section.dart';
-import 'widgets/recent_activity_section.dart';
+import 'widgets/home_market_section.dart';
+import 'widgets/home_shortcuts_row.dart';
 
 /// Operational command center overview for the broker desk.
 class DashboardScreen extends ConsumerWidget {
@@ -100,29 +100,47 @@ class DashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                // Render fallback quick actions even in error state
-                QuickActionsSection(actions: state.quickActions),
+                const SizedBox(height: 12),
               ] else ...[
-                // Summary KPI Grid
-                DashboardKpiGrid(
-                  cards: state.kpiCards,
-                  onRefresh: () => controller.refresh(),
-                ),
-                const SizedBox(height: 18),
-
-                // Quick Actions
-                QuickActionsSection(actions: state.quickActions),
-                const SizedBox(height: 20),
-
-                // Recent Activities
-                RecentActivitySection(
-                  activities: state.recentActivities,
-                  isAuthoritative: state.metrics?.isAuthoritative ?? false,
-                ),
+                // Summary · Actions · Recent Activity (full views open on tap)
+                HomeShortcutsRow(state: state),
+                const SizedBox(height: 14),
               ],
 
-              const SizedBox(height: 72),
+              // Buyer Requirements / Seller Offers (Work Desk data)
+              const HomeMarketSection(),
+              const SizedBox(height: 12),
+
+              // Statutory fiduciary notice, kept at the end of Home.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(LucideIcons.shieldAlert, size: 14, color: Color(0xFFD97706)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        AppConfig.fiduciaryNoticeEn,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF92400E),
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Clear of the "+" FAB above the bottom navigation.
+              const SizedBox(height: 96),
             ],
           ),
         ),

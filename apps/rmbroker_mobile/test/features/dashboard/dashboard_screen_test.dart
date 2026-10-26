@@ -17,6 +17,12 @@ import 'package:rmbroker_mobile/features/dashboard/presentation/controllers/dash
 import 'package:rmbroker_mobile/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/dashboard_kpi_grid.dart';
 import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/quick_actions_section.dart';
+import 'package:rmbroker_mobile/features/dashboard/presentation/dashboard_section_screens.dart';
+import 'package:rmbroker_mobile/features/notifications/presentation/screens/notification_center_screen.dart';
+import 'package:rmbroker_mobile/features/work/data/work_repository.dart';
+import 'package:rmbroker_mobile/features/work/domain/offer_model.dart';
+import 'package:rmbroker_mobile/features/work/domain/requirement_model.dart';
+import 'package:rmbroker_mobile/features/work/presentation/controllers/requirements_controller.dart';
 
 class MockDashboardRepository extends DashboardRepository {
   final DashboardDataResult resultData;
@@ -45,15 +51,18 @@ void main() {
   Widget createTestWidget({
     required DashboardRepository repository,
     Size screenSize = const Size(412, 915),
+    Widget child = const DashboardScreen(),
+    HomeWorkRepository? work,
   }) {
     return ProviderScope(
       overrides: [
         dashboardRepositoryProvider.overrideWithValue(repository),
+        workRepositoryProvider.overrideWithValue(work ?? HomeWorkRepository()),
       ],
       child: MaterialApp(
         home: MediaQuery(
           data: MediaQueryData(size: screenSize),
-          child: const DashboardScreen(),
+          child: child,
         ),
       ),
     );
@@ -95,13 +104,119 @@ void main() {
       expect(find.byKey(const ValueKey('header_more_button')), findsOneWidget);
       expect(find.text('NS'), findsNothing);
 
-      // Welcome Banner
+      // Greeting card
       expect(find.text('Nilesh Sharma'), findsOneWidget);
-      expect(find.text('BROKER'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'^Good (Morning|Afternoon|Evening),$')), findsOneWidget);
+      expect(find.text('Find good deals. Stay updated.'), findsNothing, reason: 'deprecated tagline removed');
+      // "Summary" stays one line; "Recent Activity" may use two.
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('home_shortcut_label_Summary'))).data,
+        'Summary',
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('home_shortcut_label_Recent Activity'))).data,
+        'Recent\nActivity',
+      );
+      expect(find.byKey(const ValueKey('home_post_requirement')), findsOneWidget);
+      // Fiduciary notice kept (end of Home)
       expect(find.textContaining('does not own or store physical commodity inventory'), findsOneWidget);
+
+      // Exactly three shortcuts; full grid, actions and feed are not on Home
+      for (final k in ['summary', 'actions', 'activity']) {
+        expect(find.byKey(ValueKey('home_shortcut_$k')), findsOneWidget, reason: k);
+      }
+      expect(find.byType(DashboardKpiGrid), findsNothing);
+      expect(find.byType(QuickActionsSection), findsNothing);
+      expect(
+        find.descendant(of: find.byKey(const ValueKey('home_shortcut_summary')), matching: find.text('3')),
+        findsOneWidget,
+        reason: 'active deals metric',
+      );
+      expect(
+        find.descendant(of: find.byKey(const ValueKey('home_shortcut_actions')), matching: find.text('5')),
+        findsOneWidget,
+        reason: '5 implemented quick actions',
+      );
     });
 
-    testWidgets('renders all 8 summary metrics with authoritative values', (
+    testWidgets('Requirements selected by default; switching shows offers from real providers', (
+      tester,
+    ) async {
+      final repo = MockDashboardRepository(
+        brokerUser: testBroker,
+        resultData: DashboardDataMetricsTestResult.empty(),
+      );
+      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpAndSettle();
+
+      Text count(String k) => tester.widget<Text>(find.byKey(ValueKey('${k}_count')));
+      expect(count('home_tab_requirements').data, '1');
+      expect(count('home_tab_offers').data, '1');
+
+      final req = find.byKey(const ValueKey('home_req_req-1'));
+      await tester.ensureVisible(req);
+      for (final t in [
+        'De-oiled Rice Bran (DORB)',
+        '100 MT',
+        '₹21,000/MT',
+        'Kota Mandi',
+        '#REQ-REQ-1',
+        'Buyer: Rohan Gupta Pvt. Ltd.', // from the requirement's buyer company
+        'View',
+      ]) {
+        expect(find.descendant(of: req, matching: find.text(t)), findsOneWidget, reason: t);
+      }
+      expect(find.byKey(const ValueKey('home_offer_off-1')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('home_tab_offers')));
+      await tester.pumpAndSettle();
+      final offer = find.byKey(const ValueKey('home_offer_off-1'));
+      await tester.ensureVisible(offer);
+      for (final t in [
+        'Soyabean Meal',
+        '60 MT',
+        '₹28,300/MT',
+        'Jaipur',
+        homeOffer('off-1', 'Soyabean Meal').ref, // offer ID, as the model formats it
+        'Seller: Hadoti Grain', // from the offer's seller company
+      ]) {
+        expect(find.descendant(of: offer, matching: find.text(t)), findsOneWidget, reason: t);
+      }
+      expect(find.byKey(const ValueKey('home_req_req-1')), findsNothing);
+    });
+
+    testWidgets('unreadable party names are omitted, never shown as a company', (
+      tester,
+    ) async {
+      final repo = MockDashboardRepository(
+        brokerUser: testBroker,
+        resultData: DashboardDataMetricsTestResult.empty(),
+      );
+      final hidden = RequirementItem.fromJson({
+        'id': 'req-h',
+        'requirement_ref': '#REQ-H',
+        'commodity_name': 'Dal',
+        'buyer_company_name': WorkRepository.restrictedBuyerLabel,
+        'unit_symbol': 'MT',
+        'quantity': 5,
+        'target_price': 5000,
+        'target_date': DateTime.now().add(const Duration(days: 5)).toIso8601String(),
+        'status': 'Open',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      await tester.pumpWidget(createTestWidget(
+        repository: repo,
+        work: HomeWorkRepository(requirements: [hidden]),
+      ));
+      await tester.pumpAndSettle();
+      final row = find.byKey(const ValueKey('home_req_req-h'));
+      await tester.ensureVisible(row);
+      expect(find.descendant(of: row, matching: find.text('#REQ-H')), findsOneWidget);
+      expect(find.descendant(of: row, matching: find.textContaining('Buyer:')), findsNothing);
+      expect(find.textContaining(WorkRepository.restrictedBuyerLabel), findsNothing);
+    });
+
+    testWidgets('Summary page renders all 8 metrics with authoritative values', (
       tester,
     ) async {
       final repo = MockDashboardRepository(
@@ -122,7 +237,7 @@ void main() {
         ),
       );
 
-      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpWidget(createTestWidget(repository: repo, child: const DashboardSummaryScreen()));
       await tester.pumpAndSettle();
 
       expect(find.byType(DashboardKpiGrid), findsOneWidget);
@@ -157,8 +272,16 @@ void main() {
       await tester.pumpWidget(createTestWidget(repository: repo));
       await tester.pumpAndSettle();
 
-      // Zero fabricated numbers displayed
+      // Home: notice shown; Summary shortcut shows no fabricated number
       expect(find.text('Backend endpoint /api/v1/broker/dashboard is pending exposure.'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byKey(const ValueKey('home_shortcut_summary')), matching: find.text('—')),
+        findsOneWidget,
+      );
+
+      // Summary page: unavailable metrics marked honestly
+      await tester.pumpWidget(createTestWidget(repository: repo, child: const DashboardSummaryScreen()));
+      await tester.pumpAndSettle();
       expect(find.text('—'), findsWidgets);
       expect(find.text('Pending API'), findsWidgets);
     });
@@ -180,6 +303,13 @@ void main() {
       expect(find.text('Unable to Synchronize Desk Data'), findsOneWidget);
       expect(find.textContaining('Database permission denied: 42501'), findsOneWidget);
       expect(find.text('Retry Connection'), findsOneWidget);
+      // Requirements / Offers still available on Home when metrics fail
+      expect(find.byKey(const ValueKey('home_tab_requirements')), findsOneWidget);
+
+      // Actions page keeps the static quick actions even on error
+      await tester.pumpWidget(createTestWidget(repository: repo, child: const DashboardActionsScreen()));
+      await tester.pumpAndSettle();
+      expect(find.text('Retry Connection'), findsOneWidget);
       expect(find.byType(QuickActionsSection), findsOneWidget);
     });
 
@@ -193,7 +323,7 @@ void main() {
         ),
       );
 
-      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpWidget(createTestWidget(repository: repo, child: const DashboardSummaryScreen()));
       await tester.pumpAndSettle();
 
       expect(find.byType(DashboardKpiGrid), findsOneWidget);
@@ -202,7 +332,7 @@ void main() {
       expect(find.text('—'), findsNothing);
     });
 
-    testWidgets('renders quick actions with implemented and roadmap items', (
+    testWidgets('Actions page renders quick actions with implemented and roadmap items', (
       tester,
     ) async {
       final repo = MockDashboardRepository(
@@ -210,7 +340,7 @@ void main() {
         resultData: DashboardDataMetricsTestResult.empty(),
       );
 
-      await tester.pumpWidget(createTestWidget(repository: repo));
+      await tester.pumpWidget(createTestWidget(repository: repo, child: const DashboardActionsScreen()));
       await tester.pumpAndSettle();
 
       expect(find.byType(QuickActionsSection), findsOneWidget);
@@ -236,7 +366,10 @@ void main() {
       );
       final router = AppRouter.router;
       await tester.pumpWidget(ProviderScope(
-        overrides: [dashboardRepositoryProvider.overrideWithValue(repo)],
+        overrides: [
+          dashboardRepositoryProvider.overrideWithValue(repo),
+          workRepositoryProvider.overrideWithValue(HomeWorkRepository()),
+        ],
         child: MaterialApp.router(routerConfig: router),
       ));
       router.go('/dashboard');
@@ -246,6 +379,27 @@ void main() {
       await tester.pumpAndSettle();
 
       int selectedTab() => tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
+
+      // Home shortcuts open their destinations; Summary/Actions stay in Home.
+      for (final (key, screen) in [
+        ('home_shortcut_summary', DashboardSummaryScreen),
+        ('home_shortcut_actions', DashboardActionsScreen),
+      ]) {
+        await tester.tap(find.byKey(ValueKey(key)));
+        await tester.pumpAndSettle();
+        expect(find.byType(screen), findsOneWidget, reason: key);
+        expect(selectedTab(), 0, reason: '$key keeps Home selected');
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: 'Back returns to Home');
+      }
+      await tester.tap(find.byKey(const ValueKey('home_shortcut_activity')));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(NotificationCenterScreen), findsOneWidget, reason: 'full activity feed');
+      await tester.pageBack();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
       void expectMorePage() {
         expect(find.byType(MoreScreen), findsOneWidget);
         for (final k in ['more_profile', 'more_tools', 'more_finance', 'more_settings']) {
@@ -417,6 +571,35 @@ void main() {
       // Confirm no render overflow exception occurred
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('real 320dp surface: three shortcuts in one row, long names, no overflow', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(640, 1600);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(tester.view.reset);
+      final repo = MockDashboardRepository(
+        brokerUser: testBroker,
+        resultData: DashboardDataMetricsTestResult.empty(),
+      );
+      await tester.pumpWidget(createTestWidget(
+        repository: repo,
+        screenSize: const Size(320, 800),
+        work: HomeWorkRepository(
+          requirements: [homeRequirement('r-long', 'Yellow Maize (Corn) Premium Export Quality Non-GMO Feed Grade')],
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      final ys = [
+        for (final k in ['summary', 'actions', 'activity'])
+          tester.getTopLeft(find.byKey(ValueKey('home_shortcut_$k'))).dy,
+      ];
+      expect(ys.toSet().length, 1, reason: 'one horizontal row');
+      final cardHeight = tester.getSize(find.byKey(const ValueKey('home_shortcut_summary'))).height;
+      expect(cardHeight, greaterThanOrEqualTo(48), reason: 'touch target');
+    });
   });
 
   group('ModulePlaceholderScreen Tests', () {
@@ -439,6 +622,67 @@ void main() {
     });
   });
 }
+
+/// Work Desk data for the Home Requirements / Offers section. Fakes only.
+class HomeWorkRepository extends WorkRepository {
+  final List<RequirementItem> requirements;
+  final List<OfferItem> offers;
+
+  HomeWorkRepository({List<RequirementItem>? requirements, List<OfferItem>? offers})
+      : requirements = requirements ?? [homeRequirement('req-1', 'De-oiled Rice Bran (DORB)')],
+        offers = offers ?? [homeOffer('off-1', 'Soyabean Meal')];
+
+  @override
+  String? activeBrokerId() => 'broker-100';
+
+  @override
+  Future<WorkDataResult<List<RequirementItem>>> getRequirements() async => WorkSuccess(requirements);
+
+  @override
+  Future<WorkDataResult<List<OfferItem>>> getOffers() async => WorkSuccess(offers);
+}
+
+RequirementItem homeRequirement(String id, String commodity) => RequirementItem.fromJson({
+      'id': id,
+      'requirement_ref': '#REQ-${id.toUpperCase()}',
+      'company_id': 'buyer-co',
+      'buyer_company_name': 'Rohan Gupta Pvt. Ltd.',
+      'commodity_id': 'c-$id',
+      'commodity_name': commodity,
+      'grade_id': 'g',
+      'grade_name': 'FAQ',
+      'unit_id': 'mt',
+      'unit_symbol': 'MT',
+      'broker_id': 'broker-100',
+      'quantity': 100,
+      'fulfilled_quantity': 0,
+      'target_price': 21000,
+      'delivery_terms_id': 'FOR Mill Delivery, Kota Mandi',
+      'target_date': DateTime.now().add(const Duration(days: 10)).toIso8601String(),
+      'status': 'Open',
+      'created_at': DateTime.now().subtract(const Duration(hours: 10)).toIso8601String(),
+    });
+
+OfferItem homeOffer(String id, String commodity) => OfferItem.fromJson({
+      'id': id,
+      'lot_number': 'LOT-${id.toUpperCase()}',
+      'seller_company_name': 'Hadoti Grain',
+      'commodity_id': 'c-$id',
+      'commodity_name': commodity,
+      'grade_id': 'g',
+      'grade_name': 'FAQ',
+      'unit_id': 'mt',
+      'unit_symbol': 'MT',
+      'total_quantity': 60,
+      'available_quantity': 60,
+      'asking_price': 28300,
+      'district_name': 'Jaipur',
+      'state_name': 'Rajasthan',
+      'available_from': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+      'valid_until': DateTime.now().add(const Duration(days: 20)).toIso8601String(),
+      'status': 'Open',
+      'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+    });
 
 class DashboardDataMetricsTestResult extends DashboardDataSuccess {
   DashboardDataMetricsTestResult.empty()

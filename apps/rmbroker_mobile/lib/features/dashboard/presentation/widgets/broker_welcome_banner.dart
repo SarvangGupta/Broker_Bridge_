@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import 'package:rmbroker_mobile/core/config/app_config.dart';
+import 'package:rmbroker_mobile/app/theme/app_colors.dart';
 import 'package:rmbroker_mobile/features/authentication/domain/broker_user.dart';
+import 'package:rmbroker_mobile/features/work/presentation/widgets/create_requirement_sheet.dart';
 
-/// Trading Desk introduction banner with broker identity, live operations access, and statutory fiduciary notice.
+/// Home greeting card: time-based greeting, broker name, tagline and the
+/// Post Requirement shortcut (opens the existing requirement form).
 class BrokerWelcomeBanner extends StatelessWidget {
   final BrokerUser? broker;
   final String? contractNotice;
@@ -32,213 +33,97 @@ class BrokerWelcomeBanner extends StatelessWidget {
     final name = broker?.fullName.isNotEmpty == true
         ? broker!.fullName
         : 'Broker Desk';
-    final role = (broker?.role ?? 'Broker').toUpperCase();
-    final greeting = _getTimeBasedGreeting();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Trading Desk Introduction Card — matching reference visual
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          key: const ValueKey('home_greeting_card'),
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [
-                Color(0xFFE8F8F0), // Soft mint
-                Color(0xFFF3FAF5), // Pale mint cream
-                Color(0xFFFEFCE8), // Warm light tint
+            color: const Color(0xFFEFFAF3),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFD1FAE5)),
+          ),
+          // One compact row: sun · greeting/name · (chart when wide) · Post Requirement.
+          child: LayoutBuilder(
+            builder: (context, constraints) => Row(
+              children: [
+                const Icon(LucideIcons.sun, size: 30, color: Color(0xFFF59E0B)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${_getTimeBasedGreeting()},',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primaryNavy,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (constraints.maxWidth >= 380) ...[
+                  const SizedBox(width: 8),
+                  const _TradingChartGraphic(),
+                ],
+                const SizedBox(width: 8),
+                Flexible(
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('home_post_requirement'),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.primaryNavy,
+                      side: const BorderSide(color: Color(0xFFD1FAE5)),
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: const Icon(
+                        LucideIcons.plus,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                    label: const Text(
+                      'Post Requirement',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    onPressed: () => CreateRequirementSheet.show(context),
+                  ),
+                ),
               ],
             ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: const Color(0xFFD1FAE5),
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Left Column: Desk Title, Subtitle, Broker Identity
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Your Trading Desk',
-                          style: TextStyle(
-                            fontSize: 16.5,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A), // Deep navy
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 1.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFCCFBF1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            role,
-                            style: const TextStyle(
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0F766E),
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Deals · Requirements · Offers · Logistics',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF475569),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Text(
-                          '$greeting, ',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        Flexible(
-                          child: Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F172A),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Right side: chart graphic stacked above Live Operations button
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Rising green chart with upward arrow
-                  const _TradingChartGraphic(),
-                  const SizedBox(height: 6),
-                  // Live Operations button
-                  InkWell(
-                    onTap: () => context.go('/deals?filter=active'),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.88),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: const Color(0xFFA7F3D0),
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 3,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            LucideIcons.calendar,
-                            size: 13,
-                            color: Color(0xFF0F766E),
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Live Ops',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F766E),
-                            ),
-                          ),
-                          SizedBox(width: 2),
-                          Icon(
-                            LucideIcons.chevronRight,
-                            size: 12,
-                            color: Color(0xFF0F766E),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Statutory Fiduciary Notice (English)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFFBEB),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: const Color(0xFFFDE68A),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Icon(LucideIcons.shieldAlert, size: 14, color: Color(0xFFD97706)),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  AppConfig.fiduciaryNoticeEn,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF92400E),
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
 
@@ -287,11 +172,9 @@ class _TradingChartGraphic extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
-      width: 44,
-      height: 32,
-      child: CustomPaint(
-        painter: _TradingChartPainter(),
-      ),
+      width: 56,
+      height: 40,
+      child: CustomPaint(painter: _TradingChartPainter()),
     );
   }
 }
@@ -303,12 +186,13 @@ class _TradingChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // 4 ascending green bars matching visual reference
     final barPaint = Paint()
-      ..color = const Color(0xFF22C55E) // Green 500
+      ..color =
+          const Color(0xFF22C55E) // Green 500
       ..style = PaintingStyle.fill;
 
-    const barWidth = 4.5;
-    const barSpacing = 3.0;
-    final heights = [8.0, 14.0, 20.0, 26.0];
+    const barWidth = 6.0;
+    const barSpacing = 4.0;
+    final heights = [10.0, 17.0, 25.0, 33.0];
 
     for (int i = 0; i < heights.length; i++) {
       final x = i * (barWidth + barSpacing) + 2.0;
@@ -322,14 +206,20 @@ class _TradingChartPainter extends CustomPainter {
 
     // Upward curving arrow
     final arrowPaint = Paint()
-      ..color = const Color(0xFF16A34A) // Green 600
+      ..color =
+          const Color(0xFF16A34A) // Green 600
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
     final path = Path();
-    path.moveTo(1.0, size.height - 12);
-    path.quadraticBezierTo(size.width * 0.45, size.height - 18, size.width - 6, 4);
+    path.moveTo(1.0, size.height - 14);
+    path.quadraticBezierTo(
+      size.width * 0.45,
+      size.height - 22,
+      size.width - 6,
+      4,
+    );
     canvas.drawPath(path, arrowPaint);
 
     // Arrowhead

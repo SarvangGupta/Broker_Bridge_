@@ -24,9 +24,14 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
+    // On very narrow screens the title area cannot fit the LIVE badge beside
+    // the four header actions; it is dropped there rather than overflowing.
+    final narrow = MediaQuery.sizeOf(context).width < 340;
+    final showLiveBadge = !narrow;
+    final logoSize = narrow ? 30.0 : 36.0;
 
     return AppBar(
-      titleSpacing: 16,
+      titleSpacing: narrow ? 8 : 16,
       elevation: 0,
       scrolledUnderElevation: 1,
       surfaceTintColor: Colors.transparent,
@@ -35,8 +40,8 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
         children: [
           // Dark teal rounded logo container
           Container(
-            width: 36,
-            height: 36,
+            width: logoSize,
+            height: logoSize,
             decoration: BoxDecoration(
               color: const Color(0xFF134E4A), // Slate/dark teal
               borderRadius: BorderRadius.circular(10),
@@ -60,33 +65,42 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Text(
-                'RMBroker',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                  letterSpacing: -0.3,
+          SizedBox(width: narrow ? 6 : 10),
+          // Shrinks (ellipsis) on narrow phones next to the action icons.
+          const Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'RMBroker',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                  ),
                 ),
-              ),
-              Text(
-                'COMMODITY DESK',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
+                Text(
+                  'COMMODITY DESK',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(width: 10),
-          const StatusBadge(status: 'LIVE', isLive: true),
+          if (showLiveBadge) ...[
+            const SizedBox(width: 8),
+            const StatusBadge(status: 'LIVE', isLive: true),
+          ],
         ],
       ),
       actions: [
