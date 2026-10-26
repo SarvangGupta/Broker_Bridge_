@@ -13,6 +13,10 @@ class BrokerModel {
   final bool isVerified;
   final List<String> commoditiesHandled;
 
+  /// False when [commoditiesHandled] is the default list substituted because
+  /// the source row carried no commodity data.
+  final bool hasCommodityData;
+
   const BrokerModel({
     required this.id,
     required this.name,
@@ -24,6 +28,7 @@ class BrokerModel {
     this.trustScore = 100,
     this.isVerified = false,
     this.commoditiesHandled = const [],
+    this.hasCommodityData = true,
   });
 
   bool get hasPhone => mobile != null && mobile!.trim().isNotEmpty;
@@ -64,6 +69,7 @@ class BrokerModel {
       commoditiesHandled: commodities.isNotEmpty
           ? commodities
           : const ['Soybean', 'Chana', 'Wheat', 'Mustard'],
+      hasCommodityData: commodities.isNotEmpty,
     );
   }
 

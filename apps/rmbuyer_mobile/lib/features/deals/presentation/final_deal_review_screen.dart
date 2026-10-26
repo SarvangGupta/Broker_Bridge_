@@ -454,46 +454,21 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
                     ? const Center(child: Text('Deal snapshot not found.'))
                     : Column(
                         children: [
-                          // Counterparty Shield Banner
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            color:
-                                AppColors.primaryContainer.withValues(alpha: 0.6),
-                            child: const Row(
-                              children: [
-                                Icon(LucideIcons.shieldCheck,
-                                    size: 15, color: AppColors.primary),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Counterparty Shield: Trade terms mediated exclusively by licensed Broker Desk. Direct counterparty details shielded.',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.primaryDark,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
                           Expanded(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.all(16),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   _buildHeaderCard(deal),
+                                  const SizedBox(height: 12),
+                                  _buildCommercialOverviewCard(deal),
                                   const SizedBox(height: 12),
                                   if (deal.hasPreviousVersion &&
                                       deal.previousTerms != null) ...[
                                     _buildVisualDiffCard(deal),
                                     const SizedBox(height: 12),
                                   ],
-                                  _buildCommercialOverviewCard(deal),
-                                  const SizedBox(height: 12),
                                   _buildChargesLedgerCard(deal),
                                   const SizedBox(height: 12),
                                   _buildDeliveryAndLogisticsCard(deal),
@@ -524,57 +499,53 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _refLabel('Deal Ref'),
                     Text(
-                      'Deal Ref: ${deal.dealId}',
+                      deal.dealId,
                       style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
                         color: AppColors.textPrimaryLight,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 6),
+                    _refLabel('Mandate Ref'),
                     Text(
-                      'Mandate Ref: ${deal.requirementDisplayId}',
+                      deal.requirementDisplayId,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: AppColors.textSecondaryLight,
                       ),
                     ),
                   ],
                 ),
               ),
-              StatusBadge(status: deal.status.label),
+              const SizedBox(width: 8),
+              Flexible(child: StatusBadge(status: deal.status.label)),
             ],
           ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.primaryContainer.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(LucideIcons.history,
-                    size: 13, color: AppColors.primaryDark),
-                const SizedBox(width: 6),
-                Text(
-                  'Deal Snapshot v${deal.versionNumber} • Generated on ${DateFormat('dd MMM yyyy, hh:mm a').format(deal.snapshotTimestamp)}',
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(LucideIcons.history,
+                  size: 14, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Deal Snapshot v${deal.versionNumber} • ${DateFormat('dd MMM yyyy, hh:mm a').format(deal.snapshotTimestamp)}',
                   style: const TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryDark,
+                    color: AppColors.textSecondaryLight,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -639,29 +610,71 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
 
     if (diffs.isEmpty) return const SizedBox.shrink();
 
-    return AppCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(LucideIcons.gitCompare,
-                  size: 16, color: AppColors.secondary),
-              const SizedBox(width: 8),
-              Text(
-                'Changes in Version ${deal.versionNumber} (vs v${deal.previousVersionNumber})',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimaryLight,
-                ),
-              ),
-            ],
+    return _buildCollapsibleCard(
+      key: const Key('section-changes'),
+      icon: LucideIcons.fileDiff,
+      title: 'Changes in Version ${deal.versionNumber} (vs v${deal.previousVersionNumber})',
+      subtitle: '${diffs.length} field${diffs.length == 1 ? '' : 's'} updated',
+      tint: AppColors.successBackground.withValues(alpha: 0.4),
+      children: diffs,
+    );
+  }
+
+  Widget _refLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+    );
+  }
+
+  /// Rounded card with a tappable header that expands to reveal [children].
+  /// Collapsed by default to keep the review compact.
+  Widget _buildCollapsibleCard({
+    required Key key,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+    Widget? trailing,
+    Color? tint,
+  }) {
+    return Material(
+      color: tint ?? AppColors.surfaceLight,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: AppColors.borderLight),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: key,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          leading: Icon(icon, size: 22, color: AppColors.primary),
+          iconColor: AppColors.textSecondaryLight,
+          collapsedIconColor: AppColors.textSecondaryLight,
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimaryLight,
+            ),
           ),
-          const SizedBox(height: 10),
-          ...diffs,
-        ],
+          subtitle: Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondaryLight,
+            ),
+          ),
+          trailing: trailing,
+          children: children,
+        ),
       ),
     );
   }
@@ -734,29 +747,60 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
         children: [
           Row(
             children: [
-              const Icon(LucideIcons.receipt,
-                  size: 16, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Agreed Commercial Terms (${terms.commodityName})',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimaryLight,
+              const Icon(LucideIcons.chartColumn,
+                  size: 20, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Key Deal Terms (Version ${deal.versionNumber})',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimaryLight,
+                  ),
                 ),
               ),
+              if (deal.hasPreviousVersion)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.successBackground,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Updated from v${deal.previousVersionNumber}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildMetric('Quantity', '${terms.quantity} ${terms.unitSymbol}'),
-              _buildMetric('Base Rate',
-                  '${currencyFormat.format(terms.basePricePerUnit)}/${terms.unitSymbol}'),
-              _buildMetric('Net Landed',
-                  '${currencyFormat.format(terms.netLandedPricePerUnit)}/${terms.unitSymbol}'),
-            ],
+          _buildMetric('Commodity', terms.commodityName),
+          const SizedBox(height: 10),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _buildMetric(
+                      'Quantity', '${terms.quantity} ${terms.unitSymbol}'),
+                ),
+                const VerticalDivider(width: 16),
+                Expanded(
+                  child: _buildMetric('Base Rate',
+                      '${currencyFormat.format(terms.basePricePerUnit)}/${terms.unitSymbol}'),
+                ),
+                const VerticalDivider(width: 16),
+                Expanded(
+                  child: _buildMetric('Net Landed',
+                      '${currencyFormat.format(terms.netLandedPricePerUnit)}/${terms.unitSymbol}'),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           const Divider(),
@@ -764,12 +808,14 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Total Estimated Value',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimaryLight,
+              const Expanded(
+                child: Text(
+                  'Total Estimated Value',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimaryLight,
+                  ),
                 ),
               ),
               Text(
@@ -804,26 +850,41 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
       decimalDigits: 0,
     );
 
-    return AppCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final totalLabel = '₹${terms.totalChargesPerUnit}/${terms.unitSymbol}';
+
+    return _buildCollapsibleCard(
+      key: const Key('section-charges'),
+      icon: LucideIcons.coins,
+      title: 'Transparent Charges Ledger',
+      subtitle: terms.applicableCharges.map((c) => c.name).join(', '),
+      tint: AppColors.infoBackground.withValues(alpha: 0.35),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Row(
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Icon(LucideIcons.listCheck, size: 16, color: AppColors.primary),
-              SizedBox(width: 8),
+              const Text(
+                'Total Charges',
+                style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
+              ),
               Text(
-                'Transparent Charges Ledger',
-                style: TextStyle(
+                totalLabel,
+                style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.textPrimaryLight,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(width: 6),
+          const Icon(LucideIcons.chevronDown,
+              size: 20, color: AppColors.textSecondaryLight),
+        ],
+      ),
+      children: [
           ...terms.applicableCharges.map((charge) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -881,16 +942,18 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Total Facilitation & Mandi Charges',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimaryLight,
+              const Expanded(
+                child: Text(
+                  'Total Facilitation & Mandi Charges',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimaryLight,
+                  ),
                 ),
               ),
               Text(
-                '₹${terms.totalChargesPerUnit}/${terms.unitSymbol}',
+                totalLabel,
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -899,34 +962,19 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
               ),
             ],
           ),
-        ],
-      ),
+      ],
     );
   }
 
   Widget _buildDeliveryAndLogisticsCard(FinalDealReviewData deal) {
     final terms = deal.currentTerms;
 
-    return AppCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(LucideIcons.truck, size: 16, color: AppColors.primary),
-              SizedBox(width: 8),
-              Text(
-                'Delivery & Logistics Terms',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimaryLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+    return _buildCollapsibleCard(
+      key: const Key('section-delivery'),
+      icon: LucideIcons.truck,
+      title: 'Delivery & Logistics Terms',
+      subtitle: 'Delivery location, window, packaging, freight, payment',
+      children: [
           _buildInfoRow('Delivery Location', terms.deliveryLocation),
           if (terms.deliveryWindowStart != null && terms.deliveryWindowEnd != null)
             _buildInfoRow(
@@ -939,34 +987,19 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
           _buildInfoRow('Inspection / Lab QA', terms.inspectionRequirements),
           if (terms.specialConditions != null)
             _buildInfoRow('Special Conditions', terms.specialConditions!),
-        ],
-      ),
+      ],
     );
   }
 
   Widget _buildQualitySpecsCard(FinalDealReviewData deal) {
     final specs = deal.currentTerms.qualityParameters;
 
-    return AppCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(LucideIcons.microscope, size: 16, color: AppColors.primary),
-              SizedBox(width: 8),
-              Text(
-                'Agreed Quality Parameters',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimaryLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+    return _buildCollapsibleCard(
+      key: const Key('section-quality'),
+      icon: LucideIcons.flaskConical,
+      title: 'Agreed Quality Parameters',
+      subtitle: specs.map((q) => q.parameterName).join(', '),
+      children: [
           ...specs.map((q) {
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -1036,60 +1069,73 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
               ),
             );
           }),
-        ],
-      ),
+      ],
     );
   }
 
   Widget _buildBrokerDeskCard(FinalDealReviewData deal) {
-    return AppCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(LucideIcons.briefcase,
-                  size: 16, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Broker Desk: ${deal.brokerName}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimaryLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            deal.brokerAgency,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondaryLight,
-            ),
-          ),
-          if (deal.brokerNotes != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.backgroundLight,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'Notes: ${deal.brokerNotes}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontStyle: FontStyle.italic,
-                  color: AppColors.textSecondaryLight,
-                ),
+    final notes = deal.brokerNotes;
+    final title = 'Broker Desk: ${deal.brokerName}';
+
+    if (notes == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Row(
+          children: [
+            const Icon(LucideIcons.briefcase, size: 22, color: AppColors.primary),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    deal.brokerAgency,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                  ),
+                ],
               ),
             ),
           ],
-        ],
-      ),
+        ),
+      );
+    }
+
+    return _buildCollapsibleCard(
+      key: const Key('section-broker'),
+      icon: LucideIcons.briefcase,
+      title: title,
+      subtitle: deal.brokerAgency,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundLight,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            'Notes: $notes',
+            style: const TextStyle(
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: AppColors.textSecondaryLight,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1097,60 +1143,45 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
     // Phase G Requirement: Deal confirmation does NOT mean invoicing, payment, or dispatch is complete.
     final isConfirmed = deal.isConfirmed;
 
-    return AppCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(LucideIcons.milestone, size: 16, color: AppColors.primary),
-              SizedBox(width: 8),
-              Text(
-                'Trade Execution Lifecycle',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimaryLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildMilestoneStep(
-            stepNumber: 1,
-            title: 'Deal Confirmation',
-            subtitle: isConfirmed
-                ? 'Completed — Confirmed by Buyer'
-                : 'Action Required: Explicit Confirmation',
-            isComplete: isConfirmed,
-            isActive: !isConfirmed,
-          ),
-          _buildMilestoneStep(
-            stepNumber: 2,
-            title: 'Contract Issuance & Trade Slip',
-            subtitle: isConfirmed
-                ? 'In Progress — Broker desk compiling legal SoDA'
-                : 'Pending Deal Confirmation',
-            isComplete: false,
-            isActive: isConfirmed,
-          ),
-          _buildMilestoneStep(
-            stepNumber: 3,
-            title: 'Weighbridge & Dispatch Notice',
-            subtitle: 'Not Started — Pending seller dispatch report',
-            isComplete: false,
-            isActive: false,
-          ),
-          _buildMilestoneStep(
-            stepNumber: 4,
-            title: 'Quality Acceptance & Settlement',
-            subtitle: 'Not Started — Pending delivery & slip verification',
-            isComplete: false,
-            isActive: false,
-          ),
-        ],
-      ),
+    return _buildCollapsibleCard(
+      key: const Key('section-lifecycle'),
+      icon: LucideIcons.listOrdered,
+      title: 'Trade Execution Lifecycle',
+      subtitle: 'Deal confirmation, contract, dispatch, settlement',
+      children: [
+        _buildMilestoneStep(
+          stepNumber: 1,
+          title: 'Deal Confirmation',
+          subtitle: isConfirmed
+              ? 'Completed — Confirmed by Buyer'
+              : 'Action Required: Explicit Confirmation',
+          isComplete: isConfirmed,
+          isActive: !isConfirmed,
+        ),
+        _buildMilestoneStep(
+          stepNumber: 2,
+          title: 'Contract Issuance & Trade Slip',
+          subtitle: isConfirmed
+              ? 'In Progress — Broker desk compiling legal SoDA'
+              : 'Pending Deal Confirmation',
+          isComplete: false,
+          isActive: isConfirmed,
+        ),
+        _buildMilestoneStep(
+          stepNumber: 3,
+          title: 'Weighbridge & Dispatch Notice',
+          subtitle: 'Not Started — Pending seller dispatch report',
+          isComplete: false,
+          isActive: false,
+        ),
+        _buildMilestoneStep(
+          stepNumber: 4,
+          title: 'Quality Acceptance & Settlement',
+          subtitle: 'Not Started — Pending delivery & slip verification',
+          isComplete: false,
+          isActive: false,
+        ),
+      ],
     );
   }
 
@@ -1282,18 +1313,18 @@ class _FinalDealReviewScreenState extends State<FinalDealReviewScreen> {
       child: Row(
         children: [
           Expanded(
-            flex: 2,
             child: AppButton(
               label: 'Request Amendment',
+              icon: LucideIcons.pencil,
               variant: AppButtonVariant.outline,
               onPressed: _isSubmitting ? null : _handleRequestAmendment,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            flex: 3,
             child: AppButton(
               label: 'Confirm Deal',
+              icon: LucideIcons.checkCircle,
               variant: AppButtonVariant.primary,
               isLoading: _isSubmitting,
               onPressed: _isSubmitting ? null : _handleConfirmDeal,

@@ -51,20 +51,24 @@ void main() {
       // Verify Header & Identity
       expect(find.text('Broker Desk Profile'), findsOneWidget);
       expect(find.text('Rajesh Verma'), findsOneWidget);
-      expect(find.text('(Jaipur Mandi, Rajasthan)'), findsOneWidget);
       expect(find.text('98 Trust'), findsOneWidget);
-
-      // Verify About rows
-      expect(find.text('Mandi Location'), findsOneWidget);
-      expect(find.text('Jaipur Mandi, Rajasthan'), findsOneWidget);
-      expect(find.text('Yellow Soybean, Desi Chana, Wheat (Sharbati)'), findsOneWidget);
-      expect(find.text('98 / 100'), findsOneWidget);
       expect(find.text('Jaipur Grain Broker Desk'), findsOneWidget);
-      expect(find.text('08AAACJ1234A1Z1'), findsOneWidget);
+      expect(find.text('Verified profile'), findsOneWidget);
 
-      // Verify header commodity chips
+      // Location in header and as a Markets Served chip
+      expect(find.text('Jaipur Mandi, Rajasthan'), findsNWidgets(2));
+      expect(find.text('Markets Served'), findsOneWidget);
+
+      // Commodities card
+      expect(find.text('Commodities Dealt In'), findsOneWidget);
       expect(find.text('Yellow Soybean'), findsOneWidget);
       expect(find.text('Wheat (Sharbati)'), findsOneWidget);
+
+      // Credibility from real data only
+      expect(find.text('98 / 100'), findsOneWidget);
+      expect(find.text('GST Verified'), findsOneWidget);
+      expect(find.text('Registered GSTIN: 08AAACJ1234A1Z1'), findsOneWidget);
+      expect(find.textContaining('Years'), findsNothing);
 
       // Contact actions near the top
       expect(find.text('Call'), findsOneWidget);
@@ -79,10 +83,40 @@ void main() {
       expect(launchedUri!.host, 'wa.me');
 
       // Verify Primary Action
-      expect(find.text('Post Requirement to this Broker Desk'), findsOneWidget);
+      expect(find.text('Post Requirement to Broker'), findsOneWidget);
 
       // Verify Fiduciary Shield Notice
       expect(find.textContaining('Seller identities stay protected.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Live row without commodity/location data shows no invented chips',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final broker = BrokerModel.fromMap({
+        'id': 'live-1',
+        'name': 'A Very Long Broker Desk Name That Should Wrap Cleanly',
+        'mobile': '+919800000000',
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: BrokerProfileScreen(brokerId: 'live-1', initialBroker: broker),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Commodities Dealt In'), findsNothing);
+      expect(find.text('Markets Served'), findsNothing);
+      expect(find.text('Soybean'), findsNothing);
+      expect(find.text('Mandi Trading Floor'), findsNothing);
+      expect(find.text('Verified profile'), findsNothing);
+      expect(find.text('Post Requirement to Broker'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('Broker without a number shows no contact buttons', (WidgetTester tester) async {

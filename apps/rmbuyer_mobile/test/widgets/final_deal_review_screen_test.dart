@@ -32,35 +32,53 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Header & References
-      expect(find.text('Deal Ref: DEAL-2026-TEST-201'), findsOneWidget);
-      expect(find.text('Mandate Ref: REQ-2026-062'), findsOneWidget);
+      expect(find.text('DEAL-2026-TEST-201'), findsOneWidget);
+      expect(find.text('REQ-2026-062'), findsOneWidget);
       expect(find.textContaining('Deal Snapshot v2'), findsOneWidget);
       expect(find.text('AWAITING BUYER CONFIRMATION'), findsWidgets);
 
-      // Verify Counterparty Shield Banner
-      expect(find.textContaining('Counterparty Shield:'), findsOneWidget);
+      // Counterparty Shield banner removed
+      expect(find.textContaining('Counterparty Shield:'), findsNothing);
 
-      // Verify Visual Diff Card (comparing current v2 vs previous v1)
-      expect(find.text('Changes in Version 2 (vs v1)'), findsOneWidget);
-      expect(find.text('Base Commodity Rate'), findsOneWidget);
-
-      // Verify Commercial Terms
-      expect(find.textContaining('Agreed Commercial Terms (Yellow Maize / Corn)'), findsOneWidget);
+      // Key Deal Terms
+      expect(find.text('Key Deal Terms (Version 2)'), findsOneWidget);
+      expect(find.text('Updated from v1'), findsOneWidget);
+      expect(find.text('Yellow Maize / Corn'), findsOneWidget);
       expect(find.text('250.0 MT'), findsWidgets);
 
-      // Verify Transparent Charges Ledger
+      // Collapsible sections: headers visible, contents hidden until tapped
+      expect(find.text('Changes in Version 2 (vs v1)'), findsOneWidget);
+      expect(find.text('Base Commodity Rate'), findsNothing);
+      await tester.tap(find.text('Changes in Version 2 (vs v1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Base Commodity Rate'), findsOneWidget);
+
       expect(find.text('Transparent Charges Ledger'), findsOneWidget);
+      expect(find.text('Total Charges'), findsOneWidget);
+      expect(find.text('Brokerage & Facilitation Fee'), findsNothing);
+      await tester.tap(find.text('Transparent Charges Ledger'));
+      await tester.pumpAndSettle();
       expect(find.text('Brokerage & Facilitation Fee'), findsOneWidget);
       expect(find.text('Mandi Cess & Weighment Handling'), findsOneWidget);
       expect(find.text('Transit Escrow & Quality Assurance Cover'), findsOneWidget);
 
-      // Verify Quality Parameters Table
+      expect(find.text('Delivery & Logistics Terms'), findsOneWidget);
+      expect(find.text('Delivery Location'), findsNothing);
+
       expect(find.text('Agreed Quality Parameters'), findsOneWidget);
+      expect(find.text('Moisture Content'), findsNothing);
+      await tester.tap(find.text('Agreed Quality Parameters'));
+      await tester.pumpAndSettle();
       expect(find.text('Moisture Content'), findsOneWidget);
       expect(find.text('Foreign Matter / Admixture'), findsOneWidget);
 
-      // Verify Trade Execution Milestones Tracker
+      expect(find.textContaining('Broker Desk:'), findsOneWidget);
+
       expect(find.text('Trade Execution Lifecycle'), findsOneWidget);
+      expect(find.text('Deal Confirmation'), findsNothing);
+      await tester.ensureVisible(find.text('Trade Execution Lifecycle'));
+      await tester.tap(find.text('Trade Execution Lifecycle'));
+      await tester.pumpAndSettle();
       expect(find.text('Deal Confirmation'), findsOneWidget);
       expect(find.text('Contract Issuance & Trade Slip'), findsOneWidget);
       expect(find.text('Weighbridge & Dispatch Notice'), findsOneWidget);
@@ -159,7 +177,40 @@ void main() {
       expect(find.text('Confirm Deal'), findsNothing);
       expect(find.text('Request Amendment'), findsNothing);
       expect(find.textContaining('Deal Snapshot v2 Officially Confirmed'), findsOneWidget);
+      await tester.ensureVisible(find.text('Trade Execution Lifecycle'));
+      await tester.tap(find.text('Trade Execution Lifecycle'));
+      await tester.pumpAndSettle();
       expect(find.text('Completed — Confirmed by Buyer'), findsOneWidget);
+    });
+
+    testWidgets('Phone width: no overflow and footer buttons stay visible', (tester) async {
+      tester.view.physicalSize = const Size(360, 740);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(buildTestWidget(dealId: 'DEAL-2026-TEST-205'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final confirm = tester.getRect(find.text('Confirm Deal'));
+      final amend = tester.getRect(find.text('Request Amendment'));
+      expect(confirm.bottom, lessThanOrEqualTo(740));
+      expect(amend.bottom, lessThanOrEqualTo(740));
+
+      // Expanding every section keeps the layout overflow-free and scrollable.
+      for (final title in [
+        'Transparent Charges Ledger',
+        'Delivery & Logistics Terms',
+        'Agreed Quality Parameters',
+        'Trade Execution Lifecycle',
+      ]) {
+        await tester.scrollUntilVisible(find.text(title), 200,
+            scrollable: find.byType(Scrollable).first);
+        await tester.tap(find.text(title));
+        await tester.pumpAndSettle();
+      }
+      expect(tester.takeException(), isNull);
+      expect(find.text('Confirm Deal'), findsOneWidget);
     });
   });
 }
