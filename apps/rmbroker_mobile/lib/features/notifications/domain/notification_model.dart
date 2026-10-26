@@ -226,23 +226,33 @@ class BrokerNotification {
   /// One line of commercial context from the payload, e.g.
   /// `#REQ-107DF7 · 35 MT · ₹28,000/MT · FOR Mill Delivery, Kota Mandi`.
   String? get detailLine {
-    final parts = <String>[];
-    final ref = recordReference;
-    if (ref != null) parts.add(ref);
+    final d = detailFields;
+    final parts = [d.reference, d.quantity, d.price, d.location].whereType<String>().toList();
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  /// The parts of [detailLine], each null when the record does not carry it.
+  ({String? reference, String? quantity, String? price, String? location}) get detailFields {
     final qty = payload?['quantity'];
     final unit = payload?['unit']?.toString() ?? payload?['unitSymbol']?.toString();
+    String? quantity;
     if (qty is num) {
       final q = qty % 1 == 0 ? qty.toInt().toString() : qty.toString();
-      parts.add(unit != null && unit.isNotEmpty ? '$q $unit' : q);
+      quantity = unit != null && unit.isNotEmpty ? '$q $unit' : q;
     }
-    final price = payload?['targetPrice'] ?? payload?['price'] ?? payload?['agreedPrice'];
-    if (price is num && price > 0) {
-      final formatted = NumberFormat.decimalPattern('en_IN').format(price);
-      parts.add(unit != null && unit.isNotEmpty ? '₹$formatted/$unit' : '₹$formatted');
+    final rawPrice = payload?['targetPrice'] ?? payload?['price'] ?? payload?['agreedPrice'];
+    String? price;
+    if (rawPrice is num && rawPrice > 0) {
+      final formatted = NumberFormat.decimalPattern('en_IN').format(rawPrice);
+      price = unit != null && unit.isNotEmpty ? '₹$formatted/$unit' : '₹$formatted';
     }
-    final location = payload?['deliveryLocation']?.toString();
-    if (location != null && location.trim().isNotEmpty) parts.add(location.trim());
-    return parts.isEmpty ? null : parts.join(' · ');
+    final location = payload?['deliveryLocation']?.toString().trim();
+    return (
+      reference: recordReference,
+      quantity: quantity,
+      price: price,
+      location: location != null && location.isNotEmpty ? location : null,
+    );
   }
 
   /// Returns the target Flutter route path if resolved.

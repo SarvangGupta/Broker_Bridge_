@@ -6,6 +6,7 @@ import 'package:rmbroker_mobile/features/deals/domain/deal_model.dart';
 import 'package:rmbroker_mobile/features/deals/presentation/controllers/deals_controller.dart';
 import 'package:rmbroker_mobile/features/deals/presentation/deals_screen.dart';
 import 'package:rmbroker_mobile/features/work/data/work_repository.dart';
+import 'package:rmbroker_mobile/features/work/domain/requirement_negotiation_model.dart';
 import 'package:rmbroker_mobile/features/work/domain/offer_model.dart';
 import 'package:rmbroker_mobile/features/work/domain/requirement_model.dart';
 import 'package:rmbroker_mobile/features/work/presentation/controllers/requirements_controller.dart';
@@ -27,6 +28,15 @@ class MockVarunDealRepository extends DealRepository {
 }
 
 class MockVarunWorkRepository extends WorkRepository {
+  @override
+  Future<WorkDataResult<RequirementNegotiationData>> getRequirementNegotiationDetails(String requirementId) async =>
+      WorkSuccess(RequirementNegotiationData(
+        requirementId: requirementId,
+        currentVersionNumber: 1,
+        currentStatus: 'Open',
+        offeredPrice: 0,
+        proposedQuantity: 0,
+      ));
   final List<RequirementItem> requirements;
   final List<OfferItem> offers;
 
@@ -710,11 +720,11 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Partially Allocated (0)'), findsOneWidget);
+      expect(find.text('Partly Allocated (0)'), findsOneWidget);
 
-      // Legitimate empty state displayed
-      expect(find.text('No Matching Requirements'), findsOneWidget);
-      expect(find.text('No buyer requirements match your search filter.'), findsOneWidget);
+      // Legitimate empty state names the empty filter (RB-WORK-DESK-UI-01)
+      expect(find.text('No partly allocated requirements'), findsOneWidget);
+      expect(find.text('Clear Filters'), findsOneWidget);
 
       // No unrelated requirements shown
       expect(find.text('REQ-101'), findsNothing);

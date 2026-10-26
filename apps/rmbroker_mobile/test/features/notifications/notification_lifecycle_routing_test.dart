@@ -12,6 +12,7 @@ import 'package:rmbroker_mobile/features/notifications/domain/notification_categ
 import 'package:rmbroker_mobile/features/notifications/domain/notification_model.dart';
 import 'package:rmbroker_mobile/features/notifications/presentation/controllers/notification_controller.dart';
 import 'package:rmbroker_mobile/features/work/data/work_repository.dart';
+import 'package:rmbroker_mobile/features/work/domain/requirement_negotiation_model.dart';
 import 'package:rmbroker_mobile/features/work/domain/offer_model.dart';
 import 'package:rmbroker_mobile/features/work/domain/requirement_model.dart';
 import 'package:rmbroker_mobile/features/work/presentation/controllers/matches_controller.dart';
@@ -106,6 +107,15 @@ class FlowNotificationRepository extends NotificationRepository {
 }
 
 class FlowWorkRepository extends WorkRepository {
+  @override
+  Future<WorkDataResult<RequirementNegotiationData>> getRequirementNegotiationDetails(String requirementId) async =>
+      WorkSuccess(RequirementNegotiationData(
+        requirementId: requirementId,
+        currentVersionNumber: 1,
+        currentStatus: 'Open',
+        offeredPrice: 0,
+        proposedQuantity: 0,
+      ));
   final List<RequirementItem> requirements;
   final List<OfferItem> offers;
   final RequirementItem? detail;
@@ -231,7 +241,7 @@ void main() {
   }
 
   Future<void> openNotification(WidgetTester tester) async {
-    await tester.tap(find.text('New Procurement Requirement: Maize DDGS'));
+    await tester.tap(find.byKey(const ValueKey('notif_headline_9b02ec34-38e1-4efe-a494-9b55ad7fb485')));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
   }
@@ -252,21 +262,33 @@ void main() {
     );
 
     // 1. Readable notification with sender context and record reference.
-    expect(find.text('Buyer posted requirement for 35 MT of Maize DDGS.'), findsOneWidget);
-    expect(find.text('#REQ-107DF7 · 35 MT · ₹28,000/MT · FOR Mill Delivery, Kota Mandi'), findsOneWidget);
-    expect(find.text('Direct mandate notification from verified buyer'), findsOneWidget);
+    // Compact card: type label + commodity; the full message is in Details.
+    expect(find.text('New requirement'), findsOneWidget);
+    expect(find.text('Maize DDGS'), findsOneWidget);
+    expect(find.text('Buyer posted requirement for 35 MT of Maize DDGS.'), findsNothing);
+    // Record metadata, each part with its own icon (Alerts card).
+    for (final part in ['#REQ-107DF7', '35 MT', '₹28,000/MT', 'Kota Mandi', 'FOR Mill Delivery']) {
+      expect(find.text(part), findsOneWidget, reason: part);
+    }
 
     // 2. Tap opens the referenced requirement (not the generic Work list).
     await openNotification(tester);
     final detail = tester.widget<RequirementDetailScreen>(find.byType(RequirementDetailScreen));
     expect(detail.requirementId, reqId);
     expect(notifRepo.markReadCalls, 1);
-    expect(find.text('Rohan Feeds'), findsOneWidget);
-    expect(find.text('Delivery Terms: FOR Mill Delivery, Kota Mandi'), findsOneWidget);
-    expect(find.text('₹28000 / MT'), findsOneWidget);
-    expect(find.text('0% Fulfilled'), findsOneWidget);
+    // Summary card + Buyer Details summary.
+    expect(find.text('Rohan Feeds'), findsNWidgets(2));
+    expect(find.text('Requested: 35 MT  |  Fulfilled: 0%'), findsOneWidget);
+    expect(find.text('₹28,000 / MT  |  ${requirement().targetDateFormatted}'), findsOneWidget);
     expect(find.text('Not assigned to your desk'), findsNothing);
-    expect(find.text('No seller lot has been allocated to this requirement yet.'), findsOneWidget);
+    expect(find.text('No seller allocated yet'), findsOneWidget);
+    // Expanded sections show the existing terms.
+    await tester.tap(find.byKey(const ValueKey('req_section_price')));
+    await tester.pumpAndSettle();
+    expect(find.text('FOR Mill Delivery, Kota Mandi'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('req_section_quantity')));
+    await tester.pumpAndSettle();
+    expect(find.text('0% Fulfilled'), findsOneWidget);
 
     // 3. Find Matching Offers selects this requirement in the Match Center.
     await tester.ensureVisible(find.text('Find Matching Offers'));
@@ -353,6 +375,9 @@ void main() {
     expect(find.text('Requirement closed (Cancelled)'), findsOneWidget);
     expect(find.text('Find Matching Offers'), findsNothing);
     expect(find.text('Cancel Mandate'), findsNothing);
+    await tester.ensureVisible(find.byKey(const ValueKey('req_section_seller')));
+    await tester.tap(find.byKey(const ValueKey('req_section_seller')));
+    await tester.pumpAndSettle();
     final linkedDeal = find.byKey(const ValueKey('linked_deal_$dealId'));
     expect(linkedDeal, findsOneWidget);
 
@@ -369,8 +394,8 @@ void main() {
       deals: FlowDealRepository(),
     );
 
-    await tester.tap(find.text('New Procurement Requirement: Maize DDGS'));
-    await tester.tap(find.text('New Procurement Requirement: Maize DDGS'), warnIfMissed: false);
+    await tester.tap(find.byKey(const ValueKey('notif_headline_9b02ec34-38e1-4efe-a494-9b55ad7fb485')));
+    await tester.tap(find.byKey(const ValueKey('notif_headline_9b02ec34-38e1-4efe-a494-9b55ad7fb485')), warnIfMissed: false);
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 

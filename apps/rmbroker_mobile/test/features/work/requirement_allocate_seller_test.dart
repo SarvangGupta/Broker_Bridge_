@@ -10,6 +10,7 @@ import 'package:rmbroker_mobile/features/deals/domain/deal_model.dart';
 import 'package:rmbroker_mobile/features/deals/presentation/controllers/deals_controller.dart';
 import 'package:rmbroker_mobile/features/deals/presentation/screens/deal_detail_screen.dart';
 import 'package:rmbroker_mobile/features/work/data/work_repository.dart';
+import 'package:rmbroker_mobile/features/work/domain/requirement_negotiation_model.dart';
 import 'package:rmbroker_mobile/features/work/domain/offer_model.dart';
 import 'package:rmbroker_mobile/features/work/domain/requirement_model.dart';
 import 'package:rmbroker_mobile/features/work/presentation/controllers/requirements_controller.dart';
@@ -67,6 +68,15 @@ OfferItem lot(String id, {String broker = varun, bool verified = true, String co
     });
 
 class FakeWork extends WorkRepository {
+  @override
+  Future<WorkDataResult<RequirementNegotiationData>> getRequirementNegotiationDetails(String requirementId) async =>
+      WorkSuccess(RequirementNegotiationData(
+        requirementId: requirementId,
+        currentVersionNumber: 1,
+        currentStatus: 'Open',
+        offeredPrice: 0,
+        proposedQuantity: 0,
+      ));
   final List<OfferItem> offers;
   FakeWork(this.offers);
 
@@ -176,6 +186,10 @@ void main() {
     ));
     router.go('/requirements/$reqId');
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    // Seller Allocation & Deals starts collapsed; open it.
+    await tester.ensureVisible(find.byKey(const ValueKey('req_section_seller')));
+    await tester.tap(find.byKey(const ValueKey('req_section_seller')));
     await tester.pumpAndSettle();
   }
 

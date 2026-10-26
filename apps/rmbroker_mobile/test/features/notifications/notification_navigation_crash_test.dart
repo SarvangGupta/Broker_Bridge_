@@ -143,7 +143,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
 
-    expect(find.text('Notifications & Activity'), findsOneWidget);
+    expect(find.text('Alerts'), findsOneWidget);
     expect(find.text('Deal Awaiting Final Confirmation'), findsOneWidget);
 
     // Verify NotificationCard has stable ValueKey
@@ -164,7 +164,7 @@ void main() {
       await tester.tap(backBtn);
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pumpAndSettle();
-      expect(find.text('Notifications & Activity'), findsOneWidget);
+      expect(find.text('Alerts'), findsOneWidget);
     }
   });
 

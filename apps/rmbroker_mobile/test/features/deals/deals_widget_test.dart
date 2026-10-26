@@ -78,7 +78,7 @@ void main() {
 
       // Verify Reference & Status
       expect(find.text('DL-2026-0042'), findsOneWidget);
-      expect(find.text('Negotiating'), findsOneWidget);
+      expect(find.text('NEGOTIATING'), findsOneWidget); // uppercase badge, as on Requirements cards
       expect(find.text('v1'), findsOneWidget);
 
       // Verify Commodity & Counterparties

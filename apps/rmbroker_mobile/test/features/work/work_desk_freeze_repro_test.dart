@@ -106,7 +106,7 @@ void main() {
     expect(find.byType(RequirementDetailScreen), findsOneWidget);
     expect(find.text('Sharbati Wheat'), findsOneWidget);
     expect(find.text('Grade: Premium Sharbati'), findsOneWidget);
-    expect(find.text('Quantity Lifecycle Breakdown'), findsOneWidget);
+    expect(find.text('Quantity Breakdown'), findsOneWidget);
 
     debugPrint('Check 4: Tap Back button to return to Work Desk');
     await tester.tap(find.byIcon(Icons.arrow_back));

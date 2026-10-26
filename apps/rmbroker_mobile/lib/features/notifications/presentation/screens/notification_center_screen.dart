@@ -8,14 +8,33 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_loading_indicator.dart';
+import '../../domain/alert_kind.dart';
 import '../../domain/notification_category.dart';
 import '../../domain/notification_model.dart';
 import '../controllers/notification_controller.dart';
 import '../widgets/notification_card.dart';
 import '../widgets/notification_detail_dialog.dart';
-import '../widgets/notification_filter_bar.dart';
 
-/// Central Notification & Trading Desk Activity Center for authorized brokers.
+/// Time bucket of an alert, by the local calendar date of its record timestamp.
+enum AlertGroup {
+  today('Today'),
+  yesterday('Yesterday'),
+  earlier('Earlier');
+
+  final String label;
+  const AlertGroup(this.label);
+
+  static AlertGroup of(DateTime createdAt, DateTime now) {
+    final local = createdAt.toLocal();
+    final day = DateTime(local.year, local.month, local.day);
+    final today = DateTime(now.year, now.month, now.day);
+    if (!day.isBefore(today)) return AlertGroup.today;
+    if (day == today.subtract(const Duration(days: 1))) return AlertGroup.yesterday;
+    return AlertGroup.earlier;
+  }
+}
+
+/// Alerts: the broker's notification and activity feed.
 class NotificationCenterScreen extends ConsumerStatefulWidget {
   const NotificationCenterScreen({super.key});
 
@@ -27,6 +46,7 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
   final TextEditingController _searchController = TextEditingController();
   bool _isNavigating = false;
   Timer? _debounceTimer;
+  final Set<AlertGroup> _collapsed = {};
 
   @override
   void dispose() {
@@ -86,6 +106,13 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
     }
   }
 
+  void _clearFilters(NotificationController controller) {
+    _searchController.clear();
+    controller.setSearchQuery('');
+    controller.selectCategory(NotificationCategory.all);
+    controller.selectAlertsFilter();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(notificationControllerProvider);
@@ -94,16 +121,17 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
+        backgroundColor: AppColors.backgroundLight,
+        foregroundColor: AppColors.primaryNavy,
+        elevation: 0,
+        titleSpacing: 0,
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text('Alerts', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.primaryNavy)),
             Text(
-              'Notifications & Activity',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-            ),
-            Text(
-              'सूचना व गतिविधि केंद्र',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+              'Stay updated on your business',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
             ),
           ],
         ),
@@ -111,7 +139,8 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
           // Mark all as read action
           if (state.unreadCount > 0)
             IconButton(
-              icon: const Icon(LucideIcons.checkCheck, size: 20),
+              key: const ValueKey('alerts_mark_all_read'),
+              icon: const Icon(LucideIcons.checkCheck, size: 22),
               tooltip: 'Mark All Read',
               onPressed: () async {
                 await controller.markAllAsRead();
@@ -125,10 +154,9 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
                 }
               },
             ),
-
-          // Refresh button
           IconButton(
-            icon: const Icon(LucideIcons.refreshCw, size: 18),
+            key: const ValueKey('alerts_refresh'),
+            icon: const Icon(LucideIcons.refreshCw, size: 20),
             tooltip: 'Refresh Feed',
             onPressed: () => controller.refresh(),
           ),
@@ -136,54 +164,82 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
       ),
       body: Column(
         children: [
-          const SizedBox(height: 10),
-
-          // Search Bar
+          // Search
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Container(
-              height: 42,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.borderLight),
               ),
               child: TextField(
                 controller: _searchController,
-                onChanged: (val) => controller.setSearchQuery(val),
+                onChanged: (val) {
+                  controller.setSearchQuery(val);
+                  setState(() {});
+                },
                 style: const TextStyle(fontSize: 13),
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  prefixIcon: const Icon(LucideIcons.search, size: 16, color: AppColors.textSecondaryLight),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                  prefixIcon: const Icon(LucideIcons.search, size: 18, color: AppColors.textSecondaryLight),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(LucideIcons.x, size: 14),
                           onPressed: () {
                             _searchController.clear();
                             controller.setSearchQuery('');
+                            setState(() {});
                           },
                         )
                       : null,
-                  hintText: 'Search notifications by commodity, deal, party...',
+                  hintText: 'Search by commodity, deal, party or location...',
                   hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.textDisabled),
                   border: InputBorder.none,
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 10),
 
-          // Category Filters & Unread Toggle
-          NotificationFilterBar(
-            selectedCategory: state.selectedCategory,
-            unreadOnly: state.unreadOnly,
-            categoryCounts: state.categoryCounts,
-            onCategorySelected: (cat) => controller.selectCategory(cat),
-            onToggleUnreadOnly: () => controller.toggleUnreadOnly(),
+          // Filters
+          SizedBox(
+            height: 40,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(children: [
+                _chip(
+                  key: 'all',
+                  icon: LucideIcons.bell,
+                  label: 'All',
+                  count: state.allNotifications.length,
+                  selected: state.kindFilter == null && !state.unreadOnly,
+                  onTap: () => controller.selectAlertsFilter(),
+                ),
+                _chip(
+                  key: 'unread',
+                  dotColor: AppColors.primary,
+                  label: 'Unread',
+                  count: state.unreadCount,
+                  selected: state.kindFilter == null && state.unreadOnly,
+                  onTap: () => controller.selectAlertsFilter(unreadOnly: true),
+                ),
+                for (final k in AlertKind.filterable)
+                  _chip(
+                    key: k.name,
+                    icon: k.icon,
+                    iconColor: k.color,
+                    label: k.filterLabel,
+                    count: state.kindCounts[k] ?? 0,
+                    selected: state.kindFilter == k,
+                    onTap: () => controller.selectAlertsFilter(kind: k),
+                  ),
+              ]),
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
-          // Notification List / Body
           Expanded(
             child: RefreshIndicator(
               onRefresh: () => controller.refresh(),
@@ -192,6 +248,65 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _chip({
+    required String key,
+    IconData? icon,
+    Color? iconColor,
+    Color? dotColor,
+    required String label,
+    required int count,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final fg = selected ? Colors.white : AppColors.textPrimaryLight;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: selected ? AppColors.primary : AppColors.surfaceLight,
+        shape: StadiumBorder(side: BorderSide(color: selected ? AppColors.primary : AppColors.borderLight)),
+        child: InkWell(
+          key: ValueKey('alerts_filter_$key'),
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 15, color: selected ? Colors.white : (iconColor ?? AppColors.textPrimaryLight)),
+                  const SizedBox(width: 6),
+                ],
+                if (dotColor != null) ...[
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(color: selected ? Colors.white : dotColor, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: fg)),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: selected ? Colors.white.withValues(alpha: 0.2) : AppColors.backgroundLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$count',
+                    key: ValueKey('alerts_filter_count_$key'),
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: fg),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -238,6 +353,7 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
     if (state.filteredNotifications.isEmpty) {
       final isFiltered = state.selectedCategory != NotificationCategory.all ||
           state.unreadOnly ||
+          state.kindFilter != null ||
           state.searchQuery.isNotEmpty;
 
       return Center(
@@ -255,45 +371,27 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.borderLight),
                 ),
-                child: const Icon(
-                  LucideIcons.bellOff,
-                  size: 28,
-                  color: AppColors.textDisabled,
-                ),
+                child: const Icon(LucideIcons.bellOff, size: 28, color: AppColors.textDisabled),
               ),
               const SizedBox(height: 16),
               Text(
-                isFiltered
-                    ? 'No matching notifications found'
-                    : 'All Caught Up!',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimaryLight,
-                ),
+                isFiltered ? 'No matching notifications found' : 'All Caught Up!',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimaryLight),
               ),
               const SizedBox(height: 6),
               Text(
                 isFiltered
-                    ? 'Try adjusting your category or unread filters.'
+                    ? 'Try adjusting your search or filters.'
                     : 'There are no operational alerts pending on your desk.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  color: AppColors.textSecondaryLight,
-                ),
+                style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondaryLight),
               ),
               if (isFiltered) ...[
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
                   icon: const Icon(LucideIcons.rotateCcw, size: 14),
                   label: const Text('Reset All Filters'),
-                  onPressed: () {
-                    _searchController.clear();
-                    controller.setSearchQuery('');
-                    controller.selectCategory(NotificationCategory.all);
-                    if (state.unreadOnly) controller.toggleUnreadOnly();
-                  },
+                  onPressed: () => _clearFilters(controller),
                 ),
               ],
             ],
@@ -302,21 +400,67 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+    // Group by local day; filteredNotifications is already newest-first.
+    final now = DateTime.now();
+    final groups = <AlertGroup, List<BrokerNotification>>{};
+    for (final n in state.filteredNotifications) {
+      groups.putIfAbsent(AlertGroup.of(n.createdAt, now), () => []).add(n);
+    }
+
+    final children = <Widget>[];
+    for (final g in AlertGroup.values) {
+      final items = groups[g];
+      if (items == null || items.isEmpty) continue;
+      final collapsed = _collapsed.contains(g);
+      final unread = items.where((n) => !n.isRead).length;
+      children.add(
+        InkWell(
+          key: ValueKey('alerts_group_${g.name}'),
+          onTap: () => setState(() => collapsed ? _collapsed.remove(g) : _collapsed.add(g)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+            child: Row(
+              children: [
+                Text(g.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primaryNavy)),
+                const Spacer(),
+                Text(
+                  unread > 0 ? '$unread new · ${items.length}' : '${items.length}',
+                  key: ValueKey('alerts_group_count_${g.name}'),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: unread > 0 ? AppColors.primary : AppColors.textSecondaryLight,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(collapsed ? LucideIcons.chevronDown : LucideIcons.chevronUp,
+                    size: 18, color: AppColors.textSecondaryLight),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (!collapsed) {
+        for (final item in items) {
+          children.add(Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: NotificationCard(
+              key: ValueKey('notif_card_${item.id}'),
+              notification: item,
+              onTap: (notif) => _handleRecordNavigation(context, notif),
+              onAction: (notif) => _handleRecordNavigation(context, notif),
+              onMarkAsRead: (notif) => controller.markAsRead(notif.id),
+              onShowDetails: (notif) => NotificationDetailDialog.show(context, notification: notif),
+            ),
+          ));
+        }
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: state.filteredNotifications.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final item = state.filteredNotifications[index];
-        return NotificationCard(
-          key: ValueKey('notif_card_${item.id}'),
-          notification: item,
-          onTap: (notif) => _handleRecordNavigation(context, notif),
-          onAction: (notif) => _handleRecordNavigation(context, notif),
-          onMarkAsRead: (notif) => controller.markAsRead(notif.id),
-        );
-      },
+      children: children,
     );
   }
 }

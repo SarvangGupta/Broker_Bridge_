@@ -89,7 +89,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(notif.resolvedRoute, '/deals/deal-bkg-0042');
-    expect(find.text('Notifications & Activity'), findsOneWidget);
+    expect(find.text('Alerts'), findsOneWidget);
     expect(find.text('Deal Awaiting Final Confirmation'), findsOneWidget);
 
     // Tap the confirmation card

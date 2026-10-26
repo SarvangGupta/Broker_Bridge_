@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/notification_repository.dart';
+import '../../domain/alert_kind.dart';
 import '../../domain/notification_category.dart';
 import '../../domain/notification_model.dart';
 
@@ -17,6 +18,19 @@ class NotificationState {
   final int unreadCount;
   final Map<NotificationCategory, int> categoryCounts;
 
+  /// Alerts chip filter (null = all kinds).
+  final AlertKind? kindFilter;
+
+  /// Notification count per [AlertKind].
+  Map<AlertKind, int> get kindCounts {
+    final counts = {for (final k in AlertKind.values) k: 0};
+    for (final n in allNotifications) {
+      final k = AlertKind.of(n);
+      counts[k] = counts[k]! + 1;
+    }
+    return counts;
+  }
+
   const NotificationState({
     this.allNotifications = const [],
     this.filteredNotifications = const [],
@@ -28,6 +42,7 @@ class NotificationState {
     this.successMessage,
     this.unreadCount = 0,
     this.categoryCounts = const {},
+    this.kindFilter,
   });
 
   factory NotificationState.initial() {
@@ -51,6 +66,7 @@ class NotificationState {
     bool clearSuccess = false,
     int? unreadCount,
     Map<NotificationCategory, int>? categoryCounts,
+    AlertKind? Function()? kindFilter,
   }) {
     return NotificationState(
       allNotifications: allNotifications ?? this.allNotifications,
@@ -63,6 +79,7 @@ class NotificationState {
       successMessage: clearSuccess ? null : (successMessage ?? this.successMessage),
       unreadCount: unreadCount ?? this.unreadCount,
       categoryCounts: categoryCounts ?? this.categoryCounts,
+      kindFilter: kindFilter != null ? kindFilter() : this.kindFilter,
     );
   }
 }
@@ -136,6 +153,19 @@ class NotificationController extends Notifier<NotificationState> {
     state = state.copyWith(
       selectedCategory: category,
       filteredNotifications: filtered,
+    );
+  }
+
+  /// Alerts chips are single-select: All, Unread, or one record kind.
+  void selectAlertsFilter({AlertKind? kind, bool unreadOnly = false}) {
+    state = state.copyWith(kindFilter: () => kind, unreadOnly: unreadOnly);
+    state = state.copyWith(
+      filteredNotifications: _applyFilter(
+        state.allNotifications,
+        category: state.selectedCategory,
+        unreadOnly: unreadOnly,
+        searchQuery: state.searchQuery,
+      ),
     );
   }
 
@@ -254,19 +284,28 @@ class NotificationController extends Notifier<NotificationState> {
       result = result.where((n) => n.category == category).toList();
     }
 
+    // 1b. Alerts chip (record kind)
+    final kind = state.kindFilter;
+    if (kind != null) {
+      result = result.where((n) => AlertKind.of(n) == kind).toList();
+    }
+
     // 2. Unread filter
     if (unreadOnly) {
       result = result.where((n) => !n.isRead).toList();
     }
 
-    // 3. Search query filter
+    // 3. Search query filter (text plus the record metadata shown on the card)
     final q = searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
       result = result.where((n) {
+        final commodity = (n.payload?['commodity'] ?? n.payload?['commodityName'])?.toString() ?? '';
         return n.title.toLowerCase().contains(q) ||
             n.message.toLowerCase().contains(q) ||
             n.contextReason.toLowerCase().contains(q) ||
-            (n.actionLabel?.toLowerCase().contains(q) ?? false);
+            (n.actionLabel?.toLowerCase().contains(q) ?? false) ||
+            (n.detailLine?.toLowerCase().contains(q) ?? false) ||
+            commodity.toLowerCase().contains(q);
       }).toList();
     }
 

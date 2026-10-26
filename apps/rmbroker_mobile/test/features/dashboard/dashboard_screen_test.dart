@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'package:rmbroker_mobile/app/router/app_router.dart';
 import 'package:rmbroker_mobile/core/widgets/module_placeholder_screen.dart';
+import 'package:rmbroker_mobile/features/more/presentation/more_screen.dart';
+import 'package:rmbroker_mobile/features/profile/presentation/broker_profile_screen.dart';
 import 'package:rmbroker_mobile/core/widgets/status_badge.dart';
 import 'package:rmbroker_mobile/features/authentication/domain/broker_user.dart';
 import 'package:rmbroker_mobile/features/dashboard/data/dashboard_repository.dart';
@@ -86,8 +89,9 @@ void main() {
       expect(find.byType(StatusBadge), findsOneWidget);
       expect(find.text('LIVE'), findsOneWidget);
 
-      // Broker Initials Avatar
-      expect(find.text('NS'), findsOneWidget);
+      // Header More (⋮) replaces the initials avatar (RB-MORE-ENTRYPOINTS-01)
+      expect(find.byKey(const ValueKey('header_more_button')), findsOneWidget);
+      expect(find.text('NS'), findsNothing);
 
       // Welcome Banner
       expect(find.text('Nilesh Sharma'), findsOneWidget);
@@ -217,25 +221,60 @@ void main() {
       expect(find.text('Roadmap'), findsOneWidget);
     });
 
-    testWidgets('tapping profile avatar opens profile bottom sheet with sign out access', (
+    testWidgets('header More and bottom-nav More open the same shared More page', (
       tester,
     ) async {
+      // Same 800dp surface as the other dashboard tests use.
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
       final repo = MockDashboardRepository(
         brokerUser: testBroker,
         resultData: DashboardDataMetricsTestResult.empty(),
       );
-
-      await tester.pumpWidget(createTestWidget(repository: repo));
+      final router = AppRouter.router;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [dashboardRepositoryProvider.overrideWithValue(repo)],
+        child: MaterialApp.router(routerConfig: router),
+      ));
+      router.go('/dashboard');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 3)); // splash timer from the shared router's first build
       await tester.pumpAndSettle();
 
-      // Tap avatar initials
-      await tester.tap(find.text('NS'));
-      await tester.pumpAndSettle();
+      int selectedTab() => tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
+      void expectMorePage() {
+        expect(find.byType(MoreScreen), findsOneWidget);
+        for (final k in ['more_profile', 'more_tools', 'more_finance', 'more_settings']) {
+          expect(find.byKey(Key(k)), findsOneWidget, reason: k);
+        }
+        expect(selectedTab(), 4, reason: 'More tab selected');
+        expect(find.byType(BottomSheet), findsNothing, reason: 'no profile sheet');
+      }
 
-      // Verify bottom sheet contents
-      expect(find.text('nilesh.sharma@rmbroker.in'), findsOneWidget);
-      expect(find.text('Jaipur Mandi Commodity Exchange'), findsOneWidget);
-      expect(find.text('Sign Out from Desk'), findsOneWidget);
+      // 1. Header ⋮
+      await tester.tap(find.byKey(const ValueKey('header_more_button')));
+      await tester.pumpAndSettle();
+      expectMorePage();
+      final fromHeader = tester.element(find.byType(MoreScreen));
+
+      // 2. Back to Home, then the bottom-nav More tab: same page in the same branch.
+      await tester.tap(find.text('Home'));
+      await tester.pumpAndSettle();
+      expect(selectedTab(), 0);
+      await tester.tap(find.text('More'));
+      await tester.pumpAndSettle();
+      expectMorePage();
+      expect(identical(tester.element(find.byType(MoreScreen)), fromHeader), isTrue,
+          reason: 'one shared More destination (same branch state)');
+
+      // 3. Profile is reachable through More > Profile.
+      await tester.tap(find.byKey(const Key('more_profile')));
+      // The profile screen shows a loading spinner; pump fixed frames.
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(BrokerProfileScreen), findsOneWidget, reason: 'existing profile screen');
     });
 
     testWidgets('tapping quick dial FAB opens broker communication desk sheet', (

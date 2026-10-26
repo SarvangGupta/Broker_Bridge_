@@ -140,13 +140,22 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();
 
-      expect(find.text('Notifications & Activity'), findsOneWidget);
-      expect(find.text('सूचना व गतिविधि केंद्र'), findsOneWidget);
+      expect(find.text('Alerts'), findsOneWidget);
+      expect(find.text('Stay updated on your business'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget);
+      expect(find.text('Search by commodity, deal, party or location...'), findsOneWidget);
 
-      // Check category chips
+      // Filter chips with counts from the data
       expect(find.text('All'), findsOneWidget);
-      expect(find.text('Unread Only'), findsOneWidget);
+      expect(find.text('Unread'), findsOneWidget);
+      Text count(String key) =>
+          tester.widget<Text>(find.byKey(ValueKey('alerts_filter_count_$key')));
+      expect(count('all').data, '3');
+      expect(count('unread').data, '2');
+      expect(count('requirement').data, '1');
+      expect(count('offer').data, '0');
+      expect(count('deal').data, '1');
+      expect(count('task').data, '0');
 
       // Check cards
       expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
@@ -154,32 +163,36 @@ void main() {
       expect(find.text('Commission Payment Recorded'), findsOneWidget);
     });
 
-    testWidgets('filtering by category displays only items of selected category', (
+    testWidgets('filtering by record kind displays only items of that kind', (
       tester,
     ) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();
 
-      // Tap on Commission & Invoices chip
-      final commChip = find.widgetWithText(FilterChip, 'Commission & Invoices');
-      await tester.ensureVisible(commChip);
-      await tester.tap(commChip);
+      final dealsChip = find.byKey(const ValueKey('alerts_filter_deal'));
+      await tester.ensureVisible(dealsChip);
+      await tester.tap(dealsChip);
       await tester.pumpAndSettle();
 
-      // Only commission notification should be visible
-      expect(find.text('Commission Payment Recorded'), findsOneWidget);
-      expect(find.text('Deal Awaiting Confirmation'), findsNothing);
+      expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
+      expect(find.text('Commission Payment Recorded'), findsNothing);
       expect(find.text('High-Score Match (96%)'), findsNothing);
+
+      final reqChip = find.byKey(const ValueKey('alerts_filter_requirement'));
+      await tester.ensureVisible(reqChip);
+      await tester.tap(reqChip);
+      await tester.pumpAndSettle();
+      expect(find.text('High-Score Match (96%)'), findsOneWidget);
+      expect(find.text('Deal Awaiting Confirmation'), findsNothing);
     });
 
-    testWidgets('toggling Unread Only displays only unread items', (
+    testWidgets('Unread chip displays only unread items', (
       tester,
     ) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();
 
-      // Tap Unread Only
-      await tester.tap(find.text('Unread Only'));
+      await tester.tap(find.byKey(const ValueKey('alerts_filter_unread')));
       await tester.pumpAndSettle();
 
       expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
@@ -237,21 +250,23 @@ void main() {
       expect(find.byTooltip('Mark All Read'), findsNothing);
     });
 
-    testWidgets('tapping Mark Read on unread card marks it read', (
+    testWidgets('Mark as read from the card menu marks only that alert read', (
       tester,
     ) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();
 
-      // Find 'Mark Read' text buttons
-      final markReadBtns = find.text('Mark Read');
-      expect(markReadBtns, findsNWidgets(2)); // 2 unread items
+      expect(find.byKey(const ValueKey('notif_unread_test-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('notif_unread_test-2')), findsOneWidget);
 
-      await tester.tap(markReadBtns.first);
+      await tester.tap(find.byKey(const ValueKey('notif_menu_test-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mark as read'));
       await tester.pumpAndSettle();
 
-      // One less mark read button
-      expect(find.text('Mark Read'), findsNWidgets(1));
+      expect(find.byKey(const ValueKey('notif_unread_test-1')), findsNothing);
+      expect(find.byKey(const ValueKey('notif_unread_test-2')), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const ValueKey('alerts_filter_count_unread'))).data, '1');
     });
   });
 
@@ -277,11 +292,15 @@ void main() {
       );
 
       expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
-      expect(find.text('Review Deal'), findsOneWidget);
-      expect(find.text('ACTION REQUIRED'), findsOneWidget);
+      expect(find.text('Confirmation required'), findsOneWidget); // short type label
+      expect(find.text('Action required'), findsOneWidget); // urgent status
+      expect(find.text('10m ago'), findsOneWidget);
+      // One compact action; the long message is not repeated on the card
+      expect(find.text('View details'), findsOneWidget);
+      expect(find.text('Deal DL-2026-0891 (50 MT Mustard Seed) requires review.'), findsNothing);
 
       // Tap action button
-      await tester.tap(find.text('Review Deal'));
+      await tester.tap(find.byKey(const ValueKey('notif_action_test-1')));
       await tester.pump();
       expect(actionTriggered, isTrue);
 

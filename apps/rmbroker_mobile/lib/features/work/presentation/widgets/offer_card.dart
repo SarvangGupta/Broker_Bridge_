@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/widgets/desk_card_parts.dart';
 import '../../domain/offer_model.dart';
 
+/// Compact seller lot card for the Work Desk, in the Requirements card style.
 class OfferCard extends StatelessWidget {
   final OfferItem offer;
   final VoidCallback onTap;
@@ -46,303 +49,171 @@ class OfferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _getStatusColor(offer.status);
-    final loadingColor = _getLoadingStatusColor(offer.loadingStatus);
+    final money = NumberFormat.decimalPattern('en_IN');
+    final location = [offer.districtName, offer.stateName].where((s) => s.trim().isNotEmpty).join(', ');
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AppColors.borderLight),
-      ),
-      color: AppColors.surfaceLight,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return DeskCardShell(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top row: status · lot · ref · chevron
+          Row(
             children: [
-              // Top Row: Ref, Lot Number, Status Badge
-              Row(
-                children: [
-                  Text(
-                    offer.ref,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryDark,
-                    ),
+              Flexible(flex: 3, child: DeskStatusBadge(label: offer.status.displayLabel, color: _getStatusColor(offer.status))),
+              const SizedBox(width: 6),
+              Flexible(
+                flex: 2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: AppColors.borderLight, borderRadius: BorderRadius.circular(4)),
+                  child: Text(
+                    offer.lotNumber,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondaryLight),
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.borderLight,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      offer.lotNumber,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondaryLight,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      offer.status.displayLabel,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Commodity & Grade
-              Text(
-                offer.commodityName,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimaryLight,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                offer.gradeName,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondaryLight,
+              const SizedBox(width: 6),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  offer.ref,
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondaryLight),
                 ),
               ),
-              const SizedBox(height: 10),
-
-              // Seller Company
-              Row(
-                children: [
-                  const Icon(LucideIcons.store, size: 13, color: AppColors.textSecondaryLight),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      offer.sellerCompanyName,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimaryLight,
+              const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.textSecondaryLight),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  offer.commodityName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimaryLight),
+                ),
+                Text(
+                  offer.gradeName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(LucideIcons.store, size: 13, color: AppColors.textSecondaryLight),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        offer.sellerCompanyName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondaryLight),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  if (offer.isSellerVerified)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4),
-                      child: Icon(Icons.verified, size: 13, color: AppColors.primary),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Separated Inventory Quantities Box (Zero ambiguous mixing)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundLight,
-                  borderRadius: BorderRadius.circular(8),
+                    if (offer.isSellerVerified) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.verified, size: 13, color: AppColors.primary),
+                    ],
+                  ],
                 ),
-                child: Row(
+                const SizedBox(height: 10),
+
+                // Inventory: available · total lot · reserved
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Available',
-                            style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            offer.formattedAvailableQuantity,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.success,
-                            ),
-                          ),
-                        ],
+                      child: DeskMetric(
+                        icon: LucideIcons.package,
+                        label: 'Available',
+                        value: offer.formattedAvailableQuantity,
+                        valueColor: AppColors.success,
                       ),
                     ),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Total Lot',
-                            style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            offer.formattedOfferedQuantity,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimaryLight,
-                            ),
-                          ),
-                        ],
+                      child: DeskMetric(
+                        icon: LucideIcons.boxes,
+                        label: 'Total Lot',
+                        value: offer.formattedOfferedQuantity,
                       ),
                     ),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Reserved',
-                            style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            offer.formattedReservedQuantity,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFD97706),
-                            ),
-                          ),
-                        ],
+                      child: DeskMetric(
+                        icon: LucideIcons.lock,
+                        label: 'Reserved',
+                        value: offer.formattedReservedQuantity,
+                        valueColor: const Color(0xFFD97706),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 10),
+                const SizedBox(height: 8),
 
-              // Pricing & Location
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(LucideIcons.indianRupee, size: 13, color: AppColors.textSecondaryLight),
-                            const SizedBox(width: 4),
-                            Text(
-                              '₹${offer.askingPrice.toInt()} / ${offer.unitSymbol}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimaryLight,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (offer.confidentialMinimumPrice != null) ...[
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              const Icon(LucideIcons.lock, size: 10, color: AppColors.goldDark),
-                              const SizedBox(width: 3),
-                              Text(
-                                'Floor: ₹${offer.confidentialMinimumPrice!.toInt()} / ${offer.unitSymbol}',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.goldDark,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
+                // Commercial: asking price · floor (when set) · location
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: DeskMetric(
+                        icon: LucideIcons.coins,
+                        label: 'Asking Price',
+                        value: '₹${money.format(offer.askingPrice.round())} / ${offer.unitSymbol}',
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(LucideIcons.mapPin, size: 13, color: AppColors.textSecondaryLight),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            '${offer.districtName}, ${offer.stateName}',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              color: AppColors.textSecondaryLight,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Bottom Row: Loading Readiness & Validity Expiration
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: loadingColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(LucideIcons.truck, size: 11, color: loadingColor),
-                        const SizedBox(width: 4),
-                        Text(
-                          offer.loadingStatus.displayLabel,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: loadingColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(LucideIcons.calendar, size: 11, color: AppColors.textSecondaryLight),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Valid: ${offer.validUntilFormatted}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: offer.isExpired ? AppColors.error : AppColors.textSecondaryLight,
+                    if (offer.confidentialMinimumPrice != null)
+                      Expanded(
+                        child: DeskMetric(
+                          icon: LucideIcons.shieldCheck,
+                          label: 'Floor',
+                          value: '₹${money.format(offer.confidentialMinimumPrice!.round())} / ${offer.unitSymbol}',
+                          valueColor: AppColors.goldDark,
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
+                    Expanded(
+                      child: DeskMetric(
+                        icon: LucideIcons.mapPin,
+                        label: 'Location',
+                        value: location.isEmpty ? 'Not specified' : location,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Bottom row: readiness · validity
+                Row(
+                  children: [
+                    Flexible(
+                      child: DeskStatusPill(
+                        icon: LucideIcons.truck,
+                        label: offer.loadingStatus.displayLabel,
+                        color: _getLoadingStatusColor(offer.loadingStatus),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: DeskStatusPill(
+                        icon: LucideIcons.calendar,
+                        label: 'Valid: ${offer.validUntilFormatted}',
+                        color: offer.isExpired ? AppColors.error : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

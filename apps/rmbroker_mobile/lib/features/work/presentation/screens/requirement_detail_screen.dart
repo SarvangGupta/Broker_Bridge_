@@ -10,11 +10,14 @@ import '../../../deals/presentation/controllers/allocations_controller.dart';
 import '../../../deals/presentation/controllers/deals_controller.dart';
 import '../../data/work_repository.dart';
 import '../../domain/requirement_model.dart';
+import '../../domain/requirement_negotiation_model.dart';
 import '../controllers/requirements_controller.dart';
+import '../widgets/detail_accordion_card.dart';
 import '../widgets/negotiate_requirement_sheet.dart';
 import '../widgets/select_seller_lot_sheet.dart';
 
-/// Dedicated Requirement Detail Screen following the established Deal Detail navigation pattern.
+/// Requirement Details: compact header and summary, seven collapsible
+/// sections (all collapsed on entry) and a sticky action bar.
 class RequirementDetailScreen extends ConsumerStatefulWidget {
   final String requirementId;
 
@@ -34,6 +37,18 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
   bool _notFound = false;
   String? _loadError;
 
+  /// Recorded proposal rounds (deal versions) for Activity History; loaded
+  /// once with the page, never on section expansion.
+  List<NegotiationRoundItem> _rounds = const [];
+
+  static const Color _navy = AppColors.primaryNavy;
+  static const Color _blue = Color(0xFF2563EB);
+  static const Color _green = Color(0xFF059669);
+  static const Color _amber = Color(0xFFD97706);
+  static const Color _purple = Color(0xFF7C3AED);
+  static const Color _slate = Color(0xFF475569);
+  static const Color _pink = Color(0xFFBE185D);
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +61,8 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
       _loading = true;
       _loadError = null;
     });
-    final result = await ref.read(workRepositoryProvider).getRequirementById(widget.requirementId);
+    final repo = ref.read(workRepositoryProvider);
+    final result = await repo.getRequirementById(widget.requirementId);
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -63,6 +79,22 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
           _loadError = contractNotice;
       }
     });
+    // Rounds are only readable by the assigned broker (the repository rejects others).
+    if (result is WorkSuccess<RequirementItem> &&
+        result.data.brokerId != null &&
+        result.data.brokerId == repo.activeBrokerId()) {
+      _loadRounds(repo);
+    }
+  }
+
+  Future<void> _loadRounds(WorkRepository repo) async {
+    try {
+      final res = await repo.getRequirementNegotiationDetails(widget.requirementId);
+      if (!mounted) return;
+      if (res is WorkSuccess<RequirementNegotiationData>) setState(() => _rounds = res.data.rounds);
+    } catch (_) {
+      // Activity History then shows only the creation event.
+    }
   }
 
   Future<void> _refreshAll() async {
@@ -82,7 +114,7 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
   Widget _buildNotice({required IconData icon, required Color color, required String title, required String body}) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
@@ -119,9 +151,11 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
     ref.read(allocationsProvider(widget.requirementId).notifier).loadAllocations();
   }
 
-  /// Allocations and deals recorded against this requirement, so the broker can
-  /// continue the workflow without losing the requirement link.
-  Widget _buildLinkedRecords(BuildContext context, RequirementItem requirement) {
+  // --------------------------------------------------------------------------
+  // Seller Allocation & Deals
+  // --------------------------------------------------------------------------
+
+  Widget _buildSellerSection(RequirementItem requirement) {
     final allocState = ref.watch(allocationsProvider(requirement.id));
     // Only real deal records: a requirement-level negotiation item has no
     // deal row, and opening it as a deal showed a "Deal record pending" page.
@@ -130,51 +164,70 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
         .deals
         .where((d) => d.requirementId == requirement.id && !d.isRequirementNegotiation)
         .toList();
-    final unallocated = !allocState.isLoading && allocState.allocations.isEmpty && deals.isEmpty;
+    final allocations = allocState.allocations;
+    final empty = allocations.isEmpty && deals.isEmpty;
+    final unallocated = !allocState.isLoading && empty;
     final canAllocate = unallocated &&
         SelectSellerLotSheet.canAllocate(requirement, ref.read(workRepositoryProvider).activeBrokerId());
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderLight),
-      ),
+    final String summary;
+    if (allocState.isLoading && empty) {
+      summary = 'Loading allocations...';
+    } else if (empty) {
+      summary = allocState.errorMessage ?? allocState.contractNotice ?? 'No seller allocated yet';
+    } else {
+      summary = [
+        if (allocations.isNotEmpty) '${allocations.length} allocation${allocations.length == 1 ? '' : 's'}',
+        if (deals.isNotEmpty) '${deals.length} deal${deals.length == 1 ? '' : 's'}',
+      ].join(' · ');
+    }
+
+    return DetailAccordionCard(
+      sectionKey: 'seller',
+      icon: LucideIcons.users,
+      tint: _purple,
+      title: 'Seller Allocation & Deals',
+      summary: summary,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Linked Seller Allocations & Deals',
-            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimaryLight),
-          ),
-          const SizedBox(height: 10),
-          if (allocState.isLoading && allocState.allocations.isEmpty)
+          if (allocState.isLoading && empty)
             const Text('Loading allocations...', style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight))
-          else if (allocState.allocations.isEmpty && deals.isEmpty) ...[
+          else if (empty) ...[
+            const Icon(LucideIcons.users, size: 30, color: AppColors.textSecondaryLight),
+            const SizedBox(height: 6),
             Text(
               allocState.errorMessage ?? allocState.contractNotice ?? 'No seller lot has been allocated to this requirement yet.',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
             ),
             if (canAllocate) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
+              const Text(
+                'Allocate a seller to start negotiations and move this requirement forward.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+              ),
+              const SizedBox(height: 10),
               OutlinedButton.icon(
                 key: const ValueKey('allocate_seller_button'),
                 onPressed: () => _allocateSeller(requirement),
-                icon: const Icon(LucideIcons.userPlus, size: 14),
+                icon: const Icon(LucideIcons.plus, size: 16),
                 label: const Text('Allocate Seller'),
                 style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ],
-          for (final a in allocState.allocations)
+          for (final a in allocations)
             Padding(
               key: ValueKey('linked_alloc_${a.id}'),
-              padding: const EdgeInsets.symmetric(vertical: 3),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
                   const Icon(LucideIcons.gitCommit, size: 14, color: AppColors.textSecondaryLight),
@@ -196,7 +249,7 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
               key: ValueKey('linked_deal_${d.id}'),
               onTap: () => context.push('/deals/${d.id}'),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 5),
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
                     const Icon(LucideIcons.handshake, size: 14, color: AppColors.primary),
@@ -215,6 +268,159 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Activity History: only recorded events (creation + saved proposal rounds)
+  // --------------------------------------------------------------------------
+
+  List<({String title, DateTime at, String detail})> _activityEvents(RequirementItem r) {
+    final money = NumberFormat.decimalPattern('en_IN');
+    final events = <({String title, DateTime at, String detail})>[
+      (title: 'Requirement Created', at: r.createdAt, detail: 'Mandate recorded for ${r.formattedRequestedQuantity}.'),
+      for (final round in _rounds)
+        (
+          title: round.isBroker ? 'Proposal v${round.versionNumber} sent to buyer' : 'Buyer counter-offer v${round.versionNumber}',
+          at: round.createdAt,
+          detail: '₹${money.format(round.rate.round())} / ${r.unitSymbol} · ${round.quantity.toStringAsFixed(0)} ${r.unitSymbol}',
+        ),
+    ];
+    events.sort((a, b) => b.at.compareTo(a.at));
+    return events;
+  }
+
+  Widget _buildActivitySection(RequirementItem r, DateFormat dateFormat) {
+    final events = _activityEvents(r);
+    final latest = events.first;
+    return DetailAccordionCard(
+      sectionKey: 'activity',
+      icon: LucideIcons.clock,
+      tint: _amber,
+      title: 'Activity History',
+      summary: 'Latest: ${latest.title} (${DateFormat('dd MMM yyyy').format(latest.at)})',
+      child: Column(
+        children: [
+          for (var i = 0; i < events.length; i++)
+            IntrinsicHeight(
+              key: ValueKey('activity_event_$i'),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 3),
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: i == 0 ? AppColors.primary : AppColors.textDisabled,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      if (i < events.length - 1)
+                        const Expanded(child: VerticalDivider(width: 12, thickness: 1.5, color: AppColors.borderLight)),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(events[i].title,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _navy)),
+                          Text(dateFormat.format(events[i].at),
+                              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondaryLight)),
+                          Text(events[i].detail,
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Shared row builders
+  // --------------------------------------------------------------------------
+
+  Widget _buildQuantityRow(String label, double qty, String unit, Color color, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
+                color: isBold ? AppColors.textPrimaryLight : AppColors.textSecondaryLight,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${qty.toStringAsFixed(0)} $unit',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tile(IconData icon, String label, String value, Color tint) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: tint.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(10)),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: tint),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
+                const SizedBox(height: 2),
+                Text(value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: tint)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -294,33 +500,95 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
     );
   }
 
-  Widget _buildQuantityRow(String label, double qty, String unit, Color color, {bool isBold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
-                color: isBold ? AppColors.textPrimaryLight : AppColors.textSecondaryLight,
+  // --------------------------------------------------------------------------
+  // Bottom action bar (same actions and conditions as before)
+  // --------------------------------------------------------------------------
+
+  Widget? _buildActionBar(RequirementItem requirement, bool canAct, bool showSecondary) {
+    if (!canAct && !showSecondary) return null;
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          border: const Border(top: BorderSide(color: AppColors.borderLight)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, -2))],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (canAct)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  key: const ValueKey('req_action_proposal'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(LucideIcons.scale, size: 18),
+                  label: Text(
+                    requirement.isProposed ? 'View / Amend Proposal' : 'Initiate Negotiation & Submit Proposal',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  onPressed: () => NegotiateRequirementSheet.show(context, requirement: requirement),
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${qty.toStringAsFixed(0)} $unit',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
+            if (canAct && showSecondary) const SizedBox(height: 8),
+            if (showSecondary)
+              Row(
+                children: [
+                  if (requirement.status != RequirementStatus.cancelled) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('req_action_cancel'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: Size.zero,
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
+                          padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(LucideIcons.ban, size: 16),
+                        label: const Text(
+                          'Cancel Mandate',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () => _showCancelDialog(context, requirement),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('req_action_matches'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: Size.zero,
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(LucideIcons.sparkles, size: 16),
+                      label: const Text(
+                        'Find Matching Offers',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      // Navigate to Work Desk Match Center tab
+                      onPressed: () => context.go('/work?tab=2&reqId=${requirement.id}'),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -347,7 +615,7 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        title: Text(requirement?.ref ?? 'Requirement Mandate'),
+        title: const Text('Requirement Details'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.canPop() ? context.pop() : context.go('/work'),
@@ -360,6 +628,7 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
           ),
         ],
       ),
+      bottomNavigationBar: requirement == null ? null : _buildActionBar(requirement, canAct, canAct),
       body: _loading && requirement == null
           ? const Center(child: CircularProgressIndicator())
           : requirement == null
@@ -387,526 +656,351 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
               : RefreshIndicator(
                   onRefresh: _refreshAll,
                   child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!isAssigned)
-                          _buildNotice(
-                            icon: LucideIcons.lock,
-                            color: AppColors.goldDark,
-                            title: 'Not assigned to your desk',
-                            body: requirement.brokerId == null
-                                ? 'The buyer has not assigned this requirement to a broker. You can view it, but matching and proposals are disabled.'
-                                : 'This requirement is assigned to another broker desk. You can view it, but matching and proposals are disabled.',
-                          )
-                        else if (isClosed)
-                          _buildNotice(
-                            icon: LucideIcons.archive,
-                            color: AppColors.textSecondaryLight,
-                            title: 'Requirement closed (${requirement.status.displayLabel})',
-                            body: 'This requirement is no longer an active opportunity. Linked deals remain available below.',
-                          ),
-                        // 1. Status & Urgency Header Banner
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.borderLight),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: _getStatusColor(requirement.status).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  requirement.status.displayLabel,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: _getStatusColor(requirement.status),
-                                  ),
-                                ),
-                              ),
-                              const Spacer(),
-                              if (requirement.isUrgent)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.error.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: const [
-                                      Icon(LucideIcons.clock, size: 12, color: AppColors.error),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Urgent Demand',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.error,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // 2. Commodity & Counterparty Card
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.borderLight),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                requirement.commodityName,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.textPrimaryLight,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Grade: ${requirement.gradeName}',
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textSecondaryLight,
-                                ),
-                              ),
-                              if (requirement.categoryName != null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Category: ${requirement.categoryName}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondaryLight,
-                                  ),
-                                ),
-                              ],
-                              const Divider(height: 20, color: AppColors.borderLight),
-                              Row(
-                                children: [
-                                  const Icon(LucideIcons.building, size: 16, color: AppColors.textSecondaryLight),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      requirement.buyerCompanyName,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.textPrimaryLight,
-                                      ),
-                                    ),
-                                  ),
-                                  if (requirement.isBuyerVerified)
-                                    const Padding(
-                                      padding: EdgeInsets.only(left: 4, right: 8),
-                                      child: Icon(Icons.verified, size: 16, color: AppColors.primary),
-                                    ),
-                                  // No trust chip when the buyer company is not visible to this desk.
-                                  if (requirement.buyerTrustScore > 0) Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryContainer.withValues(alpha: 0.25),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      '${requirement.buyerTrustScore}% Trust',
-                                      style: const TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.primaryDark,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // 3. Complete 7-Quantity Lifecycle Breakdown
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.borderLight),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Expanded(
-                                    child: Text(
-                                      'Quantity Lifecycle Breakdown',
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.textPrimaryLight,
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    '${requirement.fulfillmentPercentage}% Fulfilled',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value: (requirement.fulfillmentPercentage / 100).clamp(0.0, 1.0).toDouble(),
-                                  backgroundColor: AppColors.borderLight,
-                                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
-                                  minHeight: 6,
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              _buildQuantityRow(
-                                '1. Requested Volume',
-                                requirement.requestedQuantity,
-                                requirement.unitSymbol,
-                                AppColors.textPrimaryLight,
-                                isBold: true,
-                              ),
-                              const Divider(height: 12, color: AppColors.borderLight),
-                              _buildQuantityRow(
-                                '2. Allocated Volume',
-                                requirement.allocatedQuantity,
-                                requirement.unitSymbol,
-                                AppColors.primary,
-                              ),
-                              _buildQuantityRow(
-                                '3. Contracted Volume',
-                                requirement.contractedQuantity,
-                                requirement.unitSymbol,
-                                const Color(0xFF0D9488),
-                              ),
-                              _buildQuantityRow(
-                                '4. Delivered Volume',
-                                requirement.deliveredQuantity,
-                                requirement.unitSymbol,
-                                AppColors.success,
-                              ),
-                              _buildQuantityRow(
-                                '5. Accepted Volume',
-                                requirement.acceptedQuantity,
-                                requirement.unitSymbol,
-                                AppColors.success,
-                              ),
-                              _buildQuantityRow(
-                                '6. Disputed / Rejected',
-                                requirement.disputedQuantity,
-                                requirement.unitSymbol,
-                                AppColors.error,
-                              ),
-                              const Divider(height: 12, color: AppColors.borderLight),
-                              _buildQuantityRow(
-                                '7. Remaining Unallocated',
-                                requirement.remainingQuantity,
-                                requirement.unitSymbol,
-                                const Color(0xFFD97706),
-                                isBold: true,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // 4. Commercial Terms & Delivery Specs
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.borderLight),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Commercial & Delivery Terms',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimaryLight,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('Target Price', style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          '₹${requirement.targetPrice.toInt()} / ${requirement.unitSymbol}',
-                                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('Target Delivery Date', style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          requirement.targetDateFormatted,
-                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(LucideIcons.mapPin, size: 15, color: AppColors.textSecondaryLight),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Delivery Terms: ${requirement.deliveryTerms}',
-                                      style: const TextStyle(fontSize: 13, color: AppColors.textPrimaryLight, fontWeight: FontWeight.w500),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // 5. Structured Quality Parameters
-                        if (requirement.qualityParameters != null && requirement.qualityParameters!.isNotEmpty) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceLight,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppColors.borderLight),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Standard Quality Parameters',
-                                  style: TextStyle(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimaryLight,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: requirement.qualityParameters!.entries.map((entry) {
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.backgroundLight,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: AppColors.borderLight),
-                                      ),
-                                      child: Text(
-                                        '${entry.key}: ${entry.value}',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimaryLight,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-
-                        // 6. Operational Information & Broker Audit
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.borderLight),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Operational Audit & Mandate Records',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimaryLight,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'Created: ${dateFormat.format(requirement.createdAt)}',
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
-                              ),
-                              if (requirement.brokerId != null) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Assigned Broker ID: ${requirement.brokerId}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
-                                ),
-                              ],
-                              if (requirement.notes != null && requirement.notes!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.backgroundLight,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'Notes: ${requirement.notes}',
-                                    style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimaryLight),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // 7. Linked allocations and deals
-                        _buildLinkedRecords(context, requirement),
-                        const SizedBox(height: 20),
-
-                        // 8. Broker Action Buttons (assigned, active requirements only)
-                        if (canAct) ...[
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                elevation: 0,
-                              ),
-                              icon: const Icon(LucideIcons.scale, size: 18),
-                              label: Text(
-                                requirement.isProposed
-                                    ? 'View / Amend Commercial Proposal'
-                                    : 'Initiate Negotiation & Submit Proposal',
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                              ),
-                              onPressed: () {
-                                NegotiateRequirementSheet.show(
-                                  context,
-                                  requirement: requirement,
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                        if (isAssigned && !isClosed) Row(
-                          children: [
-                            if (requirement.status != RequirementStatus.cancelled) ...[
-                              Expanded(
-                                flex: 2,
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: Size.zero,
-                                    foregroundColor: AppColors.error,
-                                    side: const BorderSide(color: AppColors.error),
-                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                  icon: const Icon(LucideIcons.ban, size: 16),
-                                  label: const Text(
-                                    'Cancel Mandate',
-                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  onPressed: () => _showCancelDialog(context, requirement),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                            ],
-                            Expanded(
-                              flex: 3,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  minimumSize: Size.zero,
-                                  backgroundColor: requirement.status != RequirementStatus.cancelled && requirement.status != RequirementStatus.fulfilled
-                                      ? AppColors.surfaceLight
-                                      : AppColors.primary,
-                                  foregroundColor: requirement.status != RequirementStatus.cancelled && requirement.status != RequirementStatus.fulfilled
-                                      ? AppColors.primary
-                                      : Colors.white,
-                                  side: requirement.status != RequirementStatus.cancelled && requirement.status != RequirementStatus.fulfilled
-                                      ? const BorderSide(color: AppColors.primary)
-                                      : BorderSide.none,
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                                icon: const Icon(LucideIcons.sparkles, size: 16),
-                                label: const Text(
-                                  'Find Matching Offers',
-                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                onPressed: () {
-                                  // Navigate to Work Desk Match Center tab
-                                  context.go('/work?tab=2&reqId=${requirement.id}');
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _buildSections(requirement, isAssigned, isClosed, brokerId, dateFormat),
                     ),
                   ),
                 ),
     );
+  }
+
+  List<Widget> _buildSections(
+    RequirementItem requirement,
+    bool isAssigned,
+    bool isClosed,
+    String? brokerId,
+    DateFormat dateFormat,
+  ) {
+    final statusColor = _getStatusColor(requirement.status);
+    final money = NumberFormat.decimalPattern('en_IN');
+    final price = '₹${money.format(requirement.targetPrice.round())} / ${requirement.unitSymbol}';
+    final hasQuality = requirement.qualityParameters != null && requirement.qualityParameters!.isNotEmpty;
+
+    final String assignment;
+    if (requirement.brokerId == null) {
+      assignment = 'Not assigned to a broker';
+    } else if (requirement.brokerId == brokerId) {
+      assignment = 'Your broker desk';
+    } else {
+      assignment = 'Another broker desk';
+    }
+
+    return [
+      if (!isAssigned)
+        _buildNotice(
+          icon: LucideIcons.lock,
+          color: AppColors.goldDark,
+          title: 'Not assigned to your desk',
+          body: requirement.brokerId == null
+              ? 'The buyer has not assigned this requirement to a broker. You can view it, but matching and proposals are disabled.'
+              : 'This requirement is assigned to another broker desk. You can view it, but matching and proposals are disabled.',
+        )
+      else if (isClosed)
+        _buildNotice(
+          icon: LucideIcons.archive,
+          color: AppColors.textSecondaryLight,
+          title: 'Requirement closed (${requirement.status.displayLabel})',
+          body: 'This requirement is no longer an active opportunity. Linked deals remain available below.',
+        ),
+
+      // Header: status · urgency · Req ID · created
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              requirement.status.displayLabel,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: statusColor),
+            ),
+          ),
+          if (requirement.isUrgent) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Urgent Demand',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.error),
+              ),
+            ),
+          ],
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  requirement.ref,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _navy),
+                ),
+                Text(
+                  'Created ${dateFormat.format(requirement.createdAt)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 10),
+
+      // Commodity summary card
+      Container(
+        key: const ValueKey('req_summary_card'),
+        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  child: const Icon(LucideIcons.wheat, color: AppColors.primary, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        requirement.commodityName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _navy),
+                      ),
+                      Text(
+                        'Grade: ${requirement.gradeName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+                      ),
+                      if (requirement.categoryName != null)
+                        Text(
+                          'Category: ${requirement.categoryName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20, color: AppColors.borderLight),
+            Row(
+              children: [
+                const Icon(LucideIcons.building2, size: 16, color: AppColors.textSecondaryLight),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    requirement.buyerCompanyName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+                  ),
+                ),
+                if (requirement.isBuyerVerified)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4, right: 4),
+                    child: Icon(Icons.verified, size: 16, color: AppColors.primary),
+                  ),
+                // No trust chip when the buyer company is not visible to this desk.
+                if (requirement.buyerTrustScore > 0)
+                  Text(
+                    '${requirement.buyerTrustScore}% Trust',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+
+      // 1. Quantity Breakdown
+      DetailAccordionCard(
+        sectionKey: 'quantity',
+        icon: LucideIcons.chartColumn,
+        tint: _blue,
+        title: 'Quantity Breakdown',
+        summary:
+            'Requested: ${requirement.formattedRequestedQuantity}  |  Fulfilled: ${requirement.fulfillmentPercentage}%',
+        trailingLabel: '${requirement.fulfillmentPercentage}% Fulfilled',
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: (requirement.fulfillmentPercentage / 100).clamp(0.0, 1.0).toDouble(),
+                backgroundColor: AppColors.borderLight,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                minHeight: 6,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _buildQuantityRow('1. Requested Volume', requirement.requestedQuantity, requirement.unitSymbol,
+                AppColors.textPrimaryLight, isBold: true),
+            const Divider(height: 12, color: AppColors.borderLight),
+            _buildQuantityRow(
+                '2. Allocated Volume', requirement.allocatedQuantity, requirement.unitSymbol, AppColors.primary),
+            _buildQuantityRow('3. Contracted Volume', requirement.contractedQuantity, requirement.unitSymbol,
+                const Color(0xFF0D9488)),
+            _buildQuantityRow(
+                '4. Delivered Volume', requirement.deliveredQuantity, requirement.unitSymbol, AppColors.success),
+            _buildQuantityRow(
+                '5. Accepted Volume', requirement.acceptedQuantity, requirement.unitSymbol, AppColors.success),
+            _buildQuantityRow(
+                '6. Disputed / Rejected', requirement.disputedQuantity, requirement.unitSymbol, AppColors.error),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: _amber.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
+              child: _buildQuantityRow('Remaining Unallocated', requirement.remainingQuantity, requirement.unitSymbol,
+                  _amber, isBold: true),
+            ),
+          ],
+        ),
+      ),
+
+      // 2. Price & Delivery
+      DetailAccordionCard(
+        sectionKey: 'price',
+        icon: LucideIcons.indianRupee,
+        tint: _green,
+        title: 'Price & Delivery',
+        summary: '$price  |  ${requirement.targetDateFormatted}',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: _tile(LucideIcons.indianRupee, 'Target Price', price, _green)),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _tile(LucideIcons.calendar, 'Target Delivery Date', requirement.targetDateFormatted, _blue)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _tile(
+              LucideIcons.mapPin,
+              'Delivery Terms',
+              requirement.deliveryTerms.trim().isEmpty ? 'Not specified' : requirement.deliveryTerms,
+              _slate,
+            ),
+            if (hasQuality) ...[
+              const SizedBox(height: 10),
+              const Text('Quality Parameters',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _navy)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: requirement.qualityParameters!.entries.map((entry) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundLight,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.borderLight),
+                    ),
+                    child: Text(
+                      '${entry.key}: ${entry.value}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+
+      // 3. Activity History
+      _buildActivitySection(requirement, dateFormat),
+
+      // 4. Seller Allocation & Deals
+      _buildSellerSection(requirement),
+
+      // 5. Buyer Details
+      DetailAccordionCard(
+        sectionKey: 'buyer',
+        icon: LucideIcons.building2,
+        tint: _blue,
+        title: 'Buyer Details',
+        summary: requirement.buyerCompanyName,
+        child: Column(
+          children: [
+            _infoRow('Company', requirement.buyerCompanyName),
+            _infoRow('Verification', requirement.isBuyerVerified ? 'Verified' : 'Not verified'),
+            if (requirement.buyerTrustScore > 0) _infoRow('Trust Score', '${requirement.buyerTrustScore}%'),
+          ],
+        ),
+      ),
+
+      // 6. Documents (no document source exists on the broker app)
+      const DetailAccordionCard(
+        sectionKey: 'documents',
+        icon: LucideIcons.fileText,
+        tint: _slate,
+        title: 'Documents',
+        summary: 'Not available yet',
+        child: Text(
+          'Requirement documents are not available in the broker app yet.',
+          style: TextStyle(fontSize: 12.5, color: AppColors.textSecondaryLight),
+        ),
+      ),
+
+      // 7. Audit Details
+      DetailAccordionCard(
+        sectionKey: 'audit',
+        icon: LucideIcons.shieldCheck,
+        tint: _pink,
+        title: 'Audit Details',
+        summary: 'Created: ${DateFormat('dd MMM yyyy').format(requirement.createdAt)}',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _infoRow('Created', dateFormat.format(requirement.createdAt)),
+            _infoRow('Assigned Broker', assignment),
+            if (requirement.rawStatus != null) _infoRow('Recorded Status', requirement.rawStatus!),
+            if (requirement.notes != null && requirement.notes!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Notes: ${requirement.notes}',
+                  style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimaryLight),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ];
   }
 }
