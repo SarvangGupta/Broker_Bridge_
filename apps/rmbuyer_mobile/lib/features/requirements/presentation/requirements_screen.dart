@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -167,232 +168,323 @@ class _RequirementsScreenState extends State<RequirementsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      builder: (ctx) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(ctx).height * 0.9,
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.borderLight,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          req.commodityName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimaryLight,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          req.gradeName,
-                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
-                        ),
-                      ],
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              16 + MediaQuery.paddingOf(ctx).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.borderLight,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  StatusBadge(status: req.status),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 12),
-
-              // Mandate Identifiers
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Requirement ID: ${req.id}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMutedLight),
-                  ),
-                  if (req.createdAt != null)
-                    Text(
-                      'Created: ${DateFormat('dd MMM yyyy').format(req.createdAt!)}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textMutedLight),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Metrics Grid
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.borderLight),
                 ),
-                child: Column(
+
+                // Header: commodity, grade and status
+                Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.secondaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        LucideIcons.package,
+                        size: 24,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            req.commodityName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            req.gradeName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    StatusBadge(status: req.status),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+
+                // Requirement ID with copy
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Requirement ID: ${req.id}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMutedLight,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      key: const Key('copy-requirement-id'),
+                      icon: const Icon(LucideIcons.copy, size: 16),
+                      color: AppColors.textSecondaryLight,
+                      tooltip: 'Copy Requirement ID',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: req.id));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Requirement ID copied')),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                if (req.createdAt != null)
+                  Text(
+                    'Created: ${DateFormat('dd MMM yyyy').format(req.createdAt!)}',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                  ),
+                const SizedBox(height: 10),
+
+                // Key metrics card
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: _cardDecoration(),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildMetricCol('Target Quantity', '${req.quantity} ${req.unit}'),
-                        _buildMetricCol('Target Price', '${currencyFormat.format(req.targetPrice)}/${req.unit}'),
-                        _buildMetricCol(
+                        _buildMetricCell(
+                          LucideIcons.package,
+                          'Target Quantity',
+                          '${req.quantity} ${req.unit}',
+                        ),
+                        const VerticalDivider(width: 1),
+                        _buildMetricCell(
+                          LucideIcons.indianRupee,
+                          'Target Price',
+                          '${currencyFormat.format(req.targetPrice)}/${req.unit}',
+                        ),
+                        const VerticalDivider(width: 1),
+                        _buildMetricCell(
+                          LucideIcons.chartColumn,
                           'Est. Mandate Value',
                           currencyFormat.format(req.totalEstimatedValue),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildMetricCol(
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Delivery due (and payment terms when present)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: _cardDecoration(),
+                  child: Row(
+                    children: [
+                      const Icon(LucideIcons.calendarDays, size: 20, color: AppColors.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildMetricCol(
                           'Target Delivery Due',
                           DateFormat('dd MMMM yyyy').format(req.targetDate),
                         ),
-                        if (req.paymentTerms != null)
-                          _buildMetricCol('Payment Terms', req.paymentTerms!),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // Delivery Mandi Location
-              if (req.deliveryTerms != null) ...[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(LucideIcons.truck, size: 16, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Delivery Location / Mandi Terms',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMutedLight),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            req.deliveryTerms!,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
-                          ),
-                        ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-              ],
-
-              // Assigned Broker Desk
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(LucideIcons.briefcase, size: 16, color: AppColors.secondary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Assigned Mandi Broker Desk',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMutedLight),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          req.brokerName ?? 'Global Broadcast (All Verified Brokers)',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
-                        ),
+                      if (req.paymentTerms != null) ...[
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildMetricCol('Payment Terms', req.paymentTerms!)),
                       ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Counterparty Shield Notice
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
-                  children: [
-                    Icon(LucideIcons.shieldCheck, size: 16, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Direct seller identities are protected and broker-mediated. All counterparty negotiations and quality inspections are executed via your assigned broker desk.',
-                        style: TextStyle(fontSize: 11, color: AppColors.primaryDark),
+                const SizedBox(height: 6),
+
+                // Delivery location
+                if (req.deliveryTerms != null)
+                  _buildInfoRow(
+                    LucideIcons.mapPin,
+                    'Delivery Location / Mandi Terms',
+                    req.deliveryTerms!,
+                  ),
+                if (req.deliveryTerms != null) const Divider(height: 1),
+
+                // Assigned broker desk
+                _buildInfoRow(
+                  LucideIcons.users,
+                  'Assigned Mandi Broker Desk',
+                  req.brokerName ?? 'Global Broadcast (All Verified Brokers)',
+                ),
+                const SizedBox(height: 8),
+
+                // Counterparty Shield Notice
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.successBackground.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(LucideIcons.shieldCheck, size: 20, color: AppColors.primary),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Seller identity is protected. ',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              TextSpan(
+                                text:
+                                    'Negotiations and quality inspections are broker-mediated through your assigned broker desk.',
+                              ),
+                            ],
+                          ),
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: AppColors.primaryDark,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
-              // Actions
-              AppButton(
-                label: 'View Timeline & Full Details',
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  context.push('/requirements/${req.id}', extra: req);
-                },
-                variant: AppButtonVariant.primary,
-                icon: LucideIcons.history,
-              ),
-              const SizedBox(height: 12),
-              if (req.canCancel)
+                // Actions
                 AppButton(
-                  label: 'Cancel Procurement Mandate',
+                  label: 'View Timeline & Full Details',
                   onPressed: () {
                     Navigator.of(ctx).pop();
-                    _handleCancelRequirement(req);
+                    context.push('/requirements/${req.id}', extra: req);
                   },
-                  variant: AppButtonVariant.outline,
-                  icon: LucideIcons.xCircle,
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.borderLight),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Requirement in "${req.status}" state is locked in broker negotiations and cannot be cancelled directly.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                  variant: AppButtonVariant.primary,
+                  icon: LucideIcons.history,
+                ),
+                const SizedBox(height: 10),
+                if (req.canCancel)
+                  AppButton(
+                    label: 'Cancel Requirement',
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _handleCancelRequirement(req);
+                    },
+                    variant: AppButtonVariant.outline,
+                    icon: LucideIcons.xCircle,
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: _cardDecoration(),
+                    child: Center(
+                      child: Text(
+                        'Requirement in "${req.status}" state is locked in broker negotiations and cannot be cancelled directly.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                      ),
                     ),
                   ),
-                ),
-              const SizedBox(height: 12),
-            ],
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: AppColors.surfaceLight,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.borderLight),
+    );
+  }
+
+  Widget _buildMetricCell(IconData icon, String label, String value) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: AppColors.primary),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 2,
+              style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimaryLight),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.primary),
+          const SizedBox(width: 14),
+          Expanded(child: _buildMetricCol(label, value)),
+        ],
       ),
     );
   }

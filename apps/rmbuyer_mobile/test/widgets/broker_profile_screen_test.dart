@@ -51,35 +51,55 @@ void main() {
       // Verify Header & Identity
       expect(find.text('Broker Desk Profile'), findsOneWidget);
       expect(find.text('Rajesh Verma'), findsOneWidget);
-      expect(find.text('Jaipur Grain Broker Desk'), findsOneWidget);
-      expect(find.text('AUTHORIZED MANDI BROKER'), findsOneWidget);
+      expect(find.text('(Jaipur Mandi, Rajasthan)'), findsOneWidget);
+      expect(find.text('98 Trust'), findsOneWidget);
 
-      // Verify Info Rows
-      expect(find.text('Operating Mandi'), findsOneWidget);
+      // Verify About rows
+      expect(find.text('Mandi Location'), findsOneWidget);
       expect(find.text('Jaipur Mandi, Rajasthan'), findsOneWidget);
-      expect(find.text('98 / 100 Verified'), findsOneWidget);
+      expect(find.text('Yellow Soybean, Desi Chana, Wheat (Sharbati)'), findsOneWidget);
+      expect(find.text('98 / 100'), findsOneWidget);
+      expect(find.text('Jaipur Grain Broker Desk'), findsOneWidget);
       expect(find.text('08AAACJ1234A1Z1'), findsOneWidget);
 
-      // Verify Commodities Handled
-      expect(find.text('Commodities Handled'), findsOneWidget);
+      // Verify header commodity chips
       expect(find.text('Yellow Soybean'), findsOneWidget);
-      expect(find.text('Desi Chana'), findsOneWidget);
       expect(find.text('Wheat (Sharbati)'), findsOneWidget);
 
-      // Verify Contact Buttons
-      expect(find.text('Call Desk'), findsOneWidget);
+      // Contact actions near the top
+      expect(find.text('Call'), findsOneWidget);
       expect(find.text('WhatsApp'), findsOneWidget);
 
-      // Tap Call Button
-      await tester.tap(find.text('Call Desk'));
+      await tester.tap(find.byKey(const Key('broker-call')));
       await tester.pump();
       expect(launchedUri.toString(), 'tel:+919829012345');
+
+      await tester.tap(find.byKey(const Key('broker-whatsapp')));
+      await tester.pump();
+      expect(launchedUri!.host, 'wa.me');
 
       // Verify Primary Action
       expect(find.text('Post Requirement to this Broker Desk'), findsOneWidget);
 
       // Verify Fiduciary Shield Notice
-      expect(find.textContaining('Fiduciary Protection: RMBuyer operates on a strict broker-mediated model'), findsOneWidget);
+      expect(find.textContaining('Seller identities stay protected.'), findsOneWidget);
+    });
+
+    testWidgets('Broker without a number shows no contact buttons', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const BrokerProfileScreen(
+            brokerId: 'b-no-phone',
+            initialBroker: BrokerModel(id: 'b-no-phone', name: 'Desk Without Mobile'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('broker-call')), findsNothing);
+      expect(find.byKey(const Key('broker-whatsapp')), findsNothing);
+      expect(find.textContaining('pending administrative verification'), findsOneWidget);
     });
   });
 }

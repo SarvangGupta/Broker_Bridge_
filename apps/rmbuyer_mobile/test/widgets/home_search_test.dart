@@ -56,15 +56,10 @@ void main() {
       // Verify Primary CTA
       expect(find.text('Post Your Requirement'), findsOneWidget);
 
-      // Verify Mandi Catalogs
-      expect(find.text('Browse Commodity Mandi Catalogs'), findsOneWidget);
-      expect(find.text('Yellow Soybean'), findsOneWidget);
-      expect(find.text('Desi Chana (Gram)'), findsOneWidget);
-      expect(find.text('Wheat (Sharbati)'), findsOneWidget);
-      expect(find.text('Mustard Seeds'), findsOneWidget);
-
-      // Verify Authorized Mandi Broker Desks Spotlight
-      expect(find.text('Authorized Mandi Broker Desks'), findsOneWidget);
+      // Catalog grid and broker spotlight moved off Home (Brokers tab owns the list)
+      expect(find.text('Browse Commodity Mandi Catalogs'), findsNothing);
+      expect(find.text('Authorized Mandi Broker Desks'), findsNothing);
+      expect(find.text('Regulated Broker-Mediated Procurement'), findsOneWidget);
     });
 
     testWidgets('Live debounced search updates UI with results and clear button resets to home',
@@ -119,7 +114,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verified: Resets back to default home layout
-      expect(find.text('Browse Commodity Mandi Catalogs'), findsOneWidget);
+      expect(find.text('Regulated Broker-Mediated Procurement'), findsOneWidget);
       expect(find.text('Search Results (2)'), findsNothing);
     });
 

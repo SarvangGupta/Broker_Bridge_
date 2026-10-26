@@ -32,8 +32,9 @@ void main() {
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Requirements'), findsOneWidget);
     expect(find.text('Deals'), findsOneWidget);
-    expect(find.text('Nutrition Guide'), findsOneWidget);
-    expect(find.text('Profile'), findsOneWidget);
+    expect(find.text('Brokers'), findsOneWidget);
+    expect(find.text('More'), findsOneWidget);
+    expect(find.text('Nutrition Guide'), findsNothing);
 
     // Tap Requirements tab in bottom nav
     await tester.tap(find.text('Requirements'));
@@ -47,8 +48,23 @@ void main() {
 
     expect(find.text('Procurement Deals'), findsOneWidget);
 
-    // Tap Profile tab in bottom nav
-    await tester.tap(find.text('Profile'));
+    // Central Brokers button opens the broker listing
+    await tester.tap(find.byKey(const Key('nav-brokers')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(
+      find.text('Find an authorized mandi broker for your procurement needs.'),
+      findsOneWidget,
+    );
+
+    // More tab exposes Nutrition Guide and Profile
+    await tester.tap(find.text('More'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Nutrition Guide'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('more-profile')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump();
@@ -56,7 +72,7 @@ void main() {
     expect(find.text('Profile & Settings'), findsOneWidget);
   });
 
-  testWidgets('Five tabs fit a phone-width bar and Nutrition Guide opens', (WidgetTester tester) async {
+  testWidgets('Nutrition Guide opens as a full screen at phone width', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(360, 780);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -78,8 +94,8 @@ void main() {
     AppRouter.router.go('/nutrition');
     await tester.pumpAndSettle();
 
-    // Bar label plus the screen's AppBar title; no layout overflow was reported.
-    expect(find.text('Nutrition Guide'), findsNWidgets(2));
+    // AppBar title only (no longer a bar tab); no layout overflow was reported.
+    expect(find.text('Nutrition Guide'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

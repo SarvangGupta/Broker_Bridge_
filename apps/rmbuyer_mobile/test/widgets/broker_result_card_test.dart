@@ -1,27 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rmbuyer_mobile/app/theme/app_theme.dart';
-import 'package:rmbuyer_mobile/core/services/contact_launcher_service.dart';
 import 'package:rmbuyer_mobile/features/search/domain/broker_model.dart';
 import 'package:rmbuyer_mobile/features/search/presentation/widgets/broker_result_card.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 void main() {
-  group('RB-BUYER-02: BrokerResultCard Widget Tests', () {
-    testWidgets('Scenario 10 & 11: Renders broker info, trust score, and triggers Call & WhatsApp actions',
+  group('RMBUYER-BROKERS-UI-02: BrokerResultCard Widget Tests', () {
+    testWidgets('Renders name, bracketed location, trust and chips with no contact actions',
         (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.physicalSize = const Size(360, 780);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
-
-      Uri? launchedUri;
-
-      final fakeLauncher = ContactLauncherService(
-        launchUrlFn: (uri, {mode = LaunchMode.platformDefault}) async {
-          launchedUri = uri;
-          return true;
-        },
-      );
 
       const broker = BrokerModel(
         id: 'b-1',
@@ -31,79 +21,64 @@ void main() {
         mobile: '+919829012345',
         trustScore: 98,
         isVerified: true,
-        commoditiesHandled: ['Yellow Soybean', 'Desi Chana'],
+        commoditiesHandled: ['Soybean', 'Chana', 'Wheat', 'Mustard', 'Maize', 'Tur'],
       );
 
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,
-          home: Scaffold(
-            body: BrokerResultCard(
-              broker: broker,
-              contactLauncher: fakeLauncher,
-            ),
-          ),
+          home: const Scaffold(body: BrokerResultCard(broker: broker)),
         ),
       );
 
-      // Verify Header & Broker Info
       expect(find.text('Rajesh Verma'), findsOneWidget);
-      expect(find.text('Jaipur Grain Broker Desk'), findsOneWidget);
-      expect(find.text('Jaipur Mandi, Rajasthan'), findsOneWidget);
+      expect(find.text('(Jaipur Mandi, Rajasthan)'), findsOneWidget);
       expect(find.text('98 Trust'), findsOneWidget);
-      expect(find.text('GST VERIFIED'), findsOneWidget);
+      expect(find.text('Soybean'), findsOneWidget);
+      expect(find.text('Mustard'), findsOneWidget);
+      expect(find.text('Maize'), findsNothing);
+      expect(find.text('+2'), findsOneWidget);
 
-      // Verify Commodity Chips
-      expect(find.text('Yellow Soybean'), findsOneWidget);
-      expect(find.text('Desi Chana'), findsOneWidget);
-
-      // Verify Call Button & Action
-      expect(find.text('Call Desk'), findsOneWidget);
-      await tester.tap(find.text('Call Desk'));
-      await tester.pump();
-      expect(launchedUri.toString(), 'tel:+919829012345');
-
-      // Verify WhatsApp Button & Action
-      expect(find.text('WhatsApp'), findsOneWidget);
-      await tester.tap(find.text('WhatsApp'));
-      await tester.pump();
-      expect(launchedUri!.host, 'wa.me');
-      expect(launchedUri!.path, '/919829012345');
+      // Contact actions moved to the profile
+      expect(find.text('Call Desk'), findsNothing);
+      expect(find.text('WhatsApp'), findsNothing);
+      expect(find.text('Jaipur Grain Broker Desk'), findsNothing);
+      expect(tester.takeException(), isNull);
     });
 
-    testWidgets('Scenario 12: Missing contact information disables actions gracefully without exposing private data',
+    testWidgets('Hides placeholder location and opens the broker profile on tap',
         (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(800, 1000);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+      const broker = BrokerModel(
+        id: 'b-2',
+        name: 'Placeholder Desk',
+        companyName: 'Licensed Mandi Broker Desk',
+        location: 'Mandi Trading Floor',
+      );
 
-      const brokerNoPhone = BrokerModel(
-        id: 'b-no-phone',
-        name: 'Desk Without Mobile',
-        companyName: 'Central Mandi Traders',
-        mobile: null, // Missing mobile
-        trustScore: 85,
-        isVerified: false,
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, _) => const Scaffold(body: BrokerResultCard(broker: broker)),
+          ),
+          GoRoute(
+            path: '/brokers/:id',
+            builder: (_, state) => Text('profile ${state.pathParameters['id']}'),
+          ),
+        ],
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: const Scaffold(
-            body: BrokerResultCard(
-              broker: brokerNoPhone,
-            ),
-          ),
-        ),
+        MaterialApp.router(theme: AppTheme.lightTheme, routerConfig: router),
       );
 
-      // Verify buttons exist but are disabled (onPressed is null)
-      final callBtn = tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Call Desk'));
-      final waBtn = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'WhatsApp'));
+      expect(find.text('Mandi Trading Floor'), findsNothing);
+      expect(find.text('(Mandi Trading Floor)'), findsNothing);
+      expect(find.text('Licensed Mandi Broker Desk'), findsNothing);
 
-      expect(callBtn.onPressed, isNull);
-      expect(waBtn.onPressed, isNull);
-      expect(find.text('GST VERIFIED'), findsNothing);
+      await tester.tap(find.text('Placeholder Desk'));
+      await tester.pumpAndSettle();
+      expect(find.text('profile b-2'), findsOneWidget);
     });
   });
 }

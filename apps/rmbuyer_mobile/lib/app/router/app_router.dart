@@ -9,6 +9,7 @@ import '../../features/authentication/presentation/splash_screen.dart';
 import '../../features/deals/presentation/buyer_deals_screen.dart';
 import '../../features/deals/presentation/final_deal_review_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/home/presentation/more_screen.dart';
 import '../../features/home/presentation/navigation_shell.dart';
 import '../../features/notifications/presentation/buyer_notifications_screen.dart';
 import '../../features/nutrition/presentation/nutrition_guide_screen.dart';
@@ -25,6 +26,7 @@ import '../../features/requirements/presentation/requirement_details_screen.dart
 import '../../features/requirements/presentation/requirements_screen.dart';
 import '../../features/search/domain/broker_model.dart';
 import '../../features/search/presentation/broker_profile_screen.dart';
+import '../../features/search/presentation/brokers_screen.dart';
 import '../../features/search/presentation/buyer_search_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
@@ -273,6 +275,15 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/brokers',
+                name: 'brokers',
+                builder: (context, state) => const BrokersScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/deals',
                 name: 'deals',
                 builder: (context, state) => const BuyerDealsScreen(),
@@ -282,22 +293,27 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/nutrition',
-                name: 'nutrition',
-                builder: (context, state) => const NutritionGuideScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/profile',
-                name: 'profile',
-                builder: (context, state) => const ProfileSettingsScreen(),
+                path: '/more',
+                name: 'more',
+                builder: (context, state) => const MoreScreen(),
               ),
             ],
           ),
         ],
+      ),
+
+      // Secondary destinations reached from the More tab (Protected)
+      GoRoute(
+        path: '/nutrition',
+        name: 'nutrition',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const NutritionGuideScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ProfileSettingsScreen(),
       ),
     ],
   );

@@ -89,16 +89,16 @@ void main() {
         'ta',
       );
 
-      AppRouter.router.go('/nutrition');
+      AppRouter.router.go('/more');
       await tester.pumpAndSettle();
       expect(find.text('முகப்பு'), findsOneWidget); // bottom nav "Home"
       expect(find.text('Home'), findsNothing);
 
       // Restart: tear the whole app down and mount a fresh provider scope.
       await tester.pumpWidget(const SizedBox());
-      await _mountApp(tester, '/nutrition');
+      await _mountApp(tester, '/more');
       expect(find.text('முகப்பு'), findsOneWidget);
-      expect(find.text('சுயவிவரம்'), findsOneWidget); // bottom nav "Profile"
+      expect(find.text('சுயவிவரம்'), findsOneWidget); // More tile "Profile"
     },
   );
 
@@ -119,7 +119,7 @@ void main() {
         );
         await _mountApp(tester, '/settings');
         expect(tester.takeException(), isNull);
-        AppRouter.router.go('/nutrition');
+        AppRouter.router.go('/more');
         await tester.pumpAndSettle();
         expect(find.text(home), findsOneWidget);
         expect(tester.takeException(), isNull);

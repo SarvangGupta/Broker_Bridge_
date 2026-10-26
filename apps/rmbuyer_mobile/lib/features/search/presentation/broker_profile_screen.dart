@@ -9,6 +9,7 @@ import '../../../core/widgets/app_error_state.dart';
 import '../../../core/widgets/app_loading_indicator.dart';
 import '../data/search_repository.dart';
 import '../domain/broker_model.dart';
+import 'widgets/broker_result_card.dart';
 import '../../../l10n/app_localizations.dart';
 
 /// Screen presenting verified broker desk profile details and supported contact actions.
@@ -112,237 +113,174 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
 
     final broker = _broker!;
 
+    final location = brokerDisplayLocation(broker);
+    final company = broker.companyName?.trim();
+    final hasCompany = company != null &&
+        company.isNotEmpty &&
+        company != 'Licensed Mandi Broker Desk' &&
+        company != 'Licensed Mandi Desk';
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Broker Identity Header Card
-          AppCard(
-            padding: const EdgeInsets.all(20),
-            child: Column(
+          // Identity header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primaryContainer.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          broker.name.isNotEmpty ? broker.name[0].toUpperCase() : 'B',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(LucideIcons.briefcase, size: 26, color: AppColors.primary),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            broker.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            broker.companyName ?? 'Licensed Mandi Desk',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondaryLight,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryContainer,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'AUTHORIZED MANDI BROKER',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primaryDark,
-                                letterSpacing: 0.4,
+                          Expanded(
+                            child: Text(
+                              broker.name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimaryLight,
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          TrustBadge(score: broker.trustScore),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 12),
-                _buildInfoRow('Operating Mandi', broker.location ?? 'State Mandi Floor'),
-                _buildInfoRow('Trust Score', '${broker.trustScore} / 100 Verified'),
-                if (broker.companyGst != null)
-                  _buildInfoRow('Registered GSTIN', broker.companyGst!),
-                _buildInfoRow(
-                  'Verification Status',
-                  broker.isVerified ? 'GST Verified Mandi Desk' : 'Standard License',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Commodities Handled Card
-          AppCard(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(LucideIcons.package, size: 18, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text(
-                      'Commodities Handled',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimaryLight,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: broker.commoditiesHandled.map((commodity) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.backgroundLight,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppColors.borderLight),
-                      ),
-                      child: Text(
-                        commodity,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimaryLight,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Contact Actions Card
-          AppCard(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Broker Communication Actions',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimaryLight,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Reach out directly to this verified broker to inquire on mandi arrival volumes and quote indications.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondaryLight,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (broker.hasPhone || broker.hasWhatsApp) ...[
-                  Row(
-                    children: [
-                      if (broker.hasPhone)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _launcher.launchCall(broker.mobile!),
-                            icon: const Icon(LucideIcons.phone, size: 16),
-                            label: const Text('Call Desk'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (broker.hasPhone && broker.hasWhatsApp)
-                        const SizedBox(width: 10),
-                      if (broker.hasWhatsApp)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _launcher.launchWhatsApp(
-                              broker.mobile!,
-                              prefilledMessage:
-                                  'Hello ${broker.name}, I am contacting you via RMBuyer regarding commodity procurement.',
-                            ),
-                            icon: const Icon(LucideIcons.messageCircle, size: 16),
-                            label: const Text('WhatsApp'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF25D366),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ] else ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundLight,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(LucideIcons.info, size: 16, color: AppColors.textMutedLight),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Direct phone contact details pending administrative verification. You can post a requirement directly to this desk.',
-                            style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
-                          ),
+                      if (location != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '($location)',
+                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
                         ),
                       ],
+                      if (broker.commoditiesHandled.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final c in broker.commoditiesHandled.take(4)) CommodityChip(label: c),
+                            if (broker.commoditiesHandled.length > 4)
+                              CommodityChip(label: '+${broker.commoditiesHandled.length - 4}'),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Contact actions: only rendered when a verified number exists
+          if (broker.hasPhone || broker.hasWhatsApp)
+            Row(
+              children: [
+                if (broker.hasPhone)
+                  _buildContactAction(
+                    key: const Key('broker-call'),
+                    icon: LucideIcons.phone,
+                    label: 'Call',
+                    color: AppColors.info,
+                    background: AppColors.infoBackground,
+                    onTap: () => _launcher.launchCall(broker.mobile!),
+                  ),
+                if (broker.hasPhone && broker.hasWhatsApp) const SizedBox(width: 10),
+                if (broker.hasWhatsApp)
+                  _buildContactAction(
+                    key: const Key('broker-whatsapp'),
+                    icon: LucideIcons.messageCircle,
+                    label: 'WhatsApp',
+                    color: const Color(0xFF128C4A),
+                    background: const Color(0xFFDCF8E6),
+                    onTap: () => _launcher.launchWhatsApp(
+                      broker.mobile!,
+                      prefilledMessage:
+                          'Hello ${broker.name}, I am contacting you via RMBuyer regarding commodity procurement.',
+                    ),
+                  ),
+              ],
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: const Row(
+                children: [
+                  Icon(LucideIcons.info, size: 16, color: AppColors.textMutedLight),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Direct phone contact details pending administrative verification. You can post a requirement directly to this desk.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
                     ),
                   ),
                 ],
+              ),
+            ),
+          const SizedBox(height: 20),
+
+          // About
+          const Text(
+            'About This Broker',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimaryLight,
+            ),
+          ),
+          const SizedBox(height: 10),
+          AppCard(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            child: Column(
+              children: [
+                if (location != null)
+                  _buildAboutRow(LucideIcons.mapPin, 'Mandi Location', location),
+                if (broker.commoditiesHandled.isNotEmpty)
+                  _buildAboutRow(
+                    LucideIcons.package,
+                    'Deals In',
+                    broker.commoditiesHandled.join(', '),
+                  ),
+                _buildAboutRow(
+                  LucideIcons.shieldCheck,
+                  'Trust Score',
+                  broker.isVerified ? 'GST Verified Mandi Desk' : 'Standard License',
+                  trailing: '${broker.trustScore} / 100',
+                ),
+                if (hasCompany)
+                  _buildAboutRow(LucideIcons.building2, 'Broker Desk', company),
+                if (broker.companyGst != null)
+                  _buildAboutRow(LucideIcons.fileText, 'Registered GSTIN', broker.companyGst!),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // Primary Post Requirement Action
           AppButton(
@@ -358,18 +296,14 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
             variant: AppButtonVariant.primary,
             icon: LucideIcons.filePlus,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Fiduciary Counterparty Shield Notice
+          // Counterparty Shield Notice
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.primaryContainer.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.2),
-                width: 1,
-              ),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,49 +312,102 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Fiduciary Protection: RMBuyer operates on a strict broker-mediated model. All seller offers, counter-bids, and delivery inspections are managed by licensed mandi brokers. Direct seller contacts remain shielded to prevent off-platform transaction exposure.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.primaryDark,
-                      height: 1.4,
-                    ),
+                    'Seller identities stay protected. Offers, counter-bids and inspections are handled by licensed mandi brokers.',
+                    style: TextStyle(fontSize: 12, color: AppColors.primaryDark, height: 1.35),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildContactAction({
+    required Key key,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color background,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: Material(
+        key: key,
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 20, color: color),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAboutRow(IconData icon, String label, String value, {String? trailing}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 130,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondaryLight,
-              ),
-            ),
-          ),
+          Icon(icon, size: 20, color: AppColors.primary),
+          const SizedBox(width: 14),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimaryLight,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                ),
+              ],
             ),
           ),
+          if (trailing != null)
+            Text(
+              trailing,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppColors.success,
+              ),
+            ),
         ],
       ),
     );

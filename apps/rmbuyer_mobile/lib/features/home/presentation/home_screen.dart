@@ -12,7 +12,6 @@ import '../../../core/widgets/app_error_state.dart';
 import '../../../core/widgets/app_loading_indicator.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../search/data/search_repository.dart';
-import '../../search/domain/broker_model.dart';
 import '../../search/domain/search_model.dart';
 import '../../search/presentation/widgets/broker_result_card.dart';
 import '../../../l10n/app_localizations.dart';
@@ -45,15 +44,11 @@ class _HomeScreenState extends State<HomeScreen> {
   List<SearchItem> _searchResults = [];
   bool _isSearching = false;
 
-  List<BrokerModel> _spotlightBrokers = [];
-  bool _loadingSpotlight = true;
-
   @override
   void initState() {
     super.initState();
     _searchRepo = widget.searchRepository ?? SearchRepository();
     _contactLauncher = widget.contactLauncher ?? ContactLauncherService();
-    _loadSpotlightBrokers();
   }
 
   @override
@@ -61,23 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadSpotlightBrokers() async {
-    try {
-      final brokers = await _searchRepo.searchBrokers(query: '');
-      if (!mounted) return;
-      setState(() {
-        _spotlightBrokers = brokers;
-        _loadingSpotlight = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _spotlightBrokers = SearchRepository.fallbackBrokers;
-        _loadingSpotlight = false;
-      });
-    }
   }
 
   void _onSearchChanged(String query) {
@@ -543,144 +521,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 22),
-
-        // Commodity Quick Discovery Grid
-        const Text(
-          'Browse Commodity Mandi Catalogs',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimaryLight,
-          ),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.8,
-          children: [
-            _buildCommodityTile(
-              context,
-              title: 'Yellow Soybean',
-              variety: 'Oilseed • Indore / Kota',
-              icon: LucideIcons.package,
-            ),
-            _buildCommodityTile(
-              context,
-              title: 'Desi Chana (Gram)',
-              variety: 'Pulses • Jaipur / Bikaner',
-              icon: LucideIcons.wheat,
-            ),
-            _buildCommodityTile(
-              context,
-              title: 'Wheat (Sharbati)',
-              variety: 'Grains • Sehore / Ujjain',
-              icon: LucideIcons.sparkles,
-            ),
-            _buildCommodityTile(
-              context,
-              title: 'Mustard Seeds',
-              variety: 'Oilseed • Alwar / Bharatpur',
-              icon: LucideIcons.droplets,
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        // Authorized Mandi Brokers Spotlight
-        Row(
-          children: [
-            const Text(
-              'Authorized Mandi Broker Desks',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimaryLight,
-              ),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: () => context.push('/search'),
-              child: const Text('View All', style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-
-        if (_loadingSpotlight)
-          const AppLoadingIndicator(message: 'Loading verified broker desks...')
-        else if (_spotlightBrokers.isEmpty)
-          const Text(
-            'No authorized brokers currently listed.',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
-          )
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _spotlightBrokers.take(3).length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              return BrokerResultCard(
-                broker: _spotlightBrokers[index],
-                contactLauncher: _contactLauncher,
-              );
-            },
-          ),
-        const SizedBox(height: 20),
       ],
-    );
-  }
-
-  Widget _buildCommodityTile(
-    BuildContext context, {
-    required String title,
-    required String variety,
-    required IconData icon,
-  }) {
-    return AppCard(
-      padding: const EdgeInsets.all(12),
-      onTap: () {
-        _searchController.text = title;
-        _onSearchChanged(title);
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 18, color: AppColors.primary),
-              const Spacer(),
-              const Icon(LucideIcons.chevronRight, size: 14, color: AppColors.textMutedLight),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimaryLight,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            variety,
-            style: const TextStyle(
-              fontSize: 10,
-              color: AppColors.textSecondaryLight,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
     );
   }
 }

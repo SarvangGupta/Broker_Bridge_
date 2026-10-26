@@ -33,8 +33,8 @@ void main() {
       expect(find.text('Jaipur Grain Broker Desk'), findsWidgets);
       expect(find.text('Payment Terms'), findsWidgets);
       expect(find.text('Payment on Delivery (CAD)'), findsWidgets);
-      expect(find.textContaining('Direct seller identities are protected and broker-mediated'), findsOneWidget);
-      expect(find.text('Cancel Procurement Mandate'), findsOneWidget);
+      expect(find.textContaining('Seller identity is protected.', findRichText: true), findsOneWidget);
+      expect(find.text('Cancel Requirement'), findsOneWidget);
     });
 
     testWidgets('Cancelling open requirement requires reason and updates status', (WidgetTester tester) async {
@@ -54,7 +54,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap Cancel button in modal
-      final cancelBtn = find.text('Cancel Procurement Mandate');
+      final cancelBtn = find.text('Cancel Requirement');
       await tester.ensureVisible(cancelBtn);
       await tester.tap(cancelBtn);
       await tester.pumpAndSettle();
