@@ -204,6 +204,8 @@ void main() {
   testWidgets('small 320dp screen: More and Settings pages do not overflow', (tester) async {
     await pump(tester, [], size: const Size(640, 1136), dpr: 2.0);
     expect(tester.takeException(), isNull);
+    // The Messages tile pushes Settings below the fold on 320dp.
+    await tester.scrollUntilVisible(find.byKey(const Key('more_settings')), 200);
     await tapAndSettle(tester, find.byKey(const Key('more_settings')));
     expect(tester.takeException(), isNull);
   });

@@ -400,6 +400,9 @@ class RequirementsRepository {
           final comm = item['master_commodities'] as Map<String, dynamic>?;
           final grade = item['master_grades'] as Map<String, dynamic>?;
           final unit = item['master_units'] as Map<String, dynamic>?;
+          final parsedDate = item['target_date'] != null
+              ? DateTime.tryParse(item['target_date'].toString())
+              : null;
 
           results.add(
             BuyerRequirement(
@@ -410,9 +413,8 @@ class RequirementsRepository {
               unit: unit?['symbol'] as String? ?? 'MT',
               targetPrice: (item['target_price'] as num?)?.toDouble() ?? 0.0,
               status: item['status'] as String? ?? 'Open',
-              targetDate: item['target_date'] != null
-                  ? DateTime.tryParse(item['target_date'].toString()) ?? DateTime.now()
-                  : DateTime.now(),
+              targetDate: parsedDate ?? DateTime.now(),
+              hasTargetDate: parsedDate != null,
               deliveryTerms: item['delivery_terms_id'] as String?,
               brokerId: item['broker_id'] as String?,
               commodityId: item['commodity_id'] as String?,

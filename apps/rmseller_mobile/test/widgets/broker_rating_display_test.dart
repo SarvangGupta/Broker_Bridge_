@@ -28,7 +28,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             theme: AppTheme.lightTheme,
-            home: const BrokerProfileScreen(
+            home: BrokerProfileScreen(
               brokerId: testBroker.id,
               initialBroker: testBroker,
             ),

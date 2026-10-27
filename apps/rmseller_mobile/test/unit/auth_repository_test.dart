@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rmseller_mobile/core/security/secure_storage_service.dart';
 import 'package:rmseller_mobile/features/authentication/data/auth_repository.dart';
 import 'package:rmseller_mobile/features/authentication/domain/auth_result.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
   group('RB-SELLER-01: AuthRepository Role & Security Tests', () {
@@ -85,6 +86,33 @@ void main() {
         expect(await storage.getToken(), isNull);
         expect(await storage.getUserId(), isNull);
         expect(await storage.getUserRole(), isNull);
+      },
+    );
+
+    // RB-SELLER-POST-CATEGORY-FIX-01
+    test('Offline mode restores the saved seller from storage', () async {
+      await authRepository.signInWithPassword(
+        email: 'seller@demo.com',
+        password: 'password123',
+      );
+      expect(await authRepository.getSavedUser(), isNotNull);
+    });
+
+    test(
+      'Saved token without a live Supabase session is rejected and cleared',
+      () async {
+        // Seed storage as a previous sign-in would.
+        await authRepository.signInWithPassword(
+          email: 'seller@demo.com',
+          password: 'password123',
+        );
+        final online = AuthRepository(
+          supabase: SupabaseClient('http://localhost:54321', 'test-anon-key'),
+          storage: storage,
+        );
+
+        expect(await online.getSavedUser(), isNull);
+        expect(await storage.getToken(), isNull);
       },
     );
   });

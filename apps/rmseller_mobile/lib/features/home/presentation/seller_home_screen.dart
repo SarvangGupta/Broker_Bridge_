@@ -40,7 +40,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
 
   bool _isLoading = true;
   String? _errorMessage;
-  String _companyName = 'Bikaner Agro Traders';
+  String _companyName = 'Seller Desk';
   String _sellerName = 'Seller Desk';
 
   List<SellerCommodity> _activeLots = [];
@@ -80,15 +80,57 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     try {
       final name = await _storage.getUserFullName();
       final company = await _storage.getCompanyName();
+      final companyId = await _storage.getCompanyId();
 
-      final lots = await _commoditiesRepository.getCommodities();
-      final deals = await _dealsRepository.getDeals();
+      List<SellerCommodity> lots = [];
+      String? lotsError;
+      try {
+        lots = await _commoditiesRepository.getCommodities();
+      } catch (e) {
+        final err = e.toString();
+        if (err.contains('session has expired')) {
+          // Attempt automatic session recovery once before giving up
+          final recovery = await AuthRepository(storage: _storage).recoverSession();
+          if (recovery == SessionRecoveryState.recovered) {
+            try {
+              lots = await _commoditiesRepository.getCommodities();
+            } catch (retryErr) {
+              lotsError = retryErr.toString();
+            }
+          } else if (recovery == SessionRecoveryState.networkError) {
+            lotsError =
+                'Network connection issue. Please check your internet and tap Retry.';
+          } else {
+            lotsError = 'Your session has expired. Please sign in again.';
+          }
+        } else {
+          lotsError = err;
+        }
+      }
+
+      List<SellerDealModel> deals = [];
+      try {
+        deals = await _dealsRepository.getDeals();
+      } catch (e) {
+        debugPrint('Dashboard deals load notice: $e');
+        // A deals failure does not make the entire dashboard unusable
+      }
 
       if (!mounted) return;
 
+      if (lotsError != null) {
+        setState(() {
+          _errorMessage = lotsError;
+          _isLoading = false;
+        });
+        return;
+      }
+
       setState(() {
         _sellerName = name ?? 'Seller Lead';
-        _companyName = company ?? 'Commodity Enterprise';
+        _companyName = (companyId != null && company != null && company.isNotEmpty)
+            ? company
+            : (companyId == null ? 'Individual Seller Desk' : 'Seller Desk');
         _activeLots = lots;
         _activeDeals = deals;
         _isLoading = false;
@@ -111,11 +153,16 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     }
 
     if (_errorMessage != null) {
+      final isSessionExpired = _errorMessage!.contains('session has expired');
       return Scaffold(
         appBar: AppBar(title: const Text('Seller Desk')),
         body: AppErrorState(
+          title: isSessionExpired ? 'Session Expired' : 'Something went wrong',
           message: _errorMessage!,
-          onRetry: _loadDashboardData,
+          retryLabel: isSessionExpired ? 'Sign In' : 'Try Again',
+          onRetry: isSessionExpired
+              ? () => AppRouter.authNotifier.setUnauthenticated()
+              : _loadDashboardData,
         ),
       );
     }

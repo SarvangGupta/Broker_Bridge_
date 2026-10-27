@@ -17,6 +17,10 @@ class BrokerModel {
   /// the source row carried no commodity data.
   final bool hasCommodityData;
 
+  /// False when [trustScore] is the default substituted because the source
+  /// row carried no trust score.
+  final bool hasTrustScore;
+
   const BrokerModel({
     required this.id,
     required this.name,
@@ -29,7 +33,12 @@ class BrokerModel {
     this.isVerified = false,
     this.commoditiesHandled = const [],
     this.hasCommodityData = true,
+    this.hasTrustScore = true,
   });
+
+  /// Trust is shown only for verified companies with a stored score; the
+  /// column defaults to 100, so an unverified company's score is not earned.
+  bool get showsTrustScore => hasTrustScore && isVerified;
 
   bool get hasPhone => mobile != null && mobile!.trim().isNotEmpty;
   bool get hasWhatsApp => mobile != null && mobile!.trim().isNotEmpty;
@@ -70,6 +79,7 @@ class BrokerModel {
           ? commodities
           : const ['Soybean', 'Chana', 'Wheat', 'Mustard'],
       hasCommodityData: commodities.isNotEmpty,
+      hasTrustScore: trustScoreRaw is num,
     );
   }
 

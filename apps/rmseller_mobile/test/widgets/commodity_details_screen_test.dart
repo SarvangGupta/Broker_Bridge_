@@ -49,6 +49,74 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    // RB-SELLER-PRICE-SYNC-FIX-01: this lot is not saved anywhere, so the
+    // update cannot be confirmed and must not be reported as done.
+    testWidgets('an unconfirmed price update shows an error and keeps the price', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(buildScreen());
+      await tester.pumpAndSettle();
+
+      final action = find.byKey(const Key('lot_action_update_price'));
+      await tester.ensureVisible(action);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextFormField),
+        ),
+        '6100',
+      );
+      await tester.tap(find.text('Save Price'));
+      // The repository waits up to 500 ms for the stored company id.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('updated to'), findsNothing);
+      expect(find.textContaining('cannot be updated'), findsOneWidget);
+
+      await tapSection(tester, 'Inventory & Asking Price');
+      expect(find.textContaining('5,850'), findsOneWidget);
+      expect(find.textContaining('6,100'), findsNothing);
+    });
+
+    // RB-SELLER-POST-INTEGRITY-02: Fulfil / Withdraw are shown only when the
+    // server confirms; this lot is saved nowhere, so both must fail visibly.
+    for (final (key, button) in [
+      ('lot_action_fulfill', 'Fulfill'),
+      ('lot_action_withdraw', 'Cancel'),
+    ]) {
+      testWidgets('unconfirmed $button shows an error with Retry, lot unchanged', (
+        tester,
+      ) async {
+        tester.view.physicalSize = const Size(1080, 3200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(buildScreen());
+        await tester.pumpAndSettle();
+
+        final action = find.byKey(Key(key));
+        await tester.ensureVisible(action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ElevatedButton, button));
+        // The repository waits up to 500 ms for the stored company id.
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+
+        expect(find.textContaining('Lot status updated'), findsNothing);
+        expect(find.textContaining('cannot be changed'), findsOneWidget);
+        expect(find.widgetWithText(SnackBarAction, 'Retry'), findsOneWidget);
+        // Still active: the management actions are still offered.
+        expect(find.byKey(Key(key)), findsOneWidget);
+        await tester.pumpAndSettle(const Duration(seconds: 5));
+      });
+    }
+
     testWidgets(
       'Renders summary card and inventory; pricing and dispatch expand on tap',
       (tester) async {

@@ -5,6 +5,9 @@ import 'package:rmbuyer_mobile/features/requirements/presentation/requirements_s
 
 void main() {
   testWidgets('RequirementsScreen renders title, status filter chips, and requirement cards', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.lightTheme,
@@ -22,11 +25,14 @@ void main() {
     expect(find.text('Procurement Requirements'), findsOneWidget);
     expect(find.text('Post Requirement'), findsOneWidget);
 
-    // Verify filter chips
-    expect(find.text('All Requirements'), findsOneWidget);
-    expect(find.text('Open'), findsOneWidget);
-    expect(find.text('In Negotiation'), findsOneWidget);
-    expect(find.text('Fulfilled'), findsOneWidget);
+    // Verify summary cards + filter chips (each label appears in both)
+    expect(find.text('All'), findsNWidgets(2));
+    expect(find.text('Open'), findsWidgets);
+    expect(find.text('In Negotiation'), findsWidgets);
+    expect(find.text('Proposal Received'), findsNWidgets(2));
+    expect(find.text('Confirmed'), findsNWidgets(2));
+    expect(find.text('Completed'), findsNWidgets(2));
+    expect(find.text('Search commodity or requirement ID'), findsOneWidget);
 
     // Verify requirement items rendered
     expect(find.text('Yellow Soybean'), findsOneWidget);

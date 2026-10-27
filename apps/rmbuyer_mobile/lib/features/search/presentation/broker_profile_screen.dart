@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/contact_launcher_service.dart';
-import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_error_state.dart';
 import '../../../core/widgets/app_loading_indicator.dart';
 import '../data/search_repository.dart';
 import '../domain/broker_model.dart';
 import 'widgets/broker_result_card.dart';
-import '../../../l10n/app_localizations.dart';
 
 /// Screen presenting verified broker desk profile details and supported contact actions.
+/// Only fields present on the authorized broker record are rendered; ratings,
+/// experience and deal metrics have no data source yet and are never invented.
 /// Enforces Counterparty Shield: seller identities and direct contact are never permitted.
 class BrokerProfileScreen extends StatefulWidget {
   final String brokerId;
@@ -37,6 +38,9 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
   BrokerModel? _broker;
   bool _isLoading = true;
   String? _errorMessage;
+
+  /// Guards against duplicate launches or navigation from repeated taps.
+  bool _busy = false;
 
   @override
   void initState() {
@@ -76,10 +80,27 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Unable to load broker profile. Please check your connection.';
+        _errorMessage =
+            'Unable to load broker profile. Please check your connection.';
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _guarded(Future<void> Function() action) async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      await action();
+    } finally {
+      if (mounted) _busy = false;
+    }
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -88,45 +109,108 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        title: Text(context.tr(Tr.titleBrokerProfile)),
+        title: const Text(
+          'Broker Profile',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         leading: IconButton(
           icon: const Icon(LucideIcons.arrowLeft),
+          tooltip: 'Back',
           onPressed: () => context.pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.rotateCw, color: AppColors.primary),
+            tooltip: 'Refresh',
+            onPressed: _isLoading ? null : _loadBroker,
+          ),
+        ],
       ),
-      body: SafeArea(
-        bottom: false,
-        child: _buildBody(),
-      ),
-      // Pinned primary action; SafeArea keeps it clear of system navigation.
+      body: SafeArea(bottom: false, child: _buildBody()),
+      // Pinned action; SafeArea keeps it clear of system navigation.
       bottomNavigationBar: broker == null
           ? null
           : SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                child: AppButton(
-                  label: 'Post Requirement to Broker',
-                  onPressed: () => _postRequirement(broker),
-                  variant: AppButtonVariant.primary,
-                  icon: LucideIcons.filePlus,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: SizedBox(
+                  height: 52,
+                  child: FilledButton(
+                    key: const Key('broker-post-requirement'),
+                    onPressed: () => _postRequirement(broker),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.circlePlus, size: 20),
+                        SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            'Post Requirement with this Broker',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
     );
   }
 
-  void _postRequirement(BrokerModel broker) {
-    final defaultComm = broker.hasCommodityData && broker.commoditiesHandled.isNotEmpty
-        ? broker.commoditiesHandled.first
-        : '';
-    context.push(
-      '/requirements/new?brokerId=${Uri.encodeComponent(broker.id)}&brokerName=${Uri.encodeComponent(broker.name)}&commodity=${Uri.encodeComponent(defaultComm)}',
+  /// Opens the existing requirement form with only the broker association;
+  /// commodity and commercial terms are left for the buyer to enter.
+  void _postRequirement(BrokerModel broker) => _guarded(() async {
+    await context.push(
+      '/requirements/new',
+      extra: <String, dynamic>{
+        'brokerId': broker.id,
+        'brokerName': broker.name,
+        'blankCommercialTerms': true,
+      },
     );
-  }
+  });
+
+  /// Opens this buyer's conversation with the broker; the chat screen finds
+  /// an existing thread or shows the new-conversation state.
+  void _openChat(BrokerModel broker) => _guarded(() async {
+    await context.push('/chats/broker/${broker.id}', extra: broker);
+  });
+
+  void _call(BrokerModel broker) => _guarded(() async {
+    if (!broker.hasPhone) return _snack(brokerContactPendingMessage);
+    final ok = await _launcher.launchCall(broker.mobile!);
+    if (!ok && mounted) _snack('Could not open the phone dialer.');
+  });
+
+  void _whatsApp(BrokerModel broker) => _guarded(() async {
+    if (!broker.hasWhatsApp) return _snack(brokerContactPendingMessage);
+    final ok = await _launcher.launchWhatsApp(
+      broker.mobile!,
+      prefilledMessage:
+          'Hello ${broker.name}, I am contacting you via RMBuyer regarding commodity procurement.',
+    );
+    if (!ok && mounted) _snack('Could not open WhatsApp.');
+  });
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const AppLoadingIndicator(message: 'Loading authorized broker profile...');
+      return const AppLoadingIndicator(
+        message: 'Loading authorized broker profile...',
+      );
     }
 
     if (_errorMessage != null || _broker == null) {
@@ -138,147 +222,227 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
 
     final broker = _broker!;
     final location = brokerDisplayLocation(broker);
-    final commodities = broker.hasCommodityData ? broker.commoditiesHandled : const <String>[];
-    final company = broker.companyName?.trim();
-    final hasCompany = company != null &&
-        company.isNotEmpty &&
-        company != 'Licensed Mandi Broker Desk' &&
-        company != 'Licensed Mandi Desk';
+    final firm = brokerFirmName(broker);
+    final commodities = brokerCommodities(broker);
+    final gst = broker.companyGst?.trim();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header + contact actions
+          _buildIdentityCard(broker, firm),
+          _buildMetricsNote(),
           _section(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            icon: LucideIcons.building2,
+            title: 'About This Broker',
+            children: [
+              if (firm != null)
+                _aboutRow(LucideIcons.building, 'Business Name', firm),
+              _aboutRow(LucideIcons.user, 'Contact Person', broker.name),
+              _aboutRow(
+                LucideIcons.shieldCheck,
+                'Verification Status',
+                broker.isVerified ? 'Verified Broker' : 'Not verified',
+                valueColor: broker.isVerified
+                    ? AppColors.success
+                    : AppColors.textSecondaryLight,
+                last: gst == null || gst.isEmpty,
+              ),
+              if (gst != null && gst.isNotEmpty)
+                _aboutRow(
+                  LucideIcons.fileText,
+                  'GST Registration',
+                  gst,
+                  last: true,
+                ),
+            ],
+          ),
+          _section(
+            icon: LucideIcons.sprout,
+            title: 'Deals In (Commodities)',
+            children: [
+              if (commodities.isEmpty)
+                const Text(
+                  'No commodities listed for this broker yet.',
+                  key: Key('broker-no-commodities'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondaryLight,
+                  ),
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final c in commodities) CommodityChip(label: c),
+                  ],
+                ),
+            ],
+          ),
+          if (location != null)
+            _section(
+              icon: LucideIcons.mapPin,
+              title: 'Location',
               children: [
-                Row(
+                _aboutRow(LucideIcons.mapPin, 'Location', location, last: true),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdentityCard(BrokerModel broker, String? firm) {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              BrokerAvatar(broker: broker, size: 68),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer,
-                        borderRadius: BorderRadius.circular(16),
+                    Text(
+                      broker.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimaryLight,
                       ),
-                      child: const Icon(LucideIcons.briefcase, size: 28, color: AppColors.primary),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  broker.name,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimaryLight,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              TrustBadge(score: broker.trustScore),
-                            ],
-                          ),
-                          if (hasCompany) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              company,
-                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
-                            ),
-                          ],
-                          if (location != null) ...[
-                            const SizedBox(height: 6),
-                            _metaLine(LucideIcons.mapPin, location),
-                          ],
-                          if (broker.isVerified) ...[
-                            const SizedBox(height: 6),
-                            _metaLine(LucideIcons.badgeCheck, 'Verified profile', color: AppColors.success),
-                          ],
-                        ],
+                    if (firm != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        firm,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondaryLight,
+                        ),
                       ),
+                    ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        broker.isVerified
+                            ? const VerifiedBadge(label: 'Verified Broker')
+                            : const UnverifiedBadge(),
+                        if (broker.showsTrustScore)
+                          TrustBadge(score: broker.trustScore),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                _buildContactRow(broker),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _iconAction(
+                key: const Key('broker-call'),
+                icon: LucideIcons.phone,
+                label: 'Call broker',
+                enabled: broker.hasPhone,
+                color: AppColors.primary,
+                onTap: () => _call(broker),
+              ),
+              _iconAction(
+                key: const Key('broker-whatsapp'),
+                icon: LucideIcons.messageCircle,
+                label: 'WhatsApp broker',
+                enabled: broker.hasWhatsApp,
+                color: AppColors.primary,
+                onTap: () => _whatsApp(broker),
+              ),
+              _iconAction(
+                key: const Key('broker-chat'),
+                icon: LucideIcons.messagesSquare,
+                label: 'Chat with broker',
+                enabled: true,
+                color: AppColors.info,
+                onTap: () => _openChat(broker),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Icon-only circular action. Disabled actions stay visible but muted and
+  /// explain themselves on tap.
+  Widget _iconAction({
+    required Key key,
+    required IconData icon,
+    required String label,
+    required bool enabled,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: enabled ? label : '$label (unavailable)',
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        label: enabled ? label : '$label unavailable',
+        excludeSemantics: true,
+        child: Material(
+          key: key,
+          color: enabled ? color : AppColors.borderLight,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: 56,
+              height: 56,
+              child: Icon(
+                icon,
+                size: 24,
+                color: enabled ? Colors.white : AppColors.textMutedLight,
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
 
-          if (commodities.isNotEmpty)
-            _section(
-              child: _chipSection(LucideIcons.package, 'Commodities Dealt In', commodities),
-            ),
-
-          if (location != null)
-            _section(
-              child: _chipSection(LucideIcons.mapPin, 'Markets Served', [location]),
-            ),
-
-          // Credibility: only metrics backed by existing data
-          _section(
-            color: AppColors.successBackground.withValues(alpha: 0.45),
-            borderColor: AppColors.success.withValues(alpha: 0.15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _sectionTitle(LucideIcons.chartColumn, 'Credibility & Experience'),
-                const SizedBox(height: 12),
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _metric(LucideIcons.shieldCheck, '${broker.trustScore} / 100', 'Trust Score'),
-                      const VerticalDivider(width: 1),
-                      _metric(
-                        broker.isVerified ? LucideIcons.badgeCheck : LucideIcons.fileText,
-                        broker.isVerified ? 'GST Verified' : 'Standard',
-                        'Verification',
-                      ),
-                    ],
-                  ),
-                ),
-                if (broker.companyGst != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'Registered GSTIN: ${broker.companyGst}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // Counterparty Shield Notice
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primaryContainer.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Row(
-              children: [
-                Icon(LucideIcons.shieldCheck, size: 22, color: AppColors.primary),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'All negotiations remain broker-mediated. Seller identities stay protected.',
-                    style: TextStyle(fontSize: 12, color: AppColors.primaryDark, height: 1.35),
-                  ),
-                ),
-              ],
+  /// Ratings, experience, deal and client metrics have no backend source yet.
+  Widget _buildMetricsNote() {
+    return Container(
+      key: const Key('broker-metrics-unavailable'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: const Row(
+        children: [
+          Icon(LucideIcons.star, size: 18, color: AppColors.textMutedLight),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Ratings, reviews and trade history are not available yet.',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondaryLight,
+              ),
             ),
           ),
         ],
@@ -286,205 +450,100 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
     );
   }
 
-  Widget _buildContactRow(BrokerModel broker) {
-    if (!broker.hasPhone && !broker.hasWhatsApp) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.backgroundLight,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          children: [
-            Icon(LucideIcons.info, size: 16, color: AppColors.textMutedLight),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Direct phone contact details pending administrative verification. You can post a requirement directly to this desk.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+  Widget _section({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
               ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        if (broker.hasPhone)
-          _buildContactAction(
-            key: const Key('broker-call'),
-            icon: LucideIcons.phone,
-            label: 'Call',
-            color: AppColors.info,
-            background: AppColors.infoBackground,
-            onTap: () => _launcher.launchCall(broker.mobile!),
+            ],
           ),
-        if (broker.hasPhone && broker.hasWhatsApp) const SizedBox(width: 10),
-        if (broker.hasWhatsApp)
-          _buildContactAction(
-            key: const Key('broker-whatsapp'),
-            icon: LucideIcons.messageCircle,
-            label: 'WhatsApp',
-            color: const Color(0xFF128C4A),
-            background: const Color(0xFFDCF8E6),
-            onTap: () => _launcher.launchWhatsApp(
-              broker.mobile!,
-              prefilledMessage:
-                  'Hello ${broker.name}, I am contacting you via RMBuyer regarding commodity procurement.',
-            ),
-          ),
-      ],
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
     );
   }
 
-  Widget _section({required Widget child, Color? color, Color? borderColor}) {
+  Widget _card({required Widget child}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color ?? AppColors.surfaceLight,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor ?? AppColors.borderLight),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: child,
     );
   }
 
-  Widget _sectionTitle(IconData icon, String title) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: AppColors.primary),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimaryLight,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _chipSection(IconData icon, String title, List<String> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionTitle(icon, title),
-        const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.only(left: 30),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final item in items)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundLight,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.borderLight),
-                  ),
-                  child: Text(
-                    item,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textPrimaryLight),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _metaLine(IconData icon, String text, {Color color = AppColors.textSecondaryLight}) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: color),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _metric(IconData icon, String value, String label) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Column(
-          children: [
-            Icon(icon, size: 20, color: AppColors.primary),
-            const SizedBox(height: 6),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimaryLight,
-                ),
+  Widget _aboutRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color valueColor = AppColors.textPrimaryLight,
+    bool last = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        border: last
+            ? null
+            : const Border(bottom: BorderSide(color: AppColors.borderLight)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.textSecondaryLight),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 4,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondaryLight,
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContactAction({
-    required Key key,
-    required IconData icon,
-    required String label,
-    required Color color,
-    required Color background,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: Material(
-        key: key,
-        color: background,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 24, color: color),
-                const SizedBox(height: 6),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimaryLight,
-                  ),
-                ),
-              ],
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 5,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: valueColor,
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

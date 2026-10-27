@@ -175,6 +175,9 @@ class _BuyerNotificationsScreenState extends State<BuyerNotificationsScreen> {
         }
       case NotificationTargetKind.requirementsList:
         context.go('/requirements');
+      case NotificationTargetKind.chat:
+        // The chat screen re-checks participation via RLS before showing anything.
+        await context.push('/chats/${target.id}');
       case NotificationTargetKind.deal:
       case NotificationTargetKind.offer:
         // Buyers have no read access to deals/quotations yet; never open a screen

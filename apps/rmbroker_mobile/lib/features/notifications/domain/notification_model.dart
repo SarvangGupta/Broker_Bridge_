@@ -154,7 +154,8 @@ class BrokerNotification {
       return true;
     }
     if (payload != null) {
-      if (payload!['dealId'] != null ||
+      if (payload!['conversationId'] != null ||
+          payload!['dealId'] != null ||
           payload!['deal_id'] != null ||
           payload!['invoiceId'] != null ||
           payload!['invoice_id'] != null ||
@@ -196,6 +197,9 @@ class BrokerNotification {
     if (lower == singular || lower == '${singular}s') return null;
     return id;
   }
+
+  /// Chat conversation referenced by a CHAT_MESSAGE notification.
+  String? get conversationId => _payloadId(const ['conversationId']) ?? _urlId('chat');
 
   /// Deal referenced by this notification (payload first, then URL).
   String? get dealId => _payloadId(const ['dealId', 'deal_id']) ?? _urlId('deal');
@@ -261,6 +265,9 @@ class BrokerNotification {
   /// `/work?tab=0`, and web writers use `/buyer/...` or `/broker/...` URLs), so a
   /// tap always opens the referenced record in its own section.
   String? get resolvedRoute {
+    // Buyer chat message (0043): the chat screen re-checks participation via RLS.
+    final conversation = conversationId;
+    if (conversation != null) return '/chats/$conversation';
     final deal = dealId;
     if (deal != null) return '/deals/$deal';
     final requirement = requirementId;

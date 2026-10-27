@@ -78,4 +78,6 @@ apps/rmbroker_mobile/.flutter-plugins
 apps/rmbroker_mobile/.flutter-plugins-dependencies
 apps/rmbroker_mobile/android/.gradle/
 apps/rmbroker_mobile/android/local.properties
+release-apks/
+*.apk
 

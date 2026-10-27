@@ -22,6 +22,10 @@ class BuyerRequirement {
   final double fulfilledQuantity;
   final DateTime? createdAt;
 
+  /// False when the source row had no parsable target date and [targetDate]
+  /// is only a placeholder.
+  final bool hasTargetDate;
+
   const BuyerRequirement({
     required this.id,
     required this.commodityName,
@@ -42,6 +46,7 @@ class BuyerRequirement {
     this.notes,
     this.fulfilledQuantity = 0.0,
     this.createdAt,
+    this.hasTargetDate = true,
   });
 
   bool get canCancel => status.toLowerCase() == 'open';
@@ -49,6 +54,9 @@ class BuyerRequirement {
   double get totalEstimatedValue => quantity * targetPrice;
 
   factory BuyerRequirement.fromMap(Map<String, dynamic> map) {
+    final parsedDate = map['target_date'] != null
+        ? DateTime.tryParse(map['target_date'].toString())
+        : null;
     return BuyerRequirement(
       id: map['id']?.toString() ?? '',
       commodityName: (map['commodity_name'] as String?) ??
@@ -63,9 +71,8 @@ class BuyerRequirement {
           (map['targetPrice'] as num?)?.toDouble() ??
           0.0,
       status: map['status'] as String? ?? 'Open',
-      targetDate: map['target_date'] != null
-          ? DateTime.tryParse(map['target_date'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      targetDate: parsedDate ?? DateTime.now(),
+      hasTargetDate: parsedDate != null,
       deliveryTerms: map['delivery_terms_id'] as String? ?? map['deliveryTerms'] as String?,
       brokerName: map['broker_name'] as String? ?? map['brokerName'] as String?,
       commodityId: map['commodity_id'] as String?,

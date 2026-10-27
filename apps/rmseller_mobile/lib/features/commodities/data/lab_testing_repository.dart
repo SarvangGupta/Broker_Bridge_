@@ -179,11 +179,23 @@ class LabTestingRepository {
   // 4. TRUSTED BACKEND PAYMENT VERIFICATION
   // ============================================================================
 
-  /// Pre-authorizes a transaction in the trusted backend ledger (used by test suites / sandbox webhooks).
+  /// Test-only switch for sandbox verification. The ledger above lives in the
+  /// app, so it is NOT a trusted backend: outside tests no code path may mark
+  /// a payment verified from it (RB-SELLER-LAB-PAYMENT-SAFETY-01).
+  @visibleForTesting
+  static bool allowSandboxVerificationForTests = false;
+
+  static bool get _sandboxAllowed =>
+      !kReleaseMode && allowSandboxVerificationForTests;
+
+  /// Pre-authorizes a transaction in the in-app ledger. Test-only: ignored
+  /// unless [allowSandboxVerificationForTests] is set, and always in release.
+  @visibleForTesting
   static void registerTrustedBackendConfirmation({
     required String transactionReference,
     required bool isSuccess,
   }) {
+    if (!_sandboxAllowed) return;
     _trustedTransactionLedger[transactionReference] = isSuccess;
   }
 
@@ -212,15 +224,19 @@ class LabTestingRepository {
       return current;
     }
 
-    // Verify against trusted backend ledger
+    // There is no server-side payment verification yet (no gateway, webhook
+    // or readable settlement record), so a UPI reference alone can never
+    // establish that money was received. Only the test-only sandbox can
+    // confirm; in the app the request stays pending.
     bool backendConfirmed = false;
-    if (_trustedTransactionLedger.containsKey(transactionReference)) {
-      backendConfirmed =
-          _trustedTransactionLedger[transactionReference] == true;
-    } else if (simulateSandboxVerification) {
-      // In sandbox/testing mode when explicitly permitted
-      backendConfirmed = true;
-      _trustedTransactionLedger[transactionReference] = true;
+    if (_sandboxAllowed) {
+      if (_trustedTransactionLedger.containsKey(transactionReference)) {
+        backendConfirmed =
+            _trustedTransactionLedger[transactionReference] == true;
+      } else if (simulateSandboxVerification) {
+        backendConfirmed = true;
+        _trustedTransactionLedger[transactionReference] = true;
+      }
     }
 
     if (!backendConfirmed) {

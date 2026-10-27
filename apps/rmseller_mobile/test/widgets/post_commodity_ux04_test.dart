@@ -49,7 +49,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('1. Commodity & Specification'), findsOneWidget);
+        expect(find.text('1. Commodity & Pricing'), findsOneWidget);
         expect(find.text('Commodity *'), findsOneWidget);
         expect(find.byKey(const Key('commodity_dropdown')), findsOneWidget);
         expect(find.text('Quality Grade *'), findsOneWidget);
@@ -72,7 +72,6 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('2. Quantity & Commercial Pricing'), findsOneWidget);
         expect(find.text('Total Quantity *'), findsOneWidget);
         expect(find.byKey(const Key('quantity_field')), findsOneWidget);
         expect(find.text('Unit *'), findsOneWidget);
@@ -133,7 +132,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Submit with empty fields
-        final submitButton = find.text('List Commodity on Desk');
+        final submitButton = find.byKey(const Key('review_and_list_button'));
         await tester.ensureVisible(submitButton);
         await tester.tap(submitButton);
         await tester.pumpAndSettle();
@@ -192,7 +191,7 @@ void main() {
     );
 
     testWidgets(
-      'POST-UX04-08: Scope Boundary: Sections 3, 4 and 5 remain intact and present',
+      'POST-UX04-08 (UX-05): four compact sections and the review action are present',
       (tester) async {
         tester.view.physicalSize = const Size(1080, 3200);
         tester.view.devicePixelRatio = 1.0;
@@ -206,10 +205,10 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('3. Warehouse Location & Loading'), findsOneWidget);
+        expect(find.text('2. Warehouse & Loading'), findsOneWidget);
+        expect(find.text('3. Lab Testing & Reports'), findsOneWidget);
         expect(find.text('4. My Trusted Broker'), findsOneWidget);
-        expect(find.text('5. Review Listing & Broker Summary'), findsOneWidget);
-        expect(find.text('List Commodity on Desk'), findsOneWidget);
+        expect(find.text('Review & List Commodity'), findsOneWidget);
       },
     );
   });

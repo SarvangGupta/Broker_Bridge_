@@ -74,6 +74,8 @@ void main() {
         dealId: 'DEAL-TEST-002',
         bookingReference: 'BKG-TEST-5678',
         commodityName: 'Mustard Seeds',
+        gradeName: 'FAQ Grade 1',
+        brokerDeskName: 'Verified Desk',
         quantityMT: 40.0,
         ratePerMT: 5600.0,
         grossAmount: 224000.0,

@@ -42,6 +42,7 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
   final LabTestingRepository _labTestingRepository = LabTestingRepository();
 
   SellerCommodity? _commodity;
+  String? _loadError;
   bool _isLoading = true;
   bool _isActionInProgress = false;
   bool _inventoryExpanded = false;
@@ -68,14 +69,27 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
   }
 
   Future<void> _loadCommodity() async {
-    setState(() => _isLoading = true);
-    final item = await _repository.getCommodityById(widget.commodityId);
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    SellerCommodity? item;
+    String? error;
+    try {
+      item = await _repository.getCommodityById(widget.commodityId);
+    } on CommodityListException catch (e) {
+      error = e.message;
+    } catch (e) {
+      debugPrint('Lot load failed: ${e.runtimeType}');
+      error = CommodityListException.generic;
+    }
     if (!mounted) return;
     setState(() {
       _commodity = item;
+      _loadError = error;
       _isLoading = false;
     });
-    _loadLabDetails();
+    if (item != null) _loadLabDetails();
   }
 
   Future<void> _loadLabDetails() async {
@@ -157,19 +171,36 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
       final newPrice = double.tryParse(priceController.text.trim());
       if (newPrice != null && newPrice > 0) {
         setState(() => _isActionInProgress = true);
-        await _repository.updateCommodityPrice(_commodity!.id, newPrice);
-        if (!mounted) return;
-        setState(() {
-          _commodity = _commodity!.copyWith(askingPrice: newPrice);
-          _isActionInProgress = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Asking price updated to ₹${newPrice.toStringAsFixed(0)} successfully!',
+        try {
+          // Show only the price the server confirms it stored.
+          final saved = await _repository.updateCommodityPrice(
+            _commodity!.id,
+            newPrice,
+          );
+          if (!mounted) return;
+          setState(() {
+            _commodity = _commodity!.copyWith(askingPrice: saved);
+            _isActionInProgress = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Asking price updated to ₹${saved.toStringAsFixed(0)} successfully!',
+              ),
+              backgroundColor: AppColors.success,
             ),
-            backgroundColor: AppColors.success,
-          ),
+          );
+        } on PriceUpdateException catch (e) {
+          if (!mounted) return;
+          // Keep the last confirmed price on screen.
+          setState(() => _isActionInProgress = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message), backgroundColor: AppColors.error),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter a price greater than zero.')),
         );
       }
     }
@@ -211,18 +242,47 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
       },
     );
 
-    if (confirmed == true && mounted) {
-      setState(() => _isActionInProgress = true);
-      await _repository.updateCommodityStatus(_commodity!.id, newStatus);
+    if (confirmed == true && mounted) await _applyStatus(newStatus);
+  }
+
+  /// Sends the status change; the screen changes only after the server
+  /// confirms it, then re-reads the lot. Failure keeps the current state.
+  Future<void> _applyStatus(String newStatus) async {
+    if (_commodity == null || _isActionInProgress) return;
+    final lotId = _commodity!.id;
+    setState(() => _isActionInProgress = true);
+    try {
+      final saved = await _repository.updateCommodityStatus(lotId, newStatus);
+      SellerCommodity? fresh;
+      try {
+        fresh = await _repository.getCommodityById(lotId);
+      } catch (e) {
+        // The change is confirmed; a failed re-read keeps the confirmed value.
+        debugPrint('Lot reload after status change failed: ${e.runtimeType}');
+      }
       if (!mounted) return;
       setState(() {
-        _commodity = _commodity!.copyWith(status: newStatus);
+        _commodity = fresh ?? _commodity!.copyWith(status: saved);
         _isActionInProgress = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Lot status updated to $newStatus.'),
+          content: Text('Lot status updated to $saved.'),
           backgroundColor: AppColors.success,
+        ),
+      );
+    } on StatusUpdateException catch (e) {
+      if (!mounted) return;
+      setState(() => _isActionInProgress = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: AppColors.error,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: () => _applyStatus(newStatus),
+          ),
         ),
       );
     }
@@ -607,7 +667,8 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
     setState(() => _isActionInProgress = true);
 
     try {
-      final success = await _repository.updateCommodityBroker(
+      // Show only the assignment the server confirms it stored.
+      final savedBrokerId = await _repository.updateCommodityBroker(
         lot.id,
         brokerId: confirmedBroker.id,
         brokerName: confirmedBroker.name,
@@ -616,44 +677,42 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
       );
 
       if (!mounted) return;
-
-      if (success) {
-        setState(() {
-          _commodity = _commodity!.copyWith(
-            brokerId: confirmedBroker.id,
-            brokerName: confirmedBroker.name,
-            brokerPhone: confirmedBroker.mobile,
-            brokerLocation: confirmedBroker.location,
-          );
-          _isActionInProgress = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Mandi broker desk changed to ${confirmedBroker.name} successfully!',
-            ),
-            backgroundColor: AppColors.success,
-          ),
+      setState(() {
+        _commodity = _commodity!.copyWith(
+          brokerId: savedBrokerId,
+          brokerName: confirmedBroker.name,
+          brokerPhone: confirmedBroker.mobile,
+          brokerLocation: confirmedBroker.location,
         );
-      } else {
-        setState(() => _isActionInProgress = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Failed to update broker assignment. Existing broker assignment preserved.',
-            ),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isActionInProgress = false);
+        _isActionInProgress = false;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Error updating broker: $e. Existing assignment preserved.',
+            'Mandi broker desk changed to ${confirmedBroker.name} successfully!',
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } on BrokerUpdateException catch (e) {
+      if (!mounted) return;
+      // Keep the last confirmed broker on screen.
+      setState(() => _isActionInProgress = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${e.message} Existing assignment preserved.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Broker change failed: ${e.runtimeType}');
+      if (!mounted) return;
+      setState(() => _isActionInProgress = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not change the broker. Existing assignment preserved.',
           ),
           backgroundColor: AppColors.error,
         ),
@@ -672,7 +731,28 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
     if (_commodity == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Lot Details')),
-        body: const Center(child: Text('Commodity lot not found')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // A failed read is shown as an error with retry, not "not found".
+                Text(
+                  _loadError ?? 'Commodity lot not found',
+                  textAlign: TextAlign.center,
+                ),
+                if (_loadError != null) ...[
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _loadCommodity,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -886,7 +966,8 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                 const SizedBox(height: 8),
                 _buildInfoRow(
                   'Lab Certificate',
-                  lot.labReportNumber ?? 'AGMARK-RAL-2026-9021',
+                  // No invented certificate number when the lot has none.
+                  lot.labReportNumber ?? 'Not provided',
                 ),
             ],
           ),

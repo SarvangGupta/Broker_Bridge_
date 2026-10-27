@@ -36,6 +36,8 @@ class SellerCommodity {
   final String? labName;
   final String? labReportFileUrl;
   final String? labReportFileName;
+  final String? companyId;
+  final String? sellerUserId;
   final int version;
   final DateTime createdAt;
 
@@ -75,9 +77,15 @@ class SellerCommodity {
     this.labName,
     this.labReportFileUrl,
     this.labReportFileName,
+    this.companyId,
+    this.sellerUserId,
     this.version = 1,
     required this.createdAt,
   });
+
+  bool get isIndividualOwned =>
+      sellerUserId != null && (companyId == null || companyId!.isEmpty);
+  bool get isCompanyOwned => companyId != null && companyId!.isNotEmpty;
 
   bool get isActive =>
       status.toLowerCase() == 'open' || status.toLowerCase() == 'active';
@@ -162,6 +170,8 @@ class SellerCommodity {
       labName: map['lab_name'] as String?,
       labReportFileUrl: map['lab_report_file_url'] as String?,
       labReportFileName: map['lab_report_file_name'] as String?,
+      companyId: map['company_id'] as String?,
+      sellerUserId: map['seller_user_id'] as String?,
       version: (map['version'] as num?)?.toInt() ?? 1,
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
@@ -201,6 +211,8 @@ class SellerCommodity {
       'lab_name': labName,
       'lab_report_file_url': labReportFileUrl,
       'lab_report_file_name': labReportFileName,
+      'company_id': companyId,
+      'seller_user_id': sellerUserId,
       'version': version,
       'created_at': createdAt.toIso8601String(),
     };
@@ -242,6 +254,8 @@ class SellerCommodity {
     String? labName,
     String? labReportFileUrl,
     String? labReportFileName,
+    String? companyId,
+    String? sellerUserId,
     int? version,
     DateTime? createdAt,
   }) {
@@ -282,6 +296,8 @@ class SellerCommodity {
       labName: labName ?? this.labName,
       labReportFileUrl: labReportFileUrl ?? this.labReportFileUrl,
       labReportFileName: labReportFileName ?? this.labReportFileName,
+      companyId: companyId ?? this.companyId,
+      sellerUserId: sellerUserId ?? this.sellerUserId,
       version: version ?? this.version,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -367,7 +383,10 @@ class CreateCommodityDto {
     return _uuidRegex.hasMatch(id.trim());
   }
 
-  Map<String, dynamic> toSupabaseInsert(String companyId) {
+  Map<String, dynamic> toSupabaseInsert({
+    String? companyId,
+    String? sellerUserId,
+  }) {
     final effectiveBrokerId =
         brokerId ??
         (selectedBrokerIds.isNotEmpty ? selectedBrokerIds.first : null);
@@ -377,8 +396,29 @@ class CreateCommodityDto {
         ? effectiveBrokerId.trim()
         : null;
 
+    final String? finalCompanyId =
+        (companyId != null && companyId.trim().isNotEmpty)
+        ? companyId.trim()
+        : null;
+    final String? finalSellerUserId =
+        (sellerUserId != null && sellerUserId.trim().isNotEmpty)
+        ? sellerUserId.trim()
+        : null;
+
+    if (finalCompanyId == null && finalSellerUserId == null) {
+      throw ArgumentError(
+        'A commodity lot must have either a companyId or a sellerUserId ownership identifier.',
+      );
+    }
+    if (finalCompanyId != null && finalSellerUserId != null) {
+      throw ArgumentError(
+        'A commodity lot cannot have both companyId and sellerUserId set simultaneously.',
+      );
+    }
+
     return {
-      'company_id': companyId,
+      'company_id': finalCompanyId,
+      'seller_user_id': finalSellerUserId,
       'commodity_id': commodityId,
       'grade_id': gradeId,
       'quantity': totalQuantity.toInt(), // integer column in schema

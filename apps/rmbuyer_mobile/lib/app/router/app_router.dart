@@ -6,6 +6,8 @@ import '../../features/authentication/presentation/controllers/auth_notifier.dar
 export '../../features/authentication/presentation/controllers/auth_notifier.dart';
 import '../../features/authentication/presentation/login_screen.dart';
 import '../../features/authentication/presentation/splash_screen.dart';
+import '../../features/chat/presentation/chat_inbox_screen.dart';
+import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/deals/presentation/buyer_deals_screen.dart';
 import '../../features/deals/presentation/final_deal_review_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -28,6 +30,8 @@ import '../../features/search/domain/broker_model.dart';
 import '../../features/search/presentation/broker_profile_screen.dart';
 import '../../features/search/presentation/brokers_screen.dart';
 import '../../features/search/presentation/buyer_search_screen.dart';
+import '../../features/search/presentation/widgets/broker_result_card.dart'
+    show brokerFirmName;
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'buyerRoot',
@@ -178,6 +182,36 @@ class AppRouter {
           final broker = state.extra as BrokerModel?;
           return BrokerProfileScreen(brokerId: id, initialBroker: broker);
         },
+      ),
+      // Buyer <-> Broker chat (BROKERBRIDGE-CHAT-E2E-01)
+      GoRoute(
+        path: '/chats',
+        name: 'chat_inbox',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ChatInboxScreen(
+          emptyText:
+              'No conversations yet. Open a broker profile and tap Chat to start one.',
+        ),
+      ),
+      GoRoute(
+        path: '/chats/broker/:brokerId',
+        name: 'chat_with_broker',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final broker = state.extra as BrokerModel?;
+          return ChatScreen(
+            brokerId: state.pathParameters['brokerId'],
+            fallbackName: broker?.name,
+            fallbackCompany: broker == null ? null : brokerFirmName(broker),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/chats/:id',
+        name: 'chat_conversation',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) =>
+            ChatScreen(conversationId: state.pathParameters['id']),
       ),
       // Broker Offers & Negotiation (Protected)
       GoRoute(

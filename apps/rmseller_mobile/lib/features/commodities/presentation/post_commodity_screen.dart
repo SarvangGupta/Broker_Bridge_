@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -7,26 +8,33 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../app/router/app_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_loading_indicator.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../brokers/data/seller_broker_repository.dart';
 import '../../brokers/domain/seller_broker_model.dart';
+import '../../profile/data/seller_profile_repository.dart';
+import '../../profile/domain/business_location_model.dart';
+import '../../profile/presentation/seller_profile_screen.dart';
+import '../domain/posting_history.dart';
 import '../data/commodities_repository.dart';
 import '../data/lab_testing_repository.dart';
 import '../domain/commodity_model.dart';
 import '../domain/lab_testing_model.dart';
+import '../domain/lot_location.dart';
 import '../domain/master_commodity_data.dart';
 import 'commodity_picker_sheet.dart';
+import 'lot_location_sheet.dart';
 
 class PostCommodityScreen extends StatefulWidget {
   final String? initialCommodityId;
   final String? initialBrokerId;
   final SellerCommodity? initialLot;
   final CommoditiesRepository? commoditiesRepository;
+  final SellerProfileRepository? profileRepository;
 
   const PostCommodityScreen({
     super.key,
@@ -34,6 +42,7 @@ class PostCommodityScreen extends StatefulWidget {
     this.initialBrokerId,
     this.initialLot,
     this.commoditiesRepository,
+    this.profileRepository,
   });
 
   /// Unit preselected for a new lot: the "Metric Ton" MT row, else any MT row,
@@ -64,6 +73,15 @@ class PostCommodityScreen extends StatefulWidget {
     return null;
   }
 
+  /// Field error for the availability window, or null when valid. Compared by
+  /// calendar day, so the same day for both is allowed.
+  static String? validUntilError(DateTime availableFrom, DateTime validUntil) {
+    DateTime day(DateTime d) => DateTime(d.year, d.month, d.day);
+    return day(validUntil).isBefore(day(availableFrom))
+        ? 'Valid Until must be on or after Available From'
+        : null;
+  }
+
   @override
   State<PostCommodityScreen> createState() => _PostCommodityScreenState();
 }
@@ -74,6 +92,29 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       widget.commoditiesRepository ?? CommoditiesRepository();
   final SellerBrokerRepository _brokerRepository = SellerBrokerRepository();
   final LabTestingRepository _labTestingRepository = LabTestingRepository();
+  late final SellerProfileRepository _profileRepository =
+      widget.profileRepository ?? SellerProfileRepository();
+
+  // Compact accordion (RB-SELLER-POST-UX-05): at most one section open.
+  static const int _secCommodity = 0;
+  static const int _secLocation = 1;
+  static const int _secLab = 2;
+  static const int _secBroker = 3;
+  int? _openSection;
+
+  /// True when the location summary came from the seller's saved profile
+  /// location and has not been edited for this lot yet.
+  bool _locationFromProfile = false;
+
+  /// Whether a business location default exists on this device.
+  bool _hasSavedBusinessLocation = false;
+
+  /// Error message when fetching saved warehouse location failed.
+  String? _savedLocationError;
+
+  // Quick post (RB-SELLER-QUICK-POST-01).
+  ListingReadiness? _readiness;
+  PickerHistory _history = const PickerHistory.unavailable();
 
   bool _isLoadingMasterData = true;
   bool _isSubmitting = false;
@@ -88,7 +129,6 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   List<MasterUnit> _units = [];
   List<MasterState> _states = [];
   List<MasterDistrict> _districts = [];
-  List<MasterMandi> _mandis = [];
   List<SellerBrokerModel> _brokers = [];
 
   // Form State
@@ -97,7 +137,13 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   MasterUnit? _selectedUnit;
   MasterState? _selectedState;
   MasterDistrict? _selectedDistrict;
-  MasterMandi? _selectedMandi;
+
+  // Warehouse / loading / office locations. The warehouse state & district are
+  // _selectedState / _selectedDistrict; the rest is carried as text (see LotLocation).
+  LotLocation _lotLocation = const LotLocation();
+
+  // Mandi is no longer captured, but an edited lot keeps its stored value.
+  String? _legacyMandiName;
 
   final TextEditingController _lotNumberController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
@@ -105,13 +151,6 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   final TextEditingController _confidentialPriceController =
       TextEditingController();
   final TextEditingController _paymentTermsController = TextEditingController();
-  final TextEditingController _warehouseAddressController =
-      TextEditingController(text: 'Krishi Upaj Mandi Yard Warehouse A-4');
-  final TextEditingController _dispatchFacilityController =
-      TextEditingController(text: 'Krishi Upaj Mandi Yard Warehouse A-4');
-  final TextEditingController _officeLocationController = TextEditingController(
-    text: 'Bikaner Commercial Head Office',
-  );
   final TextEditingController _labReportNumberController =
       TextEditingController();
   final TextEditingController _qualityRemarksController =
@@ -163,9 +202,6 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     _askingPriceController.dispose();
     _confidentialPriceController.dispose();
     _paymentTermsController.dispose();
-    _warehouseAddressController.dispose();
-    _dispatchFacilityController.dispose();
-    _officeLocationController.dispose();
     _labReportNumberController.dispose();
     _qualityRemarksController.dispose();
     _customTestParameterController.dispose();
@@ -216,8 +252,6 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       MasterState? initState;
       List<MasterDistrict> districts = [];
       MasterDistrict? initDistrict;
-      List<MasterMandi> mandis = [];
-      MasterMandi? initMandi;
 
       if (widget.initialLot != null) {
         final lot = widget.initialLot!;
@@ -229,12 +263,7 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               .toString();
         }
         if (lot.paymentTerms != null) _paymentSchedule = lot.paymentTerms!;
-        if (lot.officeLocation != null)
-          _officeLocationController.text = lot.officeLocation!;
-        if (lot.loadingRemarks != null)
-          _dispatchFacilityController.text = lot.loadingRemarks!;
-        if (lot.warehouseName != null)
-          _warehouseAddressController.text = lot.warehouseName!;
+        _legacyMandiName = lot.mandiName;
         if (lot.loadingStatus.isNotEmpty) _loadingStatus = lot.loadingStatus;
         if (lot.labReportNumber != null)
           _labReportNumberController.text = lot.labReportNumber!;
@@ -277,31 +306,31 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               orElse: () => districts.first,
             );
           }
-
-          if (initDistrict != null) {
-            mandis = await _commoditiesRepository.getMasterMandis(
-              initDistrict.id,
-            );
-            if (mandis.isNotEmpty) {
-              initMandi = mandis.firstWhere(
-                (m) =>
-                    lot.mandiName != null &&
-                    m.name.toLowerCase().contains(lot.mandiName!.toLowerCase()),
-                orElse: () => mandis.first,
-              );
-            }
-          }
         }
-      } else {
-        initState = states.isNotEmpty ? states.first : null;
-        districts = initState != null
-            ? await _commoditiesRepository.getMasterDistricts(initState.id)
-            : <MasterDistrict>[];
-        initDistrict = districts.isNotEmpty ? districts.first : null;
-        mandis = initDistrict != null
-            ? await _commoditiesRepository.getMasterMandis(initDistrict.id)
-            : <MasterMandi>[];
-        initMandi = mandis.isNotEmpty ? mandis.first : null;
+      }
+
+      var initLocation = LotLocation.decode(
+        warehouseText: widget.initialLot?.warehouseName,
+        loadingText: widget.initialLot?.loadingRemarks,
+        officeText: widget.initialLot?.officeLocation,
+        warehouseState: initState,
+        warehouseDistrict: initDistrict,
+        states: states,
+      );
+
+      // New lot: start from the seller's saved profile location, if any. No
+      // state or district is preselected otherwise (the seller adds one).
+      var fromProfile = false;
+      if (widget.initialLot == null) {
+        final saved = await _loadSavedLocation(states);
+        if (saved != null) {
+          initState = saved.state;
+          districts = saved.districts;
+          initDistrict = saved.district;
+          initLocation = saved.location;
+          fromProfile = true;
+          _hasSavedBusinessLocation = true;
+        }
       }
 
       SellerBrokerModel? initialBroker;
@@ -335,13 +364,18 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         _selectedState = initState;
         _districts = districts;
         _selectedDistrict = initDistrict;
-        _mandis = mandis;
-        _selectedMandi = initMandi;
+        _lotLocation = initLocation;
+        _locationFromProfile = fromProfile;
+        // Open the first step while the commodity is still missing.
+        _openSection ??= initialComm == null ? _secCommodity : null;
         if (initialBroker != null) {
           _selectedBroker = initialBroker;
         }
         _isLoadingMasterData = false;
       });
+      // Non-blocking: the form is usable while these load.
+      unawaited(_loadReadiness());
+      unawaited(_loadHistory());
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -351,7 +385,125 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     }
   }
 
-  Future<void> _onCommodityChanged(MasterCommodity? newComm) async {
+  /// The saved profile location mapped onto the live state/district masters.
+  /// Returns null when nothing was saved or the state is not in the master
+  /// The saved profile location mapped onto the live state/district masters.
+  /// Returns null when nothing was saved or the state is not in the master
+  /// list; an unmatched district is left for the seller to pick.
+  Future<
+    ({
+      MasterState state,
+      List<MasterDistrict> districts,
+      MasterDistrict? district,
+      LotLocation location,
+    })?
+  >
+  _loadSavedLocation(List<MasterState> states) async {
+    try {
+      final saved = await _profileRepository
+          .getSavedBusinessLocation()
+          .timeout(const Duration(seconds: 4));
+      if (saved == null) {
+        _savedLocationError = null;
+        return null;
+      }
+      final state =
+          states.where((s) => s.id == saved.stateId).firstOrNull ??
+          states
+              .where(
+                (s) =>
+                    s.name.toLowerCase() == saved.stateName.trim().toLowerCase(),
+              )
+              .firstOrNull;
+      if (state == null) {
+        _savedLocationError = null;
+        return null;
+      }
+      final districts = await _commoditiesRepository.getMasterDistricts(
+        state.id,
+      );
+      final district =
+          districts.where((d) => d.id == saved.districtId).firstOrNull ??
+          districts
+              .where(
+                (d) =>
+                    d.name.toLowerCase() ==
+                    saved.districtName.trim().toLowerCase(),
+              )
+              .firstOrNull;
+      final office = await _profileRepository.getSavedOfficeAddress().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => null,
+      );
+      final address = [
+        saved.addressLine,
+        saved.locality,
+      ].where((s) => s.trim().isNotEmpty).join(', ');
+      _savedLocationError = null;
+      return (
+        state: state,
+        districts: districts,
+        district: district,
+        location: LotLocation(
+          warehouse: LotAddress(
+            label: saved.name,
+            address: address,
+            stateId: state.id,
+            stateName: state.name,
+            districtId: district?.id,
+            districtName: district?.name ?? '',
+            pinCode: saved.pinCode,
+          ),
+          // A distinct saved office stays separate; it is never replaced.
+          officeSameAsWarehouse: office == null,
+          office: office == null
+              ? const LotAddress()
+              : LotAddress(address: office),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Saved profile location unavailable: $e');
+      _savedLocationError = 'Could not load your saved warehouse location.';
+      return null;
+    }
+  }
+
+  /// Retries loading the saved warehouse location without discarding entered draft values.
+  Future<void> _reloadSavedLocation() async {
+    setState(() => _savedLocationError = null);
+    try {
+      final saved = await _loadSavedLocation(_states);
+      if (!mounted) return;
+      if (saved != null) {
+        setState(() {
+          _selectedState = saved.state;
+          _districts = saved.districts;
+          _selectedDistrict = saved.district;
+          _lotLocation = saved.location;
+          _locationFromProfile = true;
+          _hasSavedBusinessLocation = true;
+          _savedLocationError = null;
+        });
+      } else {
+        setState(() => _savedLocationError = null);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(
+          () => _savedLocationError =
+              'Could not load your saved warehouse location. Please check connection and retry.',
+        );
+      }
+    }
+  }
+
+  /// Changes the product and reloads its grades. [preferredGradeId] (from the
+  /// seller's posting history) is selected only if it is still a valid grade
+  /// of this product. Nothing transaction-specific is copied.
+  Future<void> _onCommodityChanged(
+    MasterCommodity? newComm, {
+    String? preferredGradeId,
+  }) async {
     if (newComm == null) return;
     // Clear first so a grade of the previous product can never be submitted.
     setState(() {
@@ -367,7 +519,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       if (!mounted || _selectedCommodity?.id != newComm.id) return;
       setState(() {
         _grades = grades;
-        _selectedGrade = grades.isNotEmpty ? grades.first : null;
+        _selectedGrade =
+            grades.where((g) => g.id == preferredGradeId).firstOrNull ??
+            (grades.isNotEmpty ? grades.first : null);
         _isLoadingGrades = false;
       });
     } catch (e) {
@@ -404,676 +558,358 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         if (mounted) setState(() => _commodities = comms);
         return comms;
       },
+      history: _history,
+      onRetryHistory: () async {
+        await _loadHistory();
+        return _history;
+      },
     );
-    if (picked != null && mounted) await _onCommodityChanged(picked);
+    if (picked != null && mounted) {
+      await _onCommodityChanged(
+        picked.commodity,
+        preferredGradeId: picked.preferredGradeId,
+      );
+    }
   }
 
-  void _openLocationPopup() {
-    // Local copy of form state so cancellation preserves original values!
-    MasterState? tempState = _selectedState;
-    MasterDistrict? tempDistrict = _selectedDistrict;
-    MasterMandi? tempMandi = _selectedMandi;
-    List<MasterDistrict> tempDistricts = List.from(_districts);
-    List<MasterMandi> tempMandis = List.from(_mandis);
-    bool isLoadingDistricts = false;
-    bool isLoadingMandis = false;
+  // ============================================================================
+  // QUICK POST: posting history + business-profile readiness
+  // (RB-SELLER-QUICK-POST-01)
+  // ============================================================================
 
-    final tempWarehouseController = TextEditingController(
-      text: _warehouseAddressController.text,
-    );
-    final tempDispatchController = TextEditingController(
-      text: _dispatchFacilityController.text,
-    );
-    final tempOfficeController = TextEditingController(
-      text: _officeLocationController.text,
-    );
-    final tempCustomMandiController = TextEditingController();
-    bool isCustomMandi = false;
-    bool sameAsWarehouse =
-        tempDispatchController.text.trim() ==
-        tempWarehouseController.text.trim();
-    String? formError;
-    final popupFormKey = GlobalKey<FormState>();
+  /// The seller's real posting history (server only; never sample lots).
+  Future<void> _loadHistory() async {
+    PickerHistory history;
+    try {
+      final lots = await _commoditiesRepository.getPostingHistory();
+      history = _commoditiesRepository.isOnline
+          ? PickerHistory(items: PreviousCommodity.fromListings(lots))
+          : const PickerHistory.unavailable();
+    } on CommodityListException catch (e) {
+      // A failed read is not "no history": say so; the catalogue still works.
+      history = PickerHistory(
+        error: 'Could not load your previously posted commodities. ${e.message}',
+      );
+    } catch (e) {
+      debugPrint('Posting history load failed: ${e.runtimeType}');
+      history = const PickerHistory(
+        error: 'Could not load your previously posted commodities.',
+      );
+    }
+    if (mounted) setState(() => _history = history);
+  }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            void loadMandisForDistrict(String districtId) async {
-              setModalState(() => isLoadingMandis = true);
-              final mandis = await _commoditiesRepository.getMasterMandis(
-                districtId,
-              );
-              if (!mounted) return;
-              setModalState(() {
-                tempMandis = mandis;
-                if (tempMandis.isNotEmpty) {
-                  tempMandi = tempMandis.firstWhere(
-                    (m) => m.id == tempMandi?.id,
-                    orElse: () => tempMandis.first,
-                  );
-                } else {
-                  tempMandi = null;
-                }
-                isLoadingMandis = false;
-              });
-            }
+  /// Checks the firm details the backend needs (server-side). An error is
+  /// "unable to verify", never "incomplete".
+  Future<void> _loadReadiness() async {
+    setState(() => _readiness = null);
+    ListingReadiness readiness;
+    try {
+      readiness = await _profileRepository.checkListingReadiness().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => const ListingReadiness.unverified(
+          'Checking your business profile took too long. Please retry.',
+        ),
+      );
+    } catch (e) {
+      debugPrint('Readiness check failed: ${e.runtimeType}');
+      readiness = const ListingReadiness.unverified(
+        'Could not check your business profile. Please retry.',
+      );
+    }
+    if (!mounted) return;
+    setState(() => _readiness = readiness);
+    await _applyCompanyRegionDefault(readiness);
+  }
 
-            if (tempDistrict != null &&
-                tempMandis.isEmpty &&
-                !isLoadingMandis) {
-              loadMandisForDistrict(tempDistrict!.id);
-            }
+  /// With no saved warehouse location, default the warehouse state/district to
+  /// the firm's registered region on the server. The address is still asked.
+  Future<void> _applyCompanyRegionDefault(ListingReadiness r) async {
+    if (widget.initialLot != null || _selectedState != null) return;
+    final state = _states.where((s) => s.id == r.companyStateId).firstOrNull;
+    if (state == null) return;
+    List<MasterDistrict> districts = const [];
+    try {
+      districts = await _commoditiesRepository.getMasterDistricts(state.id);
+    } catch (_) {}
+    if (!mounted || _selectedState != null) return;
+    final district = districts
+        .where((d) => d.id == r.companyDistrictId)
+        .firstOrNull;
+    setState(() {
+      _selectedState = state;
+      _districts = districts;
+      _selectedDistrict = district;
+      _locationFromProfile = true;
+      _lotLocation = LotLocation(
+        warehouse: LotAddress(
+          stateId: state.id,
+          stateName: state.name,
+          districtId: district?.id,
+          districtName: district?.name ?? '',
+        ),
+        officeSameAsWarehouse: _lotLocation.officeSameAsWarehouse,
+        office: _lotLocation.office,
+      );
+    });
+  }
 
-            return DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.85,
-              maxChildSize: 0.95,
-              minChildSize: 0.5,
-              builder: (context, scrollController) {
-                return SingleChildScrollView(
-                  controller: scrollController,
-                  padding: EdgeInsets.only(
-                    left: 20,
-                    right: 20,
-                    top: 16,
-                    bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-                  ),
-                  child: Form(
-                    key: popupFormKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade300,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            const Icon(
-                              LucideIcons.truck,
-                              color: AppColors.primary,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Warehouse / Loading Location',
-                                    style: AppTypography.titleMedium,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  const Text(
-                                    'Specify warehouse, mandi yard & physical truck dispatch site',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondaryLight,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(LucideIcons.x),
-                              onPressed: () => Navigator.pop(context),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 24),
+  bool get _isFirstTimeSeller =>
+      _history.available && _history.error == null && _history.items.isEmpty;
 
-                        if (formError != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: AppColors.errorBackground,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: AppColors.error.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  LucideIcons.alertTriangle,
-                                  size: 16,
-                                  color: AppColors.error,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    formError!,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.error,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+  /// What is still missing from the warehouse location, in plain words.
+  List<String> get _missingLocationItems => [
+    if (_lotLocation.warehouse.address.trim().isEmpty)
+      'Warehouse / godown address',
+    if (_selectedState == null) 'State',
+    if (_selectedDistrict == null) 'District',
+  ];
 
-                        const Text(
-                          'Supported Mandi Location Presets',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondaryLight,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: MasterCommodityData
-                                .verifiedLocationPresets
-                                .map((preset) {
-                                  final isSelected =
-                                      tempState?.id == preset['stateId'] &&
-                                      tempDistrict?.id == preset['districtId'];
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: ChoiceChip(
-                                      label: Text(
-                                        preset['presetName']!,
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                      selected: isSelected,
-                                      onSelected: (selected) async {
-                                        if (selected) {
-                                          setModalState(() {
-                                            tempState = _states.firstWhere(
-                                              (s) => s.id == preset['stateId'],
-                                              orElse: () => _states.first,
-                                            );
-                                            tempWarehouseController.text =
-                                                preset['warehouseAddress']!;
-                                            tempDispatchController.text =
-                                                preset['loadingFacility']!;
-                                          });
-                                          final dists =
-                                              await _commoditiesRepository
-                                                  .getMasterDistricts(
-                                                    preset['stateId']!,
-                                                  );
-                                          final mandis =
-                                              await _commoditiesRepository
-                                                  .getMasterMandis(
-                                                    preset['districtId']!,
-                                                  );
-                                          if (!mounted) return;
-                                          setModalState(() {
-                                            tempDistricts = dists;
-                                            tempDistrict = dists.firstWhere(
-                                              (d) =>
-                                                  d.id == preset['districtId'],
-                                              orElse: () => dists.first,
-                                            );
-                                            tempMandis = mandis;
-                                            tempMandi = mandis.isNotEmpty
-                                                ? mandis.firstWhere(
-                                                    (m) => m.name
-                                                        .toLowerCase()
-                                                        .contains(
-                                                          preset['mandiName']!
-                                                              .toLowerCase(),
-                                                        ),
-                                                    orElse: () => mandis.first,
-                                                  )
-                                                : null;
-                                            isCustomMandi = false;
-                                            formError = null;
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  );
-                                })
-                                .toList(),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Warehouse State *',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  DropdownButtonFormField<MasterState>(
-                                    value: tempState,
-                                    isExpanded: true,
-                                    decoration: const InputDecoration(
-                                      contentPadding: EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 10,
-                                      ),
-                                    ),
-                                    items: _states.map((s) {
-                                      return DropdownMenuItem(
-                                        value: s,
-                                        child: Text(
-                                          s.name,
-                                          style: const TextStyle(fontSize: 13),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      );
-                                    }).toList(),
-                                    onChanged: (newState) async {
-                                      if (newState == null) return;
-                                      setModalState(() {
-                                        tempState = newState;
-                                        tempDistrict = null;
-                                        tempMandi = null;
-                                        tempDistricts = [];
-                                        tempMandis = [];
-                                        isLoadingDistricts = true;
-                                        formError = null;
-                                      });
-                                      final dists = await _commoditiesRepository
-                                          .getMasterDistricts(newState.id);
-                                      if (!mounted) return;
-                                      setModalState(() {
-                                        tempDistricts = dists;
-                                        tempDistrict = dists.isNotEmpty
-                                            ? dists.first
-                                            : null;
-                                        isLoadingDistricts = false;
-                                      });
-                                      if (tempDistrict != null) {
-                                        loadMandisForDistrict(tempDistrict!.id);
-                                      }
-                                    },
-                                    validator: (s) =>
-                                        s == null ? 'State required' : null,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'District *',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  DropdownButtonFormField<MasterDistrict>(
-                                    value: tempDistrict,
-                                    isExpanded: true,
-                                    decoration: InputDecoration(
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 10,
-                                          ),
-                                      hintText: isLoadingDistricts
-                                          ? 'Loading...'
-                                          : (tempDistricts.isEmpty
-                                                ? 'No districts'
-                                                : 'Select'),
-                                    ),
-                                    items: tempDistricts.map((d) {
-                                      return DropdownMenuItem(
-                                        value: d,
-                                        child: Text(
-                                          d.name,
-                                          style: const TextStyle(fontSize: 13),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      );
-                                    }).toList(),
-                                    onChanged: (newDist) {
-                                      if (newDist == null) return;
-                                      setModalState(() {
-                                        tempDistrict = newDist;
-                                        tempMandi = null;
-                                        tempMandis = [];
-                                        formError = null;
-                                      });
-                                      loadMandisForDistrict(newDist.id);
-                                    },
-                                    validator: (d) =>
-                                        d == null ? 'District required' : null,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Mandi Yard / APMC Market Hub *',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                InkWell(
-                                  onTap: () {
-                                    setModalState(() {
-                                      isCustomMandi = !isCustomMandi;
-                                    });
-                                  },
-                                  child: Text(
-                                    isCustomMandi
-                                        ? 'Choose from List'
-                                        : '+ Other / Custom Mandi',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            if (!isCustomMandi)
-                              DropdownButtonFormField<MasterMandi>(
-                                value: tempMandi,
-                                isExpanded: true,
-                                decoration: InputDecoration(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                  hintText: isLoadingMandis
-                                      ? 'Loading Mandis...'
-                                      : (tempMandis.isEmpty
-                                            ? 'No mandis found'
-                                            : 'Select Mandi Hub'),
-                                ),
-                                items: tempMandis.map((m) {
-                                  return DropdownMenuItem(
-                                    value: m,
-                                    child: Text(
-                                      '${m.name} (${m.yardType})',
-                                      style: const TextStyle(fontSize: 12),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (m) =>
-                                    setModalState(() => tempMandi = m),
-                                validator: (m) => (!isCustomMandi && m == null)
-                                    ? 'Mandi hub required'
-                                    : null,
-                              )
-                            else
-                              AppTextField(
-                                controller: tempCustomMandiController,
-                                label: 'Custom Mandi / Trade Yard Name *',
-                                hint: 'e.g. Suratgarh Private Trade Yard',
-                                validator: (v) =>
-                                    (isCustomMandi &&
-                                        (v == null || v.trim().isEmpty))
-                                    ? 'Mandi name required'
-                                    : null,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-
-                        AppTextField(
-                          controller: tempWarehouseController,
-                          label: 'Registered Warehouse / Storage Facility Address *',
-                          hint: 'e.g. Warehouse A-4, Krishi Upaj Mandi Yard, Industrial Area',
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? 'Warehouse address required'
-                              : null,
-                          onChanged: (val) {
-                            if (sameAsWarehouse) {
-                              setModalState(
-                                () => tempDispatchController.text = val,
-                              );
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 14),
-
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade50.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.amber.shade200),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    LucideIcons.truck,
-                                    size: 16,
-                                    color: AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Actual Physical Loading / Dispatch Facility *',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Identify the exact physical gate, shed, or platform where transport trucks will be weighed and loaded.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondaryLight,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Checkbox(
-                                    value: sameAsWarehouse,
-                                    activeColor: AppColors.primary,
-                                    onChanged: (val) {
-                                      setModalState(() {
-                                        sameAsWarehouse = val ?? false;
-                                        if (sameAsWarehouse) {
-                                          tempDispatchController.text =
-                                              tempWarehouseController.text;
-                                        }
-                                      });
-                                    },
-                                  ),
-                                  const Expanded(
-                                    child: Text(
-                                      'Same as registered warehouse address',
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              AppTextField(
-                                controller: tempDispatchController,
-                                label: 'Physical Loading Platform / Gate Details *',
-                                hint: 'e.g. Krishi Upaj Mandi Yard Shed 4, Gate 2 Platform',
-                                validator: (v) => v == null || v.trim().isEmpty
-                                    ? 'Loading facility required'
-                                    : null,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    LucideIcons.building2,
-                                    size: 16,
-                                    color: AppColors.textSecondaryLight,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Enterprise Office Location (Registered HQ)',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Maintained from Seller Enterprise Profile; distinct from physical commodity loading and warehouse storage.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondaryLight,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              AppTextField(
-                                controller: tempOfficeController,
-                                label: 'Registered Enterprise Office HQ *',
-                                hint: 'e.g. Bikaner Commercial Head Office',
-                                validator: (v) => v == null || v.trim().isEmpty
-                                    ? 'Enterprise office required'
-                                    : null,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child: AppButton(
-                                label: 'Cancel',
-                                variant: ButtonVariant.outline,
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: AppButton(
-                                label: 'Save Location',
-                                variant: ButtonVariant.primary,
-                                onPressed: () {
-                                  if (!popupFormKey.currentState!.validate()) {
-                                    setModalState(() {
-                                      formError = 'Please fill all mandatory location fields.';
-                                    });
-                                    return;
-                                  }
-
-                                  if (tempState == null ||
-                                      tempDistrict == null) {
-                                    setModalState(() {
-                                      formError = 'Please select warehouse state and district.';
-                                    });
-                                    return;
-                                  }
-
-                                  setState(() {
-                                    _selectedState = tempState;
-                                    _selectedDistrict = tempDistrict;
-                                    _districts = tempDistricts;
-                                    if (isCustomMandi &&
-                                        tempCustomMandiController.text
-                                            .trim()
-                                            .isNotEmpty) {
-                                      _selectedMandi = MasterMandi(
-                                        id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
-                                        districtId: tempDistrict!.id,
-                                        stateId: tempState!.id,
-                                        name: tempCustomMandiController.text
-                                            .trim(),
-                                      );
-                                    } else {
-                                      _selectedMandi = tempMandi;
-                                    }
-                                    _mandis = tempMandis;
-                                    _warehouseAddressController.text =
-                                        tempWarehouseController.text.trim();
-                                    _dispatchFacilityController.text =
-                                        tempDispatchController.text.trim();
-                                    _officeLocationController.text =
-                                        tempOfficeController.text.trim();
-                                  });
-
-                                  Navigator.pop(context);
-
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Warehouse & loading location saved successfully.',
-                                      ),
-                                      backgroundColor: AppColors.success,
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+  Widget? _buildReadinessCard() {
+    final r = _readiness;
+    Widget card({
+      required Key key,
+      required Color color,
+      required IconData icon,
+      required String title,
+      required List<String> lines,
+      String? actionLabel,
+      VoidCallback? onAction,
+    }) {
+      return Container(
+        key: key,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                );
-              },
-            );
-          },
-        );
-      },
+                ),
+              ],
+            ),
+            for (final l in lines)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 26),
+                child: Text('• $l', style: const TextStyle(fontSize: 12)),
+              ),
+            if (actionLabel != null && onAction != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(onPressed: onAction, child: Text(actionLabel)),
+              ),
+          ],
+        ),
+      );
+    }
+
+    if (r == null) {
+      return const Padding(
+        key: Key('readiness-checking'),
+        padding: EdgeInsets.only(bottom: 12),
+        child: Text(
+          'Checking your business profile…',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+        ),
+      );
+    }
+    if (r.status == ListingReadinessStatus.unverified) {
+      final isSessionExpired = r.error?.contains('session has expired') == true;
+      return card(
+        key: const Key('readiness-unverified'),
+        color: AppColors.errorBackground,
+        icon: LucideIcons.triangleAlert,
+        title: isSessionExpired
+            ? 'Session Expired'
+            : 'Could not verify your business profile',
+        lines: [r.error!],
+        actionLabel: isSessionExpired ? 'Sign In Again' : 'Retry',
+        onAction: isSessionExpired
+            ? () => AppRouter.authNotifier.setUnauthenticated()
+            : _loadReadiness,
+      );
+    }
+    if (r.status == ListingReadinessStatus.incomplete) {
+      return card(
+        key: const Key('readiness-incomplete'),
+        color: AppColors.errorBackground,
+        icon: LucideIcons.building2,
+        title: 'Business details needed before listing',
+        lines: r.missing,
+        actionLabel: 'Complete Profile',
+        onAction: _openCompleteProfile,
+      );
+    }
+    // Saved warehouse loading error: show retry banner without claiming location is missing (Case E)
+    if (_savedLocationError != null) {
+      return card(
+        key: const Key('readiness-location-error'),
+        color: AppColors.errorBackground,
+        icon: LucideIcons.triangleAlert,
+        title: 'Could not load your saved warehouse',
+        lines: [_savedLocationError!],
+        actionLabel: 'Retry',
+        onAction: _reloadSavedLocation,
+      );
+    }
+    // Firm verified; ask only for what the lot still lacks.
+    if (!_locationComplete) {
+      return card(
+        key: const Key('readiness-location-missing'),
+        color: Colors.amber.shade50,
+        icon: LucideIcons.warehouse,
+        title: _isFirstTimeSeller
+            ? 'Complete your business details once'
+            : 'Add your warehouse location',
+        lines: _missingLocationItems,
+        actionLabel: 'Add warehouse location',
+        onAction: () => _openLocationPopup(highlightMissing: true),
+      );
+    }
+    return null;
+  }
+
+  /// Opens the Profile screen to complete missing business/seller details,
+  /// preserving all entered draft commodity lot fields.
+  Future<void> _openCompleteProfile() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SellerProfileScreen(isInitialEdit: true),
+      ),
+    );
+    if (!mounted) return;
+    await _loadReadiness();
+  }
+
+  Future<void> _openLocationPopup({bool highlightMissing = false}) async {
+    List<BusinessLocationModel> savedWarehouses = const [];
+    try {
+      savedWarehouses = await _profileRepository.getSavedWarehouses();
+    } catch (_) {}
+
+    final result = await showLotLocationSheet(
+      context: context,
+      initial: _currentLotLocation(),
+      states: _states,
+      loadDistricts: _commoditiesRepository.getMasterDistricts,
+      highlightMissing: highlightMissing,
+      savedWarehouses: savedWarehouses,
+    );
+    if (result == null || !mounted) return;
+    await _applyLotLocation(result);
+  }
+
+  LotLocation _currentLotLocation() {
+    final l = _lotLocation;
+    return LotLocation(
+      warehouse: LotAddress(
+        label: l.warehouse.label,
+        address: l.warehouse.address,
+        stateId: _selectedState?.id,
+        stateName: _selectedState?.name ?? '',
+        districtId: _selectedDistrict?.id,
+        districtName: _selectedDistrict?.name ?? '',
+        pinCode: l.warehouse.pinCode,
+      ),
+      loadingSameAsWarehouse: l.loadingSameAsWarehouse,
+      loadingPoint: l.loadingPoint,
+      loading: l.loading,
+      officeSameAsWarehouse: l.officeSameAsWarehouse,
+      office: l.office,
+    );
+  }
+
+  String get _warehouseSummary {
+    final s = _currentLotLocation().warehouse.summary;
+    return s.isEmpty ? 'Not set' : s;
+  }
+
+  String get _loadingSummary {
+    final l = _lotLocation;
+    if (!l.loadingSameAsWarehouse) return l.loadingRemarksText;
+    return [
+      'Same as warehouse',
+      l.loadingPoint,
+    ].where((s) => s.isNotEmpty).join(' · ');
+  }
+
+  String get _officeSummary => _lotLocation.officeSameAsWarehouse
+      ? 'Same as warehouse'
+      : _lotLocation.office.summary;
+
+  /// Copies the saved form into the lot draft and updates the persistent
+  /// default warehouse for this seller.
+  Future<void> _applyLotLocation(LotLocation result) async {
+    final stateId = result.warehouse.stateId;
+    final state = _states.where((s) => s.id == stateId).firstOrNull;
+    var districts = _districts;
+    if (state != null && state.id != _selectedState?.id) {
+      districts = await _commoditiesRepository.getMasterDistricts(state.id);
+    }
+    if (!mounted) return;
+    setState(() {
+      _lotLocation = result;
+      _locationFromProfile = false;
+      _selectedState = state;
+      _districts = districts;
+      _selectedDistrict = districts
+          .where((d) => d.id == result.warehouse.districtId)
+          .firstOrNull;
+    });
+
+    var savedDefault = false;
+    final w = result.warehouse;
+    if (w.address.trim().isNotEmpty &&
+        state != null &&
+        _selectedDistrict != null) {
+      try {
+        await _profileRepository.saveBusinessLocationDefault(
+          BusinessLocationModel(
+            name: w.label,
+            addressLine: w.address,
+            locality: '',
+            stateId: state.id,
+            stateName: state.name,
+            districtId: _selectedDistrict!.id,
+            districtName: _selectedDistrict!.name,
+            pinCode: w.pinCode,
+            latitude: null,
+            longitude: null,
+          ),
+          isUpdate: _hasSavedBusinessLocation,
+        ).timeout(const Duration(seconds: 4));
+        savedDefault = !_hasSavedBusinessLocation;
+        _hasSavedBusinessLocation = true;
+        _savedLocationError = null;
+      } catch (e) {
+        debugPrint('Saving default business location failed: ${e.runtimeType}');
+      }
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          savedDefault
+              ? 'Location saved. It will be filled in for your next lot.'
+              : 'Location details updated.',
+        ),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
@@ -1244,31 +1080,30 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
           _labAttachment = LabReportAttachment(
             fileName: name,
             localFilePath: picked.path,
-            fileSizeBytes: bytes > 0 ? bytes : 240000,
+            fileSizeBytes: bytes,
             fileType: 'image',
-            isUploaded: true,
+            // Chosen on the device only; there is no upload pipeline yet.
+            isUploaded: false,
             reportReference: _generateReportReference(name),
           );
         });
-        return;
       }
+      // Cancelled: nothing is attached (never a placeholder file).
     } catch (e) {
-      debugPrint('Gallery picker notice: $e');
+      debugPrint('Gallery picker failed: ${e.runtimeType}');
+      _showAttachmentError('gallery');
     }
-    if (mounted && _labAttachment == null) {
-      final name =
-          'lab_certificate_gallery_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}.jpg';
-      setState(() {
-        _labAttachment = LabReportAttachment(
-          fileName: name,
-          localFilePath: '/storage/emulated/0/Download/lab_certificate.jpg',
-          fileSizeBytes: 245000,
-          fileType: 'image',
-          isUploaded: true,
-          reportReference: _generateReportReference(name),
-        );
-      });
-    }
+  }
+
+  void _showAttachmentError(String source) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Could not open the $source. Check the app permission and try again.',
+        ),
+      ),
+    );
   }
 
   Future<void> _pickDocumentFile() async {
@@ -1285,28 +1120,16 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
             localFilePath: f.path,
             fileSizeBytes: f.lengthSync() ?? 0,
             fileType: 'document',
-            isUploaded: true,
+            // Chosen on the device only; there is no upload pipeline yet.
+            isUploaded: false,
             reportReference: _generateReportReference(f.name),
           );
         });
-        return;
       }
+      // Cancelled: nothing is attached (never a placeholder file).
     } catch (e) {
-      debugPrint('Document picker notice: $e');
-    }
-    if (mounted && _labAttachment == null) {
-      final name =
-          'assay_report_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}.pdf';
-      setState(() {
-        _labAttachment = LabReportAttachment(
-          fileName: name,
-          localFilePath: '/storage/emulated/0/Download/assay_report.pdf',
-          fileSizeBytes: 520000,
-          fileType: 'document',
-          isUploaded: true,
-          reportReference: _generateReportReference(name),
-        );
-      });
+      debugPrint('Document picker failed: ${e.runtimeType}');
+      _showAttachmentError('file picker');
     }
   }
 
@@ -1330,31 +1153,18 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
           _labAttachment = LabReportAttachment(
             fileName: name,
             localFilePath: photo.path,
-            fileSizeBytes: bytes > 0 ? bytes : 310000,
+            fileSizeBytes: bytes,
             fileType: 'image',
-            isUploaded: true,
+            // Chosen on the device only; there is no upload pipeline yet.
+            isUploaded: false,
             reportReference: _generateReportReference(name),
           );
         });
-        return;
       }
+      // Cancelled: nothing is attached (never a placeholder file).
     } catch (e) {
-      debugPrint('Camera capture notice: $e');
-    }
-    if (mounted && _labAttachment == null) {
-      final name =
-          'camera_capture_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}.jpg';
-      setState(() {
-        _labAttachment = LabReportAttachment(
-          fileName: name,
-          localFilePath:
-              '/storage/emulated/0/DCIM/Camera/certificate_capture.jpg',
-          fileSizeBytes: 310000,
-          fileType: 'image',
-          isUploaded: true,
-          reportReference: _generateReportReference(name),
-        );
-      });
+      debugPrint('Camera capture failed: ${e.runtimeType}');
+      _showAttachmentError('camera');
     }
   }
 
@@ -1757,8 +1567,9 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
   }
 
   Widget _buildBrokerSelectionSection() {
-    return AppCard(
-      child: Column(
+    // Rendered inside the section card (UX-05), so no nested card chrome.
+    return Builder(
+      builder: (_) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -1799,11 +1610,23 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
           ),
           const SizedBox(height: 12),
           if (_selectedBroker == null) ...[
-            AppButton(
-              label: 'Select Broker(s)',
-              icon: LucideIcons.userPlus,
-              variant: ButtonVariant.primary,
-              onPressed: _openBrokerPicker,
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _openBrokerPicker,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  elevation: 0,
+                ),
+                icon: const Icon(LucideIcons.userPlus, size: 18),
+                label: Text(
+                  'Select Broker(s)',
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelLarge,
+                ),
+              ),
             ),
           ] else ...[
             Container(
@@ -2010,6 +1833,15 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       return;
     }
 
+    // Same rule as the field error and the review gate.
+    final dateError = _dateError;
+    if (dateError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(dateError)),
+      );
+      return;
+    }
+
     final totalQty = double.tryParse(_quantityController.text.trim()) ?? 0;
     final askingPrice =
         double.tryParse(_askingPriceController.text.trim()) ?? 0;
@@ -2054,10 +1886,10 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         stateName: _selectedState!.name,
         districtId: _selectedDistrict!.id,
         districtName: _selectedDistrict!.name,
-        warehouseName: _warehouseAddressController.text.trim().isNotEmpty
-            ? _warehouseAddressController.text.trim()
+        warehouseName: _lotLocation.warehouseText.isNotEmpty
+            ? _lotLocation.warehouseText
             : null,
-        mandiName: _selectedMandi?.name,
+        mandiName: _legacyMandiName,
         loadingStatus: _loadingStatus,
         availableFrom: _availableFrom,
         validUntil: _validUntil,
@@ -2067,8 +1899,8 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         brokerPhone: _selectedBroker?.mobile,
         brokerLocation: _selectedBroker?.location,
         paymentTerms: _paymentSchedule,
-        officeLocation: _officeLocationController.text.trim(),
-        loadingRemarks: _dispatchFacilityController.text.trim(),
+        officeLocation: _lotLocation.officeText,
+        loadingRemarks: _lotLocation.loadingRemarksText,
         labReportNumber: _requestLabTesting
             ? (_currentLabRequest?.id ??
                   'LAB-REQ-${_lotNumberController.text.trim().isNotEmpty ? _lotNumberController.text.trim() : "DRAFT"}')
@@ -2082,8 +1914,8 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
                   ? 'Attached: ${_labAttachment!.fileName}'
                   : 'No Lab Report Attached'),
         labReportFileName: _labAttachment?.fileName,
-        labReportFileUrl:
-            _labAttachment?.remoteStorageUrl ?? _labAttachment?.localFilePath,
+        // Only a real storage URL; a device path is not a report URL.
+        labReportFileUrl: _labAttachment?.remoteStorageUrl,
       );
 
       final created = await _commoditiesRepository.createCommodity(dto);
@@ -2098,10 +1930,10 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
           customNotes: _currentLabRequest!.customNotes,
         );
         if (_currentLabRequest!.isPaid) {
+          // Never simulated: only an authoritative confirmation can verify.
           await _labTestingRepository.verifyPaymentWithBackend(
             availabilityId: created.id,
             transactionReference: _currentLabRequest!.transactionReference,
-            simulateSandboxVerification: true,
           );
         }
       }
@@ -2119,11 +1951,14 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
       // Deep link to view saved listing details immediately
       context.pushReplacement('/commodities/${created.id}', extra: created);
-    } catch (e) {
+    } on ListingSubmitException catch (e) {
+      // Form values stay as entered so the seller can retry.
       if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Failed to submit commodity listing: $e';
-      });
+      setState(() => _errorMessage = e.message);
+    } catch (e) {
+      debugPrint('Listing submit failed: ${e.runtimeType}');
+      if (!mounted) return;
+      setState(() => _errorMessage = ListingSubmitException.generic);
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -2191,10 +2026,10 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     if (_currentLabRequest == null) return;
     setState(() => _isVerifyingPayment = true);
     try {
+      // Never simulated: a UPI reference alone does not prove payment.
       final verified = await _labTestingRepository.verifyPaymentWithBackend(
         availabilityId: _currentLabRequest!.availabilityId,
         transactionReference: _currentLabRequest!.transactionReference,
-        simulateSandboxVerification: true,
       );
 
       if (!mounted) return;
@@ -2205,17 +2040,18 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       if (verified.isPaid) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Payment confirmed by backend! Testing request submitted.',
-            ),
+            content: Text('Payment verified. Testing request submitted.'),
             backgroundColor: AppColors.success,
           ),
         );
       } else {
+        // Accurate: the app cannot confirm UPI payments itself.
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Payment verification still pending at banking backend.',
+              'Payment not confirmed yet. UPI payments must be verified by '
+              'the RMBroker team before lab testing starts; your request stays '
+              'pending until then.',
             ),
             backgroundColor: Colors.orange,
           ),
@@ -2321,8 +2157,11 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               ],
             ),
             const SizedBox(height: 6),
+            // Accurate: there is no automatic or in-app payment verification.
             const Text(
-              'UPI payment was initiated. Verification is performed by the trusted backend. Status is checked automatically.',
+              'UPI payment was started. The app cannot confirm UPI payments; '
+              'the RMBroker team must verify it before lab testing starts. '
+              'Until then this request stays pending.',
               style: TextStyle(
                 fontSize: 11,
                 color: AppColors.textSecondaryLight,
@@ -2870,308 +2709,753 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Section 1: Commodity & Specification (RB-SELLER-POST-UX-04 Redesign)
-            _buildSection1(),
-            const SizedBox(height: 20),
-
-            // Section 2: Quantity & Commercial Pricing (RB-SELLER-POST-UX-04 Redesign)
-            _buildSection2(totalVal),
-            const SizedBox(height: 20),
-
-            // Section 3: Warehouse Location & Loading
-            _buildSectionHeader(
-              '3. Warehouse Location & Loading',
-              LucideIcons.truck,
-            ),
+            ?_buildReadinessCard(),
+            _buildLotBadge(),
             const SizedBox(height: 12),
-            AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+
+            // RB-SELLER-POST-UX-05: four compact sections, one open at a time.
+            _buildCollapsible(
+              index: _secCommodity,
+              icon: LucideIcons.package,
+              title: '1. Commodity & Pricing',
+              summary: _commoditySummary,
+              complete: _commodityComplete,
+              required: true,
+              body: () => _buildCommodityDetails(totalVal, dateFormat),
+            ),
+            _buildCollapsible(
+              index: _secLocation,
+              icon: LucideIcons.mapPin,
+              title: '2. Warehouse & Loading',
+              summary: _locationSummaryLines,
+              complete: _locationComplete,
+              required: true,
+              body: _buildLocationDetails,
+            ),
+            _buildCollapsible(
+              index: _secLab,
+              icon: LucideIcons.flaskConical,
+              title: '3. Lab Testing & Reports',
+              summary: _labSummaryLines,
+              complete: true,
+              body: () => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            LucideIcons.mapPin,
-                            size: 18,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Warehouse / Loading Location',
-                            style: AppTypography.titleMedium,
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _selectedDistrict != null
-                              ? AppColors.successBackground
-                              : Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: _selectedDistrict != null
-                                ? AppColors.success.withOpacity(0.3)
-                                : Colors.amber.shade300,
-                          ),
-                        ),
-                        child: Text(
-                          _selectedDistrict != null
-                              ? 'Configured'
-                              : 'Required *',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: _selectedDistrict != null
-                                ? AppColors.success
-                                : Colors.amber.shade900,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Location Summary Box
-                  InkWell(
-                    onTap: _openLocationPopup,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                LucideIcons.store,
-                                size: 15,
-                                color: AppColors.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '${_selectedMandi?.name ?? "Mandi Yard"}, ${_selectedDistrict?.name ?? "District"}, ${_selectedState?.name ?? "State"}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              const Icon(
-                                LucideIcons.warehouse,
-                                size: 14,
-                                color: AppColors.textSecondaryLight,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Warehouse: ${_warehouseAddressController.text.trim().isNotEmpty ? _warehouseAddressController.text.trim() : "Krishi Upaj Mandi Yard Warehouse A-4"}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondaryLight,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              const Icon(
-                                LucideIcons.truck,
-                                size: 14,
-                                color: AppColors.textSecondaryLight,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Loading Platform: ${_dispatchFacilityController.text.trim().isNotEmpty ? _dispatchFacilityController.text.trim() : "Krishi Upaj Mandi Yard Warehouse A-4"}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondaryLight,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              const Icon(
-                                LucideIcons.building2,
-                                size: 14,
-                                color: AppColors.textSecondaryLight,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Office HQ: ${_officeLocationController.text.trim()}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondaryLight,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  AppButton(
-                    label: 'Edit Warehouse / Loading Details',
-                    onPressed: _openLocationPopup,
-                    variant: ButtonVariant.outline,
-                    icon: LucideIcons.pencil,
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 10),
-
-                  const Text(
-                    'Physical Loading Readiness *',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    value: _loadingStatus,
-                    decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                    ),
-                    items: MasterCommodityData.verifiedLoadingStatuses.map((s) {
-                      return DropdownMenuItem(value: s, child: Text(s));
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => _loadingStatus = val);
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: _availableFrom,
-                              firstDate: DateTime.now().subtract(
-                                const Duration(days: 30),
-                              ),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 90),
-                              ),
-                            );
-                            if (picked != null)
-                              setState(() => _availableFrom = picked);
-                          },
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: 'Available From',
-                            ),
-                            child: Text(
-                              dateFormat.format(_availableFrom),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: _validUntil,
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 90),
-                              ),
-                            );
-                            if (picked != null)
-                              setState(() => _validUntil = picked);
-                          },
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: 'Valid Until *',
-                            ),
-                            child: Text(
-                              dateFormat.format(_validUntil),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
                   _buildLabTestingSection(),
                   const SizedBox(height: 14),
                   _buildLabReportAttachmentCard(),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-
-            // Section 4: My Trusted Broker (UX-02)
-            _buildSectionHeader('4. My Trusted Broker', LucideIcons.users),
-            const SizedBox(height: 12),
-            _buildBrokerSelectionSection(),
-            const SizedBox(height: 20),
-
-            // Section 5: Review Listing & Broker Summary
-            _buildSectionHeader(
-              '5. Review Listing & Broker Summary',
-              LucideIcons.fileCheck2,
-            ),
-            const SizedBox(height: 12),
-            _buildReviewSummaryCard(totalVal, dateFormat),
-            const SizedBox(height: 28),
-
-            // Submit Button with in-flight duplicate guard
-            AppButton(
-              label: 'List Commodity on Desk',
-              onPressed: _isSubmitting ? null : _handleSubmit,
-              isLoading: _isSubmitting,
-              icon: LucideIcons.send,
+            _buildCollapsible(
+              index: _secBroker,
+              icon: LucideIcons.users,
+              title: '4. My Trusted Broker',
+              summary: _brokerSummaryLines,
+              complete: true,
+              body: _buildBrokerSelectionSection,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'By listing, you confirm this inventory is physically present at the specified warehouse location and ready for broker matching.',
-              style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
-              textAlign: TextAlign.center,
+
+            // Duplicate guard: disabled while a submission is in flight.
+            // Styled like AppButton, but the label can shrink on narrow screens.
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                key: const Key('review_and_list_button'),
+                onPressed: _isSubmitting ? null : _openReview,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  elevation: 0,
+                ),
+                icon: _isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(LucideIcons.send, size: 18),
+                label: Text(
+                  _isSubmitting ? 'Listing…' : 'Review & List Commodity',
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelLarge,
+                ),
+              ),
             ),
             const SizedBox(height: 40),
           ],
         ),
+      ),
+    );
+  }
+
+  // ============================================================================
+  // COMPACT SECTIONS & REVIEW (RB-SELLER-POST-UX-05)
+  // ============================================================================
+
+  double get _qty => double.tryParse(_quantityController.text.trim()) ?? 0;
+  double get _price => double.tryParse(_askingPriceController.text.trim()) ?? 0;
+
+  bool get _commodityComplete =>
+      _selectedCommodity != null &&
+      _selectedGrade != null &&
+      _selectedUnit != null &&
+      _qty > 0 &&
+      _price > 0;
+
+  // State/district are NOT NULL on availabilities; the warehouse address is
+  // the business detail asked for once (RB-SELLER-QUICK-POST-01).
+  bool get _locationComplete =>
+      _selectedState != null &&
+      _selectedDistrict != null &&
+      _lotLocation.warehouse.address.trim().isNotEmpty;
+
+  List<String> get _commoditySummary {
+    final c = _selectedCommodity;
+    if (c == null) return const ['Add commodity details'];
+    final unit = _selectedUnit?.symbol ?? '';
+    final qty = _quantityController.text.trim();
+    final price = _askingPriceController.text.trim();
+    return [
+      '${c.name} · ${_selectedGrade?.gradeName ?? 'Select grade'}',
+      qty.isEmpty || price.isEmpty
+          ? 'Enter quantity and price'
+          : '$qty $unit · ₹$price/$unit',
+    ];
+  }
+
+  List<String> get _locationSummaryLines {
+    if (!_locationComplete) {
+      return [
+        _locationFromProfile
+            ? 'Saved address loaded · choose district'
+            : 'Add warehouse location',
+      ];
+    }
+    final w = _lotLocation.warehouse;
+    final place = [
+      if (w.label.isNotEmpty) w.label else if (w.address.isNotEmpty) w.address,
+      '${_selectedDistrict!.name}, ${_selectedState!.name}',
+    ].join(' · ');
+    return [
+      place,
+      _lotLocation.loadingSameAsWarehouse
+          ? 'Loading: same as warehouse'
+          : 'Loading: separate location',
+    ];
+  }
+
+  List<String> get _labSummaryLines => [
+    _requestLabTesting ? 'Testing requested' : 'Testing not requested',
+    _labAttachment != null ? 'Report attached' : 'No report attached',
+  ];
+
+  List<String> get _brokerSummaryLines {
+    final b = _selectedBroker;
+    if (b == null) return const ['No broker selected · open broker pool'];
+    return [
+      b.name,
+      if ((b.location ?? '').isNotEmpty) b.location!,
+    ];
+  }
+
+  Widget _buildCollapsible({
+    required int index,
+    required IconData icon,
+    required String title,
+    required List<String> summary,
+    required bool complete,
+    required Widget Function() body,
+    bool required = false,
+  }) {
+    final open = _openSection == index;
+    final attention = required && !complete;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        key: Key('post_section_$index'),
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: attention && !open
+                ? Colors.amber.shade300
+                : Colors.grey.shade200,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              button: true,
+              expanded: open,
+              label: '$title. ${summary.join('. ')}',
+              excludeSemantics: true,
+              // Re-expose the tap that excludeSemantics hides from the InkWell.
+              onTap: () => setState(() => _openSection = open ? null : index),
+              child: InkWell(
+                key: Key('post_section_header_$index'),
+                onTap: () =>
+                    setState(() => _openSection = open ? null : index),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryContainer.withValues(
+                            alpha: 0.6,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, size: 18, color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (!open)
+                              for (final line in summary)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    line,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondaryLight,
+                                    ),
+                                  ),
+                                ),
+                          ],
+                        ),
+                      ),
+                      if (attention && !open)
+                        Container(
+                          margin: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'To do',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
+                        ),
+                      Icon(
+                        open ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                        size: 20,
+                        color: AppColors.textSecondaryLight,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (open) ...[
+              Divider(height: 1, color: Colors.grey.shade200),
+              Padding(padding: const EdgeInsets.all(14), child: body()),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _showAdditionalDetails = false;
+
+  Widget _buildCommodityDetails(double totalVal, DateFormat dateFormat) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSection1(),
+        const SizedBox(height: 14),
+        _buildSection2(totalVal),
+        const SizedBox(height: 10),
+        InkWell(
+          key: const Key('additional_details_toggle'),
+          onTap: () =>
+              setState(() => _showAdditionalDetails = !_showAdditionalDetails),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Additional Details (Optional)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                Icon(
+                  _showAdditionalDetails
+                      ? LucideIcons.chevronUp
+                      : LucideIcons.chevronDown,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_showAdditionalDetails) _buildAvailabilityDates(dateFormat),
+      ],
+    );
+  }
+
+  /// [d] limited to the picker window, so an edited lot with dates outside it
+  /// cannot trip showDatePicker's initialDate assertion.
+  static DateTime _clampDate(DateTime d, DateTime first, DateTime last) =>
+      d.isBefore(first) ? first : (d.isAfter(last) ? last : d);
+
+  String? get _dateError =>
+      PostCommodityScreen.validUntilError(_availableFrom, _validUntil);
+
+  Widget _buildAvailabilityDates(DateFormat dateFormat) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: InkWell(
+            key: const Key('available_from_field'),
+            onTap: () async {
+              final first = DateTime.now().subtract(const Duration(days: 30));
+              final last = DateTime.now().add(const Duration(days: 90));
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _clampDate(_availableFrom, first, last),
+                firstDate: first,
+                lastDate: last,
+              );
+              if (picked != null) setState(() => _availableFrom = picked);
+            },
+            child: InputDecorator(
+              decoration: const InputDecoration(labelText: 'Available From'),
+              child: Text(
+                dateFormat.format(_availableFrom),
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: InkWell(
+            key: const Key('valid_until_field'),
+            onTap: () async {
+              final first = DateTime.now();
+              final last = DateTime.now().add(const Duration(days: 90));
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _clampDate(_validUntil, first, last),
+                firstDate: first,
+                lastDate: last,
+              );
+              if (picked != null) setState(() => _validUntil = picked);
+            },
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Valid Until *',
+                errorText: _dateError,
+                errorMaxLines: 2,
+              ),
+              child: Text(
+                dateFormat.format(_validUntil),
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationDetails() {
+    Widget row(IconData icon, String label, String value) => Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textSecondaryLight),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_locationFromProfile)
+          Container(
+            key: const Key('location_from_profile_note'),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _locationComplete
+                  ? AppColors.successBackground
+                  : Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              _locationComplete
+                  ? 'Filled from your saved profile location. Edit it if this lot is elsewhere.'
+                  // The saved district did not match the current district list.
+                  : 'Your saved profile address is loaded, but its district '
+                        'needs to be chosen again. Tap Add Location.',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        if (!_locationComplete && !_locationFromProfile)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text(
+              'No warehouse location yet. Add one to list this lot.',
+              style: TextStyle(fontSize: 12, color: AppColors.error),
+            ),
+          )
+        else if (!_locationComplete)
+          const SizedBox.shrink()
+        else ...[
+          row(LucideIcons.warehouse, 'Registered Warehouse', _warehouseSummary),
+          row(LucideIcons.truck, 'Loading Location', _loadingSummary),
+          row(LucideIcons.building2, 'Enterprise Office', _officeSummary),
+        ],
+        SizedBox(
+          height: 44,
+          child: OutlinedButton.icon(
+            key: const Key('edit_location_button'),
+            onPressed: _openLocationPopup,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: Icon(
+              _locationComplete ? LucideIcons.pencil : LucideIcons.plus,
+              size: 16,
+            ),
+            label: Text(
+              _locationComplete ? 'Edit Location' : 'Add Location',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'Physical Loading Readiness *',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          initialValue: _loadingStatus,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
+          items: MasterCommodityData.verifiedLoadingStatuses
+              .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+              .toList(),
+          onChanged: (val) {
+            if (val != null) setState(() => _loadingStatus = val);
+          },
+        ),
+      ],
+    );
+  }
+
+  /// First required section that is incomplete, in on-screen order.
+  int? _firstIncompleteSection() {
+    if (!_commodityComplete || _dateError != null) return _secCommodity;
+    if (!_locationComplete) return _secLocation;
+    return null;
+  }
+
+  /// Validates, then shows the review. Only "List Commodity on Desk" in the
+  /// review calls the existing [_handleSubmit].
+  Future<void> _openReview() async {
+    if (_isSubmitting) return;
+    final missing = _firstIncompleteSection();
+    if (missing != null) {
+      setState(() {
+        _openSection = missing;
+        // The date fields live under Additional Details; show the error there.
+        if (_dateError != null) _showAdditionalDetails = true;
+      });
+      // Let the opened section build so its field errors can show.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      _formKey.currentState?.validate();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            missing == _secCommodity
+                ? (_commodityComplete
+                      ? _dateError!
+                      : 'Complete commodity, grade, quantity and price.')
+                : 'Add the warehouse location: ${_missingLocationItems.join(', ')}.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // The lot is filled in; the firm must also be verified on the server.
+    final r = _readiness;
+    if (r == null || r.status != ListingReadinessStatus.complete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            r == null
+                ? 'Still checking your business profile. Please try again in a moment.'
+                : (r.error ?? r.missing.join(' ')),
+          ),
+          action: r?.status == ListingReadinessStatus.unverified
+              ? SnackBarAction(label: 'Retry', onPressed: _loadReadiness)
+              : (r?.status == ListingReadinessStatus.incomplete
+                  ? SnackBarAction(
+                      label: 'Complete Profile',
+                      onPressed: _openCompleteProfile,
+                    )
+                  : null),
+        ),
+      );
+      return;
+    }
+    if (!(_formKey.currentState?.validate() ?? true)) return;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.backgroundLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _buildReviewSheet(ctx),
+    );
+    if (confirmed == true && mounted) await _handleSubmit();
+  }
+
+  Widget _buildReviewSheet(BuildContext ctx) {
+    final currencyFormat = NumberFormat('#,##,###');
+    final dateFormat = DateFormat('dd MMM yyyy');
+    final unit = _selectedUnit?.symbol ?? '(select unit)';
+    final totalVal = _qty * _price;
+
+    void edit(int section) {
+      Navigator.pop(ctx, false);
+      setState(() => _openSection = section);
+    }
+
+    Widget group(String title, int section, List<Widget> rows) => Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 6, 6, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              TextButton(
+                key: Key('review_edit_$section'),
+                onPressed: () => edit(section),
+                child: const Text('Edit'),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Column(children: rows),
+          ),
+        ],
+      ),
+    );
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.9,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      builder: (context, scrollController) => Column(
+        children: [
+          Expanded(
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Review & List Commodity',
+                        style: AppTypography.titleMedium,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      icon: const Icon(LucideIcons.x),
+                      onPressed: () => Navigator.pop(ctx, false),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Lot ${_lotNumberController.text.trim()}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ),
+                group('Commodity & Pricing', _secCommodity, [
+                  _buildReviewRow('Commodity', _selectedCommodity?.name ?? ''),
+                  _buildReviewRow(
+                    'Category',
+                    (_selectedCommodity?.categoryName ?? '').trim().isEmpty
+                        ? 'Category unavailable'
+                        : _selectedCommodity!.categoryName!,
+                  ),
+                  _buildReviewRow(
+                    'Quality Grade',
+                    _selectedGrade?.gradeName ?? '',
+                  ),
+                  _buildReviewRow(
+                    'Supply Quantity',
+                    '${_quantityController.text.trim()} $unit',
+                  ),
+                  _buildReviewRow(
+                    'Asking Price',
+                    '₹${_askingPriceController.text.trim()} per $unit',
+                  ),
+                  if (totalVal > 0)
+                    _buildReviewRow(
+                      'Estimated Gross Value',
+                      '₹${currencyFormat.format(totalVal)}',
+                      isHighlight: true,
+                    ),
+                  _buildReviewRow('Commercial Terms', _paymentSchedule),
+                  _buildReviewRow(
+                    'Availability',
+                    '${dateFormat.format(_availableFrom)} – ${dateFormat.format(_validUntil)}',
+                  ),
+                ]),
+                group('Locations', _secLocation, [
+                  _buildReviewRow('Warehouse', _warehouseSummary),
+                  _buildReviewRow(
+                    'Loading Facility',
+                    '$_loadingSummary ($_loadingStatus)',
+                  ),
+                  _buildReviewRow('Office HQ', _officeSummary),
+                ]),
+                group('Lab Testing & Reports', _secLab, [
+                  if (_requestLabTesting) ...[
+                    _buildReviewRow(
+                      'Lab Testing (Optional)',
+                      '${LabTestRateCard.laboratoryName} (${_selectedLabTestIds.length} tests)',
+                      isHighlight: true,
+                    ),
+                    _buildReviewRow(
+                      'Lab Payment Status',
+                      _currentLabRequest?.paymentStatus.label ??
+                          'Awaiting Payment',
+                      isHighlight: _currentLabRequest?.isPaid == true,
+                    ),
+                  ] else
+                    _buildReviewRow('Lab Testing', 'Not requested'),
+                  _buildReviewRow(
+                    'Lab Report',
+                    _labAttachment != null
+                        ? _labAttachment!.fileName
+                        : 'No report attached',
+                    isHighlight: _labAttachment != null,
+                  ),
+                ]),
+                group('My Trusted Broker', _secBroker, [
+                  _buildReviewRow(
+                    'Trusted Broker Routing',
+                    _selectedBroker != null
+                        ? _selectedBroker!.name
+                        : 'Open broker pool',
+                    isHighlight: _selectedBroker != null,
+                  ),
+                ]),
+              ],
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: AppButton(
+                key: const Key('confirm_list_button'),
+                label: 'List Commodity on Desk',
+                onPressed: () => Navigator.pop(ctx, true),
+                icon: LucideIcons.send,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3329,89 +3613,55 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     );
   }
 
+  /// Batch / Lot No. shown once at the top; its generation lifecycle is unchanged.
+  Widget _buildLotBadge() {
+    final lot = _lotNumberController.text.trim();
+    if (lot.isEmpty) return const SizedBox.shrink();
+    return Semantics(
+      label: 'Batch and Lot Number $lot',
+      child: Container(
+        key: const Key('section1_batch_lot_label'),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.primaryContainer.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            const Text(
+              'BATCH / LOT NO.  ',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: AppColors.textSecondaryLight,
+              ),
+            ),
+            Expanded(
+              child: Text(
+                lot,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Commodity search + grade (expanded Commodity & Pricing, part 1).
   Widget _buildSection1() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section 1 Header with compact Batch/Lot No. secondary label
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isNarrow = constraints.maxWidth < 420;
-            final header = _buildSectionHeader(
-              '1. Commodity & Specification',
-              LucideIcons.package,
-            );
-            final lotBadge = _lotNumberController.text.trim().isNotEmpty
-                ? Semantics(
-                    label:
-                        'Batch and Lot Number ${_lotNumberController.text.trim()}',
-                    child: Container(
-                      key: const Key('section1_batch_lot_label'),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withValues(
-                          alpha: 0.5,
-                        ),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'BATCH / LOT NO.  ',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                              color: AppColors.textSecondaryLight,
-                            ),
-                          ),
-                          Text(
-                            _lotNumberController.text.trim(),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : null;
-
-            if (isNarrow || lotBadge == null) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  header,
-                  if (lotBadge != null) ...[
-                    const SizedBox(height: 6),
-                    lotBadge,
-                  ],
-                ],
-              );
-            }
-
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(child: header),
-                const SizedBox(width: 8),
-                lotBadge,
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        AppCard(
-          child: LayoutBuilder(
+        Builder(
+          builder: (_) => LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth >= 520;
               final commodityDropdown = _buildFormFieldWrapper(
@@ -3456,18 +3706,14 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     );
   }
 
+  /// Quantity, unit, price and terms (expanded Commodity & Pricing, part 2).
   Widget _buildSection2(double totalVal) {
     final currencyFormat = NumberFormat('#,##,###');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          '2. Quantity & Commercial Pricing',
-          LucideIcons.indianRupee,
-        ),
-        const SizedBox(height: 12),
-        AppCard(
-          child: LayoutBuilder(
+        Builder(
+          builder: (_) => LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth >= 600;
 
@@ -3687,116 +3933,6 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
     );
   }
 
-  Widget _buildReviewSummaryCard(double totalVal, DateFormat dateFormat) {
-    final currencyFormat = NumberFormat('#,##,###');
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _selectedCommodity?.name ?? 'Commodity Lot',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  color: AppColors.primary,
-                ),
-              ),
-              Text(
-                _lotNumberController.text.trim(),
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  color: AppColors.textSecondaryLight,
-                ),
-              ),
-            ],
-          ),
-          Text(
-            _selectedGrade?.gradeName ?? 'Standard FAQ',
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondaryLight,
-            ),
-          ),
-          const Divider(height: 20),
-
-          _buildReviewRow(
-            'Supply Quantity',
-            _quantityController.text.trim().isEmpty
-                ? 'Not entered'
-                : '${_quantityController.text.trim()} ${_selectedUnit?.symbol ?? "(select unit)"}',
-          ),
-          _buildReviewRow(
-            'Asking Price',
-            _askingPriceController.text.trim().isEmpty
-                ? 'Not entered'
-                : '₹${_askingPriceController.text.trim()} per ${_selectedUnit?.symbol ?? "(select unit)"}',
-          ),
-          if (totalVal > 0)
-            _buildReviewRow(
-              'Estimated Gross Value',
-              '₹${currencyFormat.format(totalVal)}',
-              isHighlight: true,
-            ),
-          _buildReviewRow(
-            'Warehouse & Mandi',
-            '${_selectedMandi?.name ?? ""}, ${_warehouseAddressController.text.trim().isNotEmpty ? _warehouseAddressController.text.trim() : "Mandi Yard"}',
-          ),
-          _buildReviewRow(
-            'Loading Facility',
-            '${_selectedDistrict?.name ?? ""}, ${_selectedState?.name ?? ""} ($_loadingStatus)',
-          ),
-          _buildReviewRow('Office HQ', _officeLocationController.text.trim()),
-          _buildReviewRow('Commercial Terms', _paymentSchedule),
-          if (_requestLabTesting) ...[
-            _buildReviewRow(
-              'Lab Testing (Optional)',
-              'Riddhi Siddhi Lab (${_selectedLabTestIds.length} tests)',
-              isHighlight: true,
-            ),
-            _buildReviewRow(
-              'Testing Request Ref',
-              _currentLabRequest?.id ??
-                  'LAB-REQ-${_lotNumberController.text.trim().isNotEmpty ? _lotNumberController.text.trim() : "DRAFT"}',
-            ),
-            _buildReviewRow(
-              'Lab Testing Fee',
-              '₹${LabTestRateCard.calculateTotal(_selectedLabTestIds.map((id) => LabTestRateCard.standardParameters.firstWhere((p) => p.id == id))).toInt()} (UPI Only)',
-            ),
-            _buildReviewRow(
-              'Lab Payment Status',
-              _currentLabRequest?.paymentStatus.label ?? 'Awaiting Payment',
-              isHighlight: _currentLabRequest?.isPaid == true,
-            ),
-          ],
-          if (_labAttachment != null) ...[
-            _buildReviewRow(
-              'Attached Lab Report',
-              '${_labAttachment!.fileName}${_labAttachment!.formattedSize.isNotEmpty ? " (${_labAttachment!.formattedSize})" : ""}',
-              isHighlight: true,
-            ),
-            if (_labAttachment!.reportReference != null)
-              _buildReviewRow(
-                'Report Reference',
-                _labAttachment!.reportReference!,
-              ),
-          ] else if (!_requestLabTesting)
-            _buildReviewRow('Lab Report', 'None (Skipped)'),
-          _buildReviewRow(
-            'Trusted Broker Routing',
-            _selectedBroker != null
-                ? '${_selectedBroker!.name} (${_selectedBroker!.location ?? ""})'
-                : 'Direct / Open Broker Pool',
-            isHighlight: _selectedBroker != null,
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildReviewRow(
     String label,
     String value, {
@@ -3831,16 +3967,6 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: AppColors.primary),
-        const SizedBox(width: 8),
-        Expanded(child: Text(title, style: AppTypography.titleMedium)),
-      ],
     );
   }
 }

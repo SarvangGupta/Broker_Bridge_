@@ -54,7 +54,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(
-      find.text('Find an authorized mandi broker for your procurement needs.'),
+      find.text('Connect with trusted brokers for your procurement needs.'),
       findsOneWidget,
     );
 

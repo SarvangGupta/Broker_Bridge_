@@ -146,9 +146,10 @@ class SellerDealsRepository {
           );
         }
 
-        if (list.isNotEmpty) return list;
+        return list;
       } catch (e) {
         debugPrint('Deals Supabase fetch notice: $e');
+        return const [];
       }
     }
 

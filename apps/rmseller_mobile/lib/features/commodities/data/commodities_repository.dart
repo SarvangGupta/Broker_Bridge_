@@ -2,11 +2,96 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/security/secure_storage_service.dart';
+import '../../authentication/data/auth_repository.dart';
 import '../domain/commodity_model.dart';
 import '../domain/master_commodity_data.dart';
 
 /// Repository managing Seller commodity listings, lot-level inventory,
 /// and authoritative database synchronization with the `availabilities` table.
+/// A price change the server did not confirm; [message] is user-facing.
+class PriceUpdateException implements Exception {
+  final String message;
+  const PriceUpdateException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// A listing the server did not save; [message] is safe to show the seller.
+class ListingSubmitException implements Exception {
+  static const String generic =
+      'Unable to publish your commodity right now. Please try again or '
+      'contact support if the problem continues.';
+
+  final String message;
+  final String? code;
+  const ListingSubmitException(this.message, {this.code});
+
+  @override
+  String toString() => message;
+}
+
+/// The seller's lots could not be read; [message] is safe to show.
+class CommodityListException implements Exception {
+  static const String generic =
+      'Could not load your commodity lots. Check your connection and try again.';
+
+  final String message;
+  const CommodityListException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// A status change (Fulfil / Withdraw) the server did not confirm.
+class StatusUpdateException implements Exception {
+  static const String generic =
+      'Could not update the lot status. Check your connection and try again.';
+
+  final String message;
+  const StatusUpdateException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// A broker change the server did not confirm; [message] is user-facing.
+class BrokerUpdateException implements Exception {
+  final String message;
+  const BrokerUpdateException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// Ownership representation for Seller listing isolation: either an enterprise
+/// company or an authorized individual seller identity.
+enum SellerOwnershipType { company, individual }
+
+class SellerOwnership {
+  final SellerOwnershipType type;
+  final String? companyId;
+  final String? userId;
+
+  const SellerOwnership._({required this.type, this.companyId, this.userId});
+
+  factory SellerOwnership.company(String companyId) =>
+      SellerOwnership._(type: SellerOwnershipType.company, companyId: companyId);
+
+  factory SellerOwnership.individual(String userId) =>
+      SellerOwnership._(type: SellerOwnershipType.individual, userId: userId);
+
+  bool get isCompany => type == SellerOwnershipType.company;
+  bool get isIndividual => type == SellerOwnershipType.individual;
+
+  /// Cache key for partitioning session-stored lots
+  String get cacheKey => isCompany ? companyId! : 'individual_$userId';
+}
+
+/// Error type only, for logs that must not carry row values or tokens.
+String _errorCode(Object e) =>
+    e is PostgrestException ? 'code=${e.code}' : e.runtimeType.toString();
+
 class CommoditiesRepository {
   final SupabaseClient? _customClient;
   final SecureStorageService _storage;
@@ -262,31 +347,46 @@ class CommoditiesRepository {
 
       String listingId =
           'AVL-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      String cacheKey = companyId;
+      SellerOwnership? ownership;
 
       if (client != null) {
-        final session = client.auth.currentSession;
-        final insertPayload = dto.toSupabaseInsert(companyId);
+        ownership = await _resolveSellerOwnership(
+          client,
+          (m) => ListingSubmitException(m),
+          ListingSubmitException.generic,
+        );
+        cacheKey = ownership.cacheKey;
 
-        if (session != null && !session.isExpired) {
-          try {
-            final res = await client
-                .from('availabilities')
-                .insert(insertPayload)
-                .select('id, created_at, status')
-                .single();
+        final insertPayload = ownership.isCompany
+            ? dto.toSupabaseInsert(companyId: ownership.companyId)
+            : dto.toSupabaseInsert(sellerUserId: ownership.userId);
 
-            if (res['id'] != null) {
-              listingId = res['id'].toString();
-            }
-          } catch (e) {
-            debugPrint('Remote Supabase availability insertion error: $e');
-            throw Exception('Failed to save commodity listing to server: $e');
-          }
-        } else {
-          // No valid session: never report a listing the server did not save.
-          throw StateError(
-            'Your session has expired. Please sign in again to post this listing.',
+        try {
+          final res = await client
+              .from('availabilities')
+              .insert(insertPayload)
+              .select('id, created_at, status')
+              .single();
+          listingId = res['id'].toString();
+        } on PostgrestException catch (e) {
+          // Log the code only; the message can echo row values.
+          debugPrint('Availability insert rejected: code=${e.code}');
+          throw ListingSubmitException(
+            switch (e.code) {
+              '42501' =>
+                'Your account is not yet allowed to publish listings. '
+                    'Please contact support.',
+              '23505' =>
+                'Lot ${dto.lotNumber.trim()} is already listed. '
+                    'Check My Commodities instead of posting it again.',
+              _ => ListingSubmitException.generic,
+            },
+            code: e.code,
           );
+        } catch (e) {
+          debugPrint('Availability insert failed: ${_errorCode(e)}');
+          throw const ListingSubmitException(ListingSubmitException.generic);
         }
       }
 
@@ -328,13 +428,19 @@ class CommoditiesRepository {
         labName: dto.labName,
         labReportFileUrl: dto.labReportFileUrl,
         labReportFileName: dto.labReportFileName,
+        companyId: client != null && ownership?.isCompany == true
+            ? ownership!.companyId
+            : (client != null ? null : companyId),
+        sellerUserId: client != null && ownership?.isIndividual == true
+            ? ownership!.userId
+            : null,
         version: 1,
         createdAt: DateTime.now(),
       );
 
-      // Register into session cache, partitioned by company
+      // Register into session cache, partitioned by company or individual seller
       _sessionCommoditiesByCompany
-          .putIfAbsent(companyId, () => [])
+          .putIfAbsent(cacheKey, () => [])
           .insert(0, createdCommodity);
 
       // Notify active listeners
@@ -351,48 +457,46 @@ class CommoditiesRepository {
   // ============================================================================
 
   /// Fetch Seller commodity listings with optional status filter.
-  /// Strictly scoped to authenticated Seller's companyId.
+  /// Scoped to authenticated Seller's company or individual seller identity.
   Future<List<SellerCommodity>> getCommodities({String? statusFilter}) async {
     final client = _supabase;
     final List<SellerCommodity> results = [];
 
-    String? companyId;
-    try {
-      companyId = await _storage.getCompanyId().timeout(
-        const Duration(milliseconds: 500),
-        onTimeout: () => null,
+    final String cacheKey;
+    SellerOwnership? ownership;
+    if (client != null) {
+      ownership = await _resolveSellerOwnershipOrNull(
+        client,
+        (m) => CommodityListException(m),
+        CommodityListException.generic,
       );
-    } catch (_) {}
-
-    if (companyId == null || companyId.isEmpty) {
-      final sessionUser = client?.auth.currentUser;
-      if (sessionUser != null && client != null) {
-        try {
-          final userRow = await client
-              .from('users')
-              .select('company_id')
-              .eq('id', sessionUser.id)
-              .maybeSingle();
-          companyId = userRow?['company_id']?.toString();
-        } catch (_) {}
+      if (ownership == null) {
+        return const [];
       }
+      cacheKey = ownership.cacheKey;
+    } else {
+      cacheKey = await _offlineCompanyId();
     }
 
-    companyId ??= '20000000-0000-0000-0000-000000000101';
-
-    // Prepend newly posted commodities from this session for this company only
-    final sessionItems = _sessionCommoditiesByCompany[companyId] ?? [];
+    // Prepend newly posted commodities from this session for this company/seller only
+    final sessionItems = _sessionCommoditiesByCompany[cacheKey] ?? [];
     results.addAll(sessionItems);
 
-    if (client != null) {
+    if (client != null && ownership != null) {
       try {
         var query = client
             .from('availabilities')
             .select(
-              'id, company_id, commodity_id, grade_id, quantity, unit_id, price, state_id, district_id, status, lot_number, total_quantity, available_quantity, reserved_quantity, sold_quantity, asking_price, confidential_minimum_price, available_from, valid_until, loading_status, broker_id, version, created_at, master_commodities(name), master_grades(grade_name), master_units(symbol), master_states(name), master_districts(name)',
+              'id, company_id, seller_user_id, commodity_id, grade_id, quantity, unit_id, price, state_id, district_id, status, lot_number, total_quantity, available_quantity, reserved_quantity, sold_quantity, asking_price, confidential_minimum_price, available_from, valid_until, loading_status, loading_remarks, broker_id, version, created_at, master_commodities(name), master_grades(grade_name), master_units(symbol), master_states(name), master_districts(name), broker:users!availabilities_broker_id_fkey(name, mobile)',
             );
 
-        query = query.eq('company_id', companyId);
+        if (ownership.isCompany) {
+          query = query.eq('company_id', ownership.companyId!);
+        } else {
+          query = query
+              .isFilter('company_id', null)
+              .eq('seller_user_id', ownership.userId!);
+        }
 
         if (statusFilter != null && statusFilter != 'ALL') {
           query = query.eq('status', statusFilter);
@@ -454,14 +558,23 @@ class CommoditiesRepository {
                         DateTime.now().add(const Duration(days: 7))
                   : DateTime.now().add(const Duration(days: 7)),
               brokerId: item['broker_id'] as String?,
-              brokerName: item['broker_id'] != null
-                  ? 'Assigned Mandi Broker Desk'
-                  : null,
+              // Real broker from the broker_id FK, not a placeholder label.
+              brokerName: item['broker_id'] == null
+                  ? null
+                  : (item['broker'] as Map<String, dynamic>?)?['name']
+                            as String? ??
+                        'Assigned broker',
+              brokerPhone:
+                  (item['broker'] as Map<String, dynamic>?)?['mobile']
+                      as String?,
+              loadingRemarks: item['loading_remarks'] as String?,
               commodityId: item['commodity_id'] as String?,
               gradeId: item['grade_id'] as String?,
               unitId: item['unit_id'] as String?,
               stateId: item['state_id'] as String?,
               districtId: item['district_id'] as String?,
+              companyId: item['company_id'] as String?,
+              sellerUserId: item['seller_user_id'] as String?,
               version: (item['version'] as num?)?.toInt() ?? 1,
               createdAt: item['created_at'] != null
                   ? DateTime.tryParse(item['created_at'].toString()) ??
@@ -470,9 +583,30 @@ class CommoditiesRepository {
             ),
           );
         }
+      } on PostgrestException catch (e) {
+        if (e.code == 'PGRST301' ||
+            (e.message.toLowerCase().contains('jwt') &&
+                e.message.toLowerCase().contains('expired'))) {
+          final recovery = await AuthRepository(
+            supabase: client,
+            storage: _storage,
+          ).recoverSession(force: true);
+          if (recovery == SessionRecoveryState.recovered) {
+            return getCommodities(statusFilter: statusFilter);
+          }
+          throw const CommodityListException(
+            'Your session has expired. Please sign in again.',
+          );
+        }
+        debugPrint('Availabilities fetch failed: ${_errorCode(e)}');
+        throw const CommodityListException(CommodityListException.generic);
       } catch (e) {
-        debugPrint('Availabilities Supabase fetch notice: $e');
+        // A failed read is an error, never an empty list or sample data.
+        debugPrint('Availabilities fetch failed: ${_errorCode(e)}');
+        throw const CommodityListException(CommodityListException.generic);
       }
+      // Real (possibly empty) server data; sample lots are offline-only.
+      return results;
     }
 
     if (results.isEmpty) {
@@ -488,6 +622,17 @@ class CommoditiesRepository {
     return results;
   }
 
+  /// True when a backend is configured (false in offline/test mode).
+  bool get isOnline => _supabase != null;
+
+  /// The seller's real listings, for "previously posted" suggestions. Empty in
+  /// offline/test mode, so the sample lots are never shown as history. Throws
+  /// [CommodityListException] when the server read fails (not "no history").
+  Future<List<SellerCommodity>> getPostingHistory() async {
+    if (_supabase == null) return const [];
+    return getCommodities();
+  }
+
   Future<SellerCommodity?> getCommodityById(String id) async {
     final list = await getCommodities();
     for (final c in list) {
@@ -496,151 +641,423 @@ class CommoditiesRepository {
     return null;
   }
 
-  /// Update listing status (e.g., Cancelled, Fulfilled, Active) with seller company scoping
-  Future<bool> updateCommodityStatus(
+  /// Changes the lot status (e.g. Fulfilled, Cancelled). Returns the status
+  /// the server confirms it stored; throws [StatusUpdateException] when
+  /// nothing was saved, so callers never show an unconfirmed state.
+  Future<String> updateCommodityStatus(
     String commodityId,
     String newStatus,
   ) async {
     final client = _supabase;
-    String? companyId;
-    try {
-      companyId = await _storage.getCompanyId().timeout(
-        const Duration(milliseconds: 500),
-        onTimeout: () => null,
-      );
-    } catch (_) {}
-    companyId ??= '20000000-0000-0000-0000-000000000101';
-
-    // Update in-memory session cache first
-    final sessionList = _sessionCommoditiesByCompany[companyId];
-    if (sessionList != null) {
-      final idx = sessionList.indexWhere((c) => c.id == commodityId);
-      if (idx != -1) {
-        final old = sessionList[idx];
-        sessionList[idx] = old.copyWith(status: newStatus);
-      }
-    }
+    final String companyId;
+    String confirmed = newStatus;
 
     if (client != null) {
+      if (!CreateCommodityDto.isValidUuid(commodityId)) {
+        throw const StatusUpdateException(
+          'This lot is not saved on the server, so its status cannot be changed.',
+        );
+      }
+      final ownership = await _resolveSellerOwnership(
+        client,
+        (m) => StatusUpdateException(m),
+        StatusUpdateException.generic,
+      );
+      List<dynamic> rows;
       try {
-        await client
+        var query = client
             .from('availabilities')
             .update({'status': newStatus})
-            .eq('id', commodityId)
-            .eq('company_id', companyId);
+            .eq('id', commodityId);
+
+        if (ownership.isCompany) {
+          query = query.eq('company_id', ownership.companyId!);
+        } else {
+          query = query
+              .isFilter('company_id', null)
+              .eq('seller_user_id', ownership.userId!);
+        }
+
+        rows = await query.select('id, status');
+      } on PostgrestException catch (e) {
+        debugPrint('Status update rejected: code=${e.code}');
+        throw StatusUpdateException(
+          e.code == '42501'
+              ? 'Your account is not allowed to change this lot.'
+              : StatusUpdateException.generic,
+        );
       } catch (e) {
-        debugPrint('Supabase status update error: $e');
+        debugPrint('Status update failed: ${_errorCode(e)}');
+        throw const StatusUpdateException(StatusUpdateException.generic);
+      }
+      if (rows.isEmpty) {
+        throw const StatusUpdateException(
+          'The status was not changed: this lot was not found for your account.',
+        );
+      }
+      confirmed =
+          (rows.first as Map<String, dynamic>)['status']?.toString() ?? '';
+      if (confirmed != newStatus) {
+        throw const StatusUpdateException(StatusUpdateException.generic);
+      }
+      // Mirror the confirmed value into the session cache.
+      final sessionList = _sessionCommoditiesByCompany[ownership.cacheKey];
+      final idx = sessionList?.indexWhere((c) => c.id == commodityId) ?? -1;
+      if (idx != -1) {
+        sessionList![idx] = sessionList[idx].copyWith(status: confirmed);
+      }
+    } else {
+      companyId = await _offlineCompanyId();
+      // Offline/test mode: only lots held in this session's cache can change.
+      final known = _sessionCommoditiesByCompany[companyId]?.any(
+        (c) => c.id == commodityId,
+      );
+      if (known != true) {
+        throw const StatusUpdateException(
+          'This lot is not saved, so its status cannot be changed.',
+        );
+      }
+      final sessionList = _sessionCommoditiesByCompany[companyId];
+      final idx = sessionList?.indexWhere((c) => c.id == commodityId) ?? -1;
+      if (idx != -1) {
+        sessionList![idx] = sessionList[idx].copyWith(status: confirmed);
       }
     }
 
     commoditiesUpdatedNotifier.value++;
-    return true;
+    return confirmed;
   }
 
   /// Update asking price for an active lot with seller company scoping
-  Future<bool> updateCommodityPrice(String commodityId, double newPrice) async {
-    final client = _supabase;
-    String? companyId;
-    try {
-      companyId = await _storage.getCompanyId().timeout(
-        const Duration(milliseconds: 500),
-        onTimeout: () => null,
-      );
-    } catch (_) {}
-    companyId ??= '20000000-0000-0000-0000-000000000101';
-
-    // Update in-memory session cache first
-    final sessionList = _sessionCommoditiesByCompany[companyId];
-    if (sessionList != null) {
-      final idx = sessionList.indexWhere((c) => c.id == commodityId);
-      if (idx != -1) {
-        final old = sessionList[idx];
-        sessionList[idx] = old.copyWith(askingPrice: newPrice);
-      }
+  /// Returns the asking price the server confirms it stored. Throws
+  /// [PriceUpdateException] when nothing was saved, so callers never report a
+  /// price that is not persisted.
+  Future<double> updateCommodityPrice(String commodityId, double newPrice) async {
+    if (newPrice <= 0 || !newPrice.isFinite) {
+      throw const PriceUpdateException('Asking price must be positive.');
     }
+    final client = _supabase;
+    final String companyId;
 
+    double confirmed = newPrice;
     if (client != null) {
+      if (!CreateCommodityDto.isValidUuid(commodityId)) {
+        // e.g. the offline sample lots: they do not exist on the server.
+        throw const PriceUpdateException(
+          'This lot is not saved on the server, so its price cannot be updated.',
+        );
+      }
+      final ownership = await _resolveSellerOwnership(
+        client,
+        (m) => PriceUpdateException(m),
+        'Could not update the price. Check your connection and try again.',
+      );
+      List<dynamic> rows;
       try {
-        await client
+        var query = client
             .from('availabilities')
             .update({
               'price': newPrice.toString(),
               'asking_price': newPrice.toString(),
             })
-            .eq('id', commodityId)
-            .eq('company_id', companyId);
+            .eq('id', commodityId);
+
+        if (ownership.isCompany) {
+          query = query.eq('company_id', ownership.companyId!);
+        } else {
+          query = query
+              .isFilter('company_id', null)
+              .eq('seller_user_id', ownership.userId!);
+        }
+
+        rows = await query.select('id, asking_price, price');
+      } on PostgrestException catch (e) {
+        debugPrint('Price update rejected: code=${e.code}');
+        throw PriceUpdateException(
+          e.code == '42501'
+              ? 'Your account is not allowed to change this lot.'
+              : 'Could not update the price. Check your connection and try again.',
+        );
       } catch (e) {
         debugPrint('Supabase price update error: $e');
+        throw const PriceUpdateException(
+          'Could not update the price. Check your connection and try again.',
+        );
+      }
+      if (rows.isEmpty) {
+        throw const PriceUpdateException(
+          'The price was not updated: this lot was not found for your account.',
+        );
+      }
+      final row = rows.first as Map<String, dynamic>;
+      confirmed =
+          double.tryParse('${row['asking_price'] ?? row['price']}') ?? newPrice;
+
+      // Mirror the confirmed value into the session cache.
+      final sessionList = _sessionCommoditiesByCompany[ownership.cacheKey];
+      final idx = sessionList?.indexWhere((c) => c.id == commodityId) ?? -1;
+      if (idx != -1) {
+        sessionList![idx] = sessionList[idx].copyWith(askingPrice: confirmed);
+      }
+    } else {
+      companyId = await _offlineCompanyId();
+      // Offline/test mode: only lots held in this session's cache can change.
+      final known = _sessionCommoditiesByCompany[companyId]?.any(
+        (c) => c.id == commodityId,
+      );
+      if (known != true) {
+        throw const PriceUpdateException(
+          'This lot is not saved, so its price cannot be updated.',
+        );
+      }
+      final sessionList = _sessionCommoditiesByCompany[companyId];
+      final idx = sessionList?.indexWhere((c) => c.id == commodityId) ?? -1;
+      if (idx != -1) {
+        sessionList![idx] = sessionList[idx].copyWith(askingPrice: confirmed);
       }
     }
 
     commoditiesUpdatedNotifier.value++;
-    return true;
+    return confirmed;
   }
 
+  /// Offline/test mode only: the stored company id, else the demo company.
+  Future<String> _offlineCompanyId() async {
+    String? id;
+    try {
+      id = await _storage.getCompanyId().timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () => null,
+      );
+    } catch (_) {}
+    return (id == null || id.isEmpty)
+        ? '20000000-0000-0000-0000-000000000101'
+        : id;
+  }
+
+  Future<SellerOwnership> _resolveSellerOwnership(
+    SupabaseClient client,
+    Exception Function(String message) error, [
+    String generic = CommodityListException.generic,
+  ]) async {
+    final ownership = await _resolveSellerOwnershipOrNull(client, error, generic);
+    if (ownership == null) {
+      throw error(
+        'Your account is not provisioned as a seller. Please contact support.',
+      );
+    }
+    return ownership;
+  }
+
+  Future<SellerOwnership?> _resolveSellerOwnershipOrNull(
+    SupabaseClient client,
+    Exception Function(String message) error, [
+    String generic = CommodityListException.generic,
+  ]) async {
+    var session = client.auth.currentSession;
+    if (session == null || session.isExpired) {
+      final recovery = await AuthRepository(
+        supabase: client,
+        storage: _storage,
+      ).recoverSession();
+
+      if (recovery == SessionRecoveryState.networkError) {
+        throw error(
+          'Network connection issue. Please check your internet and tap Retry.',
+        );
+      }
+      if (recovery == SessionRecoveryState.unrecoverable) {
+        throw error('Your session has expired. Please sign in again.');
+      }
+      session = client.auth.currentSession;
+    }
+    if (session == null || session.isExpired) {
+      throw error('Your session has expired. Please sign in again.');
+    }
+    Map<String, dynamic>? row;
+    try {
+      row = await client
+          .from('users')
+          .select('id, role, status, company_id')
+          .eq('id', session.user.id)
+          .maybeSingle();
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST301' ||
+          (e.message.toLowerCase().contains('jwt') &&
+              e.message.toLowerCase().contains('expired'))) {
+        final retryRecovery = await AuthRepository(
+          supabase: client,
+          storage: _storage,
+        ).recoverSession(force: true);
+        if (retryRecovery == SessionRecoveryState.recovered) {
+          final freshSession = client.auth.currentSession;
+          if (freshSession != null) {
+            try {
+              row = await client
+                  .from('users')
+                  .select('id, role, status, company_id')
+                  .eq('id', freshSession.user.id)
+                  .maybeSingle();
+            } catch (_) {
+              throw error(generic);
+            }
+          }
+        } else {
+          throw error('Your session has expired. Please sign in again.');
+        }
+      } else {
+        debugPrint('Seller identity lookup failed: ${_errorCode(e)}');
+        throw error(generic);
+      }
+    } catch (e) {
+      debugPrint('Seller identity lookup failed: ${_errorCode(e)}');
+      throw error(generic);
+    }
+    if (row == null) {
+      // Attempt idempotent self-provisioning before reporting unprovisioned
+      try {
+        await client.rpc(
+          'provision_individual_seller',
+          params: {'target_auth_user_id': session.user.id},
+        );
+        row = await client
+            .from('users')
+            .select('id, role, status, company_id')
+            .eq('id', session.user.id)
+            .maybeSingle();
+      } catch (e) {
+        debugPrint('Auto-provisioning attempt in repository: $e');
+      }
+    }
+    if (row == null) {
+      return null;
+    }
+    final role = row['role']?.toString().toLowerCase().trim() ??
+        session.user.appMetadata['role']?.toString().toLowerCase().trim();
+    final isInactive = row['status'] == false || row['status'] == 'false';
+    if (role != null && role != 'seller') {
+      throw error(
+        'Your account does not have active seller permissions.',
+      );
+    }
+    if (isInactive) {
+      throw error(
+        'Your account has been deactivated. Please contact support.',
+      );
+    }
+    final compId = row['company_id']?.toString().trim();
+    if (compId != null && compId.isNotEmpty) {
+      return SellerOwnership.company(compId);
+    } else {
+      return SellerOwnership.individual(session.user.id);
+    }
+  }
+
+
   /// Update assigned broker for an active lot with seller company scoping and validation (UX-04)
-  Future<bool> updateCommodityBroker(
+  /// Returns the broker id the server confirms it stored. Throws
+  /// [BrokerUpdateException] when nothing was saved, so callers never show a
+  /// broker change that is not persisted.
+  Future<String?> updateCommodityBroker(
     String commodityId, {
     required String? brokerId,
     required String? brokerName,
     String? brokerPhone,
     String? brokerLocation,
   }) async {
-    final client = _supabase;
-    String? companyId;
-    try {
-      companyId = await _storage.getCompanyId().timeout(
-        const Duration(milliseconds: 500),
-        onTimeout: () => null,
+    // An unregistered broker id is an error, never silently cleared to null.
+    if (brokerId != null && !CreateCommodityDto.isValidUuid(brokerId)) {
+      throw const BrokerUpdateException(
+        'This broker is not registered on the platform, so they cannot be assigned.',
       );
-    } catch (_) {}
-    companyId ??= '20000000-0000-0000-0000-000000000101';
+    }
+    final client = _supabase;
+    final String companyId;
+    String? confirmed = brokerId;
 
-    // Update in-memory session cache first
-    final sessionList = _sessionCommoditiesByCompany[companyId];
-    if (sessionList != null) {
-      final idx = sessionList.indexWhere((c) => c.id == commodityId);
+    if (client != null) {
+      if (!CreateCommodityDto.isValidUuid(commodityId)) {
+        throw const BrokerUpdateException(
+          'This lot is not saved on the server, so its broker cannot be changed.',
+        );
+      }
+      const generic =
+          'Could not change the broker. Check your connection and try again.';
+      final ownership = await _resolveSellerOwnership(
+        client,
+        (m) => BrokerUpdateException(m),
+        generic,
+      );
+      List<dynamic> rows;
+      try {
+        var query = client
+            .from('availabilities')
+            .update({'broker_id': brokerId})
+            .eq('id', commodityId);
+
+        if (ownership.isCompany) {
+          query = query.eq('company_id', ownership.companyId!);
+        } else {
+          query = query
+              .isFilter('company_id', null)
+              .eq('seller_user_id', ownership.userId!);
+        }
+
+        rows = await query.select('id, broker_id');
+      } on PostgrestException catch (e) {
+        debugPrint('Broker update rejected: code=${e.code}');
+        throw BrokerUpdateException(
+          (e.code == '23503' || e.code == '42501')
+              ? 'This broker is not registered on the platform, so they cannot be assigned.'
+              : generic,
+        );
+      } catch (e) {
+        debugPrint('Broker update failed: ${_errorCode(e)}');
+        throw const BrokerUpdateException(generic);
+      }
+      if (rows.isEmpty) {
+        throw const BrokerUpdateException(
+          'The broker was not changed: this lot was not found for your account.',
+        );
+      }
+      confirmed = (rows.first as Map<String, dynamic>)['broker_id']?.toString();
+
+      // Mirror the confirmed assignment into the session cache.
+      final sessionList = _sessionCommoditiesByCompany[ownership.cacheKey];
+      final idx = sessionList?.indexWhere((c) => c.id == commodityId) ?? -1;
       if (idx != -1) {
-        final old = sessionList[idx];
-        sessionList[idx] = old.copyWith(
-          brokerId: brokerId,
+        sessionList![idx] = sessionList[idx].copyWith(
+          brokerId: confirmed,
+          brokerName: brokerName,
+          brokerPhone: brokerPhone,
+          brokerLocation: brokerLocation,
+        );
+      }
+    } else {
+      companyId = await _offlineCompanyId();
+      // Offline/test mode: only lots held in this session's cache can change.
+      final known = _sessionCommoditiesByCompany[companyId]?.any(
+        (c) => c.id == commodityId,
+      );
+      if (known != true) {
+        throw const BrokerUpdateException(
+          'This lot is not saved, so its broker cannot be changed.',
+        );
+      }
+      final sessionList = _sessionCommoditiesByCompany[companyId];
+      final idx = sessionList?.indexWhere((c) => c.id == commodityId) ?? -1;
+      if (idx != -1) {
+        sessionList![idx] = sessionList[idx].copyWith(
+          brokerId: confirmed,
           brokerName: brokerName,
           brokerPhone: brokerPhone,
           brokerLocation: brokerLocation,
         );
       }
     }
-    final mockIdx = _baselineCommodities.indexWhere((c) => c.id == commodityId);
-    if (mockIdx != -1) {
-      final old = _baselineCommodities[mockIdx];
-      _baselineCommodities[mockIdx] = old.copyWith(
-        brokerId: brokerId,
-        brokerName: brokerName,
-        brokerPhone: brokerPhone,
-        brokerLocation: brokerLocation,
-      );
-    }
-
-    if (client != null) {
-      try {
-        final cleanId =
-            (brokerId != null && CreateCommodityDto.isValidUuid(brokerId))
-            ? brokerId.trim()
-            : null;
-
-        await client
-            .from('availabilities')
-            .update({'broker_id': cleanId})
-            .eq('id', commodityId)
-            .eq('company_id', companyId);
-      } catch (e) {
-        debugPrint('Supabase broker assignment update error: $e');
-        return false;
-      }
-    }
 
     commoditiesUpdatedNotifier.value++;
-    return true;
+    return confirmed;
   }
 
   static final List<SellerCommodity> _baselineCommodities = [

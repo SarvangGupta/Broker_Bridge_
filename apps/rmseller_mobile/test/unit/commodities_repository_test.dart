@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rmseller_mobile/core/security/secure_storage_service.dart';
 import 'package:rmseller_mobile/features/commodities/data/commodities_repository.dart';
 import 'package:rmseller_mobile/features/commodities/domain/commodity_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
   group('RB-SELLER-02: CommoditiesRepository Unit Tests', () {
@@ -104,11 +105,12 @@ void main() {
         final created = await repository.createCommodity(dto);
         expect(created.status, 'Open');
 
-        final success = await repository.updateCommodityStatus(
+        // Now returns the server-confirmed status (RB-SELLER-POST-INTEGRITY-02).
+        final saved = await repository.updateCommodityStatus(
           created.id,
           'Cancelled',
         );
-        expect(success, isTrue);
+        expect(saved, 'Cancelled');
 
         final updated = await repository.getCommodityById(created.id);
         expect(updated?.status, 'Cancelled');
@@ -137,11 +139,138 @@ void main() {
       final created = await repository.createCommodity(dto);
       expect(created.askingPrice, 5000.0);
 
-      final success = await repository.updateCommodityPrice(created.id, 5250.0);
-      expect(success, isTrue);
+      final notified = CommoditiesRepository.commoditiesUpdatedNotifier.value;
+      final saved = await repository.updateCommodityPrice(created.id, 5250.0);
+      expect(saved, 5250.0);
+      expect(
+        CommoditiesRepository.commoditiesUpdatedNotifier.value,
+        notified + 1,
+      );
 
       final updated = await repository.getCommodityById(created.id);
       expect(updated?.askingPrice, 5250.0);
+
+      // A second update wins everywhere the list is read.
+      expect(await repository.updateCommodityPrice(created.id, 5400.0), 5400.0);
+      expect((await repository.getCommodityById(created.id))?.askingPrice, 5400.0);
+    });
+
+    // RB-SELLER-PRICE-SYNC-FIX-01
+    test('price update of an unsaved (sample) lot fails without notifying', () async {
+      final notified = CommoditiesRepository.commoditiesUpdatedNotifier.value;
+      final sample = (await repository.getCommodities()).first;
+
+      await expectLater(
+        repository.updateCommodityPrice(sample.id, sample.askingPrice + 100),
+        throwsA(isA<PriceUpdateException>()),
+      );
+      expect(CommoditiesRepository.commoditiesUpdatedNotifier.value, notified);
+      expect(
+        (await repository.getCommodityById(sample.id))?.askingPrice,
+        sample.askingPrice,
+      );
+    });
+
+    test('with a backend, a non-server lot id is rejected before any request', () async {
+      final online = CommoditiesRepository(
+        client: SupabaseClient('http://localhost:54321', 'test-anon-key'),
+        storage: storage,
+      );
+      await expectLater(
+        online.updateCommodityPrice('AVL-2026-001', 6000),
+        throwsA(isA<PriceUpdateException>()),
+      );
+    });
+
+    test('a failed request is reported, not treated as success', () async {
+      // Nothing listens on this port: the request fails.
+      final online = CommoditiesRepository(
+        client: SupabaseClient('http://127.0.0.1:9', 'test-anon-key'),
+        storage: storage,
+      );
+      await expectLater(
+        online.updateCommodityPrice(
+          '11111111-1111-4111-8111-111111111111',
+          6000,
+        ),
+        throwsA(isA<PriceUpdateException>()),
+      );
+    });
+
+    // RB-SELLER-AVAILABILITY-RLS-FIX-01
+    test('with a backend but no session, listing is refused with a safe message', () async {
+      final online = CommoditiesRepository(
+        client: SupabaseClient('http://127.0.0.1:9', 'test-anon-key'),
+        storage: storage,
+      );
+      final dto = CreateCommodityDto(
+        commodityId: '10000000-0000-0000-0000-000000000001',
+        commodityName: 'Yellow Soybean',
+        gradeId: '20000000-0000-0000-0000-000000000001',
+        gradeName: 'Grade A FAQ',
+        lotNumber: 'LOT-NOSESSION',
+        totalQuantity: 10.0,
+        unitId: '30000000-0000-0000-0000-000000000001',
+        unitSymbol: 'MT',
+        askingPrice: 100.0,
+        stateId: '40000000-0000-0000-0000-000000000001',
+        stateName: 'Rajasthan',
+        districtId: '50000000-0000-0000-0000-000000000001',
+        districtName: 'Bikaner Mandi Hub',
+        availableFrom: DateTime.now(),
+        validUntil: DateTime.now().add(const Duration(days: 7)),
+      );
+      await expectLater(
+        online.createCommodity(dto),
+        throwsA(
+          isA<ListingSubmitException>().having(
+            (e) => e.message,
+            'message',
+            contains('session has expired'),
+          ),
+        ),
+      );
+      // Nothing is cached as if it had been listed.
+      expect(
+        (await repository.getCommodities()).any((c) => c.lotNumber == 'LOT-NOSESSION'),
+        isFalse,
+      );
+    });
+
+    test('price update rejects a non-positive price', () async {
+      await expectLater(
+        repository.updateCommodityPrice('any', 0),
+        throwsA(isA<PriceUpdateException>()),
+      );
+    });
+
+    test('updating one lot never changes another lot', () async {
+      CreateCommodityDto dto(String lot, double price) => CreateCommodityDto(
+        commodityId: '10000000-0000-0000-0000-000000000001',
+        commodityName: 'Yellow Soybean',
+        gradeId: '20000000-0000-0000-0000-000000000001',
+        gradeName: 'Grade A FAQ',
+        lotNumber: lot,
+        totalQuantity: 10.0,
+        unitId: '30000000-0000-0000-0000-000000000001',
+        unitSymbol: 'MT',
+        askingPrice: price,
+        stateId: '40000000-0000-0000-0000-000000000001',
+        stateName: 'Rajasthan',
+        districtId: '50000000-0000-0000-0000-000000000001',
+        districtName: 'Bikaner Mandi Hub',
+        availableFrom: DateTime.now(),
+        validUntil: DateTime.now().add(const Duration(days: 7)),
+      );
+      final a = await repository.createCommodity(dto('LOT-A', 1000));
+      // createCommodity derives ids from the clock; keep them distinct.
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      final b = await repository.createCommodity(dto('LOT-B', 2000));
+      expect(a.id, isNot(b.id));
+
+      await repository.updateCommodityPrice(a.id, 1500);
+      expect((await repository.getCommodityById(a.id))?.askingPrice, 1500);
+      expect((await repository.getCommodityById(b.id))?.askingPrice, 2000);
     });
 
     test(

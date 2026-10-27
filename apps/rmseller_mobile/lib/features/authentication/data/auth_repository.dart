@@ -1,9 +1,28 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../app/router/app_router.dart';
 import '../../../core/security/secure_storage_service.dart';
 import '../domain/auth_result.dart';
 import '../domain/seller_user.dart';
+
+/// Status outcomes of an automatic or explicit session recovery attempt.
+enum SessionRecoveryState {
+  /// Session is valid and active (not expired).
+  valid,
+
+  /// Session was expired or unhydrated and was successfully refreshed.
+  recovered,
+
+  /// Refresh token is missing, invalid, or revoked; session terminated.
+  unrecoverable,
+
+  /// Recovery could not be completed due to network or connection failure.
+  networkError,
+}
 
 /// Authentication repository interfacing with Supabase Auth and Secure Storage.
 /// Strictly enforces Seller Portal role validation (role must be 'seller' or 'admin').
@@ -11,6 +30,10 @@ class AuthRepository {
   final SupabaseClient? _customClient;
   final SecureStorageService _storage;
   bool _isSigningIn = false;
+
+  /// Global in-flight recovery future to deduplicate concurrent refresh requests
+  /// and prevent Supabase refresh token rotation collision.
+  static Future<SessionRecoveryState>? _inFlightRecovery;
 
   AuthRepository({SupabaseClient? supabase, SecureStorageService? storage})
     : _customClient = supabase,
@@ -32,6 +55,12 @@ class AuthRepository {
   bool get isAuthenticated => currentUser != null;
 
   bool get isSigningIn => _isSigningIn;
+
+  /// Whether the client holds an active, unexpired authenticated session.
+  bool get hasValidSession {
+    final session = _supabase?.auth.currentSession;
+    return session != null && !session.isExpired;
+  }
 
   /// Hook for performing the underlying Supabase sign-in call.
   @visibleForTesting
@@ -78,6 +107,27 @@ class AuthRepository {
     await client.auth.signOut();
   }
 
+  /// Hook for refreshing an existing Supabase session.
+  @visibleForTesting
+  Future<AuthResponse> performSessionRefresh(
+    SupabaseClient client, [
+    String? refreshToken,
+  ]) async {
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      return await client.auth.refreshSession(refreshToken);
+    }
+    return await client.auth.refreshSession();
+  }
+
+  /// Hook for establishing a Supabase session from a persisted refresh token.
+  @visibleForTesting
+  Future<AuthResponse> performSetSession(
+    SupabaseClient client,
+    String refreshToken,
+  ) async {
+    return await client.auth.setSession(refreshToken);
+  }
+
   /// Authenticate credentials and authoritatively verify seller permissions.
   /// Prevents concurrent or repeated submissions while a request is active.
   Future<AuthResult> signInWithPassword({
@@ -98,6 +148,7 @@ class AuthRepository {
       _isSigningIn = false;
       final cleanEmail = email.trim().toLowerCase();
       if (cleanEmail == 'buyer@demo.com' || cleanEmail.contains('buyer')) {
+        await _storage.clearAll();
         return const AuthAccessDenied(
           email: 'buyer@demo.com',
           role: 'buyer',
@@ -105,6 +156,7 @@ class AuthRepository {
         );
       }
       if (cleanEmail == 'broker@demo.com' || cleanEmail.contains('broker')) {
+        await _storage.clearAll();
         return const AuthAccessDenied(
           email: 'broker@demo.com',
           role: 'broker',
@@ -199,14 +251,11 @@ class AuthRepository {
       if (serverRole == null || serverRole.isEmpty) {
         serverRole = user.userMetadata?['role'] as String?;
       }
-      companyId ??=
-          (user.userMetadata?['company_id'] as String?) ??
-          '20000000-0000-0000-0000-000000000101';
-      companyName ??=
-          (user.userMetadata?['company_name'] as String?) ??
-          'Bikaner Agro Processing Ltd';
-      companyGst ??=
-          (user.userMetadata?['company_gst'] as String?) ?? '08AAAAA0000A1Z5';
+      // A company comes only from the server users row. No hard-coded demo
+      // company, and not user_metadata (self-editable, so never ownership).
+      // An unlinked seller keeps companyId == null and can still use the
+      // desk (RB-SELLER-INDIVIDUAL-ACCESS-FIX-01). Display name only:
+      companyName ??= user.userMetadata?['company_name'] as String?;
 
       // Role check: Strictly assert seller or admin permissions
       final resolvedRole = (serverRole ?? '').toLowerCase().trim();
@@ -244,6 +293,39 @@ class AuthRepository {
         companyGst: companyGst,
       );
 
+      // Hydrate persistent default warehouse from authoritative auth metadata
+      final wh = (user.userMetadata?['default_warehouse'] as Map<String, dynamic>?) ??
+          (user.userMetadata?['warehouse'] as Map<String, dynamic>?);
+      if (wh != null &&
+          wh['address_line'] != null &&
+          wh['address_line'].toString().trim().isNotEmpty) {
+        final addr = wh['address_line'].toString();
+        final name = (wh['name'] ?? '').toString();
+        final locality = (wh['locality'] ?? '').toString();
+        final stateId = (wh['state_id'] ?? '').toString();
+        final stateName = (wh['state_name'] ?? '').toString();
+        final districtId = (wh['district_id'] ?? '').toString();
+        final districtName = (wh['district_name'] ?? '').toString();
+        final pinCode = (wh['pin_code'] ?? '').toString();
+
+        await _storage.savePreference('business_location_address_${user.id}', addr);
+        await _storage.savePreference('business_location_name_${user.id}', name);
+        await _storage.savePreference('business_location_locality_${user.id}', locality);
+        await _storage.savePreference('business_location_state_id_${user.id}', stateId);
+        await _storage.savePreference('business_location_state_${user.id}', stateName);
+        await _storage.savePreference('business_location_district_id_${user.id}', districtId);
+        await _storage.savePreference('business_location_district_${user.id}', districtName);
+        await _storage.savePreference('business_location_pincode_${user.id}', pinCode);
+
+        await _storage.savePreference('business_location_address', addr);
+        await _storage.savePreference('business_location_name', name);
+        await _storage.savePreference('business_location_locality', locality);
+        await _storage.savePreference('business_location_state_id', stateId);
+        await _storage.savePreference('business_location_state', stateName);
+        await _storage.savePreference('business_location_district_id', districtId);
+        await _storage.savePreference('business_location_district', districtName);
+        await _storage.savePreference('business_location_pincode', pinCode);
+      }
       final sellerUser = SellerUser(
         id: user.id,
         email: user.email ?? email,
@@ -275,9 +357,109 @@ class AuthRepository {
       } catch (_) {}
     }
     await _storage.clearAll();
+    try {
+      AppRouter.authNotifier.setUnauthenticated();
+    } catch (_) {}
   }
 
-  /// Check whether a valid saved session exists.
+  /// Safely recovers or refreshes an expired session using Supabase refresh token.
+  /// Deduplicates concurrent recovery calls across the app via a single in-flight future
+  /// to eliminate Gotrue refresh token rotation collisions.
+  Future<SessionRecoveryState> recoverSession({bool force = false}) async {
+    final client = _supabase;
+    if (client == null) {
+      final token = await _storage.getToken();
+      return token != null
+          ? SessionRecoveryState.valid
+          : SessionRecoveryState.unrecoverable;
+    }
+
+    final current = client.auth.currentSession;
+    if (!force && current != null && !current.isExpired) {
+      return SessionRecoveryState.valid;
+    }
+
+    if (_inFlightRecovery != null) {
+      return await _inFlightRecovery!;
+    }
+
+    final future = _performRecovery(client);
+    _inFlightRecovery = future;
+    try {
+      return await future;
+    } finally {
+      _inFlightRecovery = null;
+    }
+  }
+
+  Future<SessionRecoveryState> _performRecovery(SupabaseClient client) async {
+    try {
+      final current = client.auth.currentSession;
+      AuthResponse? response;
+
+      if (current != null && current.refreshToken != null) {
+        response = await performSessionRefresh(client, current.refreshToken);
+      } else {
+        final storedRefreshToken = await _storage.getRefreshToken();
+        if (storedRefreshToken != null && storedRefreshToken.isNotEmpty) {
+          response = await performSetSession(client, storedRefreshToken);
+        }
+      }
+
+      final session = response?.session ?? client.auth.currentSession;
+      if (session != null && !session.isExpired) {
+        await _storage.saveToken(session.accessToken);
+        if (session.refreshToken != null) {
+          await _storage.saveRefreshToken(session.refreshToken!);
+        }
+        return SessionRecoveryState.recovered;
+      }
+
+      await _handleUnrecoverableSession(client);
+      return SessionRecoveryState.unrecoverable;
+    } on AuthException catch (e) {
+      debugPrint('Auth recovery notice: ${e.message}');
+      final msg = e.message.toLowerCase();
+      if (msg.contains('network') ||
+          msg.contains('socket') ||
+          msg.contains('failed host lookup') ||
+          msg.contains('connection refused') ||
+          msg.contains('timeout')) {
+        return SessionRecoveryState.networkError;
+      }
+      await _handleUnrecoverableSession(client);
+      return SessionRecoveryState.unrecoverable;
+    } on SocketException catch (_) {
+      return SessionRecoveryState.networkError;
+    } on HttpException catch (_) {
+      return SessionRecoveryState.networkError;
+    } on TimeoutException catch (_) {
+      return SessionRecoveryState.networkError;
+    } catch (e) {
+      debugPrint('Unexpected auth recovery error: $e');
+      final str = e.toString().toLowerCase();
+      if (str.contains('network') ||
+          str.contains('socket') ||
+          str.contains('connection') ||
+          str.contains('timeout')) {
+        return SessionRecoveryState.networkError;
+      }
+      await _handleUnrecoverableSession(client);
+      return SessionRecoveryState.unrecoverable;
+    }
+  }
+
+  Future<void> _handleUnrecoverableSession(SupabaseClient client) async {
+    try {
+      await performSignOut(client);
+    } catch (_) {}
+    await _storage.clearAll();
+    try {
+      AppRouter.authNotifier.setUnauthenticated();
+    } catch (_) {}
+  }
+
+  /// Check whether a valid saved session exists, recovering an expired session if possible.
   Future<SellerUser?> getSavedUser() async {
     final token = await _storage.getToken();
     final userId = await _storage.getUserId();
@@ -290,6 +472,24 @@ class AuthRepository {
 
     if (token == null || userId == null || role == null || email == null) {
       return null;
+    }
+
+    final client = _supabase;
+    if (client != null) {
+      var session = client.auth.currentSession;
+      if (session == null || session.isExpired || session.user.id != userId) {
+        final recovery = await recoverSession();
+        if (recovery == SessionRecoveryState.unrecoverable) {
+          return null;
+        }
+        // If recovery == SessionRecoveryState.networkError, device is offline
+        // Preserve saved credentials so offline experience continues cleanly
+        session = client.auth.currentSession;
+        if (session != null && session.user.id != userId) {
+          await _storage.clearAll();
+          return null;
+        }
+      }
     }
 
     final cleanRole = role.toLowerCase().trim();

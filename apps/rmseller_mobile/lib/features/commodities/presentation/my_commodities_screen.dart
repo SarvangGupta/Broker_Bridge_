@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../app/router/app_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
 import '../../../core/widgets/app_card.dart';
@@ -173,8 +174,16 @@ class _MyCommoditiesScreenState extends State<MyCommoditiesScreen> {
                   )
                 : _errorMessage != null
                 ? AppErrorState(
+                    title: _errorMessage!.contains('session has expired')
+                        ? 'Session Expired'
+                        : 'Something went wrong',
                     message: _errorMessage!,
-                    onRetry: _fetchCommodities,
+                    retryLabel: _errorMessage!.contains('session has expired')
+                        ? 'Sign In'
+                        : 'Try Again',
+                    onRetry: _errorMessage!.contains('session has expired')
+                        ? () => AppRouter.authNotifier.setUnauthenticated()
+                        : _fetchCommodities,
                   )
                 : filtered.isEmpty
                 ? AppEmptyState(

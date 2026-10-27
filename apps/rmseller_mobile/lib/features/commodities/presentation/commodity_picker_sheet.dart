@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../domain/master_commodity_data.dart';
+import '../domain/posting_history.dart';
 
 /// "Category: …" label from the product's category association; never inferred from the name.
 class CategoryLabel extends StatelessWidget {
@@ -25,15 +26,33 @@ class CategoryLabel extends StatelessWidget {
   }
 }
 
+/// Posting-history state shown at the top of the picker.
+class PickerHistory {
+  /// Distinct previously posted products, most recent first.
+  final List<PreviousCommodity> items;
+
+  /// Set when the history could not be loaded (never shown as "no history").
+  final String? error;
+
+  /// False when no history source applies (e.g. offline mode).
+  final bool available;
+
+  const PickerHistory({this.items = const [], this.error, this.available = true});
+  const PickerHistory.unavailable() : items = const [], error = null, available = false;
+}
+
 /// Opens the searchable product picker over the live catalogue. Resolves to the
-/// selected product, or null when dismissed.
-Future<MasterCommodity?> showCommodityPickerSheet({
+/// selected product (with the remembered grade when picked from history), or
+/// null when dismissed.
+Future<CommodityPick?> showCommodityPickerSheet({
   required BuildContext context,
   required List<MasterCommodity> commodities,
   required Future<List<MasterCommodity>> Function() onRefresh,
   String? selectedId,
+  PickerHistory history = const PickerHistory.unavailable(),
+  Future<PickerHistory> Function()? onRetryHistory,
 }) {
-  return showModalBottomSheet<MasterCommodity>(
+  return showModalBottomSheet<CommodityPick>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
@@ -41,6 +60,8 @@ Future<MasterCommodity?> showCommodityPickerSheet({
       commodities: commodities,
       onRefresh: onRefresh,
       selectedId: selectedId,
+      history: history,
+      onRetryHistory: onRetryHistory,
     ),
   );
 }
@@ -49,12 +70,16 @@ class CommodityPickerSheet extends StatefulWidget {
   final List<MasterCommodity> commodities;
   final Future<List<MasterCommodity>> Function() onRefresh;
   final String? selectedId;
+  final PickerHistory history;
+  final Future<PickerHistory> Function()? onRetryHistory;
 
   const CommodityPickerSheet({
     super.key,
     required this.commodities,
     required this.onRefresh,
     this.selectedId,
+    this.history = const PickerHistory.unavailable(),
+    this.onRetryHistory,
   });
 
   @override
@@ -64,8 +89,114 @@ class CommodityPickerSheet extends StatefulWidget {
 class _CommodityPickerSheetState extends State<CommodityPickerSheet> {
   final _searchController = TextEditingController();
   late List<MasterCommodity> _items = widget.commodities;
+  late PickerHistory _history = widget.history;
   bool _isRefreshing = false;
+  bool _retryingHistory = false;
   String? _refreshError;
+
+  Future<void> _retryHistory() async {
+    final retry = widget.onRetryHistory;
+    if (retry == null) return;
+    setState(() => _retryingHistory = true);
+    final h = await retry();
+    if (!mounted) return;
+    setState(() {
+      _history = h;
+      _retryingHistory = false;
+    });
+  }
+
+  /// History entries whose product is still in the active catalogue and
+  /// matches the search.
+  List<(PreviousCommodity, MasterCommodity)> get _previous {
+    final q = _searchController.text.trim().toLowerCase();
+    final byId = {for (final c in _items) c.id: c};
+    return [
+      for (final p in _history.items)
+        if (byId[p.commodityId] case final c?)
+          if (q.isEmpty || c.name.toLowerCase().contains(q)) (p, c),
+    ];
+  }
+
+  Widget _sectionLabel(String text, {Key? key}) => Padding(
+    key: key,
+    padding: const EdgeInsets.fromLTRB(4, 10, 4, 4),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.3,
+        color: AppColors.textSecondaryLight,
+      ),
+    ),
+  );
+
+  List<Widget> _historyWidgets() {
+    final h = _history;
+    if (!h.available) return const [];
+    if (h.error != null) {
+      return [
+        Padding(
+          key: const Key('picker-history-error'),
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  h.error!,
+                  style: const TextStyle(fontSize: 12, color: AppColors.error),
+                ),
+              ),
+              if (widget.onRetryHistory != null)
+                _retryingHistory
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : TextButton(
+                        onPressed: _retryHistory,
+                        child: const Text('Retry'),
+                      ),
+            ],
+          ),
+        ),
+      ];
+    }
+    if (h.items.isEmpty) {
+      return [
+        _sectionLabel(
+          'Choose your first commodity',
+          key: const Key('picker-first-commodity'),
+        ),
+      ];
+    }
+    final prev = _previous;
+    if (prev.isEmpty) return const [];
+    return [
+      _sectionLabel(
+        'Your Previously Posted Commodities',
+        key: const Key('picker-previous-header'),
+      ),
+      for (final (p, c) in prev)
+        ListTile(
+          key: Key('previous-option-${p.commodityId}-${p.gradeId ?? ''}'),
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: const Icon(LucideIcons.history, size: 18, color: AppColors.primary),
+          title: Text(
+            p.gradeName.isNotEmpty ? '${c.name} · ${p.gradeName}' : c.name,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          subtitle: CategoryLabel(categoryName: c.categoryName),
+          onTap: () => Navigator.of(context).pop(
+            CommodityPick(c, preferredGradeId: p.gradeId),
+          ),
+        ),
+      _sectionLabel('All products'),
+    ];
+  }
 
   @override
   void dispose() {
@@ -184,9 +315,16 @@ class _CommodityPickerSheetState extends State<CommodityPickerSheet> {
                     )
                   : ListView.builder(
                       shrinkWrap: true,
-                      itemCount: filtered.length,
+                      itemCount: filtered.length + 1,
                       itemBuilder: (context, index) {
-                        final c = filtered[index];
+                        // Row 0: posting history (previous products first).
+                        if (index == 0) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: _historyWidgets(),
+                          );
+                        }
+                        final c = filtered[index - 1];
                         final isSelected = c.id == widget.selectedId;
                         return ListTile(
                           key: Key('commodity-option-${c.id}'),
@@ -204,7 +342,7 @@ class _CommodityPickerSheetState extends State<CommodityPickerSheet> {
                           trailing: isSelected
                               ? const Icon(LucideIcons.check, size: 18, color: AppColors.primary)
                               : null,
-                          onTap: () => Navigator.of(context).pop(c),
+                          onTap: () => Navigator.of(context).pop(CommodityPick(c)),
                         );
                       },
                     ),

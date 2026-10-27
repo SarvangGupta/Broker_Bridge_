@@ -61,9 +61,27 @@ class FakeCommoditiesRepository extends CommoditiesRepository {
   Future<List<MasterGrade>> getMasterGrades(String commodityId) async =>
       liveGrades[commodityId] ?? const [];
 
+  /// Server posting history; null = offline (no history source).
+  List<SellerCommodity>? history;
+
+  /// Thrown by [getPostingHistory] when set (a failed server read).
+  Object? historyError;
+
+  @override
+  bool get isOnline => history != null || historyError != null;
+
+  @override
+  Future<List<SellerCommodity>> getPostingHistory() async {
+    if (historyError != null) throw historyError!;
+    return history ?? const [];
+  }
+
+  /// What the submit throws after capturing the DTO.
+  Object submitError = Exception('captured by test (not persisted)');
+
   @override
   Future<SellerCommodity> createCommodity(CreateCommodityDto dto) async {
     submitted.add(dto);
-    throw Exception('captured by test (not persisted)');
+    throw submitError;
   }
 }

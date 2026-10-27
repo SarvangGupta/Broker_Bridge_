@@ -46,6 +46,15 @@ class MoreScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 10),
             MoreMenuTile(
+              key: const Key('more_messages'),
+              icon: LucideIcons.messagesSquare,
+              tint: MoreTint.green,
+              title: 'Messages',
+              subtitle: 'Chats with buyers',
+              onTap: () => context.push('/chats'),
+            ),
+            const SizedBox(height: 10),
+            MoreMenuTile(
               key: const Key('more_tools'),
               icon: LucideIcons.briefcase,
               tint: MoreTint.green,

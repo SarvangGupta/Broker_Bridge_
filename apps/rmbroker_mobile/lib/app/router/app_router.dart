@@ -4,6 +4,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../theme/app_colors.dart';
 import '../../core/widgets/module_placeholder_screen.dart';
+import '../../features/chat/presentation/chat_inbox_screen.dart';
+import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/authentication/presentation/access_denied_screen.dart';
 import '../../features/authentication/presentation/login_screen.dart';
 import '../../features/authentication/presentation/splash_screen.dart';
@@ -214,6 +216,26 @@ class AppRouter {
         name: 'notifications',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const NotificationCenterScreen(),
+      ),
+      // Buyer <-> Broker chat (BROKERBRIDGE-CHAT-E2E-01). Brokers reply only;
+      // conversations are opened by buyers.
+      GoRoute(
+        path: '/chats',
+        name: 'chat_inbox',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ChatInboxScreen(
+          emptyText: 'No buyer conversations yet. Buyers can message you from your profile.',
+        ),
+      ),
+      GoRoute(
+        path: '/chats/:id',
+        name: 'chat_conversation',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => ChatScreen(
+          conversationId: state.pathParameters['id'],
+          emptyHint: 'Reply to the buyer about their requirement, pricing or dispatch. '
+              'Seller identities stay protected.',
+        ),
       ),
       GoRoute(
         path: '/tasks',

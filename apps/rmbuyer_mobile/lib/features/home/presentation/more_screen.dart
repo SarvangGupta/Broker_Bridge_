@@ -19,6 +19,15 @@ class MoreScreen extends StatelessWidget {
         children: [
           _buildTile(
             context,
+            key: const Key('more-messages'),
+            icon: LucideIcons.messagesSquare,
+            title: 'Messages',
+            subtitle: 'Your conversations with brokers.',
+            onTap: () => context.push('/chats'),
+          ),
+          const SizedBox(height: 12),
+          _buildTile(
+            context,
             key: const Key('more-nutrition'),
             icon: LucideIcons.leaf,
             title: context.tr(Tr.navNutrition),

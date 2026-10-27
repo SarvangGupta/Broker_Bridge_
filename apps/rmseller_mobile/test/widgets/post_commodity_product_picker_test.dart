@@ -5,6 +5,7 @@ import 'package:rmseller_mobile/features/commodities/domain/master_commodity_dat
 import 'package:rmseller_mobile/features/commodities/presentation/post_commodity_screen.dart';
 
 import '../support/fake_commodities_repository.dart';
+import '../support/fake_profile_repository.dart';
 
 Future<void> pumpScreen(WidgetTester tester, FakeCommoditiesRepository repo, {String? initialCommodityId}) async {
   tester.view.physicalSize = const Size(1080, 3200);
@@ -13,7 +14,11 @@ Future<void> pumpScreen(WidgetTester tester, FakeCommoditiesRepository repo, {St
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.lightTheme,
-      home: PostCommodityScreen(commoditiesRepository: repo, initialCommodityId: initialCommodityId),
+      home: PostCommodityScreen(
+        commoditiesRepository: repo,
+        profileRepository: FakeProfileRepository.withWarehouse(),
+        initialCommodityId: initialCommodityId,
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -82,9 +87,7 @@ void main() {
       expect(find.byKey(const Key('no-grade-notice')), findsOneWidget);
       await tester.enterText(find.byKey(const Key('quantity_field')), '10');
       await tester.enterText(find.byKey(const Key('asking_price_field')), '4500');
-      await tester.ensureVisible(find.text('List Commodity on Desk'));
-      await tester.tap(find.text('List Commodity on Desk'));
-      await tester.pumpAndSettle();
+      await listViaReview(tester);
 
       expect(repo.submitted, isEmpty);
     });
@@ -103,9 +106,7 @@ void main() {
 
       await tester.enterText(find.byKey(const Key('quantity_field')), '10');
       await tester.enterText(find.byKey(const Key('asking_price_field')), '4500');
-      await tester.ensureVisible(find.text('List Commodity on Desk'));
-      await tester.tap(find.text('List Commodity on Desk'));
-      await tester.pumpAndSettle();
+      await listViaReview(tester);
 
       expect(repo.submitted, hasLength(1));
       expect(repo.submitted.single.commodityId, wheatBranId);
@@ -129,9 +130,7 @@ void main() {
 
         await tester.enterText(find.byKey(const Key('quantity_field')), '10');
         await tester.enterText(find.byKey(const Key('asking_price_field')), '4500');
-        await tester.ensureVisible(find.text('List Commodity on Desk'));
-        await tester.tap(find.text('List Commodity on Desk'));
-        await tester.pumpAndSettle();
+        await listViaReview(tester);
 
         expect(repo.submitted, hasLength(1));
         expect(repo.submitted.single.commodityId, maizeDdgsId);

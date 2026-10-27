@@ -68,6 +68,9 @@ enum NotificationTargetKind {
   /// A broker proposal (quotation). Buyers have no read access to `quotations`.
   offer,
 
+  /// A Buyer <-> Broker chat conversation (RLS-checked when opened).
+  chat,
+
   /// No usable reference.
   none,
 }
@@ -82,7 +85,8 @@ class NotificationTarget {
 
   bool get canOpen =>
       kind == NotificationTargetKind.requirement ||
-      kind == NotificationTargetKind.requirementsList;
+      kind == NotificationTargetKind.requirementsList ||
+      kind == NotificationTargetKind.chat;
 
   static final _uuid = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -100,6 +104,14 @@ class NotificationTarget {
   static NotificationTarget resolve(BuyerNotification n) {
     final url = n.actionUrl;
     final payloadRequirement = _validId(n.payload['requirementId']);
+
+    // Chat: `/chats/<conversation id>` or payload.conversationId (0043 RPC).
+    final chatMatch = RegExp(r'^/chats/([^/?#]+)$').firstMatch(url);
+    final chatId =
+        _validId(n.payload['conversationId']) ?? _validId(chatMatch?.group(1));
+    if (chatId != null) {
+      return NotificationTarget(NotificationTargetKind.chat, chatId);
+    }
 
     // Deals: `/buyer/deals/<id>`, or `/broker/deals/<id>` (the URL the web Broker
     // actions currently write into Buyer deal notifications), or payload.dealId.

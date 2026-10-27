@@ -19,6 +19,9 @@ void main() {
       expect(find.text('My Commodities'), findsOneWidget);
       expect(find.text('Post Commodity'), findsOneWidget);
       expect(find.byIcon(LucideIcons.plus), findsAtLeastNWidgets(1));
+      // Let the repository's 500 ms storage-lookup timeout finish before
+      // teardown (the test previously failed on '!timersPending').
+      await tester.pump(const Duration(seconds: 1));
     });
 
     testWidgets('Renders status filter chips', (tester) async {
@@ -34,6 +37,7 @@ void main() {
       expect(find.text('Active'), findsOneWidget);
       expect(find.text('Reserved'), findsOneWidget);
       expect(find.text('Expired'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
     });
   });
 }
