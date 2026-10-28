@@ -19,6 +19,7 @@ import '../../brokers/domain/seller_broker_model.dart';
 import '../../profile/data/seller_profile_repository.dart';
 import '../../profile/domain/business_location_model.dart';
 import '../../profile/presentation/seller_profile_screen.dart';
+import '../../profile/domain/seller_commodity_expertise.dart';
 import '../domain/posting_history.dart';
 import '../data/commodities_repository.dart';
 import '../data/lab_testing_repository.dart';
@@ -122,6 +123,8 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
 
   // Master Catalogs
   List<MasterCommodity> _commodities = [];
+  List<MasterCommodity> _expertiseCommodities = [];
+  bool _isLoadingExpertise = false;
   String? _commodityLoadError;
   List<MasterGrade> _grades = [];
   bool _isLoadingGrades = false;
@@ -376,6 +379,7 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       // Non-blocking: the form is usable while these load.
       unawaited(_loadReadiness());
       unawaited(_loadHistory());
+      unawaited(_loadExpertise());
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -556,6 +560,7 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       onRefresh: () async {
         final comms = await _commoditiesRepository.getMasterCommodities();
         if (mounted) setState(() => _commodities = comms);
+        await _loadExpertise();
         return comms;
       },
       history: _history,
@@ -563,12 +568,66 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
         await _loadHistory();
         return _history;
       },
+      expertiseCommodities: _expertiseCommodities,
     );
     if (picked != null && mounted) {
       await _onCommodityChanged(
         picked.commodity,
         preferredGradeId: picked.preferredGradeId,
       );
+    }
+  }
+
+  /// Loads the authenticated seller's saved commodity expertise for priority display.
+  /// Strictly non-blocking: failure falls back to normal catalog without blocking posting.
+  Future<void> _loadExpertise() async {
+    if (!mounted) return;
+    setState(() => _isLoadingExpertise = true);
+    try {
+      final List<SellerCommodityExpertise> expertiseList =
+          await _profileRepository.getSavedCommodityExpertise();
+      if (!mounted) return;
+      if (expertiseList.isEmpty || _commodities.isEmpty) {
+        setState(() {
+          _expertiseCommodities = [];
+          _isLoadingExpertise = false;
+        });
+        return;
+      }
+
+      final mapped = <MasterCommodity>[];
+      for (final exp in expertiseList) {
+        if (exp.isApproved && exp.id.isNotEmpty) {
+          final match = _commodities.firstWhere(
+            (c) => c.id == exp.id,
+            orElse: () => const MasterCommodity(id: '', name: '', code: ''),
+          );
+          if (match.id.isNotEmpty) {
+            mapped.add(match);
+            continue;
+          }
+        }
+        final normMatch = _commodities.firstWhere(
+          (c) => exp.matchesNormalized(c.name),
+          orElse: () => const MasterCommodity(id: '', name: '', code: ''),
+        );
+        if (normMatch.id.isNotEmpty && !mapped.any((m) => m.id == normMatch.id)) {
+          mapped.add(normMatch);
+        }
+      }
+
+      setState(() {
+        _expertiseCommodities = mapped;
+        _isLoadingExpertise = false;
+      });
+    } catch (e) {
+      debugPrint('Commodity expertise load notice: $e');
+      if (mounted) {
+        setState(() {
+          _expertiseCommodities = [];
+          _isLoadingExpertise = false;
+        });
+      }
     }
   }
 
@@ -3518,34 +3577,99 @@ class _PostCommodityScreenState extends State<PostCommodityScreen> {
       );
     }
     final sel = _selectedCommodity;
-    return InkWell(
-      key: const Key('commodity-picker-field'),
-      onTap: _openCommodityPicker,
-      borderRadius: BorderRadius.circular(10),
-      child: InputDecorator(
-        decoration: const InputDecoration(
-          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          suffixIcon: Icon(LucideIcons.search, size: 18),
-        ),
-        child: sel == null
-            ? const Text(
-                'Tap to search products',
-                style: TextStyle(fontSize: 14, color: AppColors.textMutedLight),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    sel.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_expertiseCommodities.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Row(
+                  children: [
+                    Icon(LucideIcons.sparkles, size: 14, color: AppColors.primary),
+                    SizedBox(width: 4),
+                    Text(
+                      'My Expertise',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final exp in _expertiseCommodities)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ActionChip(
+                            key: Key('quick-expertise-chip-${exp.id}'),
+                            avatar: Icon(
+                              sel?.id == exp.id ? LucideIcons.check : LucideIcons.sparkles,
+                              size: 13,
+                              color: sel?.id == exp.id ? Colors.white : AppColors.primary,
+                            ),
+                            label: Text(
+                              exp.name,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: sel?.id == exp.id ? FontWeight.w700 : FontWeight.w500,
+                                color: sel?.id == exp.id ? Colors.white : AppColors.textPrimaryLight,
+                              ),
+                            ),
+                            backgroundColor: sel?.id == exp.id ? AppColors.primary : Colors.grey.shade50,
+                            side: BorderSide(
+                              color: sel?.id == exp.id ? AppColors.primary : AppColors.borderLight,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            onPressed: () => _onCommodityChanged(exp),
+                          ),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  CategoryLabel(categoryName: sel.categoryName),
-                ],
-              ),
-      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        InkWell(
+          key: const Key('commodity-picker-field'),
+          onTap: _openCommodityPicker,
+          borderRadius: BorderRadius.circular(10),
+          child: InputDecorator(
+            decoration: const InputDecoration(
+              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              suffixIcon: Icon(LucideIcons.search, size: 18),
+            ),
+            child: sel == null
+                ? const Text(
+                    'Tap to search products',
+                    style: TextStyle(fontSize: 14, color: AppColors.textMutedLight),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        sel.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      CategoryLabel(categoryName: sel.categoryName),
+                    ],
+                  ),
+          ),
+        ),
+      ],
     );
   }
 

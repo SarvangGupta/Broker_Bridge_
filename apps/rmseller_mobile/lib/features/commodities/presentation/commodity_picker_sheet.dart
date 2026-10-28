@@ -51,6 +51,7 @@ Future<CommodityPick?> showCommodityPickerSheet({
   String? selectedId,
   PickerHistory history = const PickerHistory.unavailable(),
   Future<PickerHistory> Function()? onRetryHistory,
+  List<MasterCommodity> expertiseCommodities = const [],
 }) {
   return showModalBottomSheet<CommodityPick>(
     context: context,
@@ -62,6 +63,7 @@ Future<CommodityPick?> showCommodityPickerSheet({
       selectedId: selectedId,
       history: history,
       onRetryHistory: onRetryHistory,
+      expertiseCommodities: expertiseCommodities,
     ),
   );
 }
@@ -72,6 +74,7 @@ class CommodityPickerSheet extends StatefulWidget {
   final String? selectedId;
   final PickerHistory history;
   final Future<PickerHistory> Function()? onRetryHistory;
+  final List<MasterCommodity> expertiseCommodities;
 
   const CommodityPickerSheet({
     super.key,
@@ -80,6 +83,7 @@ class CommodityPickerSheet extends StatefulWidget {
     this.selectedId,
     this.history = const PickerHistory.unavailable(),
     this.onRetryHistory,
+    this.expertiseCommodities = const [],
   });
 
   @override
@@ -225,15 +229,108 @@ class _CommodityPickerSheetState extends State<CommodityPickerSheet> {
     }
   }
 
-  List<MasterCommodity> get _filtered {
+  List<MasterCommodity> get _filteredExpertise {
+    if (widget.expertiseCommodities.isEmpty) return const [];
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isEmpty) return widget.expertiseCommodities;
+    return widget.expertiseCommodities
+        .where((c) => c.name.toLowerCase().contains(q) || (c.categoryName?.toLowerCase().contains(q) ?? false))
+        .toList();
+  }
+
+  List<MasterCommodity> get _filteredAll {
     final q = _searchController.text.trim().toLowerCase();
     if (q.isEmpty) return _items;
-    return _items.where((c) => c.name.toLowerCase().contains(q)).toList();
+    return _items
+        .where((c) => c.name.toLowerCase().contains(q) || (c.categoryName?.toLowerCase().contains(q) ?? false))
+        .toList();
+  }
+
+  List<Widget> _buildItemList() {
+    final widgets = <Widget>[];
+
+    // Row 0: posting history (previous products first)
+    final history = _historyWidgets();
+    if (history.isNotEmpty) {
+      widgets.addAll(history);
+    }
+
+    final expertise = _filteredExpertise;
+    final all = _filteredAll;
+
+    if (widget.expertiseCommodities.isNotEmpty && expertise.isNotEmpty) {
+      widgets.add(_sectionLabel('My Expertise', key: const Key('picker-expertise-header')));
+      for (final c in expertise) {
+        final isSelected = c.id == widget.selectedId;
+        widgets.add(
+          ListTile(
+            key: Key('expertise-commodity-option-${c.id}'),
+            dense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            leading: const Icon(LucideIcons.sparkles, size: 18, color: AppColors.primary),
+            title: Text(
+              c.name,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                color: AppColors.textPrimaryLight,
+              ),
+            ),
+            subtitle: CategoryLabel(categoryName: c.categoryName),
+            trailing: isSelected
+                ? const Icon(LucideIcons.check, size: 18, color: AppColors.primary)
+                : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Expertise',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary),
+                    ),
+                  ),
+            onTap: () => Navigator.of(context).pop(CommodityPick(c)),
+          ),
+        );
+      }
+      widgets.add(_sectionLabel('All Commodities', key: const Key('picker-all-commodities-header')));
+    }
+
+    for (final c in all) {
+      final isSelected = c.id == widget.selectedId;
+      widgets.add(
+        ListTile(
+          key: Key('commodity-option-${c.id}'),
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          title: Text(
+            c.name,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: AppColors.textPrimaryLight,
+            ),
+          ),
+          subtitle: CategoryLabel(categoryName: c.categoryName),
+          trailing: isSelected
+              ? const Icon(LucideIcons.check, size: 18, color: AppColors.primary)
+              : null,
+          onTap: () => Navigator.of(context).pop(CommodityPick(c)),
+        ),
+      );
+    }
+
+    return widgets;
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtered;
+    final items = _buildItemList();
+    final all = _filteredAll;
+    final expertise = _filteredExpertise;
+    final isEmpty = all.isEmpty && expertise.isEmpty;
+
     return Material(
       color: Colors.white,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -299,7 +396,7 @@ class _CommodityPickerSheetState extends State<CommodityPickerSheet> {
             ],
             const SizedBox(height: 8),
             Flexible(
-              child: filtered.isEmpty
+              child: isEmpty
                   ? Padding(
                       padding: const EdgeInsets.symmetric(vertical: 24),
                       child: Text(
@@ -315,36 +412,8 @@ class _CommodityPickerSheetState extends State<CommodityPickerSheet> {
                     )
                   : ListView.builder(
                       shrinkWrap: true,
-                      itemCount: filtered.length + 1,
-                      itemBuilder: (context, index) {
-                        // Row 0: posting history (previous products first).
-                        if (index == 0) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: _historyWidgets(),
-                          );
-                        }
-                        final c = filtered[index - 1];
-                        final isSelected = c.id == widget.selectedId;
-                        return ListTile(
-                          key: Key('commodity-option-${c.id}'),
-                          dense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                          title: Text(
-                            c.name,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          subtitle: CategoryLabel(categoryName: c.categoryName),
-                          trailing: isSelected
-                              ? const Icon(LucideIcons.check, size: 18, color: AppColors.primary)
-                              : null,
-                          onTap: () => Navigator.of(context).pop(CommodityPick(c)),
-                        );
-                      },
+                      itemCount: items.length,
+                      itemBuilder: (context, index) => items[index],
                     ),
             ),
           ],

@@ -557,6 +557,13 @@ void main() {
         await tester.tap(find.byKey(const Key('save_profile_button')));
         await tester.pumpAndSettle();
 
+        // If mandatory confirmation sheet is displayed, confirm and save
+        final confirmBtn = find.byKey(const Key('confirm_and_save_button'));
+        if (confirmBtn.evaluate().isNotEmpty) {
+          await tester.tap(confirmBtn);
+          await tester.pumpAndSettle();
+        }
+
         // Success snackbar displayed
         expect(find.text('Business profile updated successfully'), findsOneWidget);
 

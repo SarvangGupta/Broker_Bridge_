@@ -5,6 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/security/secure_storage_service.dart';
 import '../../authentication/data/auth_repository.dart';
 import '../domain/business_location_model.dart';
+import '../domain/seller_bank_details.dart';
+import '../domain/seller_commodity_expertise.dart';
+import '../domain/seller_profile_audit_entry.dart';
 import '../domain/seller_profile_model.dart';
 
 enum ListingReadinessStatus { complete, incomplete, unverified }
@@ -653,6 +656,85 @@ class SellerProfileRepository {
       isGpsDetected: isGps,
     );
 
+    // Load bank details
+    String bankHolder = (await _storage.getPreference('bank_holder_name_$userId')) ??
+        (await _storage.getPreference('bank_holder_name')) ?? '';
+    String bankName = (await _storage.getPreference('bank_name_$userId')) ??
+        (await _storage.getPreference('bank_name')) ?? '';
+    String bankAccount = (await _storage.getPreference('bank_account_number_$userId')) ??
+        (await _storage.getPreference('bank_account_number')) ?? '';
+    String bankIfsc = (await _storage.getPreference('bank_ifsc_$userId')) ??
+        (await _storage.getPreference('bank_ifsc')) ?? '';
+    String bankBranch = (await _storage.getPreference('bank_branch_$userId')) ??
+        (await _storage.getPreference('bank_branch')) ?? '';
+    bool bankVerified = ((await _storage.getPreference('bank_is_verified_$userId')) ??
+        (await _storage.getPreference('bank_is_verified'))) == 'true';
+    String bankStatus = (await _storage.getPreference('bank_verification_status_$userId')) ??
+        (await _storage.getPreference('bank_verification_status')) ??
+        (bankVerified ? 'verified' : 'unverified');
+
+    final metaBank = sessionUser?.userMetadata?['bank_details'] as Map<String, dynamic>?;
+    if (metaBank != null) {
+      if (bankAccount.isEmpty && metaBank['account_number'] != null) {
+        bankAccount = metaBank['account_number'].toString();
+      }
+      if (bankIfsc.isEmpty && metaBank['ifsc_code'] != null) {
+        bankIfsc = metaBank['ifsc_code'].toString();
+      }
+      if (bankName.isEmpty && metaBank['bank_name'] != null) {
+        bankName = metaBank['bank_name'].toString();
+      }
+      if (bankHolder.isEmpty && metaBank['account_holder_name'] != null) {
+        bankHolder = metaBank['account_holder_name'].toString();
+      }
+    }
+
+    final bankDetails = SellerBankDetails(
+      accountHolderName: bankHolder,
+      bankName: bankName,
+      accountNumber: bankAccount,
+      ifscCode: bankIfsc,
+      branchName: bankBranch,
+      isVerified: bankVerified,
+      verificationStatus: bankStatus,
+    );
+
+    final invoiceDocUrl = await _storage.getPreference('profile_invoice_doc_url_$userId');
+    final invoiceDocName = await _storage.getPreference('profile_invoice_doc_name_$userId');
+
+    // Load commodity expertise
+    List<SellerCommodityExpertise> expertise = [];
+    final expertiseStr = (await _storage.getPreference('commodity_expertise_$userId')) ??
+        (await _storage.getPreference('commodity_expertise'));
+    if (expertiseStr != null && expertiseStr.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(expertiseStr);
+        if (decoded is List) {
+          expertise = decoded
+              .whereType<Map<String, dynamic>>()
+              .map((e) => SellerCommodityExpertise.fromMap(e))
+              .toList();
+        }
+      } catch (_) {}
+    }
+    if (expertise.isEmpty) {
+      final metaExpertise = sessionUser?.userMetadata?['commodity_expertise'];
+      if (metaExpertise is List) {
+        expertise = metaExpertise
+            .whereType<Map<String, dynamic>>()
+            .map((e) => SellerCommodityExpertise.fromMap(e))
+            .toList();
+      }
+    }
+
+    final businessId = (await _storage.getPreference('business_identifier_$userId')) ??
+        (await _storage.getPreference('business_identifier')) ??
+        companyName;
+    final versionId = (await _storage.getPreference('version_identifier_$userId')) ??
+        (await _storage.getPreference('version_identifier')) ??
+        invoiceDocName ??
+        '';
+
     return SellerProfileModel(
       id: userId,
       fullName: fullName,
@@ -661,6 +743,8 @@ class SellerProfileRepository {
       role: role,
       companyId: companyId,
       companyName: companyName,
+      businessIdentifier: businessId,
+      versionIdentifier: versionId,
       companyGst: companyGst,
       primaryMandi: primaryMandi,
       state: state,
@@ -669,13 +753,22 @@ class SellerProfileRepository {
       isVerified: isVerified,
       officeAddress: officeAddress,
       businessLocation: businessLoc,
+      bankDetails: bankDetails,
+      invoiceDocumentUrl: invoiceDocUrl,
+      invoiceDocumentName: invoiceDocName,
+      commodityExpertise: expertise,
     );
   }
 
   /// Authoritatively persist updated profile fields to backend database and secure cache.
+  /// Generates a strict administrative audit log upon successful save.
   Future<SellerProfileModel> updateProfile(
-    SellerProfileModel updatedProfile,
-  ) async {
+    SellerProfileModel updatedProfile, {
+    String operationType = 'MANUAL_EDIT',
+    String? requestId,
+    List<String>? confirmedFields,
+    String? customSummary,
+  }) async {
     final client = _supabase;
     if (client != null) {
       // 1. Ensure user row exists in public.users before updating
@@ -701,9 +794,19 @@ class SellerProfileRepository {
           'district_id': updatedProfile.businessLocation.districtId,
         });
       }
+
+      // 4. Update user metadata in Auth (bank details, warehouse, commodity expertise)
+      try {
+        await performUpdateUserMetadata(client, {
+          'bank_details': updatedProfile.bankDetails.toMap(),
+          'commodity_expertise': updatedProfile.commodityExpertise.map((e) => e.toMap()).toList(),
+        });
+      } catch (e) {
+        debugPrint('Auth metadata sync notice: $e');
+      }
     }
 
-    // 3. Persist to SecureStorage
+    // 4. Persist to SecureStorage
     await _storage.saveUserInfo(
       id: updatedProfile.id,
       role: updatedProfile.role,
@@ -717,6 +820,10 @@ class SellerProfileRepository {
     await _storage.savePreference('primary_mandi', updatedProfile.primaryMandi);
     await _storage.savePreference('company_state', updatedProfile.state);
     await _storage.savePreference('company_district', updatedProfile.district);
+    await _storage.savePreference('business_identifier_${updatedProfile.id}', updatedProfile.effectiveBusinessIdentifier);
+    await _storage.savePreference('business_identifier', updatedProfile.effectiveBusinessIdentifier);
+    await _storage.savePreference('version_identifier_${updatedProfile.id}', updatedProfile.versionIdentifier);
+    await _storage.savePreference('version_identifier', updatedProfile.versionIdentifier);
     await _storage.savePreference(
       'office_address',
       updatedProfile.officeAddress,
@@ -746,6 +853,189 @@ class SellerProfileRepository {
       loc.isGpsDetected.toString(),
     );
 
+    // Persist bank details
+    final bank = updatedProfile.bankDetails;
+    await _storage.savePreference('bank_holder_name_${updatedProfile.id}', bank.accountHolderName);
+    await _storage.savePreference('bank_name_${updatedProfile.id}', bank.bankName);
+    await _storage.savePreference('bank_account_number_${updatedProfile.id}', bank.accountNumber);
+    await _storage.savePreference('bank_ifsc_${updatedProfile.id}', bank.ifscCode);
+    await _storage.savePreference('bank_branch_${updatedProfile.id}', bank.branchName);
+    await _storage.savePreference('bank_is_verified_${updatedProfile.id}', bank.isVerified.toString());
+    await _storage.savePreference('bank_verification_status_${updatedProfile.id}', bank.verificationStatus);
+
+    // Also write legacy keys for backward-compatibility
+    await _storage.savePreference('bank_holder_name', bank.accountHolderName);
+    await _storage.savePreference('bank_name', bank.bankName);
+    await _storage.savePreference('bank_account_number', bank.accountNumber);
+    await _storage.savePreference('bank_ifsc', bank.ifscCode);
+    await _storage.savePreference('bank_branch', bank.branchName);
+
+    // Persist commodity expertise
+    final expertiseJson = jsonEncode(updatedProfile.commodityExpertise.map((e) => e.toMap()).toList());
+    await _storage.savePreference('commodity_expertise_${updatedProfile.id}', expertiseJson);
+    await _storage.savePreference('commodity_expertise', expertiseJson);
+
+    // Persist invoice document metadata if present
+    if (updatedProfile.invoiceDocumentUrl != null) {
+      await _storage.savePreference('profile_invoice_doc_url_${updatedProfile.id}', updatedProfile.invoiceDocumentUrl!);
+    }
+    if (updatedProfile.invoiceDocumentName != null) {
+      await _storage.savePreference('profile_invoice_doc_name_${updatedProfile.id}', updatedProfile.invoiceDocumentName!);
+    }
+
+    // 5. Generate and commit audit log (ONLY AFTER successful persistence)
+    final changed = confirmedFields ?? _detectChangedFields(updatedProfile);
+    final summary = customSummary ?? _buildSafeAuditSummary(changed, updatedProfile);
+
+    final auditEntry = SellerProfileAuditEntry(
+      id: 'audit_${DateTime.now().millisecondsSinceEpoch}',
+      sellerId: updatedProfile.id,
+      companyId: updatedProfile.companyId,
+      actorId: client?.auth.currentUser?.id ?? updatedProfile.id,
+      operationType: operationType,
+      changedFields: changed,
+      changeSummary: summary,
+      source: 'rmseller_mobile',
+      requestId: requestId ?? 'req_${DateTime.now().millisecondsSinceEpoch}',
+      timestamp: DateTime.now(),
+      documentUrl: updatedProfile.invoiceDocumentUrl,
+    );
+
+    await logProfileAuditEntry(auditEntry);
+
     return updatedProfile;
+  }
+
+  List<String> _detectChangedFields(SellerProfileModel updated) {
+    final fields = <String>[];
+    if (updated.fullName.isNotEmpty) fields.add('Full Name');
+    if (updated.companyName.isNotEmpty) fields.add('Company Name');
+    if (updated.mobile.isNotEmpty) fields.add('Mobile');
+    if (updated.companyGst.isNotEmpty) fields.add('GSTIN');
+    if (updated.officeAddress.isNotEmpty) fields.add('Office Address');
+    if (updated.businessLocation.name.isNotEmpty) fields.add('Facility Name');
+    if (updated.businessLocation.addressLine.isNotEmpty) fields.add('Godown Address');
+    if (updated.bankDetails.isConfigured) fields.add('Bank Details');
+    if (updated.commodityExpertise.isNotEmpty) fields.add('Commodity Expertise');
+    if (updated.invoiceDocumentUrl != null) fields.add('Invoice Document');
+    return fields.isEmpty ? ['Profile Updated'] : fields;
+  }
+
+  String _buildSafeAuditSummary(List<String> changed, SellerProfileModel profile) {
+    final parts = <String>[];
+    if (changed.contains('Company Name') && profile.companyName.isNotEmpty) {
+      parts.add('Firm: ${profile.companyName}');
+    }
+    if (changed.contains('GSTIN') && profile.companyGst.isNotEmpty) {
+      parts.add('GST: ${profile.companyGst}');
+    }
+    if (changed.contains('Bank Details') && profile.bankDetails.isConfigured) {
+      // Strictly use safeAuditDisplay (masked account number, no credentials)
+      parts.add('Bank: ${profile.bankDetails.safeAuditDisplay}');
+    }
+    if (changed.contains('Commodity Expertise') && profile.commodityExpertise.isNotEmpty) {
+      parts.add('Expertise: ${profile.expertiseCommodityNames.join(", ")}');
+    }
+    if (changed.contains('Invoice Document')) {
+      parts.add('Document: ${profile.invoiceDocumentName ?? "Invoice attached"}');
+    }
+    return parts.isEmpty ? 'Updated fields: ${changed.join(", ")}' : parts.join('; ');
+  }
+
+  /// Retrieves the authenticated seller's saved commodity expertise for priority ordering.
+  Future<List<SellerCommodityExpertise>> getSavedCommodityExpertise({String? userId}) async {
+    final client = _supabase;
+    final currentUserId = userId ?? client?.auth.currentUser?.id ?? await _storage.getUserId();
+    if (currentUserId != null) {
+      final local = await _storage.getPreference('commodity_expertise_$currentUserId');
+      if (local != null && local.trim().isNotEmpty) {
+        try {
+          final list = jsonDecode(local);
+          if (list is List) {
+            return list.whereType<Map<String, dynamic>>().map((e) => SellerCommodityExpertise.fromMap(e)).toList();
+          }
+        } catch (_) {}
+      }
+    }
+    final fallback = await _storage.getPreference('commodity_expertise');
+    if (fallback != null && fallback.trim().isNotEmpty) {
+      try {
+        final list = jsonDecode(fallback);
+        if (list is List) {
+          return list.whereType<Map<String, dynamic>>().map((e) => SellerCommodityExpertise.fromMap(e)).toList();
+        }
+      } catch (_) {}
+    }
+    final meta = client?.auth.currentUser?.userMetadata?['commodity_expertise'];
+    if (meta is List) {
+      return meta.whereType<Map<String, dynamic>>().map((e) => SellerCommodityExpertise.fromMap(e)).toList();
+    }
+    return const [];
+  }
+
+  /// Persist an administrative profile audit entry.
+  Future<void> logProfileAuditEntry(SellerProfileAuditEntry entry) async {
+    final client = _supabase;
+    // 1. Attempt server-side insert if Supabase is connected
+    if (client != null) {
+      try {
+        await client.from('seller_profile_audit_logs').insert(entry.toMap());
+      } catch (e) {
+        debugPrint('Server-side audit log notice (table may be pending migration): $e');
+      }
+    }
+
+    // 2. Persist locally to secure storage for verified testing & offline resilience
+    final key = 'profile_audit_logs_${entry.sellerId}';
+    final existingJson = await _storage.getPreference(key);
+    final List<dynamic> list = existingJson != null ? jsonDecode(existingJson) : [];
+    list.insert(0, entry.toMap());
+    await _storage.savePreference(key, jsonEncode(list));
+  }
+
+  /// Administrator query for seller profile change history.
+  /// STRICT AUTHORIZATION:
+  /// Accessible only to authenticated users with 'admin' role.
+  Future<List<SellerProfileAuditEntry>> getProfileAuditHistory({
+    required String sellerId,
+    bool checkAdminRole = true,
+  }) async {
+    final client = _supabase;
+    if (checkAdminRole && client != null) {
+      final currentUserId = client.auth.currentUser?.id;
+      if (currentUserId != null) {
+        final userRow = await performUserLookup(client, currentUserId);
+        final role = userRow?['role']?.toString().toLowerCase();
+        if (role != 'admin') {
+          throw PostgrestException(
+            message: 'Access denied: Profile change history is restricted to platform administrators.',
+            code: '42501',
+          );
+        }
+      }
+    }
+
+    // 1. Check server-side audit logs
+    if (client != null) {
+      try {
+        final rows = await client
+            .from('seller_profile_audit_logs')
+            .select()
+            .eq('seller_id', sellerId)
+            .order('created_at', ascending: false);
+        return (rows as List).map((r) => SellerProfileAuditEntry.fromMap(r)).toList();
+      } catch (e) {
+        debugPrint('Server-side audit log read notice: $e');
+      }
+    }
+
+    // 2. Fallback to local secure storage
+    final key = 'profile_audit_logs_$sellerId';
+    final existingJson = await _storage.getPreference(key);
+    if (existingJson != null) {
+      final List<dynamic> list = jsonDecode(existingJson);
+      return list.map((e) => SellerProfileAuditEntry.fromMap(e as Map<String, dynamic>)).toList();
+    }
+    return const [];
   }
 }

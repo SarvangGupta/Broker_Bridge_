@@ -1,9 +1,6 @@
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
-
 import '../../commodities/domain/master_commodity_data.dart';
-import '../domain/business_location_model.dart';
 
 /// Result returned from reverse geocoding coordinates.
 class ReverseGeocodeResult {

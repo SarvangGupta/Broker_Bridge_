@@ -27,6 +27,14 @@ class SellerMoreScreen extends StatelessWidget {
             onTap: () => context.go('/more/profile'),
           ),
           _MoreMenuTile(
+            key: const Key('more_menu_scan_invoice'),
+            icon: LucideIcons.scanLine,
+            color: AppColors.secondary,
+            title: 'Scan Business Invoice',
+            subtitle: 'Update profile and bank details from invoice',
+            onTap: () => context.go('/more/profile?scanInvoice=true'),
+          ),
+          _MoreMenuTile(
             key: const Key('more_menu_settings'),
             icon: LucideIcons.settings,
             color: AppColors.info,

@@ -367,7 +367,13 @@ class AppRouter {
                   GoRoute(
                     path: 'profile',
                     name: 'profile',
-                    builder: (context, state) => const SellerProfileScreen(),
+                    builder: (context, state) {
+                      final scanInvoice =
+                          state.uri.queryParameters['scanInvoice'] == 'true';
+                      return SellerProfileScreen(
+                        initialScanInvoice: scanInvoice,
+                      );
+                    },
                   ),
                   GoRoute(
                     path: 'reports',

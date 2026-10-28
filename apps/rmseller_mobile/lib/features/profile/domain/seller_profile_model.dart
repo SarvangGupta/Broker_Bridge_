@@ -1,4 +1,6 @@
 import 'business_location_model.dart';
+import 'seller_bank_details.dart';
+import 'seller_commodity_expertise.dart';
 
 /// Domain entity representing an authenticated Seller's profile and enterprise details.
 class SellerProfileModel {
@@ -18,6 +20,14 @@ class SellerProfileModel {
   final bool isVerified;
   final String officeAddress;
   final BusinessLocationModel businessLocation;
+  final SellerBankDetails bankDetails;
+  final String? invoiceDocumentUrl;
+  final String? invoiceDocumentName;
+  final String? chequeDocumentUrl;
+  final String? chequeDocumentName;
+  final String businessIdentifier;
+  final String versionIdentifier;
+  final List<SellerCommodityExpertise> commodityExpertise;
 
   const SellerProfileModel({
     required this.id,
@@ -27,6 +37,8 @@ class SellerProfileModel {
     required this.role,
     this.companyId = '',
     this.companyName = '',
+    this.businessIdentifier = '',
+    this.versionIdentifier = '',
     this.companyGst = '',
     this.primaryMandi = 'Bikaner Krishi Upaj Mandi',
     this.state = 'Rajasthan',
@@ -36,7 +48,31 @@ class SellerProfileModel {
     this.isVerified = true,
     this.officeAddress = 'Commercial Tower 4, Bikaner Corporate Hub',
     this.businessLocation = const BusinessLocationModel(),
+    this.bankDetails = const SellerBankDetails(),
+    this.invoiceDocumentUrl,
+    this.invoiceDocumentName,
+    this.chequeDocumentUrl,
+    this.chequeDocumentName,
+    this.commodityExpertise = const [],
   });
+
+  bool get hasInvoiceDocument =>
+      invoiceDocumentUrl != null && invoiceDocumentUrl!.trim().isNotEmpty;
+
+  bool get hasChequeDocument =>
+      chequeDocumentUrl != null && chequeDocumentUrl!.trim().isNotEmpty;
+
+  /// IDs of approved commodities for priority matching.
+  List<String> get expertiseCommodityIds =>
+      commodityExpertise.where((e) => e.isApproved && e.id.isNotEmpty).map((e) => e.id).toList();
+
+  /// Normalized names of all expertise commodities (both approved and custom).
+  List<String> get expertiseCommodityNames =>
+      commodityExpertise.map((e) => e.commodityName).toList();
+
+  /// Business Identifier is strictly the Firm Name (never GSTIN).
+  String get effectiveBusinessIdentifier =>
+      businessIdentifier.isNotEmpty ? businessIdentifier : companyName;
 
   SellerProfileModel copyWith({
     String? id,
@@ -46,6 +82,8 @@ class SellerProfileModel {
     String? role,
     String? companyId,
     String? companyName,
+    String? businessIdentifier,
+    String? versionIdentifier,
     String? companyGst,
     String? primaryMandi,
     String? state,
@@ -55,6 +93,12 @@ class SellerProfileModel {
     bool? isVerified,
     String? officeAddress,
     BusinessLocationModel? businessLocation,
+    SellerBankDetails? bankDetails,
+    String? invoiceDocumentUrl,
+    String? invoiceDocumentName,
+    String? chequeDocumentUrl,
+    String? chequeDocumentName,
+    List<SellerCommodityExpertise>? commodityExpertise,
   }) {
     return SellerProfileModel(
       id: id ?? this.id,
@@ -64,6 +108,8 @@ class SellerProfileModel {
       role: role ?? this.role,
       companyId: companyId ?? this.companyId,
       companyName: companyName ?? this.companyName,
+      businessIdentifier: businessIdentifier ?? this.businessIdentifier,
+      versionIdentifier: versionIdentifier ?? this.versionIdentifier,
       companyGst: companyGst ?? this.companyGst,
       primaryMandi: primaryMandi ?? this.primaryMandi,
       state: state ?? this.state,
@@ -73,6 +119,12 @@ class SellerProfileModel {
       isVerified: isVerified ?? this.isVerified,
       officeAddress: officeAddress ?? this.officeAddress,
       businessLocation: businessLocation ?? this.businessLocation,
+      bankDetails: bankDetails ?? this.bankDetails,
+      invoiceDocumentUrl: invoiceDocumentUrl ?? this.invoiceDocumentUrl,
+      invoiceDocumentName: invoiceDocumentName ?? this.invoiceDocumentName,
+      chequeDocumentUrl: chequeDocumentUrl ?? this.chequeDocumentUrl,
+      chequeDocumentName: chequeDocumentName ?? this.chequeDocumentName,
+      commodityExpertise: commodityExpertise ?? this.commodityExpertise,
     );
   }
 
@@ -104,6 +156,39 @@ class SellerProfileModel {
       );
     }
 
+    SellerBankDetails bank;
+    if (map['bank_details'] is Map<String, dynamic>) {
+      bank = SellerBankDetails.fromMap(
+        map['bank_details'] as Map<String, dynamic>,
+      );
+    } else if (map['bank_account_number'] != null || map['bank_ifsc'] != null) {
+      bank = SellerBankDetails(
+        accountHolderName: map['bank_holder_name']?.toString() ?? '',
+        bankName: map['bank_name']?.toString() ?? '',
+        accountNumber: map['bank_account_number']?.toString() ?? '',
+        ifscCode: map['bank_ifsc']?.toString() ?? '',
+        branchName: map['bank_branch']?.toString() ?? '',
+        isVerified: map['bank_is_verified'] == true,
+        verificationStatus: map['bank_verification_status']?.toString() ?? 'unverified',
+      );
+    } else {
+      bank = const SellerBankDetails();
+    }
+
+    List<SellerCommodityExpertise> expertise = [];
+    final rawExpertise = map['commodity_expertise'] ?? map['commodityExpertise'] ?? map['commodities'];
+    if (rawExpertise is List) {
+      for (final item in rawExpertise) {
+        if (item is Map<String, dynamic>) {
+          expertise.add(SellerCommodityExpertise.fromMap(item));
+        } else if (item is Map) {
+          expertise.add(SellerCommodityExpertise.fromMap(Map<String, dynamic>.from(item)));
+        } else if (item is String && item.trim().isNotEmpty) {
+          expertise.add(SellerCommodityExpertise(id: '', commodityName: item.trim()));
+        }
+      }
+    }
+
     return SellerProfileModel(
       id: map['id']?.toString() ?? '',
       fullName:
@@ -120,6 +205,17 @@ class SellerProfileModel {
           map['company_name']?.toString() ??
           map['companyName']?.toString() ??
           'Bikaner Agro Processing Ltd',
+      businessIdentifier:
+          map['business_identifier']?.toString() ??
+          map['businessIdentifier']?.toString() ??
+          map['company_name']?.toString() ??
+          map['companyName']?.toString() ??
+          '',
+      versionIdentifier:
+          map['version_identifier']?.toString() ??
+          map['versionIdentifier']?.toString() ??
+          map['invoice_document_name']?.toString() ??
+          '',
       companyGst:
           map['company_gst']?.toString() ??
           map['companyGst']?.toString() ??
@@ -141,6 +237,12 @@ class SellerProfileModel {
           map['office_address']?.toString() ??
           'Commercial Tower 4, Bikaner Corporate Hub',
       businessLocation: location,
+      bankDetails: bank,
+      invoiceDocumentUrl: map['invoice_document_url']?.toString(),
+      invoiceDocumentName: map['invoice_document_name']?.toString(),
+      chequeDocumentUrl: map['cheque_document_url']?.toString(),
+      chequeDocumentName: map['cheque_document_name']?.toString(),
+      commodityExpertise: expertise,
     );
   }
 
@@ -153,6 +255,8 @@ class SellerProfileModel {
       'role': role,
       'company_id': companyId,
       'company_name': companyName,
+      'business_identifier': businessIdentifier.isNotEmpty ? businessIdentifier : companyName,
+      'version_identifier': versionIdentifier,
       'company_gst': companyGst,
       'primary_mandi': primaryMandi,
       'state': state,
@@ -162,6 +266,12 @@ class SellerProfileModel {
       'is_verified': isVerified,
       'office_address': officeAddress,
       'business_location': businessLocation.toMap(),
+      'bank_details': bankDetails.toMap(),
+      'invoice_document_url': invoiceDocumentUrl,
+      'invoice_document_name': invoiceDocumentName,
+      'cheque_document_url': chequeDocumentUrl,
+      'cheque_document_name': chequeDocumentName,
+      'commodity_expertise': commodityExpertise.map((e) => e.toMap()).toList(),
     };
   }
 }
