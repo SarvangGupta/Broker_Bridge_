@@ -111,7 +111,7 @@ For BINA ENTERPRISES
       expect(englishStrings.corporateOfficeHqAddress, equals('Corporate Office HQ Address'));
 
       // Extracted firm name must remain strictly in original Devanagari
-      expect(extracted.firmName, equals('सियाराम ट्रेडिंग कम्पनी'));
+      expect(extracted.firmName, equals('मे० सियाराम ट्रेडिंग कम्पनी'));
       expect(extracted.firmName, isNot(contains('Siyaram')));
       expect(extracted.firmName, isNot(contains('Trading Company')));
 
@@ -136,10 +136,11 @@ For BINA ENTERPRISES
       );
       final mapped = extracted.mapToSellerProfile(baseProfile);
 
-      expect(mapped.companyName, equals('सियाराम ट्रेडिंग कम्पनी'));
-      expect(mapped.businessIdentifier, equals('सियाराम ट्रेडिंग कम्पनी'));
+      expect(mapped.companyName, equals('मे० सियाराम ट्रेडिंग कम्पनी'));
+      expect(mapped.businessIdentifier, equals('मे० सियाराम ट्रेडिंग कम्पनी'));
       expect(mapped.officeAddress, contains('मलिकपुर महेवा, भरवारी, कौशाम्बी'));
-      expect(mapped.businessLocation.name, contains('मलिकपुर महेवा, भरवारी, कौशाम्बी'));
+      expect(mapped.businessLocation.name, equals('मे० सियाराम ट्रेडिंग कम्पनी'));
+      expect(mapped.businessLocation.addressLine, contains('मलिकपुर महेवा, भरवारी, कौशाम्बी'));
       expect(mapped.businessLocation.addressLine, contains('मलिकपुर महेवा, भरवारी, कौशाम्बी'));
     });
 
@@ -158,7 +159,7 @@ For BINA ENTERPRISES
       expect(hindiStrings.bankDetailsTitle, equals('बैंक विवरण'));
 
       // Data values must remain identical Devanagari
-      expect(extracted.firmName, equals('सियाराम ट्रेडिंग कम्पनी'));
+      expect(extracted.firmName, equals('मे० सियाराम ट्रेडिंग कम्पनी'));
       expect(extracted.officeAddress, contains('मलिकपुर महेवा, भरवारी, कौशाम्बी'));
       expect(extracted.extractedCommodities.any((c) => c.contains('कैटिल फीड')), isTrue);
       expect(extracted.bankName, contains('बैंक ऑफ बड़ौदा'));

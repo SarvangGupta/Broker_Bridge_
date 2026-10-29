@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rmbuyer_mobile/app/theme/app_theme.dart';
+import 'package:rmbuyer_mobile/features/profile/data/gst_verification_repository.dart';
 import 'package:rmbuyer_mobile/features/profile/domain/buyer_profile.dart';
+import 'package:rmbuyer_mobile/features/profile/domain/gst_certificate_data.dart';
 import 'package:rmbuyer_mobile/features/profile/presentation/buyer_profile_screen.dart';
 
 import '../support/fake_buyer_profile_repository.dart';
@@ -201,4 +203,83 @@ void main() {
       expect(_field(tester, 'profile-name-field'), 'Rajesh Singhal');
     },
   );
+
+  group('verification row (RMBUYER-GST-STATUS-TRUTH-01)', () {
+    Future<void> pumpWith(
+      WidgetTester tester,
+      GstVerificationRecordSource records,
+    ) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+      final repo = FakeBuyerProfileRepository(
+        profile: const BuyerProfile(
+          id: 'b-001',
+          name: 'Rajesh Singhal',
+          role: 'buyer',
+          companyId: 'c-001',
+          companyVerified: true, // legacy flag only
+        ),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: BuyerProfileScreen(repository: repo, gstRecords: records),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    String verification(WidgetTester tester) => tester
+        .widget<Text>(
+          find
+              .descendant(
+                of: find.byKey(const Key('profile-verification')),
+                matching: find.byType(Text),
+              )
+              .last,
+        )
+        .data!;
+
+    testWidgets('legacy is_verified=true without a GST record shows Not verified', (
+      tester,
+    ) async {
+      await pumpWith(tester, const NoGstVerificationBackend());
+      expect(verification(tester), 'Not verified');
+    });
+
+    testWidgets('an approved GST record shows Verified', (tester) async {
+      await pumpWith(
+        tester,
+        const _Records(
+          GstVerificationRecord(status: GstVerificationStatus.approved),
+        ),
+      );
+      expect(verification(tester), 'Verified');
+    });
+
+    testWidgets('a pending GST record is not shown as Verified', (tester) async {
+      await pumpWith(
+        tester,
+        const _Records(
+          GstVerificationRecord(status: GstVerificationStatus.pending),
+        ),
+      );
+      expect(verification(tester), 'Not verified');
+    });
+  });
+}
+
+class _Records implements GstVerificationRecordSource {
+  final GstVerificationRecord? record;
+  const _Records(this.record);
+  @override
+  bool get available => true;
+  @override
+  Future<GstVerificationRecord?> latestFor(String companyId) async => record;
+  @override
+  Future<GstVerificationRecord> submit(GstSubmissionDraft draft, String imagePath) =>
+      throw UnimplementedError();
 }

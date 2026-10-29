@@ -43,6 +43,15 @@ class MoreScreen extends StatelessWidget {
             subtitle: 'Profile, language and display settings.',
             onTap: () => context.push('/profile'),
           ),
+          const SizedBox(height: 12),
+          _buildTile(
+            context,
+            key: const Key('more-gst-verification'),
+            icon: LucideIcons.badgeCheck,
+            title: 'GST Verification',
+            subtitle: 'Verification status and GST certificate upload.',
+            onTap: () => context.push('/gst-verification'),
+          ),
         ],
       ),
     );

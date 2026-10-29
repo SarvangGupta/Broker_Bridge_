@@ -237,7 +237,7 @@ void main() {
         '9829012345',
       );
       await tester.enterText(
-        find.byKey(const Key('edit_location_name_field')),
+        find.byKey(const Key('edit_location_address_field')),
         'Mandi Godown 5',
       );
       await tester.pumpAndSettle();

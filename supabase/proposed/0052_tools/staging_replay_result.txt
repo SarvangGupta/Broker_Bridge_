@@ -1,0 +1,65 @@
+replay DRIFT PATCH (requirements/availabilities.broker_id) applied
+replay 0001_init_users_and_companies.sql                       ok
+replay 0002_add_master_tables.sql                              ok
+replay seed_states_rajasthan_districts.sql                     ok
+replay 0003_add_requirements_table.sql                         ok
+replay 0004_add_availabilities_table.sql                       ok
+replay 0005_add_quotations_table.sql                           ok
+replay 0006_add_deals_table.sql                                ok
+replay 0007_add_quotation_rejection_counter_fields.sql         ok
+replay 0008_enable_realtime_deals_quotations.sql               ok
+replay 0009_add_visibility_broker_availabilities.sql           ok
+replay 0010_add_visibility_requirements.sql                    ok
+replay 0011_add_logistics_tables.sql                           ok
+replay 0012_seed_vehicle_types.sql                             ok
+replay 0013_add_payments_and_disputes.sql                      ok
+replay 0014_add_support_tickets.sql                            ok
+replay 0015_add_company_trust_scores.sql                       ok
+replay 0016_add_fulfilled_quantity_to_requirements.sql         ok
+replay 0017_add_notifications_table.sql                        ok
+replay 0018_add_master_industries_and_categories.sql           ok
+replay 0019_add_crm_tables.sql                                 ok
+replay 0020_upgrade_availabilities_lot_model.sql               ok
+replay 0021_quality_parameter_master_integration.sql           ok
+replay 0022_add_lab_test_records.sql                           ok
+replay 0023_add_file_url_to_lab_tests.sql                      ok
+replay 0024_add_loading_readiness_to_availabilities.sql        ok
+replay 0025_add_notification_action_url.sql                    ok
+replay 0026_add_negotiation_events.sql                         ok
+replay 0027_add_deal_versions_snapshot.sql                     ok
+replay 0028_add_bookings_table.sql                             ok
+replay 0029_add_dispatch_documents.sql                         ok
+replay 0030_add_seller_action_center_notifications.sql         ok
+replay 0031_add_master_laboratories.sql                        ok
+replay 0032_add_requirement_quality_specs.sql                  ok
+replay 0033_add_requirement_documents_table.sql                ok
+replay 0034_enforce_negotiation_immutability.sql               ok
+replay 0035_add_requirement_allocations.sql                    ok
+replay 0036_add_crm_tasks_rls_and_grants.sql                   ok
+replay 0037_add_broker_directory_rls_and_grants.sql            ok
+replay 0038_add_operational_desk_rls_and_grants.sql            ok
+replay 0039_allow_buyers_requirements_rls.sql                  ok
+replay 0040_notify_requirement_brokers_rpc.sql                 ok
+replay 0041_allow_buyers_search_brokers_rls.sql                ok
+replay 0042_allow_authenticated_read_master_categories.sql     ok
+replay 0043_buyer_broker_chat.sql                              ok
+replay 0044_allow_sellers_own_availabilities.sql               ok
+replay manual_rls_companies.sql                                ok
+replay manual_storage_rls.sql                                  ok
+replay manual_lab_storage_rls.sql                              ok
+Schema drift (repo migrations that do not apply to a clean replay): 0
+PASS  master_states/master_districts RLS from 0038 present in staging
+replay seed_broker_demo_dataset.sql ok
+PASS  staging baseline mirrors live shape (38 states / 54 districts)  — 38 states, 54 districts
+PASS  0052 inserts exactly 703 districts  — 54 -> 757
+PASS  pre-existing districts unchanged
+PASS  re-running 0052 is a no-op
+PASS  no duplicate district within a state
+PASS  alias respected: no "Ganganagar" next to "Sri Ganganagar"
+PASS  all 737 app PIN districts resolvable in staging master
+PASS  representative district present for all 36 states/UTs
+PASS  authenticated role can read all districts under RLS  — 757
+PASS  rollback refuses while a new district is referenced  — required availabilities cols: 12
+PASS  rollback restores the exact pre-0052 master
+PASS  rollback is idempotent
+13 passed, 0 failed

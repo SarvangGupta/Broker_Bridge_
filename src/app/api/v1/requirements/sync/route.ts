@@ -4,6 +4,7 @@ import { db } from "@/src/server/db"
 import { users, requirements } from "@/src/server/db/schema"
 import { eq } from "drizzle-orm"
 import { requirementSchema } from "@/src/types/requirement-schema"
+import { trustedRole } from "@/src/server/utils/trusted-role"
 
 export async function POST(req: Request) {
   try {
@@ -15,6 +16,10 @@ export async function POST(req: Request) {
     }
 
     const currentUser = await db.select().from(users).where(eq(users.id, user.id))
+    // Requirements are posted by Buyers only (previously any role with a company passed).
+    if (trustedRole(user, currentUser[0]?.role) !== 'buyer') {
+      return NextResponse.json({ error: 'Buyer access required' }, { status: 403 })
+    }
     const companyId = currentUser[0]?.companyId
 
     if (!companyId) {

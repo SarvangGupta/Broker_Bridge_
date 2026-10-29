@@ -10,7 +10,11 @@ class _FakeRepo extends RequirementsRepository {
   _FakeRepo(this.items);
 
   @override
-  Future<List<BuyerRequirement>> getRequirements({String? statusFilter}) async => items;
+  Future<List<BuyerRequirement>> getRequirements({
+    String? statusFilter,
+    bool includeBaseline = true,
+  }) async =>
+      items;
 }
 
 BuyerRequirement _req(String id, String commodity, String status, int dayOffset,

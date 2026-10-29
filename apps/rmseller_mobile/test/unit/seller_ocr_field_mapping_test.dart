@@ -123,8 +123,8 @@ void main() {
         expect(mapped.officeAddress, contains(expectedAddr));
         // Location and Street
         expect(mapped.businessLocation.addressLine, contains(expectedAddr));
-        // Shop and Godown Address
-        expect(mapped.businessLocation.name, contains(expectedAddr));
+        // Location Name = supplier firm name (RB-SELLER-PROFILE-OCR-MAPPING-02)
+        expect(mapped.businessLocation.name, 'मे० सियाराम ट्रेडिंग कम्पनी');
       });
 
       test('OCR-MAP-006: Supplier bank details (Bank Name, Account Number, IFSC, Bank Branch) map accurately', () {
@@ -235,7 +235,7 @@ void main() {
         const expectedAddr = '82, Paraswanath Colony, Nirman Nagar, Jaipur (Raj.)-302019';
         expect(mapped.officeAddress, contains(expectedAddr));
         expect(mapped.businessLocation.addressLine, contains(expectedAddr));
-        expect(mapped.businessLocation.name, contains(expectedAddr));
+        expect(mapped.businessLocation.name, 'BINA ENTERPRISES');
         expect(mapped.businessLocation.pinCode, '302019');
         expect(mapped.state, 'Rajasthan');
         expect(mapped.district, 'Jaipur');

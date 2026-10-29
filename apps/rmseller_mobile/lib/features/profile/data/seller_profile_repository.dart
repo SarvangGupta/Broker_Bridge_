@@ -267,31 +267,37 @@ class SellerProfileRepository {
     BusinessLocationModel loc, {
     bool isUpdate = false,
     String? userId,
+    bool requireBackend = false,
   }) async {
     final client = _supabase;
     final currentUserId = userId ?? client?.auth.currentUser?.id ?? await _storage.getUserId();
+
+    // Persist to authoritative backend database (user metadata) first, so a failed
+    // server write never leaves a local cache that looks saved.
+    if (client != null && client.auth.currentUser != null) {
+      try {
+        final existingWarehouses = await getSavedWarehouses(userId: currentUserId);
+        final warehousesList = existingWarehouses.map((w) => w.toMap()).toList();
+
+        final res = await performUpdateUserMetadata(client, {
+          'default_warehouse': loc.toMap(),
+          'warehouse': loc.toMap(),
+          'warehouses': warehousesList,
+        });
+        if (requireBackend && res?.user == null) {
+          throw Exception('Warehouse location was not acknowledged by the server.');
+        }
+      } catch (e) {
+        if (requireBackend) rethrow;
+        debugPrint('Persistent warehouse backend sync notice: $e');
+      }
+    }
 
     // Cache locally
     await _cacheLocationLocally(loc, currentUserId);
 
     // Also update saved warehouses list
     await saveWarehouse(loc, setAsDefault: true, userId: currentUserId);
-
-    // Persist to authoritative backend database (user metadata)
-    if (client != null && client.auth.currentUser != null) {
-      try {
-        final existingWarehouses = await getSavedWarehouses(userId: currentUserId);
-        final warehousesList = existingWarehouses.map((w) => w.toMap()).toList();
-
-        await performUpdateUserMetadata(client, {
-          'default_warehouse': loc.toMap(),
-          'warehouse': loc.toMap(),
-          'warehouses': warehousesList,
-        });
-      } catch (e) {
-        debugPrint('Persistent warehouse backend sync notice: $e');
-      }
-    }
   }
 
   /// Retrieve all registered warehouses for this seller.
@@ -642,6 +648,17 @@ class SellerProfileRepository {
       }
     }
 
+    // Warehouse coordinates: the server copy (auth user_metadata.default_warehouse) is
+    // authoritative; local storage is only a cache. Missing values stay null — never a default.
+    double? lat = (latStr == null || latStr.isEmpty) ? null : double.tryParse(latStr);
+    double? lng = (lngStr == null || lngStr.isEmpty) ? null : double.tryParse(lngStr);
+    final metaWh = sessionUser?.userMetadata?['default_warehouse'];
+    if (metaWh is Map && metaWh.containsKey('latitude')) {
+      lat = (metaWh['latitude'] as num?)?.toDouble();
+      lng = (metaWh['longitude'] as num?)?.toDouble();
+      isGps = metaWh['is_gps_detected'] == true;
+    }
+
     final businessLoc = BusinessLocationModel(
       name: locName,
       addressLine: locAddress,
@@ -651,9 +668,9 @@ class SellerProfileRepository {
       districtId: locDistrictId,
       districtName: locDistrictName,
       pinCode: locPincode,
-      latitude: latStr != null ? double.tryParse(latStr) : 28.0229,
-      longitude: lngStr != null ? double.tryParse(lngStr) : 73.3119,
-      isGpsDetected: isGps,
+      latitude: lat,
+      longitude: lng,
+      isGpsDetected: isGps && lat != null && lng != null,
     );
 
     // Load bank details
@@ -727,6 +744,15 @@ class SellerProfileRepository {
       }
     }
 
+    // GST certificate internal fields (not shown to the seller or brokers).
+    final metaGst = sessionUser?.userMetadata?['gst_certificate'];
+    final jurisdictionalOffice = (await _storage.getPreference('gst_jurisdictional_office_$userId')) ??
+        (metaGst is Map ? metaGst['jurisdictional_office']?.toString() : null) ??
+        '';
+    final gstIssueDate = (await _storage.getPreference('gst_certificate_issue_date_$userId')) ??
+        (metaGst is Map ? metaGst['issue_date']?.toString() : null) ??
+        '';
+
     final businessId = (await _storage.getPreference('business_identifier_$userId')) ??
         (await _storage.getPreference('business_identifier')) ??
         companyName;
@@ -757,6 +783,8 @@ class SellerProfileRepository {
       invoiceDocumentUrl: invoiceDocUrl,
       invoiceDocumentName: invoiceDocName,
       commodityExpertise: expertise,
+      jurisdictionalOffice: jurisdictionalOffice,
+      gstCertificateIssueDate: gstIssueDate,
     );
   }
 
@@ -800,6 +828,10 @@ class SellerProfileRepository {
         await performUpdateUserMetadata(client, {
           'bank_details': updatedProfile.bankDetails.toMap(),
           'commodity_expertise': updatedProfile.commodityExpertise.map((e) => e.toMap()).toList(),
+          'gst_certificate': {
+            'jurisdictional_office': updatedProfile.jurisdictionalOffice,
+            'issue_date': updatedProfile.gstCertificateIssueDate,
+          },
         });
       } catch (e) {
         debugPrint('Auth metadata sync notice: $e');
@@ -831,23 +863,17 @@ class SellerProfileRepository {
 
     // Persist physical business location (shop/godown)
     final loc = updatedProfile.businessLocation;
+    // The profile save is only successful once the server has stored the warehouse
+    // (including its confirmed GPS); a failure propagates so the draft is kept.
     await saveBusinessLocationDefault(
       loc,
       isUpdate: true,
       userId: updatedProfile.id,
+      requireBackend: true,
     );
-    if (loc.latitude != null) {
-      await _storage.savePreference(
-        'business_location_lat',
-        loc.latitude.toString(),
-      );
-    }
-    if (loc.longitude != null) {
-      await _storage.savePreference(
-        'business_location_lng',
-        loc.longitude.toString(),
-      );
-    }
+    // Empty string = cleared (the storage API has no delete).
+    await _storage.savePreference('business_location_lat', loc.latitude?.toString() ?? '');
+    await _storage.savePreference('business_location_lng', loc.longitude?.toString() ?? '');
     await _storage.savePreference(
       'business_location_gps',
       loc.isGpsDetected.toString(),
@@ -874,6 +900,10 @@ class SellerProfileRepository {
     final expertiseJson = jsonEncode(updatedProfile.commodityExpertise.map((e) => e.toMap()).toList());
     await _storage.savePreference('commodity_expertise_${updatedProfile.id}', expertiseJson);
     await _storage.savePreference('commodity_expertise', expertiseJson);
+
+    // Persist GST certificate internal fields
+    await _storage.savePreference('gst_jurisdictional_office_${updatedProfile.id}', updatedProfile.jurisdictionalOffice);
+    await _storage.savePreference('gst_certificate_issue_date_${updatedProfile.id}', updatedProfile.gstCertificateIssueDate);
 
     // Persist invoice document metadata if present
     if (updatedProfile.invoiceDocumentUrl != null) {

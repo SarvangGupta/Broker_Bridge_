@@ -108,6 +108,9 @@ enum NotificationCategory {
         return NotificationCategory.dealsAndConfirmations;
 
       // Dispatch & Delivery
+      case 'WAREHOUSE_UPDATED':
+      case 'WAREHOUSE_CREATED':
+      case 'WAREHOUSE_DEACTIVATED':
       case 'LOADING_REMINDER':
       case 'DISPATCH_REMINDER':
       case 'DISPATCH_RECORDED':

@@ -3,9 +3,10 @@
 import { createClient } from "@/lib/supabase/server"
 import { db } from "@/src/server/db"
 import { companies, users, masterStates, masterDistricts, masterBusinessTypes } from "@/src/server/db/schema"
-import { eq, sql } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { verifyBuyerSession } from "@/src/server/utils/buyer-auth"
+import { provisionableRole } from "@/src/server/utils/trusted-role"
 
 export async function createCompanyProfile(data: {
   name: string
@@ -70,7 +71,8 @@ export async function createCompanyProfile(data: {
     
     // Upsert user row in users table to guarantee companyId is ALWAYS linked
     if (!existingUser) {
-      const userRole = (user.user_metadata?.role as string)?.toLowerCase() || 'buyer'
+      // Never a privileged role from client-controlled user_metadata.
+      const userRole = provisionableRole(user)
       const userName = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
       await db.insert(users).values({
         id: user.id,
@@ -109,7 +111,8 @@ export async function getCompanyProfile() {
     
     // If user record is missing in PostgreSQL users table, auto-heal user record
     if (!currentUserList.length) {
-      const userRole = (user.user_metadata?.role as string)?.toLowerCase() || 'buyer'
+      // Never a privileged role from client-controlled user_metadata.
+      const userRole = provisionableRole(user)
       const userName = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
       currentUserList = await db.insert(users).values({
         id: user.id,
@@ -278,11 +281,19 @@ export async function approveCompanyAction(companyId: string) {
       return { success: false, error: 'Unauthorized: Admin access required' }
     }
 
-    await db.update(companies).set({ status: true, isVerified: true }).where(eq(companies.id, companyId))
+    // A Buyer company's verified badge comes only from an approved GST review
+    // (Buyer GST Verifications tab); here it is only activated. Migration 0054
+    // also enforces this in the database for every path.
+    const buyerMember = await db.query.users.findFirst({
+      where: and(eq(users.companyId, companyId), sql`lower(${users.role}) = 'buyer'`),
+    })
+    await db.update(companies)
+      .set(buyerMember ? { status: true } : { status: true, isVerified: true })
+      .where(eq(companies.id, companyId))
     await db.update(users).set({ status: true }).where(eq(users.companyId, companyId))
 
     revalidatePath('/', 'layout')
-    return { success: true }
+    return { success: true, gstReviewRequired: Boolean(buyerMember) }
   } catch (error: any) {
     return { success: false, error: error.message || 'Failed to approve company' }
   }

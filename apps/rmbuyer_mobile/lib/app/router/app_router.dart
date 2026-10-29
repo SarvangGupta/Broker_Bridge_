@@ -20,8 +20,10 @@ import '../../features/offers/presentation/buyer_offers_screen.dart';
 import '../../features/offers/presentation/offer_details_screen.dart';
 import '../../features/profile/presentation/buyer_profile_screen.dart';
 import '../../features/profile/presentation/display_settings_screen.dart';
+import '../../features/profile/presentation/gst_verification_screen.dart';
 import '../../features/profile/presentation/language_settings_screen.dart';
 import '../../features/profile/presentation/profile_settings_screen.dart';
+import '../../features/profile/presentation/warehouse_management_screen.dart';
 import '../../features/requirements/domain/requirement_model.dart';
 import '../../features/requirements/presentation/post_requirement_screen.dart';
 import '../../features/requirements/presentation/requirement_details_screen.dart';
@@ -268,6 +270,12 @@ class AppRouter {
             builder: (context, state) => const BuyerProfileScreen(),
           ),
           GoRoute(
+            path: 'warehouses',
+            name: 'warehouse_settings',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) => const WarehouseManagementScreen(),
+          ),
+          GoRoute(
             path: 'language',
             name: 'language_settings',
             parentNavigatorKey: rootNavigatorKey,
@@ -348,6 +356,18 @@ class AppRouter {
         name: 'profile',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const ProfileSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/gst-verification',
+        name: 'gst_verification',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final resumeDraft =
+              state.uri.queryParameters['resumeDraft'] == 'true' ||
+              extra?['resumeDraft'] == true;
+          return GstVerificationScreen(autoResumeDraft: resumeDraft);
+        },
       ),
     ],
   );

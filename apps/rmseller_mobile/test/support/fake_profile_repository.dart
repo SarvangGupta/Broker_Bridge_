@@ -36,6 +36,7 @@ class FakeProfileRepository extends SellerProfileRepository {
     BusinessLocationModel loc, {
     bool isUpdate = false,
     String? userId,
+    bool requireBackend = false,
   }) async {
     savedDefaults.add(loc);
     savedLocation = loc;

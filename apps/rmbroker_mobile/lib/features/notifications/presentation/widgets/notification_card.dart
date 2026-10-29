@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../domain/alert_kind.dart';
@@ -52,6 +53,9 @@ class NotificationCard extends StatelessWidget {
     'DEAL_FINALIZED': 'Deal finalized',
     'DEAL_CANCELLED': 'Deal cancelled',
     'BOOKING_CREATED': 'Booking created',
+    'WAREHOUSE_UPDATED': 'Warehouse update',
+    'WAREHOUSE_CREATED': 'New warehouse',
+    'WAREHOUSE_DEACTIVATED': 'Warehouse deactivated',
   };
 
   /// Short type label from the event type (never the full title).
@@ -91,15 +95,26 @@ class NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = notification;
+    final isWarehouse = n.isWarehouseEvent;
     final kind = AlertKind.of(n);
     final isUnread = !n.isRead;
     final details = n.detailFields;
-    final loc = splitLocation(details.location);
-    final status = n.isUrgent ? 'Action required' : loc.basis;
+
+    final kindIcon = isWarehouse ? LucideIcons.warehouse : kind.icon;
+    final kindColor = isWarehouse ? const Color(0xFF0D9488) : kind.color;
+
+    final loc = splitLocation(details.location ?? n.warehouseAddress);
+    final status = n.isUrgent
+        ? 'Action required'
+        : (isWarehouse ? (n.warehouseChangeType ?? loc.basis) : loc.basis);
+
     final facts = <(IconData, String)>[
       if (details.reference != null) (LucideIcons.fileText, details.reference!),
       if (details.quantity != null) (LucideIcons.truck, details.quantity!),
       if (details.price != null) (LucideIcons.indianRupee, details.price!),
+      if (isWarehouse && n.warehouseName != null) (LucideIcons.warehouse, n.warehouseName!),
+      if (isWarehouse && n.warehouseAddress != null && loc.place == null)
+        (LucideIcons.mapPin, n.warehouseAddress!),
     ];
 
     return Semantics(
@@ -108,7 +123,9 @@ class NotificationCard extends StatelessWidget {
         color: AppColors.surfaceLight,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: isUnread ? kind.color.withValues(alpha: 0.3) : AppColors.borderLight),
+          side: BorderSide(
+            color: isUnread ? kindColor.withValues(alpha: 0.3) : AppColors.borderLight,
+          ),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -135,10 +152,10 @@ class NotificationCard extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: kind.color.withValues(alpha: 0.1),
+                    color: kindColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(kind.icon, size: 20, color: kind.color),
+                  child: Icon(kindIcon, size: 20, color: kindColor),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -152,7 +169,7 @@ class NotificationCard extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
-                                color: kind.color.withValues(alpha: 0.1),
+                                color: kindColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -160,13 +177,22 @@ class NotificationCard extends StatelessWidget {
                                 key: ValueKey('notif_type_${n.id}'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: kind.color),
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: kindColor,
+                                ),
                               ),
                             ),
                           ),
                           const Spacer(),
-                          Text(n.formattedTime,
-                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
+                          Text(
+                            n.formattedTime,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
                           SizedBox(
                             width: 30,
                             height: 24,
@@ -175,16 +201,25 @@ class NotificationCard extends StatelessWidget {
                               padding: EdgeInsets.zero,
                               iconSize: 18,
                               tooltip: 'More actions',
-                              icon: const Icon(LucideIcons.ellipsisVertical, color: AppColors.textSecondaryLight),
+                              icon: const Icon(
+                                LucideIcons.ellipsisVertical,
+                                color: AppColors.textSecondaryLight,
+                              ),
                               onSelected: (v) {
                                 if (v == 'read') onMarkAsRead?.call(n);
                                 if (v == 'details') onShowDetails?.call(n);
                               },
                               itemBuilder: (_) => [
                                 if (isUnread && onMarkAsRead != null)
-                                  const PopupMenuItem(value: 'read', child: Text('Mark as read')),
+                                  const PopupMenuItem(
+                                    value: 'read',
+                                    child: Text('Mark as read'),
+                                  ),
                                 if (onShowDetails != null)
-                                  const PopupMenuItem(value: 'details', child: Text('Details')),
+                                  const PopupMenuItem(
+                                    value: 'details',
+                                    child: Text('Details'),
+                                  ),
                               ],
                             ),
                           ),
@@ -192,7 +227,7 @@ class NotificationCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
 
-                      // Row 2: commodity / activity
+                      // Row 2: commodity / activity / warehouse headline
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: Text(
@@ -208,7 +243,7 @@ class NotificationCard extends StatelessWidget {
                         ),
                       ),
 
-                      // Row 3: reference · quantity · price
+                      // Row 3: reference · quantity · price or location fact
                       if (facts.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Wrap(
@@ -230,10 +265,18 @@ class NotificationCard extends StatelessWidget {
                         ),
                       ],
 
-                      // Row 4: location · status · action
-                      if (loc.place != null || status != null || n.isActionable) ...[
+                      // Row 4: location · status · actions (Maps + Details)
+                      if (loc.place != null ||
+                          status != null ||
+                          n.isActionable ||
+                          n.googleMapsUrl != null) ...[
                         const SizedBox(height: 6),
-                        _locationActionRow(n, kind, loc.place, status),
+                        _locationActionRow(
+                          n,
+                          kindColor,
+                          loc.place,
+                          status,
+                        ),
                       ],
                     ],
                   ),
@@ -248,7 +291,14 @@ class NotificationCard extends StatelessWidget {
 
   /// Location / status beside the action; on narrow widths the action drops
   /// below so the location is never squeezed.
-  Widget _locationActionRow(BrokerNotification n, AlertKind kind, String? place, String? status) {
+  Widget _locationActionRow(
+    BrokerNotification n,
+    Color accentColor,
+    String? place,
+    String? status,
+  ) {
+    final mapsUrl = n.googleMapsUrl;
+
     final info = (place != null || status != null)
         ? Wrap(
             spacing: 8,
@@ -261,7 +311,7 @@ class NotificationCard extends StatelessWidget {
                   key: ValueKey('notif_status_${n.id}'),
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: (n.isUrgent ? AppColors.error : kind.color).withValues(alpha: 0.08),
+                    color: (n.isUrgent ? AppColors.error : accentColor).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -271,45 +321,101 @@ class NotificationCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: n.isUrgent ? AppColors.error : kind.color,
+                      color: n.isUrgent ? AppColors.error : accentColor,
                     ),
                   ),
                 ),
             ],
           )
         : null;
-    final action = n.isActionable
-        ? Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: TextButton(
-              key: ValueKey('notif_action_${n.id}'),
-              style: TextButton.styleFrom(
-                backgroundColor: kind.color.withValues(alpha: 0.1),
-                foregroundColor: kind.color,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                minimumSize: const Size(0, 34),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () => (onAction ?? onTap)(n),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('View details', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                  SizedBox(width: 2),
-                  Icon(LucideIcons.chevronRight, size: 15),
-                ],
+
+    final actions = <Widget>[
+      if (mapsUrl != null)
+        Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: TextButton.icon(
+            key: ValueKey('notif_maps_${n.id}'),
+            icon: const Icon(LucideIcons.mapPin, size: 13),
+            label: const Text(
+              'View on Google Maps',
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+            ),
+            style: TextButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.12),
+              foregroundColor: const Color(0xFF0D9488),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              minimumSize: const Size(0, 32),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
-          )
-        : null;
-    if (action == null) return info ?? const SizedBox.shrink();
-    if (info == null) return Align(alignment: Alignment.centerRight, child: action);
+            onPressed: () async {
+              final uri = Uri.tryParse(mapsUrl);
+              if (uri != null && await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+          ),
+        ),
+      if (n.isActionable)
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: TextButton(
+            key: ValueKey('notif_action_${n.id}'),
+            style: TextButton.styleFrom(
+              backgroundColor: accentColor.withValues(alpha: 0.1),
+              foregroundColor: accentColor,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: const Size(0, 32),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => (onAction ?? onTap)(n),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  n.actionLabel ?? 'View details',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(LucideIcons.chevronRight, size: 14),
+              ],
+            ),
+          ),
+        ),
+    ];
+
+    if (actions.isEmpty) return info ?? const SizedBox.shrink();
+
+    final actionsRow = Wrap(
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: actions,
+    );
+
+    if (info == null) return Align(alignment: Alignment.centerRight, child: actionsRow);
+
     return LayoutBuilder(
-      builder: (context, constraints) => constraints.maxWidth >= 260
-          ? Row(children: [Expanded(child: info), const SizedBox(width: 6), action])
+      builder: (context, constraints) => constraints.maxWidth >= 280
+          ? Row(
+              children: [
+                Expanded(child: info),
+                const SizedBox(width: 6),
+                actionsRow,
+              ],
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [info, const SizedBox(height: 6), Align(alignment: Alignment.centerRight, child: action)],
+              children: [
+                info,
+                const SizedBox(height: 6),
+                Align(alignment: Alignment.centerRight, child: actionsRow),
+              ],
             ),
     );
   }
@@ -326,7 +432,10 @@ class NotificationCard extends StatelessWidget {
             maxLines: 1,
             softWrap: false,
             overflow: TextOverflow.fade,
-            style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimaryLight),
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: AppColors.textPrimaryLight,
+            ),
           ),
         ),
       ],

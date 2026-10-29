@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
@@ -7,14 +8,27 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_error_state.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/buyer_profile_repository.dart';
+import '../data/gst_draft_repository.dart';
+import '../data/gst_verification_repository.dart';
 import '../domain/buyer_profile.dart';
+import '../domain/gst_certificate_data.dart';
 
-/// Edit Profile: the buyer's own name and mobile number are editable and saved
-/// to `public.users`; email, role and the company record are read-only.
+/// Edit Profile: structured, cohesive business profile editor.
+/// The buyer's personal name and mobile number are editable and saved to `public.users`.
+/// Company business details are protected and governed by GST verification.
+/// Direct shortcuts provide access to GST verification and warehouse management.
 class BuyerProfileScreen extends StatefulWidget {
   final BuyerProfileRepository? repository;
+  /// Defaults to the source selected for this build ([defaultGstVerificationSource]).
+  final GstVerificationRecordSource? gstRecords;
+  final GstDraftRepository? draftRepository;
 
-  const BuyerProfileScreen({super.key, this.repository});
+  const BuyerProfileScreen({
+    super.key,
+    this.repository,
+    this.gstRecords,
+    this.draftRepository,
+  });
 
   @override
   State<BuyerProfileScreen> createState() => _BuyerProfileScreenState();
@@ -22,11 +36,15 @@ class BuyerProfileScreen extends StatefulWidget {
 
 class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
   late final BuyerProfileRepository _repo;
+  late final GstDraftRepository _draftRepo;
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _mobileController = TextEditingController();
 
   BuyerProfile? _profile;
+  GstVerificationRecord? _gstRecord;
+  GstVerificationStatus? _gstStatus;
+  GstDraft? _draft;
   bool _isLoading = true;
   bool _loadFailed = false;
   bool _isSaving = false;
@@ -36,6 +54,7 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
   void initState() {
     super.initState();
     _repo = widget.repository ?? BuyerProfileRepository();
+    _draftRepo = widget.draftRepository ?? GstDraftRepository();
     _load();
   }
 
@@ -53,11 +72,37 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
     });
     try {
       final profile = await _repo.getProfile();
+      GstVerificationStatus? gstStatus;
+      GstVerificationRecord? gstRecord;
+      GstDraft? draft;
+      final companyId = profile.companyId;
+      if (companyId != null && companyId.isNotEmpty) {
+        try {
+          final records = widget.gstRecords ?? defaultGstVerificationSource();
+          final record = await records.latestFor(companyId);
+          gstRecord = record;
+          gstStatus = record?.status ?? GstVerificationStatus.notSubmitted;
+        } catch (e) {
+          debugPrint('GST verification status load failed: ${e.runtimeType}');
+        }
+
+        try {
+          draft = await _draftRepo.getDraft(
+            companyId: companyId,
+            userId: profile.id,
+          );
+        } catch (e) {
+          debugPrint('GST draft load failed: $e');
+        }
+      }
       if (!mounted) return;
       _nameController.text = profile.name;
       _mobileController.text = profile.mobile ?? '';
       setState(() {
         _profile = profile;
+        _gstRecord = gstRecord;
+        _gstStatus = gstStatus;
+        _draft = draft;
         _isLoading = false;
       });
     } catch (e) {
@@ -121,7 +166,6 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
     } catch (e) {
       debugPrint('Profile save failed: $e');
       if (!mounted) return;
-      // The typed values stay in the fields so nothing is lost.
       setState(() {
         _isSaving = false;
         _saveFailed = true;
@@ -165,6 +209,7 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
         }
       },
       child: Scaffold(
+        backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(title: Text(context.tr(Tr.titleEditProfile))),
         body: SafeArea(child: _buildBody()),
       ),
@@ -219,6 +264,8 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
             ),
             const SizedBox(height: 12),
           ],
+
+          // Section 1: Personal Details
           _section(
             icon: LucideIcons.user,
             title: context.tr(Tr.profPersonal),
@@ -265,40 +312,168 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+
+          // Section 2: Company Details (Protected & Read-Only)
+          Builder(
+            builder: (context) {
+              final isFromDraft = _gstRecord == null && _draft != null;
+              final effectiveLegalName = _gstRecord?.legalName ?? (isFromDraft ? _draft!.values[GstField.legalName] : null);
+              final effectiveTradeName = _gstRecord?.tradeName ?? (isFromDraft ? _draft!.values[GstField.tradeName] : null);
+              final effectiveConstitution = _gstRecord?.constitution ?? (isFromDraft ? _draft!.values[GstField.constitution] : null);
+              final effectiveAddress = _gstRecord?.principalAddress ?? (isFromDraft ? _draft!.values[GstField.address] : null);
+              final effectivePin = _gstRecord?.pinCode ?? (isFromDraft ? _draft!.values[GstField.pinCode] : null);
+              final effectiveCompanyName = profile.companyName ?? (isFromDraft ? (effectiveTradeName ?? effectiveLegalName) : null);
+
+              return _section(
+                icon: LucideIcons.building2,
+                title: context.tr(Tr.profCompany),
+                children: [
+                  _readOnly(context.tr(Tr.profCompanyName), effectiveCompanyName),
+                  if (effectiveLegalName != null && effectiveLegalName != effectiveCompanyName)
+                    _readOnly('Legal Business Name', effectiveLegalName),
+                  if (effectiveTradeName != null && effectiveTradeName != effectiveCompanyName)
+                    _readOnly('Trade Name', effectiveTradeName),
+                  if (effectiveConstitution != null)
+                    _readOnly('Constitution', effectiveConstitution),
+                  if (effectiveAddress != null)
+                    _readOnly('Principal Address', effectiveAddress),
+                  if (effectivePin != null)
+                    _readOnly('PIN Code', effectivePin),
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        LucideIcons.lock,
+                        size: 14,
+                        color: AppColors.textMutedLight,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          isFromDraft
+                              ? 'Details shown above are restored from your saved local draft. Submit your certificate for Admin verification to finalize your business details.'
+                              : 'Company legal and business details are populated through verified GST certificates and cannot be directly edited here.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isFromDraft ? AppColors.warning : AppColors.textMutedLight,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Section 3: GST Details and Verification Shortcut
+          Builder(
+            builder: (context) {
+              final isFromDraft = _gstRecord == null && _draft != null;
+              final effectiveGstin = profile.companyGst ?? _gstRecord?.gstin ?? (isFromDraft ? _draft!.values[GstField.gstin] : null);
+              final verificationStatusText = switch (_gstStatus) {
+                GstVerificationStatus.approved => context.tr(Tr.profVerified),
+                GstVerificationStatus.pending => 'Pending Verification',
+                GstVerificationStatus.rejected => 'Rejected',
+                _ when isFromDraft => 'Draft Saved (Unsubmitted)',
+                null => null,
+                _ => context.tr(Tr.profNotVerified),
+              };
+
+              return _section(
+                icon: LucideIcons.badgeCheck,
+                title: 'GST Details & Verification',
+                children: [
+                  _readOnly(
+                    context.tr(Tr.profGstin),
+                    effectiveGstin,
+                  ),
+                  _readOnly(
+                    context.tr(Tr.profVerification),
+                    verificationStatusText,
+                    key: const Key('profile-verification'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const Key('profile-gst-action-btn'),
+                    icon: Icon(
+                      isFromDraft ? LucideIcons.playCircle : LucideIcons.shieldCheck,
+                      size: 16,
+                    ),
+                    label: Text(
+                      _gstStatus == GstVerificationStatus.approved
+                          ? 'View GST Verification'
+                          : isFromDraft
+                              ? 'Continue GST Draft'
+                              : 'Verify Business GST',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: () async {
+                      await context.push(
+                        isFromDraft
+                            ? '/gst-verification?resumeDraft=true'
+                            : '/gst-verification',
+                        extra: {'resumeDraft': isFromDraft},
+                      );
+                      if (mounted) _load();
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Section 4: Warehouse Management Shortcut
           _section(
-            icon: LucideIcons.building2,
-            title: context.tr(Tr.profCompany),
+            icon: LucideIcons.warehouse,
+            title: 'Operational Warehouses',
             children: [
-              _readOnly(context.tr(Tr.profCompanyName), profile.companyName),
-              _readOnly(context.tr(Tr.profGstin), profile.companyGst),
-              _readOnly(
-                context.tr(Tr.profVerification),
-                switch (profile.companyVerified) {
-                  true => context.tr(Tr.profVerified),
-                  false => context.tr(Tr.profNotVerified),
-                  null => null,
-                },
-                key: const Key('profile-verification'),
+              const Text(
+                'Manage multiple unloading locations, depot addresses, and set your primary delivery site for trade contracts.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                key: const Key('profile-warehouses-action-btn'),
+                icon: const Icon(LucideIcons.mapPin, size: 16),
+                label: const Text('Manage Warehouses & Depots'),
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: () => context.push('/settings/warehouses'),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+
+          // Section 5: Account and Security Notes
           _section(
-            icon: LucideIcons.shieldCheck,
+            icon: LucideIcons.shieldAlert,
             title: context.tr(Tr.profAccount),
             children: [
-              _readOnly(context.tr(Tr.profRole), switch (profile.role) {
-                'buyer' => context.tr(Tr.profRoleBuyer),
-                'admin' => context.tr(Tr.profRoleAdmin),
-                _ => null,
-              }),
+              _readOnly(
+                context.tr(Tr.profRole),
+                switch (profile.role) {
+                  'buyer' => context.tr(Tr.profRoleBuyer),
+                  'admin' => context.tr(Tr.profRoleAdmin),
+                  _ => null,
+                },
+              ),
               const SizedBox(height: 4),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(
-                    LucideIcons.lock,
+                    LucideIcons.shieldCheck,
                     size: 14,
                     color: AppColors.textMutedLight,
                   ),
@@ -307,7 +482,7 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
                     child: Text(
                       context.tr(Tr.profProtectedNote),
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         color: AppColors.textMutedLight,
                       ),
                     ),
@@ -316,7 +491,8 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
+
           AppButton(
             key: const Key('profile-save'),
             label: _isSaving

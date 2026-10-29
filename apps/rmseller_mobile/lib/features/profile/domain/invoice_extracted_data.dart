@@ -182,6 +182,7 @@ class InvoiceFinancials {
 class InvoiceExtractedData {
   final String? firmName;
   final String? gstin;
+  final String? email; // Supplier email, only when printed on the invoice
   final String? officeAddress;
   final String? state;
   final String? district;
@@ -218,6 +219,7 @@ class InvoiceExtractedData {
   const InvoiceExtractedData({
     this.firmName,
     this.gstin,
+    this.email,
     this.officeAddress,
     this.state,
     this.district,
@@ -268,6 +270,7 @@ class InvoiceExtractedData {
     return InvoiceExtractedData(
       firmName: firmName,
       gstin: gstin,
+      email: email,
       officeAddress: officeAddress,
       state: state,
       district: district,
@@ -320,6 +323,9 @@ class InvoiceExtractedData {
   /// Computes a list of field names that differ from current profile.
   List<String> getChangedFieldNames(SellerProfileModel profile) {
     final changed = <String>[];
+    if (firmName != null && firmName!.isNotEmpty && firmName != profile.fullName) {
+      changed.add('Full Name');
+    }
     if (firmName != null && firmName!.isNotEmpty && firmName != profile.companyName) {
       changed.add('Business Name');
     }
@@ -396,8 +402,8 @@ class InvoiceExtractedData {
     final effectiveDistrict = sDistrict ?? current.district;
 
     final updatedLocation = current.businessLocation.copyWith(
-      name: effectiveAddr, // Shop and Godown Address
-      addressLine: effectiveAddr, // Location and Street
+      name: sFirm ?? current.businessLocation.name, // Location Name = supplier firm name
+      addressLine: sAddr ?? current.businessLocation.addressLine, // Street / Mandi / Area Address
       pinCode: effectivePin,
       stateName: effectiveState,
       districtName: effectiveDistrict,
@@ -411,7 +417,10 @@ class InvoiceExtractedData {
       branchName: sBranch ?? current.bankDetails.branchName,
     );
 
+    // Email is intentionally not mapped: profile email is the login identity (read-only in the
+    // profile form), so invoice email is surfaced for review only and never overwrites it.
     return current.copyWith(
+      fullName: sFirm ?? current.fullName,
       companyName: sFirm ?? current.companyName,
       // INVARIANT: Business Identifier = Firm Name (Never GSTIN)
       businessIdentifier: sFirm ?? (current.businessIdentifier.isNotEmpty ? current.businessIdentifier : current.companyName),
@@ -432,6 +441,7 @@ class InvoiceExtractedData {
   InvoiceExtractedData copyWith({
     String? firmName,
     String? gstin,
+    String? email,
     String? officeAddress,
     String? state,
     String? district,
@@ -468,6 +478,7 @@ class InvoiceExtractedData {
     return InvoiceExtractedData(
       firmName: firmName ?? this.firmName,
       gstin: gstin ?? this.gstin,
+      email: email ?? this.email,
       officeAddress: officeAddress ?? this.officeAddress,
       state: state ?? this.state,
       district: district ?? this.district,
@@ -560,6 +571,7 @@ class InvoiceExtractedData {
     return InvoiceExtractedData(
       firmName: map['firm_name']?.toString() ?? map['firmName']?.toString(),
       gstin: map['gstin']?.toString() ?? map['gst']?.toString(),
+      email: map['email']?.toString(),
       officeAddress: map['office_address']?.toString() ?? map['officeAddress']?.toString(),
       state: map['state']?.toString(),
       district: map['district']?.toString(),
@@ -599,6 +611,7 @@ class InvoiceExtractedData {
     return {
       'firm_name': firmName,
       'gstin': gstin,
+      'email': email,
       'office_address': officeAddress,
       'state': state,
       'district': district,

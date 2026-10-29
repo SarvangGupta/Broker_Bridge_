@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/src/server/db";
 import { users, companies } from "@/src/server/db/schema";
 import { eq } from "drizzle-orm";
+import { provisionableRole, trustedRole } from "./trusted-role";
 
 /**
  * Strict Flat Role Model for Buyer Module.
@@ -47,7 +48,9 @@ export async function verifyBuyerSession(): Promise<BuyerSessionResult> {
     });
 
     if (!dbUser) {
-      const userRole = (user.user_metadata?.role as string)?.toLowerCase() || 'buyer';
+      // Never a privileged role from client-controlled user_metadata: inserting
+      // role 'admin' here would be copied into trusted app_metadata by trg_sync_privileged_role.
+      const userRole = provisionableRole(user);
       const userName = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
       const inserted = await db.insert(users).values({
         id: user.id,
@@ -57,6 +60,11 @@ export async function verifyBuyerSession(): Promise<BuyerSessionResult> {
         status: true,
       }).returning();
       dbUser = inserted[0];
+    }
+
+    // Buyer actions are for Buyer accounts only (previously any role passed).
+    if (trustedRole(user, dbUser.role) !== 'buyer') {
+      return { success: false, error: "Buyer access required" };
     }
 
     if (!dbUser.companyId) {

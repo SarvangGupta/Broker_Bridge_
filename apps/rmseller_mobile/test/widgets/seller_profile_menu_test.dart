@@ -305,11 +305,13 @@ void main() {
 
         // Verify Business Location section in Edit Mode
         expect(find.byKey(const Key('business_location_edit_card')), findsOneWidget);
-        expect(find.byKey(const Key('btn_use_current_location')), findsOneWidget);
-        expect(find.byKey(const Key('btn_location_presets')), findsOneWidget);
-        expect(find.byKey(const Key('edit_location_name_field')), findsOneWidget);
+        // RB-SELLER-WAREHOUSE-UI-01: one Warehouse Address + GPS / Set on Map; no presets or name.
+        expect(find.byKey(const Key('btn_set_on_map')), findsOneWidget);
+        expect(find.byKey(const Key('warehouse_gps_field')), findsOneWidget);
+        expect(find.byKey(const Key('btn_location_presets')), findsNothing);
+        expect(find.byKey(const Key('edit_location_name_field')), findsNothing);
         expect(find.byKey(const Key('edit_location_address_field')), findsOneWidget);
-        expect(find.byKey(const Key('edit_location_locality_field')), findsOneWidget);
+        expect(find.byKey(const Key('edit_location_locality_field')), findsNothing);
         expect(find.byKey(const Key('location_state_dropdown')), findsOneWidget);
         expect(find.byKey(const Key('location_district_dropdown')), findsOneWidget);
         expect(find.byKey(const Key('edit_location_pincode_field')), findsOneWidget);
@@ -324,7 +326,7 @@ void main() {
     );
 
     testWidgets(
-      'Tapping Use Current Location populates State & District with confidence indicator',
+      'Warehouse: no fake GPS — coordinates start unset and Set on Map is offered',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(800, 2000);
         tester.view.devicePixelRatio = 1.0;
@@ -345,14 +347,13 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Tap Use Current Location
-        await tester.tap(find.byKey(const Key('btn_use_current_location')));
-        await tester.pumpAndSettle();
+        // The removed stub always produced Bikaner; coordinates must now start unset.
+        expect(find.byKey(const Key('btn_use_current_location')), findsNothing);
+        expect(tester.widget<Text>(find.byKey(const Key('warehouse_gps_value'))).data, 'Not set yet');
+        expect(find.textContaining('Location verified'), findsNothing);
+        expect(find.byKey(const Key('btn_set_on_map')), findsOneWidget);
 
-        // Verify detection success message
-        expect(find.textContaining('Location verified: Bikaner Mandi Hub, Rajasthan'), findsOneWidget);
-
-        // Verify state and district dropdown selections are set
+        // State and district dropdowns remain available for manual / PIN-based selection
         final stateFinder = find.byKey(const Key('location_state_dropdown'));
         expect(stateFinder, findsOneWidget);
 
@@ -394,9 +395,15 @@ void main() {
         await tester.tap(find.text('Madhya Pradesh').last);
         await tester.pumpAndSettle();
 
-        // Verify state changed to Madhya Pradesh and district updated to MP district
+        // State changed; district is no longer auto-guessed (RB-SELLER-ADDRESS-PIN-FIX-01)
         expect(find.text('Madhya Pradesh'), findsOneWidget);
-        expect(find.text('Indore Mandi Complex'), findsOneWidget);
+        expect(find.text('Indore Mandi Complex'), findsNothing);
+
+        // The district list now offers only Madhya Pradesh districts
+        await tester.tap(find.byKey(const Key('location_district_dropdown')));
+        await tester.pumpAndSettle();
+        expect(find.text('Indore Mandi Complex'), findsWidgets);
+        expect(find.text('Bikaner Mandi Hub'), findsNothing);
       },
     );
 
@@ -431,9 +438,6 @@ void main() {
         '12345',
       );
 
-      // Clear location name
-      await tester.enterText(find.byKey(const Key('edit_location_name_field')), '');
-
       // Tap Save Changes
       await tester.tap(find.byKey(const Key('save_profile_button')));
       await tester.pumpAndSettle();
@@ -447,10 +451,8 @@ void main() {
         find.text('Enter a valid 10-digit Indian mobile number'),
         findsOneWidget,
       );
-      expect(
-        find.text('Facility name is required'),
-        findsOneWidget,
-      );
+      // Location / shop name is no longer required (RB-SELLER-WAREHOUSE-UI-01).
+      expect(find.text('Facility name is required'), findsNothing);
     });
 
     testWidgets(
@@ -484,7 +486,7 @@ void main() {
           'Discarded Name Edit',
         );
         await tester.enterText(
-          find.byKey(const Key('edit_location_name_field')),
+          find.byKey(const Key('edit_location_address_field')),
           'Discarded Warehouse Name',
         );
 
@@ -545,10 +547,6 @@ void main() {
           '9829099887',
         );
         await tester.enterText(
-          find.byKey(const Key('edit_location_name_field')),
-          'Goyal Mandi Godown Shed 7',
-        );
-        await tester.enterText(
           find.byKey(const Key('edit_location_address_field')),
           'Gate 4, Krishi Upaj Mandi, Bikaner',
         );
@@ -573,7 +571,6 @@ void main() {
         expect(find.text('Ramesh Kumar Goyal'), findsOneWidget);
         await tester.tap(find.text('Shop & Godown'));
         await tester.pumpAndSettle();
-        expect(find.text('Goyal Mandi Godown Shed 7'), findsOneWidget);
         expect(find.text('Gate 4, Krishi Upaj Mandi, Bikaner'), findsOneWidget);
 
         // Verify persistent storage was updated
@@ -583,8 +580,9 @@ void main() {
         final updatedCompany = await storage.getCompanyName();
         expect(updatedCompany, 'Goyal Agro Mills Pvt Ltd');
 
+        // The hidden location name is preserved, not cleared.
         final updatedLocName = await storage.getPreference('business_location_name');
-        expect(updatedLocName, 'Goyal Mandi Godown Shed 7');
+        expect(updatedLocName, isNotEmpty);
       },
     );
   });

@@ -61,6 +61,7 @@ import {
   deleteQualityParameterAction
 } from "@/src/server/actions/master-data-actions"
 import { CompanyApprovalQueue } from "./company-approval-queue"
+import { BuyerGstVerificationQueue } from "./buyer-gst-verification-queue"
 import { DealDeskQueue } from "./deal-desk-queue"
 import { AdminDisputeQueue } from "./admin-dispute-queue"
 import { AdminHelpDeskQueue } from "./admin-help-desk-queue"
@@ -363,6 +364,10 @@ export function MasterDataTabs() {
           <TabsTrigger value="approvals" className="justify-start px-3 py-2 text-sm text-slate-600 data-[state=active]:bg-[#F1F5F9] data-[state=active]:text-[#334155] data-[state=active]:font-semibold rounded-md transition-colors w-full border-none shadow-none text-left flex items-center gap-2">
             <ListChecks className="w-4 h-4" />
             Approvals
+          </TabsTrigger>
+          <TabsTrigger value="gst-verifications" className="justify-start px-3 py-2 text-sm text-slate-600 data-[state=active]:bg-[#F1F5F9] data-[state=active]:text-[#334155] data-[state=active]:font-semibold rounded-md transition-colors w-full border-none shadow-none text-left flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-amber-600" />
+            Buyer GST Verifications
           </TabsTrigger>
           <TabsTrigger value="brokers" className="justify-start px-3 py-2 text-sm text-slate-600 data-[state=active]:bg-[#F1F5F9] data-[state=active]:text-[#334155] data-[state=active]:font-semibold rounded-md transition-colors w-full border-none shadow-none text-left flex items-center gap-2">
             <Users className="w-4 h-4 text-emerald-600" />
@@ -1097,6 +1102,11 @@ export function MasterDataTabs() {
             {/* COMPANY APPROVALS TAB */}
             <TabsContent value="approvals" className="m-0 outline-none">
               <CompanyApprovalQueue />
+            </TabsContent>
+
+            {/* BUYER GST VERIFICATIONS TAB */}
+            <TabsContent value="gst-verifications" className="m-0 outline-none">
+              <BuyerGstVerificationQueue />
             </TabsContent>
 
             {/* DEAL DESK TAB */}

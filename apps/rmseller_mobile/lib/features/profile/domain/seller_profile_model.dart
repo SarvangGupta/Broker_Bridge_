@@ -29,6 +29,11 @@ class SellerProfileModel {
   final String versionIdentifier;
   final List<SellerCommodityExpertise> commodityExpertise;
 
+  /// From the GST REG-06 certificate. Internal only: never shown in the seller-facing
+  /// profile summary, editable field list, listings or broker-facing cards.
+  final String jurisdictionalOffice;
+  final String gstCertificateIssueDate;
+
   const SellerProfileModel({
     required this.id,
     required this.fullName,
@@ -54,6 +59,8 @@ class SellerProfileModel {
     this.chequeDocumentUrl,
     this.chequeDocumentName,
     this.commodityExpertise = const [],
+    this.jurisdictionalOffice = '',
+    this.gstCertificateIssueDate = '',
   });
 
   bool get hasInvoiceDocument =>
@@ -99,6 +106,8 @@ class SellerProfileModel {
     String? chequeDocumentUrl,
     String? chequeDocumentName,
     List<SellerCommodityExpertise>? commodityExpertise,
+    String? jurisdictionalOffice,
+    String? gstCertificateIssueDate,
   }) {
     return SellerProfileModel(
       id: id ?? this.id,
@@ -125,6 +134,8 @@ class SellerProfileModel {
       chequeDocumentUrl: chequeDocumentUrl ?? this.chequeDocumentUrl,
       chequeDocumentName: chequeDocumentName ?? this.chequeDocumentName,
       commodityExpertise: commodityExpertise ?? this.commodityExpertise,
+      jurisdictionalOffice: jurisdictionalOffice ?? this.jurisdictionalOffice,
+      gstCertificateIssueDate: gstCertificateIssueDate ?? this.gstCertificateIssueDate,
     );
   }
 
@@ -243,6 +254,8 @@ class SellerProfileModel {
       chequeDocumentUrl: map['cheque_document_url']?.toString(),
       chequeDocumentName: map['cheque_document_name']?.toString(),
       commodityExpertise: expertise,
+      jurisdictionalOffice: map['jurisdictional_office']?.toString() ?? '',
+      gstCertificateIssueDate: map['gst_certificate_issue_date']?.toString() ?? '',
     );
   }
 
@@ -272,6 +285,8 @@ class SellerProfileModel {
       'cheque_document_url': chequeDocumentUrl,
       'cheque_document_name': chequeDocumentName,
       'commodity_expertise': commodityExpertise.map((e) => e.toMap()).toList(),
+      'jurisdictional_office': jurisdictionalOffice,
+      'gst_certificate_issue_date': gstCertificateIssueDate,
     };
   }
 }

@@ -24,8 +24,9 @@ class BusinessLocationModel {
     this.districtId = '50000000-0000-0000-0000-000000000001',
     this.districtName = 'Bikaner Mandi Hub',
     this.pinCode = '334001',
-    this.latitude = 28.0229,
-    this.longitude = 73.3119,
+    // No default coordinates: a location exists only when the seller confirmed one.
+    this.latitude,
+    this.longitude,
     this.isGpsDetected = false,
   });
 
@@ -41,7 +42,13 @@ class BusinessLocationModel {
     double? latitude,
     double? longitude,
     bool? isGpsDetected,
+    bool clearCoordinates = false,
   }) {
+    if (clearCoordinates) {
+      latitude = null;
+      longitude = null;
+      isGpsDetected = false;
+    }
     return BusinessLocationModel(
       name: name ?? this.name,
       addressLine: addressLine ?? this.addressLine,
@@ -51,8 +58,8 @@ class BusinessLocationModel {
       districtId: districtId ?? this.districtId,
       districtName: districtName ?? this.districtName,
       pinCode: pinCode ?? this.pinCode,
-      latitude: latitude ?? this.latitude,
-      longitude: longitude ?? this.longitude,
+      latitude: clearCoordinates ? null : latitude ?? this.latitude,
+      longitude: clearCoordinates ? null : longitude ?? this.longitude,
       isGpsDetected: isGpsDetected ?? this.isGpsDetected,
     );
   }
@@ -85,8 +92,8 @@ class BusinessLocationModel {
           'Bikaner Mandi Hub',
       pinCode:
           map['pin_code']?.toString() ?? map['pinCode']?.toString() ?? '334001',
-      latitude: (map['latitude'] as num?)?.toDouble() ?? 28.0229,
-      longitude: (map['longitude'] as num?)?.toDouble() ?? 73.3119,
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
       isGpsDetected:
           map['is_gps_detected'] == true || map['isGpsDetected'] == true,
     );

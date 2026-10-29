@@ -209,15 +209,21 @@ class ProfileReviewConfirmationSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '${changedDiffs.length} ${s.isHindi ? 'फ़ील्ड संशोधित' : 'field(s) modified'}',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primary),
+                  Flexible(
+                    child: Text(
+                      '${changedDiffs.length} ${s.isHindi ? 'फ़ील्ड संशोधित' : 'field(s) modified'}',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primary),
+                    ),
                   ),
-                  const Spacer(),
-                  Text(
-                    '${s.previousValueColumn} vs ${s.newValueColumn}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      '${s.previousValueColumn} vs ${s.newValueColumn}',
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                    ),
                   ),
                 ],
               ),

@@ -4,7 +4,24 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:pdfx/pdfx.dart';
 import '../domain/invoice_extracted_data.dart';
 import '../domain/cheque_extracted_data.dart';
+import '../domain/gst_certificate_extracted_data.dart';
+import 'gst_certificate_parser.dart';
 import 'india_pincode_directory.dart';
+
+/// Result envelope for GST certificate extraction.
+class GstCertificateExtractionResult {
+  final bool isSuccess;
+  final GstCertificateExtractedData data;
+  final String? errorMessage;
+
+  const GstCertificateExtractionResult.success(this.data)
+      : isSuccess = true,
+        errorMessage = null;
+
+  const GstCertificateExtractionResult.failure(this.errorMessage)
+      : isSuccess = false,
+        data = const GstCertificateExtractedData();
+}
 
 /// Result envelope for invoice extraction operations.
 class InvoiceExtractionResult {
@@ -167,6 +184,41 @@ class InvoiceOcrService {
     }
   }
 
+  /// Extract seller details from a GST REG-06 Registration Certificate (image or PDF).
+  Future<GstCertificateExtractionResult> extractGstCertificateFromFile(File file) async {
+    if (!file.existsSync() || await file.length() == 0) {
+      return const GstCertificateExtractionResult.failure('The selected certificate file is missing or empty.');
+    }
+    if (!_nativeEngineAvailable) {
+      return const GstCertificateExtractionResult.failure(
+        'On-device OCR engine is not available in this build. Please enter the details manually.',
+      );
+    }
+    try {
+      final rawText = await recognizeRawTextFromFile(file);
+      if (rawText.isEmpty) {
+        return const GstCertificateExtractionResult.failure(
+          'No readable text was found on the certificate. Please retake it in good light or enter the details manually.',
+        );
+      }
+      final data = extractGstCertificateFromText(rawText);
+      if (data.isEmpty) {
+        return const GstCertificateExtractionResult.failure(
+          'This does not look like a GST Registration Certificate (Form GST REG-06). Please check the document.',
+        );
+      }
+      return GstCertificateExtractionResult.success(data);
+    } catch (e) {
+      debugPrint('GST certificate OCR error: ${e.runtimeType}');
+      return GstCertificateExtractionResult.failure(
+        'Certificate text extraction failed: ${e.toString().replaceAll('Exception:', '').trim()}',
+      );
+    }
+  }
+
+  GstCertificateExtractedData extractGstCertificateFromText(String rawText) =>
+      const GstCertificateParser().parse(rawText);
+
   /// Extract bank details from a cheque photo or gallery image.
   Future<ChequeExtractionResult> extractChequeFromFile(File file) async {
     if (!file.existsSync()) {
@@ -231,42 +283,71 @@ class InvoiceOcrService {
         .where((l) => l.isNotEmpty)
         .toList();
 
+    // Real OCR output is not in reading order (ML Kit may emit the buyer block before the
+    // supplier header), so the buyer block is identified by its header + form lines wherever
+    // it appears, and supplier-only fields (name, address, PIN, email) skip those lines.
+    final String? signatureName = _extractSignatureFirmName(cleanLines);
+    final Set<int> buyerLineIdx = _findBuyerLineIndexes(cleanLines, signatureName);
+    final supplierLines = [
+      for (int i = 0; i < cleanLines.length; i++)
+        if (!buyerLineIdx.contains(i)) cleanLines[i],
+    ];
+    final String supplierNormalizedText = normalizeDevanagariNumerals(supplierLines.join('\n'));
+
     // 1. Structured Core Business Identifiers (Supplier / Seller)
     final String? gstin = _extractGstin(normalizedText);
-    final String? pin = _extractPinCode(normalizedText, cleanLines);
+    final String? pin = _extractPinCode(supplierNormalizedText, supplierLines);
+    final String? firmName = signatureName ?? _extractFirmName(supplierLines, gstin);
+    final String? email = _extractEmail(supplierLines);
 
     // 2. India PIN Code Intelligence & Lookup
+    // 3. Address Extraction & Multiple Address Candidate Detection
+    final addressExtraction = _extractAddressDetails(supplierLines, pin, firmName);
+    final String? officeAddress = addressExtraction.primaryAddress;
+    final Map<String, String> addressCandidates = addressExtraction.candidates;
+
     String? state;
     String? district;
+    String? pinReviewNotice;
     if (pin != null) {
       final pinResult = IndiaPinCodeDirectory.lookup(pin);
-      if (pinResult != null) {
+      if (pinResult == null) {
+        pinReviewNotice = 'PIN code $pin was not found in the India Post directory. Please verify it.';
+      } else if (pinResult.isStateAmbiguous) {
+        pinReviewNotice =
+            'PIN code $pin is listed under more than one state (${pinResult.stateCandidates.join(', ')}). Please select the state and district.';
+      } else {
         state = pinResult.stateName;
         if (pinResult.districtName.isNotEmpty) {
           district = pinResult.districtName;
+        } else if (pinResult.isAmbiguous) {
+          // Use the written address to pick among the PIN's districts; otherwise ask the seller.
+          final addr = (officeAddress ?? '').toLowerCase();
+          final mentioned = pinResult.districtCandidates.where((d) => addr.contains(d.toLowerCase())).toList();
+          if (mentioned.length == 1) {
+            district = mentioned.first;
+          } else {
+            pinReviewNotice =
+                'PIN code $pin covers more than one district (${pinResult.districtCandidates.join(', ')}). Please select the district.';
+          }
         }
       }
     }
 
-    // 3. Address Extraction & Multiple Address Candidate Detection
-    final addressExtraction = _extractAddressDetails(cleanLines, pin);
-    final String? officeAddress = addressExtraction.primaryAddress;
-    final Map<String, String> addressCandidates = addressExtraction.candidates;
-
     // 4. PIN Code & Address Conflict Detection
     final String? pinConflictNotice = IndiaPinCodeDirectory.detectAddressConflict(
-      pin,
-      officeAddress ?? rawText,
-    );
+          pin,
+          officeAddress ?? rawText,
+        ) ??
+        pinReviewNotice;
     final bool hasPinAddressConflict = pinConflictNotice != null;
 
     // 5. Contact Mobile Number Extraction & Disambiguation
-    final mobileExtraction = _extractMobileNumbers(normalizedText, cleanLines);
+    final mobileExtraction = _extractMobileNumbers(normalizedText, cleanLines, buyerLineIdx);
     final String? contactMobile = mobileExtraction.primarySellerMobile;
     final List<PhoneCandidate> phoneCandidates = mobileExtraction.candidates;
 
-    // 6. Firm Name & Invoice Metadata
-    final String? firmName = _extractFirmName(cleanLines, gstin);
+    // 6. Invoice Metadata
     final String? invoiceNo = _extractInvoiceNumber(normalizedText);
     final String? invoiceDate = _extractInvoiceDate(normalizedText);
     final String? documentType = _extractDocumentType(rawText);
@@ -317,6 +398,7 @@ class InvoiceOcrService {
     return InvoiceExtractedData(
       firmName: firmName,
       gstin: gstin,
+      email: email,
       officeAddress: officeAddress,
       state: state,
       district: district,
@@ -390,20 +472,29 @@ class InvoiceOcrService {
     final hyphenPinRegex = RegExp(r'(?:[-–—,\s])\s*([1-9][0-9]{5})\b');
     for (final line in lines) {
       final normLine = normalizeDevanagariNumerals(line);
+      // Item rows carry HSN codes / long amounts; their 6-digit totals are not PINs.
+      if (RegExp(r'[0-9]{7,}').hasMatch(normLine)) continue;
       final m = hyphenPinRegex.firstMatch(normLine);
+      // A bare space before 6 digits ("योग 336600") is only a PIN on an address-like line.
+      if (m != null && m.group(0)!.trimLeft() == m.group(1) && !_isAddressLine(line, normLine, null)) continue;
       if (m != null) {
         final pin = m.group(1)!;
         if (IndiaPinCodeDirectory.isValidPin(pin)) return pin;
       }
     }
 
-    // 3. Isolated 6-digit candidate verified by India Post Directory
+    // 3. Isolated 6-digit candidate verified by India Post Directory — only on address-like
+    // lines, so amounts / HSN rows (e.g. "... 1800 336600") are never taken as a PIN.
     final isolatedRegex = RegExp(r'\b([1-9][0-9]{5})\b');
-    for (final match in isolatedRegex.allMatches(normalizedText)) {
-      final candidate = match.group(1)!;
-      if (candidate.startsWith('202') || candidate.startsWith('199')) continue;
-      if (IndiaPinCodeDirectory.isValidPin(candidate)) {
-        return candidate;
+    for (final line in lines) {
+      final normLine = normalizeDevanagariNumerals(line);
+      if (RegExp(r'[0-9]{7,}').hasMatch(normLine)) continue;
+      if (!_isAddressLine(line, normLine, null) && !line.contains(',')) continue;
+      for (final match in isolatedRegex.allMatches(normLine)) {
+        final candidate = match.group(1)!;
+        if (candidate.startsWith('202') || candidate.startsWith('199')) continue;
+        // Unlabelled numbers must exist in the India Post directory to count as a PIN.
+        if (IndiaPinCodeDirectory.isKnownPin(candidate)) return candidate;
       }
     }
 
@@ -412,7 +503,84 @@ class InvoiceOcrService {
 
   // --- MULTI-LINE ADDRESS EXTRACTION (ENGLISH & HINDI) ---
 
-  _AddressExtractionResult _extractAddressDetails(List<String> lines, String? pin) {
+  static final RegExp _buyerSectionPattern = RegExp(
+    r'^(?:(?:consignee|क्रेता)\s*(?:\/|&)\s*)?(?:billed\s*to|bill\s*to|buyer|consignee|customer|क्रेता|खरीदार|ग्राहक|प्रति|मेसर्स(?:\s*क्रेता)?|m\/s\.?)(?:\s|$|[:\-])',
+    caseSensitive: false,
+  );
+
+  static final RegExp _gstinTokenPattern = RegExp(
+    r'\b[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}\b',
+    caseSensitive: false,
+  );
+
+  /// Supplier firm name from the signature line ("For BINA ENTERPRISES", "वास्ते-मे० <फर्म>").
+  /// This line is printed by the supplier, so it is independent of OCR block order.
+  String? _extractSignatureFirmName(List<String> lines) {
+    final sigRegex = RegExp(r'^(?:for|वास्ते)\s*[-–:]?\s*(.+)$', caseSensitive: false);
+    final businessKeywords = RegExp(
+      r'(?:agro|industries|mills?|traders|enterprises|ltd|limited|pvt|private|foods|trading|company|co\.|corporation|ट्रेडर्स|उद्योग|एग्रो|मिल्स|मिल|इंटरप्राइजेज|लिमिटेड|फर्म|कंपनी|कम्पनी|इंडस्ट्रीज|फूड्स|व्यापार)',
+      caseSensitive: false,
+    );
+    for (final line in lines) {
+      final m = sigRegex.firstMatch(line.trim());
+      if (m == null) continue;
+      final name = m
+          .group(1)!
+          .replaceAll(RegExp(r'(?:authori[sz]ed\s*signatory|अधिकृत\s*हस्ताक्षर).*$', caseSensitive: false), '')
+          .trim();
+      if (name.length >= 3 && name.length <= 80 && businessKeywords.hasMatch(name)) return name;
+    }
+    return null;
+  }
+
+  /// Indexes of buyer-section lines: each buyer header plus the form lines that follow it,
+  /// up to the item table / next section. Works regardless of where OCR places the block.
+  Set<int> _findBuyerLineIndexes(List<String> lines, String? signatureName) {
+    final sectionEnd = RegExp(
+      r'^(?:item|s\.?\s*no|particulars|description|क्र\.?\s*सं?|विवरण|hsn|invoice|इनवाइस|bank|बैंक|total|कुल|truck|गाड़ी)',
+      caseSensitive: false,
+    );
+    final sigNorm = signatureName == null ? null : normalizeDevanagariNumerals(signatureName);
+    final result = <int>{};
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (!_buyerSectionPattern.hasMatch(line)) continue;
+      // A leading "M/s <name>" on the first lines is the supplier header unless the signature
+      // line proves the supplier is someone else.
+      if (sigNorm != null && normalizeDevanagariNumerals(line).contains(sigNorm.replaceAll(RegExp(r'^(?:m\/s\.?|मे[0\.])\s*', caseSensitive: false), ''))) {
+        continue;
+      }
+      if (i < 2 && sigNorm == null) continue;
+      result.add(i);
+      for (int j = i + 1; j < lines.length && j <= i + 6; j++) {
+        if (sectionEnd.hasMatch(lines[j].trim())) break;
+        result.add(j);
+      }
+    }
+    return result;
+  }
+
+  /// Compares Devanagari ignoring vowel signs/independent vowels, so OCR slips such as
+  /// "बैंक अफ बड़ौदा" still match "बैंक ऑफ बड़ौदा".
+  static String _devanagariSkeleton(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[ऀ-ःऄ-औऺ-ॏॕ-ॗॢॣ]'), '').replaceAll(RegExp(r'\s+'), ' ');
+
+  String? _extractEmail(List<String> supplierLines) {
+    final regex = RegExp(r'\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b');
+    for (final line in supplierLines) {
+      final m = regex.firstMatch(line);
+      if (m != null) return m.group(0)!.toLowerCase();
+    }
+    return null;
+  }
+
+  /// [lines] must be supplier lines only (buyer section already removed).
+  _AddressExtractionResult _extractAddressDetails(
+    List<String> lines,
+    String? pin,
+    String? firmName,
+  ) {
+    final buyerIndex = lines.length;
     final candidates = <String, String>{};
     String? primaryAddress;
 
@@ -422,22 +590,9 @@ class InvoiceOcrService {
     );
 
     final stopHeaderPattern = RegExp(
-      r'^(?:gstin|gst|pan|invoice\s*no|bill\s*no|date|dated|bank\s*details|a\/c|account|total|mobile|phone|ph|contact|जीएसटी|पैन|बिल\s*संख्या|दिनांक|बैंक|खाता|कुल|मोबाइल|फोन|संपर्क)\b',
+      r'^(?:(?:gstin|gst|pan|invoice\s*no|bill\s*no|date|dated|bank\s*details|a\/c|account|total|mobile|phone|ph|contact|for|authori[sz]ed|s\.?\s*no|particulars|hsn)\b|जीएसटी|पैन|बिल\s*संख्या|दिनांक|बैंक|खाता|कुल|मोबाइल|फोन|संपर्क|वास्ते|अधिकृत|क्र\.?\s*सं)',
       caseSensitive: false,
     );
-
-    final buyerSectionPattern = RegExp(
-      r'^(?:(?:consignee|क्रेता)\s*(?:\/|&)\s*)?(?:billed\s*to|bill\s*to|buyer|consignee|customer|क्रेता|खरीदार|ग्राहक|प्रति|मेसर्स(?:\s*क्रेता)?|m\/s\.?)(?:\s|$|[:\-])',
-      caseSensitive: false,
-    );
-    int buyerIndex = -1;
-    for (int i = 2; i < lines.length; i++) {
-      if (buyerSectionPattern.hasMatch(lines[i].trim())) {
-        buyerIndex = i;
-        break;
-      }
-    }
-    if (buyerIndex <= 0) buyerIndex = lines.length;
 
     // 1. Prioritize Supplier header block (lines 0 to buyerIndex)
     for (int i = 0; i < buyerIndex; i++) {
@@ -508,37 +663,19 @@ class InvoiceOcrService {
       }
     }
 
-    // 3. Fallback to full document if still null
-    if (primaryAddress == null) {
-      for (int i = 0; i < lines.length; i++) {
-        final line = lines[i];
-        final match = headerPattern.firstMatch(line);
-        if (match != null) {
-          final addressLines = <String>[];
-          final firstRemainder = match.group(1)?.trim() ?? '';
-          if (firstRemainder.isNotEmpty) addressLines.add(firstRemainder);
-
-          int j = i + 1;
-          while (j < lines.length && addressLines.length < 4) {
-            final nextLine = lines[j];
-            final normNext = normalizeDevanagariNumerals(nextLine);
-            if (stopHeaderPattern.hasMatch(normNext) || headerPattern.hasMatch(nextLine)) break;
-            if (nextLine.trim().isNotEmpty && nextLine.trim().length <= 120) {
-              addressLines.add(nextLine);
-              j++;
-            } else {
-              break;
-            }
-          }
-
-          if (addressLines.isNotEmpty) {
-            final joined = addressLines.map((l) => _cleanAddressLine(l)).where((l) => l.isNotEmpty).join(', ');
-            if (joined.length >= 8) {
-              primaryAddress = joined;
-              candidates['Business Address'] = joined;
-              break;
-            }
-          }
+    // 3. Unlabeled printed address directly under the supplier firm name
+    // (common on Hindi mandi invoices: "मे० <फर्म>" followed by "<गाँव>, <कस्बा>, <जिला> मो० : ...").
+    if (primaryAddress == null && firmName != null) {
+      // Match on the core name (honorific dropped, Devanagari digits normalised: "मे0" == "मे०").
+      final core = normalizeDevanagariNumerals(firmName)
+          .replaceAll(RegExp(r'^(?:m\/s\.?|मे[0\.]|मेसर्स|मैसर्स)\s*', caseSensitive: false), '');
+      final firmIdx = lines.indexWhere((l) => normalizeDevanagariNumerals(l).contains(core));
+      if (firmIdx != -1 && firmIdx + 1 < buyerIndex) {
+        final next = lines[firmIdx + 1];
+        final cleaned = _cleanAddressLine(next);
+        if (!_isNonAddressLabelLine(next) && cleaned.contains(',') && cleaned.length >= 8) {
+          primaryAddress = cleaned;
+          candidates['Business Address'] = cleaned;
         }
       }
     }
@@ -546,13 +683,20 @@ class InvoiceOcrService {
     return _AddressExtractionResult(primaryAddress, candidates);
   }
 
+  bool _isNonAddressLabelLine(String line) {
+    final t = line.trim();
+    if (_gstinTokenPattern.hasMatch(t) && _cleanAddressLine(t).length < 8) return true;
+    return RegExp(
+      r'^(?:state\s*[:|]|gstin|gst\b|pan\b|code\s*:|invoice|inv\s*no|bill\s*of\s*supply|tax\s*invoice|original|duplicate|hsn|s\.?\s*no|कैटिल|क्रम\s*संख्या|इनवाइस|बीजक|कर\s*चालान)',
+      caseSensitive: false,
+    ).hasMatch(t);
+  }
+
   bool _isAddressLine(String line, String normLine, String? pin) {
-    if (RegExp(r'^(?:state\s*[:|]|gstin|pan|code\s*:|invoice|bill\s*of\s*supply|original|कैटिल|क्रम\s*संख्या)', caseSensitive: false).hasMatch(line.trim())) {
-      return false;
-    }
+    if (_isNonAddressLabelLine(line)) return false;
     if (pin != null && normLine.contains(pin)) return true;
     final addressKw = RegExp(
-      r'(?:plot|road|street|mandi|hub|sector|area|phase|industrial|complex|nagar|colony|gate|bazar|market|lane|village|tehsil|district|state|मार्ग|रोड|मंडी|बाजार|नगर|कॉलोनी|गली|रास्ता|ग्राम|तहसील|जिला|राज्य|परिसर|महेवा|भरवारी|कौशाम्बी)',
+      r'(?:plot|road|street|mandi|hub|sector|area|phase|industrial|complex|nagar|colony|gate|bazar|market|lane|village|tehsil|district|मार्ग|रोड|मंडी|बाजार|नगर|कॉलोनी|गली|रास्ता|ग्राम|तहसील|जिला|परिसर)',
       caseSensitive: false,
     );
     return addressKw.hasMatch(line) && line.length >= 4 && line.length <= 120;
@@ -560,14 +704,25 @@ class InvoiceOcrService {
 
   String _cleanAddressLine(String line) {
     var clean = line.replaceAll(RegExp(r'^(?:address|addr|office\s*address|पता|कार्यालय\s*पता)\s*[:\-]?\s*', caseSensitive: false), '').trim();
-    clean = clean.replaceAll(RegExp(r'(?:mob|mobile|phone|ph|contact|gstin)\s*[:\-]?\s*[0-9A-Za-z\+\-\s]+$', caseSensitive: false), '').trim();
-    clean = clean.replaceAll(RegExp(r'[,;\s\-]+$'), '').trim();
+    // Remove GSTINs (supplier or buyer) wherever OCR merged them into the address line.
+    clean = clean.replaceAll(RegExp(r'(?:gstin|gst)\s*(?:no\.?)?\s*[:\-]?\s*', caseSensitive: false), ' ');
+    clean = clean.replaceAll(_gstinTokenPattern, ' ');
+    // Remove trailing contact fragments: "Mob. : 98290 12345", "मो० : 9696700510, 9919808347".
+    clean = clean.replaceAll(
+      RegExp(
+        r'(?:\b(?:mob(?:ile)?|phone|ph|tel|contact|cell)\b\.?|मो[०\.]|मोबाइल(?:\s*नं[०\.]?)?|फोन|संपर्क|दूरभाष)\s*[:\-]?\s*\+?[0-9][0-9\-,\s\(\)]*$',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    clean = clean.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+    clean = clean.replaceAll(RegExp(r'^[,;\s\-]+|[,;\s\-]+$'), '').trim();
     return clean;
   }
 
   // --- MOBILE NUMBER EXTRACTION & DISAMBIGUATION ---
 
-  _MobileExtractionResult _extractMobileNumbers(String normalizedText, List<String> lines) {
+  _MobileExtractionResult _extractMobileNumbers(String normalizedText, List<String> lines, Set<int> buyerLineIdx) {
     final candidates = <PhoneCandidate>[];
     final seenNumbers = <String>{};
 
@@ -600,17 +755,18 @@ class InvoiceOcrService {
               normLine.contains('विक्रेता') ||
               phoneHeaderRegex.hasMatch(normLine);
 
+          final bool isTransportLine = normLine.toLowerCase().contains('transporter') ||
+              normLine.toLowerCase().contains('driver') ||
+              normLine.toLowerCase().contains('vehicle') ||
+              normLine.contains('ट्रांसपोर्ट');
+
           final bool isBuyerLine = normLine.toLowerCase().contains('buyer') ||
               normLine.toLowerCase().contains('bill to') ||
               normLine.toLowerCase().contains('consignee') ||
               normLine.contains('क्रेता') ||
               normLine.contains('खरीदार') ||
-              normLine.contains('ग्राहक');
-
-          final bool isTransportLine = normLine.toLowerCase().contains('transporter') ||
-              normLine.toLowerCase().contains('driver') ||
-              normLine.toLowerCase().contains('vehicle') ||
-              normLine.contains('ट्रांसपोर्ट');
+              normLine.contains('ग्राहक') ||
+              (buyerLineIdx.contains(i) && !isTransportLine);
 
           String label = 'Seller Contact';
           bool isSeller = true;
@@ -645,26 +801,46 @@ class InvoiceOcrService {
         break;
       }
     }
-    primarySellerMobile ??= candidates.isNotEmpty ? candidates.first.number : null;
-
+    // Never fall back to a buyer/transport number for the supplier's contact.
     return _MobileExtractionResult(primarySellerMobile, candidates);
   }
 
   // --- FIRM NAME EXTRACTION (ENGLISH & HINDI) ---
 
+  /// [lines] must be the supplier header block only (buyer section excluded).
   String? _extractFirmName(List<String> lines, String? gstin) {
+    final labelLine = RegExp(
+      r'^(?:(?:gstin|gst|state|code|mob(?:ile)?|ph(?:one)?|tel|e-?mail|invoice|inv|bill\s*no|date|dated|original|duplicate|pan|fssai|hsn)\b|मो[०\.]|मोबाइल|फोन|जीएसटी|दिनांक|क्रम\s*संख्या|इनवाइस)',
+      caseSensitive: false,
+    );
+
+    // Strips identifiers OCR may merge onto the name line; returns null if nothing name-like remains.
+    String? sanitize(String line) {
+      var c = line.replaceAll(_gstinTokenPattern, ' ');
+      c = c.replaceAll(RegExp(r'(?:gstin|gst)\s*(?:no\.?)?\s*[:\-]?', caseSensitive: false), ' ').trim();
+      if (labelLine.hasMatch(c)) return null;
+      c = c.replaceAll(RegExp(r'\+?[0-9][0-9\-\s]{8,}[0-9]'), ' ');
+      c = c.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+      c = c.replaceAll(RegExp(r'^[,;:\|\s\-]+|[,;:\|\s\-]+$'), '').trim();
+      return c.isEmpty ? null : c;
+    }
+
     final businessKeywords = RegExp(
-      r'(?:agro|industries|mills|mill|processing|traders|enterprises|ltd|limited|corp|pvt|private|foods|trading|company|co\b|ट्रेडर्स|उद्योग|एग्रो|मिल्स|मिल|इंटरप्राइजेज|प्राइवेट|लिमिटेड|फर्म|कंपनी|इंडस्ट्रीज|फूड्स|ट्रेडिंग|दाल\s*मिल|ऑयल\s*मिल|कृषि\s*फर्म|व्यापार)',
+      r'(?:agro|industries|mills|mill|processing|traders|enterprises|ltd|limited|corp|pvt|private|foods|trading|company|co\b|ट्रेडर्स|उद्योग|एग्रो|मिल्स|मिल|इंटरप्राइजेज|प्राइवेट|लिमिटेड|फर्म|कंपनी|कम्पनी|इंडस्ट्रीज|फूड्स|ट्रेडिंग|दाल\s*मिल|ऑयल\s*मिल|कृषि\s*फर्म|व्यापार)',
       caseSensitive: false,
     );
 
+    // Honorifics (M/s, मे०, मेसर्स) are part of the printed firm name and are kept.
     final prefixPattern = RegExp(
-      r'^(?:m\/s\.?|to|from|tax\s*invoice|bill\s*of\s*supply|कर\s*चालान|बीजक|मैसर्स|मेसर्स|मे[०\.]|प्रति|प्रेषक)\s*[:\-]?\s*',
+      r'^(?:to|from|tax\s*invoice|bill\s*of\s*supply|कर\s*चालान|बीजक|प्रति|प्रेषक)\s*[:\-]?\s*',
       caseSensitive: false,
     );
 
-    for (final line in lines.take(10)) {
-      final clean = line.replaceAll(prefixPattern, '').trim();
+    // Skip OCR noise (row numbers, stray digits) so the 10-line window covers real text.
+    final textLines = lines.where((l) => RegExp(r'[A-Za-zऀ-ॿ]{3,}').hasMatch(l)).toList();
+
+    for (final line in textLines.take(10)) {
+      final clean = sanitize(line)?.replaceAll(prefixPattern, '').trim() ?? '';
       if (clean.length >= 3 && clean.length <= 80) {
         final hasValidChars = RegExp(r'[A-Za-z\u0900-\u097F]').hasMatch(clean);
         if (hasValidChars && businessKeywords.hasMatch(clean)) {
@@ -674,7 +850,7 @@ class InvoiceOcrService {
     }
 
     for (final line in lines.take(4)) {
-      final clean = line.replaceAll(prefixPattern, '').trim();
+      final clean = sanitize(line)?.replaceAll(prefixPattern, '').trim() ?? '';
       if (clean.length >= 4 && clean.length <= 60) {
         if (!clean.toLowerCase().contains('invoice') &&
             !clean.toLowerCase().contains('supply') &&
@@ -1204,6 +1380,11 @@ class InvoiceOcrService {
       if (text.toLowerCase().contains(b.toLowerCase())) {
         return b;
       }
+    }
+    // OCR often drops Devanagari vowel signs; retry Hindi bank names on consonant skeletons.
+    final skeletonText = _devanagariSkeleton(text);
+    for (final b in knownBanks.where((b) => RegExp(r'[ऀ-ॿ]').hasMatch(b))) {
+      if (skeletonText.contains(_devanagariSkeleton(b))) return b;
     }
     return null;
   }

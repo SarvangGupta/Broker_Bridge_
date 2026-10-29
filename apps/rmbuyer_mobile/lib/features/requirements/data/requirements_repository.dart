@@ -341,28 +341,33 @@ class RequirementsRepository {
   // ============================================================================
 
   /// Fetch buyer requirements with optional status filter.
-  Future<List<BuyerRequirement>> getRequirements({String? statusFilter}) async {
+  Future<List<BuyerRequirement>> getRequirements({
+    String? statusFilter,
+    bool includeBaseline = true,
+  }) async {
     final client = _supabase;
     final List<BuyerRequirement> results = [];
 
     String? companyId;
-    try {
-      companyId = await _storage
-          .getCompanyId()
-          .timeout(const Duration(milliseconds: 500), onTimeout: () => null);
-    } catch (_) {}
+    if (client != null) {
+      try {
+        companyId = await _storage
+            .getCompanyId()
+            .timeout(const Duration(milliseconds: 500), onTimeout: () => null);
+      } catch (_) {}
 
-    if (companyId == null || companyId.isEmpty) {
-      final sessionUser = client?.auth.currentUser;
-      if (sessionUser != null && client != null) {
-        try {
-          final userRow = await client
-              .from('users')
-              .select('company_id')
-              .eq('id', sessionUser.id)
-              .maybeSingle();
-          companyId = userRow?['company_id']?.toString();
-        } catch (_) {}
+      if (companyId == null || companyId.isEmpty) {
+        final sessionUser = client.auth.currentUser;
+        if (sessionUser != null) {
+          try {
+            final userRow = await client
+                .from('users')
+                .select('company_id')
+                .eq('id', sessionUser.id)
+                .maybeSingle();
+            companyId = userRow?['company_id']?.toString();
+          } catch (_) {}
+        }
       }
     }
 
@@ -433,9 +438,11 @@ class RequirementsRepository {
     }
 
     // Merge with baseline requirements for testing/offline presentation
-    for (final base in _baselineRequirements) {
-      if (!results.any((r) => r.id == base.id)) {
-        results.add(base);
+    if (includeBaseline) {
+      for (final base in _baselineRequirements) {
+        if (!results.any((r) => r.id == base.id)) {
+          results.add(base);
+        }
       }
     }
 

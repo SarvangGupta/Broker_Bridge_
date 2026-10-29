@@ -22,6 +22,30 @@ class AppConfig {
     defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltenRsa3ZreHplYWVreHZtY2ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MTgwNzksImV4cCI6MjEwMTQ5NDA3OX0.SmFwSY_ZKl97mfHeyYqakHE5r_Q02TFX1Eds_sBAp1o',
   );
 
+  /// Production Supabase project ref. The GST verification backend (proposed
+  /// migrations 0053/0054) is not applied there, so it must not be used with it.
+  static const String productionProjectRef = 'imztlkvkxzeaekxvmcfe';
+
+  /// Opt-in for the secure GST verification backend:
+  /// `--dart-define=GST_VERIFICATION_BACKEND=true` with a NON-production
+  /// SUPABASE_URL/SUPABASE_ANON_KEY. Ignored for the production project until
+  /// the production rollout is approved and applied.
+  static const bool gstVerificationBackendRequested = bool.fromEnvironment(
+    'GST_VERIFICATION_BACKEND',
+  );
+
+  static bool get gstVerificationBackendEnabled =>
+      gstVerificationBackendAllowed(
+        requested: gstVerificationBackendRequested,
+        supabaseUrl: supabaseUrl,
+      );
+
+  @visibleForTesting
+  static bool gstVerificationBackendAllowed({
+    required bool requested,
+    required String supabaseUrl,
+  }) => requested && !supabaseUrl.contains(productionProjectRef);
+
   /// Next.js REST API Base URL
   /// For Android emulator use 10.0.2.2:3001, for USB reverse proxy use localhost:3001
   static const String apiBaseUrl = String.fromEnvironment(

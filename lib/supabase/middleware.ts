@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { trustedRole } from '@/src/server/utils/trusted-role'
 
 const SECURE_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -76,20 +77,18 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
-    let role = user.user_metadata?.role;
+    // Trusted app_metadata role, else the stored users.role. Never user_metadata,
+    // which the client can set to "admin" at sign-up or via auth.updateUser().
+    let role = trustedRole(user)
     if (!role) {
       try {
         const { data, error: dbErr } = await supabase.from('users').select('role').eq('id', user.id).single()
         if (!dbErr && data) {
-          role = data.role
+          role = trustedRole(user, data.role)
         }
       } catch (err) {
         console.warn('[MIDDLEWARE_WARN] Role lookup DB timeout fallback:', err)
       }
-    }
-    
-    if (typeof role === 'string') {
-      role = role.toLowerCase()
     }
 
     // If user is missing a verified role, reject access to protected routes
@@ -102,10 +101,10 @@ export async function updateSession(request: NextRequest) {
     }
 
     let targetWorkspace = '/'
-    if (role === 'admin' || role.includes('admin')) targetWorkspace = '/admin'
-    else if (role === 'broker' || role.includes('broker')) targetWorkspace = '/broker'
-    else if (role.includes('buyer')) targetWorkspace = '/buyer'
-    else if (role.includes('seller')) targetWorkspace = '/seller'
+    if (role === 'admin' || role?.includes('admin')) targetWorkspace = '/admin'
+    else if (role === 'broker' || role?.includes('broker')) targetWorkspace = '/broker'
+    else if (role?.includes('buyer')) targetWorkspace = '/buyer'
+    else if (role?.includes('seller')) targetWorkspace = '/seller'
     else targetWorkspace = '/login' // Fallback if no valid role found
 
     const isAdminPath = path.startsWith('/admin')
@@ -140,17 +139,17 @@ export async function updateSession(request: NextRequest) {
     }
 
     // Role-based protection: Unauthorized access to Admin
-    if (isAdminPath && !role.includes('admin')) {
+    if (isAdminPath && !role?.includes('admin')) {
       return redirectToOwnWorkspace()
     }
-    
+
     // Role-based protection: Unauthorized access to Broker
-    if (isBrokerPath && !role.includes('broker')) {
+    if (isBrokerPath && !role?.includes('broker')) {
       return redirectToOwnWorkspace()
     }
-    
+
     // Role-based protection: Trader Workspace access
-    const isTrader = role.includes('buyer') || role.includes('seller')
+    const isTrader = Boolean(role?.includes('buyer') || role?.includes('seller'))
 
     if (isBuyerPath && !isTrader) {
       return redirectToOwnWorkspace()

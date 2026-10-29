@@ -38,6 +38,29 @@ class ProfileStrings {
   String get confirmAndSave => isHindi ? 'पुष्टि करें और सेव करें' : 'Confirm and Save';
   String get reviewExtractedDetails => isHindi ? 'निकाली गई जानकारी की समीक्षा करें' : 'Review Extracted Details';
   String get retryScan => isHindi ? 'दोबारा स्कैन करें' : 'Retry Scan';
+
+  // RB-SELLER-GST-CERTIFICATE-PROFILE-01
+  String get hasGstCertificate => isHindi ? 'मेरे पास GST पंजीकरण प्रमाणपत्र है' : 'I have a GST Registration Certificate';
+  String get gstCertificateSub => isHindi
+      ? 'फॉर्म GST REG-06 अपलोड करें — विवरण आपकी समीक्षा के लिए भरे जाएंगे। यह GST सत्यापन नहीं है।'
+      : 'Upload Form GST REG-06 — details are filled in for your review. This is not GST verification.';
+  String get uploadGstCertificate => isHindi ? 'GST प्रमाणपत्र अपलोड करें' : 'Upload GST Certificate';
+  String get replaceDocument => isHindi ? 'बदलें' : 'Replace';
+  String get readingCertificate => isHindi ? 'प्रमाणपत्र पढ़ा जा रहा है…' : 'Reading certificate…';
+  String get gstExtractedTitle => isHindi ? 'प्रमाणपत्र से मिली जानकारी' : 'Details found on the certificate';
+  String get applyGstToProfile => isHindi ? 'प्रोफ़ाइल फ़ील्ड में भरें' : 'Fill profile fields';
+  String get gstAppliedSnack => isHindi
+      ? 'प्रमाणपत्र की जानकारी भरी गई। जाँचें और "सेव करें" दबाएं।'
+      : 'Certificate details filled in. Review them, then tap Save.';
+  String get gstAddressIsGodown => isHindi
+      ? 'मुख्य व्यवसाय स्थल ही मेरी दुकान/गोदाम का पता है'
+      : 'The principal place of business is also my shop/godown address';
+  String get legalNameLabel => isHindi ? 'वैधानिक नाम' : 'Legal Name';
+  String get tradeNameLabel => isHindi ? 'व्यापार नाम' : 'Trade Name';
+  String get principalPlaceLabel => isHindi ? 'मुख्य व्यवसाय स्थल' : 'Principal Place of Business';
+  String get jurisdictionalOfficeLabel => isHindi ? 'क्षेत्राधिकार कार्यालय (आंतरिक)' : 'Jurisdictional Office (internal)';
+  String get certificateIssueDateLabel => isHindi ? 'प्रमाणपत्र जारी तिथि (आंतरिक)' : 'Certificate Issue Date (internal)';
+  String get notFoundOnCertificate => isHindi ? 'प्रमाणपत्र पर नहीं मिला' : 'Not found on certificate';
   String get ocrInProgress => isHindi ? 'दस्तावेज़ पढ़ा जा रहा है' : 'OCR in progress';
   String get textExtractionFailed => isHindi ? 'दस्तावेज़ से जानकारी नहीं निकाली जा सकी' : 'Text extraction failed';
 
@@ -83,8 +106,41 @@ class ProfileStrings {
   String get personalContactDetails => isHindi ? 'व्यक्तिगत और संपर्क विवरण' : 'Personal & Contact Details';
   String get contactDetailsSub => isHindi ? 'सत्यापित व्यक्तिगत नाम और अधिकृत मोबाइल नंबर' : 'Verified personal name and authorized mobile number';
   String get businessIdentitySub => isHindi ? 'फर्म का नाम, कॉर्पोरेट पता और GSTIN पहचान' : 'Registered firm name, HQ office address, and GSTIN identity';
-  String get businessLocationTitle => isHindi ? 'व्यावसायिक स्थान (दुकान / गोदाम)' : 'Business Location (Shop / Warehouse / Godown)';
-  String get businessLocationSub => isHindi ? 'वस्तु निरीक्षण और माल उठाने के लिए भौतिक व्यावसायिक पता' : 'Physical trade premises for commodity inspection and dispatch';
+  String get businessLocationTitle => isHindi ? 'गोदाम' : 'Warehouse';
+  String get businessLocationSub => isHindi ? 'माल निरीक्षण और उठान के लिए गोदाम का पता और स्थान' : 'Warehouse address and location for inspection and dispatch';
+
+  // RB-SELLER-WAREHOUSE-UI-01
+  String get warehouseAddressLabel => isHindi ? 'गोदाम का पता' : 'Warehouse Address';
+  String get warehouseAddressHint => isHindi ? 'प्लॉट / दुकान नं., सड़क, क्षेत्र, शहर' : 'Plot / shop no., road, area, city';
+  String get gpsCoordinatesLabel => isHindi ? 'GPS निर्देशांक' : 'GPS Coordinates';
+  String get gpsNotSet => isHindi ? 'अभी सेट नहीं' : 'Not set yet';
+  String get setOnMap => isHindi ? 'मैप पर सेट करें' : 'Set on Map';
+  String get setWarehouseOnMap => isHindi ? 'गोदाम का स्थान चुनें' : 'Set Warehouse Location';
+  String get tapMapToPlacePin => isHindi ? 'पिन लगाने के लिए मैप पर टैप करें' : 'Tap the map to place the pin';
+  String get useMyCurrentLocation => isHindi ? 'मेरा वर्तमान स्थान' : 'Use my current location';
+  String get confirmLocation => isHindi ? 'स्थान की पुष्टि करें' : 'Confirm location';
+  String get openInGoogleMaps => isHindi ? 'Google Maps में खोलें' : 'Open in Google Maps';
+  String get removeGps => isHindi ? 'GPS हटाएं' : 'Clear GPS';
+  String get locationServiceOff => isHindi
+      ? 'फ़ोन की लोकेशन बंद है। उसे चालू करें या मैप पर टैप करके पिन लगाएं।'
+      : 'Location is turned off on this phone. Turn it on, or tap the map to place the pin.';
+  String get locationPermissionDenied => isHindi
+      ? 'लोकेशन की अनुमति नहीं मिली। मैप पर टैप करके पिन लगाएं।'
+      : 'Location permission was not given. Tap the map to place the pin instead.';
+  String get locationPermissionBlocked => isHindi
+      ? 'लोकेशन की अनुमति बंद है। सेटिंग्स में चालू करें या मैप पर टैप करें।'
+      : 'Location permission is blocked. Enable it in Settings, or tap the map to place the pin.';
+  String get locationTimeout => isHindi
+      ? 'GPS से स्थान मिलने में बहुत समय लगा। खुले स्थान में दोबारा कोशिश करें या मैप पर टैप करें।'
+      : 'Getting a GPS fix took too long. Try again in the open, or tap the map to place the pin.';
+  String get retry => isHindi ? 'फिर कोशिश करें' : 'Try again';
+  String get phoneLocationNotice => isHindi
+      ? 'यह फ़ोन का वर्तमान स्थान है। पुष्टि तभी करें जब आप गोदाम पर हों, या पिन को गोदाम पर ले जाएं।'
+      : 'This is the phone\'s current location. Confirm only if you are at the warehouse, or move the pin to it.';
+  String accuracyLabel(int m) => isHindi ? 'सटीकता ±$m मी' : 'Accuracy ±$m m';
+  String get locationUnavailable => isHindi
+      ? 'अभी स्थान नहीं मिल सका। मैप पर टैप करके पिन लगाएं।'
+      : 'Your location could not be found right now. Tap the map to place the pin.';
   String get bankDetailsTitle => isHindi ? 'बैंक विवरण' : 'Bank Details';
   String get bankDetailsSub => isHindi ? 'व्यापारिक भुगतानों के निपटान के लिए बैंक खाता' : 'Designated bank account for commodity trade settlements';
   String get myCommodityExpertiseTitle => isHindi ? 'मेरी कमोडिटी विशेषज्ञता' : 'My Commodity Expertise';

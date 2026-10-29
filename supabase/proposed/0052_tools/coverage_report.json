@@ -1,0 +1,264 @@
+{
+  "source": {
+    "rows": 157126,
+    "validRows": 157126,
+    "malformedOrNA": 0,
+    "unknownStateNames": []
+  },
+  "national": {
+    "statesCovered": 36,
+    "statesMissing": [],
+    "districtCount": 737,
+    "pinCount": 19300,
+    "ambiguousPins": 1168,
+    "crossStatePins": 46,
+    "crossStatePinExamples": [
+      "503145: TG|kamareddy / AP|vizianagaram",
+      "503235: TG|nizamabad / AP|vizianagaram",
+      "503321: TG|kamareddy / AP|vizianagaram",
+      "503230: TG|nizamabad / AP|vizianagaram",
+      "505187: TG|peddapalli / AP|vizianagaram",
+      "505525: TG|peddapalli / AP|vizianagaram",
+      "531149: AP|visakhapatanam / TG|medak",
+      "504214: TG|mancherial / AP|prakasam",
+      "504215: TG|mancherial / AP|prakasam",
+      "503225: TG|nizamabad / AP|vizianagaram"
+    ],
+    "districtSpellingVariantsMerged": 0,
+    "spellingVariantExamples": []
+  },
+  "byState": {
+    "AN": {
+      "districts": 3,
+      "pins": 22
+    },
+    "AP": {
+      "districts": 13,
+      "pins": 1243
+    },
+    "AR": {
+      "districts": 25,
+      "pins": 49
+    },
+    "AS": {
+      "districts": 33,
+      "pins": 574
+    },
+    "BR": {
+      "districts": 38,
+      "pins": 857
+    },
+    "CH": {
+      "districts": 1,
+      "pins": 25
+    },
+    "CT": {
+      "districts": 28,
+      "pins": 274
+    },
+    "DN": {
+      "districts": 3,
+      "pins": 10
+    },
+    "DL": {
+      "districts": 11,
+      "pins": 97
+    },
+    "GA": {
+      "districts": 2,
+      "pins": 88
+    },
+    "GJ": {
+      "districts": 33,
+      "pins": 1010
+    },
+    "HR": {
+      "districts": 22,
+      "pins": 315
+    },
+    "HP": {
+      "districts": 12,
+      "pins": 436
+    },
+    "JK": {
+      "districts": 20,
+      "pins": 196
+    },
+    "JH": {
+      "districts": 24,
+      "pins": 381
+    },
+    "KA": {
+      "districts": 30,
+      "pins": 1347
+    },
+    "KL": {
+      "districts": 14,
+      "pins": 1425
+    },
+    "LA": {
+      "districts": 2,
+      "pins": 16
+    },
+    "LD": {
+      "districts": 1,
+      "pins": 9
+    },
+    "MP": {
+      "districts": 52,
+      "pins": 770
+    },
+    "MH": {
+      "districts": 36,
+      "pins": 1585
+    },
+    "MN": {
+      "districts": 16,
+      "pins": 52
+    },
+    "ML": {
+      "districts": 11,
+      "pins": 69
+    },
+    "MZ": {
+      "districts": 11,
+      "pins": 47
+    },
+    "NL": {
+      "districts": 12,
+      "pins": 43
+    },
+    "OR": {
+      "districts": 30,
+      "pins": 935
+    },
+    "PY": {
+      "districts": 4,
+      "pins": 33
+    },
+    "PB": {
+      "districts": 23,
+      "pins": 534
+    },
+    "RJ": {
+      "districts": 33,
+      "pins": 1004
+    },
+    "SK": {
+      "districts": 4,
+      "pins": 19
+    },
+    "TN": {
+      "districts": 38,
+      "pins": 2040
+    },
+    "TG": {
+      "districts": 33,
+      "pins": 676
+    },
+    "TR": {
+      "districts": 8,
+      "pins": 80
+    },
+    "UP": {
+      "districts": 75,
+      "pins": 1655
+    },
+    "UT": {
+      "districts": 13,
+      "pins": 302
+    },
+    "WB": {
+      "districts": 23,
+      "pins": 1128
+    }
+  },
+  "reconciliation": {
+    "liveStates": 38,
+    "duplicateStateCodes": [
+      {
+        "code": "MP",
+        "ids": [
+          "de3acb34-ac2e-4845-bf4d-17a09d7a92dc",
+          "10000000-0000-0000-0000-000000000002"
+        ]
+      },
+      {
+        "code": "RJ",
+        "ids": [
+          "a55c1bb2-b570-4e7c-bc1f-84d6042e45e7",
+          "10000000-0000-0000-0000-000000000001"
+        ]
+      }
+    ],
+    "officialCodesMissingInLive": [],
+    "liveDistricts": 54,
+    "postalDistrictsAlreadyLive": 34,
+    "aliasedToLive": [
+      "RJ|ganganagar"
+    ],
+    "nearDuplicateSpellings": [
+      "AP: westgodavari ~ eastgodavari",
+      "BR: saran ~ siwan",
+      "BR: nalanda ~ nawada",
+      "TG: rangareddy ~ sangareddy",
+      "RJ: barmer ~ ajmer",
+      "RJ: udaipur ~ jaipur",
+      "UP: hapur ~ rampur",
+      "UP: banda ~ gonda",
+      "MP: panna ~ satna",
+      "MP: dindori ~ indore",
+      "MP: satna ~ datia",
+      "MP: satna ~ katni",
+      "JH: dumka ~ gumla",
+      "MH: nashik ~ washim",
+      "MH: solapur ~ kolhapur",
+      "GJ: botad ~ dohad",
+      "CT: bilaspur ~ bijapur",
+      "CT: korba ~ korea",
+      "TN: thiruvallur ~ thiruvarur",
+      "WB: medinipurwest ~ medinipureast",
+      "WB: paraganassouth ~ paraganasnorth",
+      "HR: sonipat ~ panipat",
+      "DL: south ~ north",
+      "DL: southwest ~ northwest",
+      "DL: southwest ~ southeast",
+      "DL: northeast ~ northwest",
+      "DL: northeast ~ southeast",
+      "JK: ramban ~ samba",
+      "JK: kulgam ~ budgam",
+      "ML: eastkhasihills ~ westkhasihills",
+      "ML: westjaintiahills ~ eastjaintiahills",
+      "ML: southgarohills ~ northgarohills",
+      "ML: westgarohills ~ eastgarohills",
+      "MN: imphaleast ~ imphalwest",
+      "TR: southtripura ~ northtripura",
+      "AR: westsiang ~ eastsiang",
+      "AR: eastkameng ~ westkameng",
+      "GA: southgoa ~ northgoa",
+      "SK: southdistrict ~ northdistrict",
+      "SK: westdistrict ~ eastdistrict"
+    ],
+    "liveDistrictsNotInPostalData": [
+      "RJ: Anoopgarh",
+      "RJ: Balotra",
+      "RJ: Beawar",
+      "RJ: Deeg",
+      "RJ: Didwana-Kuchaman",
+      "RJ: Dudu",
+      "RJ: Gangapur City",
+      "RJ: Jaipur Rural",
+      "RJ: Jodhpur Rural",
+      "RJ: Kekri",
+      "RJ: Khairthal-Tijara",
+      "RJ: Kotputli-Behror",
+      "RJ: Neem Ka Thana",
+      "RJ: Phalodi",
+      "RJ: Salumbar",
+      "RJ: Sanchore",
+      "RJ: Shahpura"
+    ],
+    "districtsToInsert": 703
+  },
+  "namespace": "b7e1c3a2-52d4-5c6e-9f10-2a6b8d4e0c01"
+}

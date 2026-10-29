@@ -167,6 +167,8 @@ class BrokerNotification {
           payload!['offer_id'] != null ||
           payload!['disputeId'] != null ||
           payload!['dispute_id'] != null ||
+          payload!['warehouseId'] != null ||
+          payload!['warehouse_id'] != null ||
           payload!['taskId'] != null ||
           payload!['task_id'] != null) {
         return true;
@@ -211,6 +213,57 @@ class BrokerNotification {
   /// Seller offer (availability lot) referenced by this notification.
   String? get offerId =>
       _payloadId(const ['availabilityId', 'availability_id', 'offerId', 'offer_id']);
+
+  /// Warehouse or unloading location referenced by this notification.
+  String? get warehouseId =>
+      _payloadId(const ['warehouseId', 'warehouse_id']);
+
+  /// Whether this event concerns a counterparty warehouse or unloading location.
+  bool get isWarehouseEvent =>
+      eventType.toUpperCase().contains('WAREHOUSE') ||
+      warehouseId != null;
+
+  /// Display name of the referenced warehouse.
+  String? get warehouseName =>
+      payload?['warehouseName']?.toString().trim() ??
+      payload?['warehouse_name']?.toString().trim();
+
+  /// Street address or location summary of the referenced warehouse.
+  String? get warehouseAddress =>
+      payload?['address']?.toString().trim() ??
+      payload?['addressLine']?.toString().trim();
+
+  /// Warehouse operational change type (CREATED, UPDATED, LOCATION_UPDATED, DEACTIVATED).
+  String? get warehouseChangeType =>
+      payload?['changeType']?.toString().trim() ??
+      payload?['change_type']?.toString().trim();
+
+  /// Authoritative Google Maps URL referencing warehouse GPS coordinates.
+  /// Strictly requires real, valid coordinates; never fabricates a link.
+  String? get googleMapsUrl {
+    final direct = payload?['googleMapsUrl']?.toString().trim() ??
+        payload?['google_maps_url']?.toString().trim();
+    if (direct != null && direct.startsWith('https://www.google.com/maps')) {
+      return direct;
+    }
+    final lat = payload?['latitude'];
+    final lng = payload?['longitude'];
+    if (lat is num && lng is num) {
+      final latD = lat.toDouble();
+      final lngD = lng.toDouble();
+      if (!latD.isNaN &&
+          !lngD.isNaN &&
+          latD >= -90.0 &&
+          latD <= 90.0 &&
+          lngD >= -180.0 &&
+          lngD <= 180.0 &&
+          !(latD.abs() < 0.000001 && lngD.abs() < 0.000001)) {
+        final query = Uri.encodeComponent('$latD,$lngD');
+        return 'https://www.google.com/maps/search/?api=1&query=$query';
+      }
+    }
+    return null;
+  }
 
   /// Short human reference for the record, matching the refs shown on cards
   /// (`#REQ-XXXXXX`, `DL-XXXXXX`, or the payload's own reference).
@@ -274,6 +327,11 @@ class BrokerNotification {
     if (requirement != null) return '/requirements/$requirement';
     final offer = offerId;
     if (offer != null) return '/work?tab=1&offerId=$offer';
+    final warehouse = warehouseId;
+    if (warehouse != null) {
+      if (actionUrl != null && actionUrl!.trim().isNotEmpty) return actionUrl!.trim();
+      return '/directory';
+    }
 
     // 1. Direct recognized action URL - translate web URLs to mobile routes
     if (actionUrl != null && actionUrl!.trim().isNotEmpty && actionUrl != '/seller') {

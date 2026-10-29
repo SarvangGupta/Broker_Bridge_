@@ -36,7 +36,11 @@ export function CompanyApprovalQueue() {
     setProcessingId(id)
     const res = await approveCompanyAction(id)
     if (res.success) {
-      toast.success("Company approved successfully.")
+      toast.success(
+        res.gstReviewRequired
+          ? "Company activated. Buyer verification needs an approved GST review (Buyer GST Verifications)."
+          : "Company approved successfully."
+      )
       await loadCompanies()
     } else {
       toast.error(res.error || "Failed to approve company.")

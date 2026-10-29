@@ -11,7 +11,13 @@ import '../../../core/security/secure_storage_service.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../authentication/data/auth_repository.dart';
 import '../../commodities/domain/master_commodity_data.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/business_location_service.dart';
+import '../data/device_location_service.dart';
+import 'widgets/warehouse_map.dart';
+import '../data/india_pincode_directory.dart';
+import '../domain/business_location_model.dart';
 import '../data/invoice_document_service.dart';
 import '../data/invoice_ocr_service.dart';
 import '../data/seller_profile_repository.dart';
@@ -19,6 +25,7 @@ import '../domain/invoice_extracted_data.dart';
 import '../domain/seller_bank_details.dart';
 import '../domain/seller_profile_model.dart';
 import '../domain/cheque_extracted_data.dart';
+import '../domain/gst_certificate_extracted_data.dart';
 import '../../commodities/data/commodities_repository.dart';
 import '../domain/seller_commodity_expertise.dart';
 import 'profile_strings.dart';
@@ -29,7 +36,9 @@ class SellerProfileScreen extends StatefulWidget {
   final SellerProfileRepository? profileRepository;
   final SecureStorageService? storageService;
   final AuthRepository? authRepository;
+  /// Kept for constructor compatibility; GPS no longer comes from this service.
   final BusinessLocationService? locationService;
+  final DeviceLocationService? deviceLocationService;
   final InvoiceOcrService? ocrService;
   final InvoiceDocumentService? documentService;
   final CommoditiesRepository? commoditiesRepository;
@@ -46,6 +55,7 @@ class SellerProfileScreen extends StatefulWidget {
     this.storageService,
     this.authRepository,
     this.locationService,
+    this.deviceLocationService,
     this.ocrService,
     this.documentService,
     this.commoditiesRepository,
@@ -64,7 +74,6 @@ class SellerProfileScreen extends StatefulWidget {
 class _SellerProfileScreenState extends State<SellerProfileScreen> {
   late final SellerProfileRepository _profileRepo;
   late final AuthRepository _authRepository;
-  late final BusinessLocationService _locationService;
   late final InvoiceOcrService _ocrService;
   late final InvoiceDocumentService _documentService;
   late final CommoditiesRepository _commoditiesRepository;
@@ -91,10 +100,7 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
   bool _isLoading = true;
   bool _isEditing = false;
   bool _isSaving = false;
-  bool _isDetectingLocation = false;
   String? _saveErrorMessage;
-  String? _locationStatusMessage;
-  bool _locationCertainty = true;
   final Set<String> _expandedSections = {};
 
   final _formKey = GlobalKey<FormState>();
@@ -124,11 +130,17 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
   MasterState? _selectedState;
   MasterDistrict? _selectedDistrict;
   List<MasterDistrict> _filteredDistricts = [];
+  // Live master_states (fallback catalogue until loaded). _allStates keeps duplicate-name
+  // rows so districts attached to any of them are offered; _states is the deduped list.
+  List<MasterState> _allStates = MasterCommodityData.verifiedStates;
+  List<MasterState> _states = MasterCommodityData.verifiedStates;
+  String? _districtReviewNotice;
 
   // Coordinates internal retention
   double? _currentLat;
   double? _currentLng;
   bool _isGpsDetected = false;
+  bool _gpsClearedInDraft = false;
 
   // Invoice & OCR states
   SelectedInvoiceDocument? _selectedInvoiceDocument;
@@ -136,6 +148,17 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
   bool _isExtractingInvoice = false;
   String? _invoiceStatusNotice;
   bool _invoiceNoticeIsError = false;
+
+  // GST REG-06 certificate (optional). Pending values are only saved via Confirm and Save.
+  bool _hasGstCertificate = false;
+  SelectedInvoiceDocument? _gstCertificateDocument;
+  GstCertificateExtractedData? _gstExtracted;
+  bool _isExtractingGst = false;
+  String? _gstNotice;
+  bool _gstNoticeIsError = false;
+  bool _gstAddressIsGodown = false;
+  String? _pendingJurisdictionalOffice;
+  String? _pendingGstIssueDate;
 
   // Cheque & OCR states
   SelectedInvoiceDocument? _selectedChequeDocument;
@@ -152,8 +175,6 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
         SellerProfileRepository(storage: widget.storageService);
     _authRepository =
         widget.authRepository ?? AuthRepository(storage: widget.storageService);
-    _locationService =
-        widget.locationService ?? const BusinessLocationService();
     _ocrService = widget.ocrService ?? const InvoiceOcrService();
     _documentService = widget.documentService ?? InvoiceDocumentService();
     _commoditiesRepository =
@@ -233,6 +254,7 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       });
 
       unawaited(_loadCatalogueCommodities());
+      await _loadLocationMasters(profile.businessLocation);
 
       if (widget.initialScanInvoice && mounted) {
         _startScanInvoiceFlow();
@@ -241,6 +263,68 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
+  }
+
+  /// Loads the live state master and re-resolves the saved State/District against it.
+  Future<void> _loadLocationMasters(BusinessLocationModel loc) async {
+    try {
+      final all = await _commoditiesRepository.getMasterStates();
+      if (!mounted || all.isEmpty) return;
+      final deduped = <MasterState>[];
+      for (final st in all) {
+        if (!deduped.any((d) => IndiaPinCodeDirectory.sameState(d.name, st.name))) deduped.add(st);
+      }
+      _allStates = all;
+      _states = deduped;
+      final state = _findState(loc.stateName, id: loc.stateId);
+      final districts = state == null ? <MasterDistrict>[] : await _loadDistrictsFor(state);
+      if (!mounted) return;
+      setState(() {
+        _selectedState = state;
+        _filteredDistricts = districts;
+        _selectedDistrict = _findDistrict(districts, loc.districtName, id: loc.districtId);
+      });
+    } catch (_) {}
+  }
+
+  /// State from the deduped list matching [id] (any duplicate row) or [name]; null if none.
+  MasterState? _findState(String name, {String id = ''}) {
+    final byId = _allStates.where((s) => id.isNotEmpty && s.id == id);
+    final target = byId.isNotEmpty ? byId.first.name : name;
+    if (target.trim().isEmpty) return null;
+    final m = _states.where((s) => IndiaPinCodeDirectory.sameState(s.name, target));
+    return m.isEmpty ? null : m.first;
+  }
+
+  /// Districts for every master row sharing the state's name (the live master has duplicates).
+  Future<List<MasterDistrict>> _loadDistrictsFor(MasterState state) async {
+    final ids = _allStates.where((s) => IndiaPinCodeDirectory.sameState(s.name, state.name)).map((s) => s.id).toSet()
+      ..add(state.id);
+    final result = <MasterDistrict>[];
+    for (final id in ids) {
+      result.addAll(await _commoditiesRepository.getMasterDistricts(id));
+    }
+    result.sort((a, b) => a.name.compareTo(b.name));
+    return result;
+  }
+
+  /// Exact (normalised) district-name match; never falls back to an unrelated district.
+  MasterDistrict? _findDistrict(List<MasterDistrict> districts, String name, {String id = ''}) {
+    final byId = districts.where((d) => id.isNotEmpty && d.id == id);
+    if (byId.isNotEmpty) return byId.first;
+    // Pass 1: exact normalised name (with audited aliases). Pass 2: ignore catalogue suffixes
+    // such as "Mandi Hub" used by the offline fallback list.
+    String exact(String s) => IndiaPinCodeDirectory.districtKey(s);
+    String loose(String s) => IndiaPinCodeDirectory.districtKey(s
+        .toLowerCase()
+        .replaceAll(RegExp(r'\b(district|mandi|hub|depot|central|complex|grain|yard|agro)\b'), ''));
+    for (final norm in [exact, loose]) {
+      final target = norm(name);
+      if (target.isEmpty) continue;
+      final m = districts.where((d) => norm(d.name) == target);
+      if (m.isNotEmpty) return m.first;
+    }
+    return null;
   }
 
   Future<void> _loadCatalogueCommodities() async {
@@ -270,6 +354,7 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
     _currentLat = loc.latitude;
     _currentLng = loc.longitude;
     _isGpsDetected = loc.isGpsDetected;
+    _gpsClearedInDraft = false;
 
     final bank = profile.bankDetails;
     _bankHolderController.text = bank.accountHolderName;
@@ -301,216 +386,26 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       );
     }
 
-    // Resolve State in verifiedStates catalog
-    MasterState stateMatch = MasterCommodityData.verifiedStates.firstWhere(
-      (s) =>
-          s.id == loc.stateId ||
-          s.name.toLowerCase() == loc.stateName.toLowerCase(),
-      orElse: () => MasterCommodityData.verifiedStates.first,
-    );
-    _selectedState = stateMatch;
-
-    // Filter districts for matched state
+    // Resolve saved State/District; unmatched values stay unselected (no first-item fallback).
+    _selectedState = _findState(loc.stateName, id: loc.stateId);
     _filteredDistricts = MasterCommodityData.verifiedDistricts
-        .where((d) => d.stateId == stateMatch.id)
+        .where((d) => d.stateId == _selectedState?.id)
         .toList();
-
-    // Resolve District in filtered districts
-    MasterDistrict districtMatch = _filteredDistricts.firstWhere(
-      (d) =>
-          d.id == loc.districtId ||
-          d.name.toLowerCase().contains(loc.districtName.toLowerCase()),
-      orElse: () => _filteredDistricts.isNotEmpty
-          ? _filteredDistricts.first
-          : MasterCommodityData.verifiedDistricts.first,
-    );
-    _selectedDistrict = districtMatch;
+    _selectedDistrict = _findDistrict(_filteredDistricts, loc.districtName, id: loc.districtId);
   }
 
-  void _onStateChanged(MasterState? newState) {
+  Future<void> _onStateChanged(MasterState? newState) async {
     if (newState == null) return;
     setState(() {
       _selectedState = newState;
-      _filteredDistricts = MasterCommodityData.verifiedDistricts
-          .where((d) => d.stateId == newState.id)
-          .toList();
-      _selectedDistrict = _filteredDistricts.isNotEmpty
-          ? _filteredDistricts.first
-          : null;
-      _locationStatusMessage = null;
+      _filteredDistricts = [];
+      _selectedDistrict = null;
+      _districtReviewNotice = null;
     });
-  }
-
-  Future<void> _handleUseCurrentLocation() async {
+    final districts = await _loadDistrictsFor(newState);
+    if (!mounted || _selectedState?.id != newState.id) return;
     setState(() {
-      _isDetectingLocation = true;
-      _locationStatusMessage = null;
-    });
-
-    try {
-      final result = await _locationService.getCurrentLocation();
-      if (!mounted) return;
-
-      setState(() {
-        _isDetectingLocation = false;
-        _selectedState = result.state;
-        _filteredDistricts = MasterCommodityData.verifiedDistricts
-            .where((d) => d.stateId == result.state.id)
-            .toList();
-        _selectedDistrict = result.district;
-
-        if (_locationLocalityController.text.trim().isEmpty) {
-          _locationLocalityController.text = result.locality;
-        }
-        if (_locationPinCodeController.text.trim().isEmpty) {
-          _locationPinCodeController.text = result.pinCode;
-        }
-
-        _currentLat = result.latitude;
-        _currentLng = result.longitude;
-        _isGpsDetected = true;
-        _locationCertainty = result.isCertain;
-        _locationStatusMessage = result.isCertain
-            ? 'Location verified: ${result.district.name}, ${result.state.name}'
-            : (result.message ??
-                  'Approximate region detected. Please verify state and district.');
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isDetectingLocation = false;
-        _locationCertainty = false;
-        _locationStatusMessage =
-            'Could not detect location. Please select state and district manually.';
-      });
-    }
-  }
-
-  void _showLocationPresetsSheet() {
-    final presets = _locationService.getLocationPresets();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Select Trading Hub Godown',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(LucideIcons.x, size: 20),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Quickly configure your godown facility for prominent regional mandi hubs.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondaryLight,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ...presets.map((preset) {
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 4,
-                        horizontal: 8,
-                      ),
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryContainer.withValues(
-                            alpha: 0.5,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          LucideIcons.warehouse,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                      ),
-                      title: Text(
-                        preset['presetName'] ?? '',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${preset['warehouseAddress']} • ${preset['districtName']}, ${preset['stateName']}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondaryLight,
-                        ),
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _applyPreset(preset);
-                      },
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _applyPreset(Map<String, String> preset) {
-    final stateId = preset['stateId'];
-    final districtId = preset['districtId'];
-
-    MasterState stateMatch = MasterCommodityData.verifiedStates.firstWhere(
-      (s) => s.id == stateId,
-      orElse: () => MasterCommodityData.verifiedStates.first,
-    );
-
-    List<MasterDistrict> matchingDistricts = MasterCommodityData
-        .verifiedDistricts
-        .where((d) => d.stateId == stateMatch.id)
-        .toList();
-
-    MasterDistrict districtMatch = matchingDistricts.firstWhere(
-      (d) => d.id == districtId,
-      orElse: () => matchingDistricts.isNotEmpty
-          ? matchingDistricts.first
-          : MasterCommodityData.verifiedDistricts.first,
-    );
-
-    setState(() {
-      _selectedState = stateMatch;
-      _filteredDistricts = matchingDistricts;
-      _selectedDistrict = districtMatch;
-
-      _locationNameController.text =
-          preset['presetName'] ?? _locationNameController.text;
-      _locationAddressController.text =
-          preset['warehouseAddress'] ?? _locationAddressController.text;
-      _locationLocalityController.text =
-          preset['mandiName'] ?? _locationLocalityController.text;
-      _locationCertainty = true;
-      _locationStatusMessage = 'Selected trading hub: ${preset['presetName']}';
+      _filteredDistricts = districts;
     });
   }
 
@@ -521,7 +416,6 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
     setState(() {
       _isEditing = true;
       _saveErrorMessage = null;
-      _locationStatusMessage = null;
     });
     if (scanInvoice) {
       _startScanInvoiceFlow();
@@ -536,13 +430,90 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       _selectedExpertise = List.from(_profile?.commodityExpertise ?? []);
       _isEditing = false;
       _saveErrorMessage = null;
-      _locationStatusMessage = null;
       _extractedInvoiceData = null;
       _invoiceStatusNotice = null;
       _selectedChequeDocument = null;
       _extractedChequeData = null;
       _chequeStatusNotice = null;
+      _resetGstDraft();
     });
+  }
+
+  /// Drops the unsaved certificate draft; saved profile values are never touched here.
+  void _resetGstDraft() {
+    _gstCertificateDocument = null;
+    _gstExtracted = null;
+    _gstNotice = null;
+    _gstNoticeIsError = false;
+    _gstAddressIsGodown = false;
+    _pendingJurisdictionalOffice = null;
+    _pendingGstIssueDate = null;
+  }
+
+  Future<void> _pickGstCertificate(Future<SelectedInvoiceDocument?> Function() picker) async {
+    final s = _getStrings(context);
+    SelectedInvoiceDocument? doc;
+    try {
+      doc = await picker();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _gstNotice = s.errFileSelection;
+        _gstNoticeIsError = true;
+      });
+      return;
+    }
+    if (doc == null || !mounted) return;
+    setState(() {
+      _gstCertificateDocument = doc;
+      _gstExtracted = null;
+      _pendingJurisdictionalOffice = null;
+      _pendingGstIssueDate = null;
+      _isExtractingGst = true;
+      _gstNotice = null;
+      _gstNoticeIsError = false;
+    });
+    final res = await _ocrService.extractGstCertificateFromFile(File(doc.localPath));
+    if (!mounted) return;
+    setState(() {
+      _isExtractingGst = false;
+      if (res.isSuccess) {
+        _gstExtracted = res.data;
+        _gstNotice = res.data.reviewNotes.isEmpty ? null : res.data.reviewNotes.join('\n');
+        _gstNoticeIsError = false;
+      } else {
+        // Manual editing stays available; nothing in the form is changed.
+        _gstNotice = res.errorMessage;
+        _gstNoticeIsError = true;
+      }
+    });
+  }
+
+  void _removeGstCertificate() => setState(_resetGstDraft);
+
+  /// Fills the editable form from the certificate. Nothing is saved until Confirm and Save.
+  void _applyGstCertificate() {
+    final d = _gstExtracted;
+    if (d == null) return;
+    final s = _getStrings(context);
+    setState(() {
+      if (d.legalName != null) _nameController.text = d.legalName!;
+      if (d.suggestedBusinessName != null) _companyController.text = d.suggestedBusinessName!;
+      if (d.gstin != null) _gstController.text = d.gstin!;
+      if (d.principalAddress != null) {
+        _officeAddressController.text = d.principalAddress!;
+        if (_gstAddressIsGodown) {
+          _locationAddressController.text = d.principalAddress!;
+          if (d.pinCode != null) _locationPinCodeController.text = d.pinCode!;
+        }
+      }
+      if (d.jurisdictionalOffice != null) _pendingJurisdictionalOffice = d.jurisdictionalOffice;
+      if (d.issueDate != null) _pendingGstIssueDate = d.issueDate;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(s.gstAppliedSnack), backgroundColor: AppColors.info),
+    );
+    unawaited(_applyStateDistrict(d.state, d.district));
   }
 
   void _startScanInvoiceFlow() {
@@ -708,8 +679,11 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
     if (data == null) return;
 
     setState(() {
+      // Full Name, Business Name and Location Name all take the supplier firm name.
       if (data.firmName != null && data.firmName!.isNotEmpty) {
+        _nameController.text = data.firmName!;
         _companyController.text = data.firmName!;
+        _locationNameController.text = data.firmName!;
       }
       if (data.gstin != null && data.gstin!.isNotEmpty) {
         _gstController.text = data.gstin!;
@@ -717,7 +691,6 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       if (data.officeAddress != null && data.officeAddress!.isNotEmpty) {
         _officeAddressController.text = data.officeAddress!;
         _locationAddressController.text = data.officeAddress!;
-        _locationNameController.text = data.officeAddress!;
       }
       if (data.pinCode != null && data.pinCode!.isNotEmpty) {
         _locationPinCodeController.text = data.pinCode!;
@@ -727,26 +700,6 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       }
 
       // Auto-suggest State and District from Indian PIN resolution
-      if (data.state != null && data.state!.isNotEmpty) {
-        final stateMatch = MasterCommodityData.verifiedStates.firstWhere(
-          (st) => st.name.toLowerCase() == data.state!.toLowerCase(),
-          orElse: () => _selectedState ?? MasterCommodityData.verifiedStates.first,
-        );
-        _selectedState = stateMatch;
-        _filteredDistricts = MasterCommodityData.verifiedDistricts
-            .where((d) => d.stateId == stateMatch.id)
-            .toList();
-
-        if (data.district != null && data.district!.isNotEmpty) {
-          final districtMatch = _filteredDistricts.firstWhere(
-            (d) => d.name.toLowerCase().contains(data.district!.toLowerCase()),
-            orElse: () => _filteredDistricts.isNotEmpty
-                ? _filteredDistricts.first
-                : (_selectedDistrict ?? MasterCommodityData.verifiedDistricts.first),
-          );
-          _selectedDistrict = districtMatch;
-        }
-      }
 
       // Bank details
       if (data.accountHolderName != null && data.accountHolderName!.isNotEmpty) {
@@ -783,6 +736,41 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
         backgroundColor: AppColors.info,
       ),
     );
+
+    unawaited(_applyStateDistrict(data.state, data.district));
+  }
+
+  /// Sets State/District from the India Post PIN lookup, matched against the live master.
+  /// Anything that cannot be matched is left for the seller and flagged, never guessed.
+  Future<void> _applyStateDistrict(String? stateName, String? districtName) async {
+    if (stateName == null || stateName.isEmpty) return;
+    final s = _getStrings(context);
+    final state = _findState(stateName);
+    if (state == null) {
+      setState(() => _districtReviewNotice = s.isHindi
+          ? 'PIN के अनुसार राज्य "$stateName" सूची में नहीं है — कृपया चुनें।'
+          : 'State "$stateName" from the PIN is not in the master list — please select it.');
+      return;
+    }
+    final districts = await _loadDistrictsFor(state);
+    if (!mounted) return;
+    final district = districtName == null ? null : _findDistrict(districts, districtName);
+    setState(() {
+      _selectedState = state;
+      _filteredDistricts = districts;
+      _selectedDistrict = district;
+      if (districtName != null && district == null) {
+        _districtReviewNotice = s.isHindi
+            ? 'PIN के अनुसार ज़िला "$districtName" (${state.name}) मास्टर सूची में नहीं है — कृपया जाँचें।'
+            : 'District "$districtName" (from PIN) is not in the ${state.name} master list — please review.';
+      } else if (districtName == null) {
+        _districtReviewNotice = s.isHindi
+            ? 'PIN से ज़िला तय नहीं हुआ — कृपया ज़िला चुनें।'
+            : 'District could not be established from the PIN — please select it.';
+      } else {
+        _districtReviewNotice = null;
+      }
+    });
   }
 
   void _openInvoicePreviewDialog() {
@@ -982,6 +970,8 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       latitude: _currentLat,
       longitude: _currentLng,
       isGpsDetected: _isGpsDetected,
+      // Clear GPS only takes effect through this (confirmed) save.
+      clearCoordinates: _gpsClearedInDraft,
     );
 
     final updatedBank = SellerBankDetails(
@@ -1010,6 +1000,8 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
           : current.primaryMandi,
       businessLocation: updatedLocation,
       bankDetails: updatedBank,
+      jurisdictionalOffice: _pendingJurisdictionalOffice ?? current.jurisdictionalOffice,
+      gstCertificateIssueDate: _pendingGstIssueDate ?? current.gstCertificateIssueDate,
       commodityExpertise: List.from(_selectedExpertise),
       invoiceDocumentUrl: _selectedInvoiceDocument?.localPath,
       invoiceDocumentName: _selectedInvoiceDocument?.fileName,
@@ -1616,9 +1608,18 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
                 )
               : null,
           children: [
-            _buildInfoRow(LucideIcons.warehouse, s.locationNameLabel, loc.name, s),
-            _buildInfoRow(LucideIcons.map, s.streetAddressLabel, loc.addressLine, s),
-            _buildInfoRow(LucideIcons.navigation, s.localityLandmarkLabel, loc.locality, s),
+            _buildInfoRow(LucideIcons.warehouse, s.warehouseAddressLabel, loc.addressLine, s),
+            _buildInfoRow(
+              LucideIcons.locateFixed,
+              s.gpsCoordinatesLabel,
+              _hasConfirmedGps(loc) ? formatCoordinates(loc.latitude!, loc.longitude!) : '',
+              s,
+            ),
+            if (_hasConfirmedGps(loc)) ...[
+              const SizedBox(height: 4),
+              WarehouseMapPreview(latitude: loc.latitude!, longitude: loc.longitude!),
+              _buildGoogleMapsLink(s, loc.latitude!, loc.longitude!, key: 'view_open_in_google_maps'),
+            ],
             _buildInfoRow(
               LucideIcons.landmark,
               s.districtLabel,
@@ -2145,6 +2146,9 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
           ),
           const SizedBox(height: 12),
 
+          _buildGstCertificateCard(s),
+          const SizedBox(height: 12),
+
           _buildExpertiseEditCard(s),
           const SizedBox(height: 12),
 
@@ -2170,7 +2174,9 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
               TextFormField(
                 key: const Key('edit_office_address_field'),
                 controller: _officeAddressController,
+                minLines: 1,
                 maxLines: null,
+                keyboardType: TextInputType.multiline,
                 decoration: InputDecoration(
                   labelText: s.corporateOfficeHqAddress,
                   hintText: s.hqAddressHint,
@@ -2269,182 +2275,36 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      s.isHindi ? 'दुकान और गोदाम' : 'Shop & Godown',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (_isGpsDetected)
-                      Text(
-                        s.isHindi ? 'GPS सक्रिय' : 'GPS Active',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.success,
-                        ),
-                      ),
-                  ],
+                Text(
+                  s.businessLocationTitle,
+                  key: const Key('warehouse_section_title'),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   s.businessLocationSub,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondaryLight,
-                  ),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
                 ),
                 const SizedBox(height: 12),
 
-                // Quick Location Action Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        key: const Key('btn_use_current_location'),
-                        onPressed: _isDetectingLocation
-                            ? null
-                            : _handleUseCurrentLocation,
-                        icon: _isDetectingLocation
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(LucideIcons.crosshair, size: 16),
-                        label: Text(
-                          _isDetectingLocation
-                              ? s.detectingGps
-                              : s.detectCurrentGps,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        key: const Key('btn_location_presets'),
-                        onPressed: _showLocationPresetsSheet,
-                        icon: const Icon(LucideIcons.warehouse, size: 16),
-                        label: Text(
-                          s.isHindi ? 'मंडी प्रीसेट' : 'Mandi Presets',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                if (_locationStatusMessage != null) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _locationCertainty
-                          ? AppColors.successBackground
-                          : AppColors.warningBackground,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: _locationCertainty
-                            ? AppColors.success.withValues(alpha: 0.4)
-                            : AppColors.warning.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _locationCertainty
-                              ? LucideIcons.checkCircle2
-                              : LucideIcons.alertTriangle,
-                          size: 16,
-                          color: _locationCertainty
-                              ? AppColors.success
-                              : AppColors.warning,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _locationStatusMessage!,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: _locationCertainty
-                                  ? AppColors.success
-                                  : AppColors.warning,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                TextFormField(
-                  key: const Key('edit_location_name_field'),
-                  controller: _locationNameController,
-                  decoration: InputDecoration(
-                    labelText: '${s.locationNameLabel} *',
-                    hintText: s.locationNameHint,
-                    prefixIcon: const Icon(LucideIcons.store, size: 18),
-                    border: const OutlineInputBorder(),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().length < 2) {
-                      return s.errLocationNameRequired;
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-
+                // Single warehouse address (independent of GPS).
                 TextFormField(
                   key: const Key('edit_location_address_field'),
                   controller: _locationAddressController,
+                  minLines: 2,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
                   decoration: InputDecoration(
-                    labelText: s.streetAddressLabel,
-                    hintText: s.streetAddressHint,
-                    prefixIcon: const Icon(LucideIcons.mapPin, size: 18),
+                    labelText: s.warehouseAddressLabel,
+                    hintText: s.warehouseAddressHint,
+                    prefixIcon: const Icon(LucideIcons.warehouse, size: 18),
                     border: const OutlineInputBorder(),
+                    alignLabelWithHint: true,
                   ),
                 ),
                 const SizedBox(height: 14),
 
-                TextFormField(
-                  key: const Key('edit_location_locality_field'),
-                  controller: _locationLocalityController,
-                  decoration: InputDecoration(
-                    labelText: s.localityLandmarkLabel,
-                    hintText: s.localityHint,
-                    prefixIcon: const Icon(LucideIcons.navigation, size: 18),
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
+                _buildWarehouseGpsRow(s),
                 const SizedBox(height: 14),
 
                 Row(
@@ -2462,7 +2322,10 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          DropdownButtonFormField<MasterState>(
+                          // initialValue is read once; re-key so programmatic (PIN) selections show.
+                          KeyedSubtree(
+                            key: ValueKey('state-${_selectedState?.id}-${_states.length}'),
+                            child: DropdownButtonFormField<MasterState>(
                             key: const Key('location_state_dropdown'),
                             initialValue: _selectedState,
                             isExpanded: true,
@@ -2473,11 +2336,13 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
                               ),
                               border: OutlineInputBorder(),
                             ),
-                            items: MasterCommodityData.verifiedStates.map((st) {
+                            items: _states.map((st) {
                               return DropdownMenuItem<MasterState>(
                                 value: st,
                                 child: Text(
-                                  st.name,
+                                  s.isHindi
+                                      ? (IndiaPinCodeDirectory.stateNameHindi(st.name) ?? st.name)
+                                      : st.name,
                                   style: const TextStyle(fontSize: 13),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -2486,6 +2351,7 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
                             onChanged: _onStateChanged,
                             validator: (val) =>
                                 val == null ? s.selectState : null,
+                          ),
                           ),
                         ],
                       ),
@@ -2503,7 +2369,9 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          DropdownButtonFormField<MasterDistrict>(
+                          KeyedSubtree(
+                            key: ValueKey('district-${_selectedDistrict?.id}-${_filteredDistricts.length}'),
+                            child: DropdownButtonFormField<MasterDistrict>(
                             key: const Key('location_district_dropdown'),
                             initialValue: _selectedDistrict,
                             isExpanded: true,
@@ -2525,16 +2393,29 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
                               );
                             }).toList(),
                             onChanged: (newDist) {
-                              setState(() => _selectedDistrict = newDist);
+                              setState(() {
+                                _selectedDistrict = newDist;
+                                _districtReviewNotice = null;
+                              });
                             },
+                            // Required only when the master lists districts for this state.
                             validator: (val) =>
-                                val == null ? s.selectDistrict : null,
+                                val == null && _filteredDistricts.isNotEmpty ? s.selectDistrict : null,
+                          ),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
+                if (_districtReviewNotice != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _districtReviewNotice!,
+                    key: const Key('district_review_notice'),
+                    style: const TextStyle(fontSize: 12, color: AppColors.warning),
+                  ),
+                ],
                 const SizedBox(height: 14),
 
                 TextFormField(
@@ -2928,6 +2809,289 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// Coordinates count as set only after the seller confirmed them on the map
+  /// (`isGpsDetected`). Unconfirmed legacy values are kept in data but not shown.
+  bool _hasConfirmedGps(BusinessLocationModel loc) => _isConfirmedGps(loc.isGpsDetected, loc.latitude, loc.longitude);
+
+  bool _isConfirmedGps(bool confirmed, double? lat, double? lng) =>
+      confirmed && lat != null && lng != null && !isLegacyPlaceholderCoordinates(lat, lng);
+
+  Widget _buildGoogleMapsLink(ProfileStrings s, double lat, double lng, {required String key}) => Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          key: Key(key),
+          onPressed: () => launchUrl(googleMapsUri(lat, lng), mode: LaunchMode.externalApplication),
+          icon: const Icon(LucideIcons.externalLink, size: 14),
+          label: Text(s.openInGoogleMaps, style: const TextStyle(fontSize: 12)),
+        ),
+      );
+
+  /// GPS coordinates + Set on Map (same row when wide enough), preview and Google Maps link.
+  Widget _buildWarehouseGpsRow(ProfileStrings s) {
+    final hasGps = _isConfirmedGps(_isGpsDetected, _currentLat, _currentLng);
+    final coordsField = InputDecorator(
+      key: const Key('warehouse_gps_field'),
+      decoration: InputDecoration(
+        labelText: s.gpsCoordinatesLabel,
+        prefixIcon: const Icon(LucideIcons.locateFixed, size: 18),
+        border: const OutlineInputBorder(),
+        isDense: true,
+      ),
+      child: Text(
+        hasGps ? formatCoordinates(_currentLat!, _currentLng!) : s.gpsNotSet,
+        key: const Key('warehouse_gps_value'),
+        style: TextStyle(fontSize: 13, color: hasGps ? AppColors.textPrimaryLight : AppColors.textMutedLight),
+      ),
+    );
+    final button = ElevatedButton.icon(
+      key: const Key('btn_set_on_map'),
+      onPressed: _openWarehouseMapPicker,
+      icon: const Icon(LucideIcons.map, size: 16),
+      label: Text(s.setOnMap),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, c) => c.maxWidth >= 340
+              ? Row(children: [Expanded(child: coordsField), const SizedBox(width: 8), button])
+              : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [coordsField, const SizedBox(height: 8), button]),
+        ),
+        if (hasGps) ...[
+          const SizedBox(height: 10),
+          WarehouseMapPreview(key: const Key('warehouse_map_preview'), latitude: _currentLat!, longitude: _currentLng!),
+          Row(
+            children: [
+              _buildGoogleMapsLink(s, _currentLat!, _currentLng!, key: 'edit_open_in_google_maps'),
+              const Spacer(),
+              TextButton(
+                key: const Key('btn_clear_gps'),
+                onPressed: () => setState(() {
+                  _currentLat = null;
+                  _currentLng = null;
+                  _isGpsDetected = false;
+                  _gpsClearedInDraft = true;
+                }),
+                child: Text(s.removeGps, style: const TextStyle(fontSize: 12, color: AppColors.error)),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Opens the map picker. Only an explicitly confirmed pin updates the coordinates;
+  /// address, PIN, State and District are never changed from GPS.
+  Future<void> _openWarehouseMapPicker() async {
+    final s = _getStrings(context);
+    final initial = _isConfirmedGps(_isGpsDetected, _currentLat, _currentLng) ? LatLng(_currentLat!, _currentLng!) : null;
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => WarehouseMapPickerScreen(
+          strings: s,
+          initial: initial,
+          locationService: widget.deviceLocationService ?? const DeviceLocationService(),
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _currentLat = picked.latitude;
+      _currentLng = picked.longitude;
+      _isGpsDetected = true;
+      _gpsClearedInDraft = false;
+    });
+  }
+
+  /// Optional GST REG-06 section (edit mode). Unchecking only hides it; saved profile
+  /// values and documents are never cleared by the checkbox.
+  Widget _buildGstCertificateCard(ProfileStrings s) {
+    final d = _gstExtracted;
+    final doc = _gstCertificateDocument;
+    final isPdf = doc != null && doc.fileName.toLowerCase().endsWith('.pdf');
+    Widget valueRow(String label, String? value, {String? key}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 120,
+                child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryLight)),
+              ),
+              Expanded(
+                child: Text(
+                  value ?? s.notFoundOnCertificate,
+                  key: key == null ? null : Key(key),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: value == null ? AppColors.textMutedLight : AppColors.textPrimaryLight,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return AppCard(
+      key: const Key('gst_certificate_card'),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Material(
+            type: MaterialType.transparency,
+            child: CheckboxListTile(
+              key: const Key('chk_has_gst_certificate'),
+              value: _hasGstCertificate,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              dense: true,
+              title: Text(s.hasGstCertificate, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+              subtitle: Text(s.gstCertificateSub, style: const TextStyle(fontSize: 11)),
+              onChanged: (v) => setState(() => _hasGstCertificate = v ?? false),
+            ),
+          ),
+          if (_hasGstCertificate) ...[
+            const SizedBox(height: 6),
+            Text(s.uploadGstCertificate, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('btn_gst_cert_camera'),
+                  onPressed: _isExtractingGst ? null : () => _pickGstCertificate(_documentService.captureFromCamera),
+                  icon: const Icon(LucideIcons.camera, size: 14),
+                  label: Text(s.camera, style: const TextStyle(fontSize: 11)),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('btn_gst_cert_gallery'),
+                  onPressed: _isExtractingGst ? null : () => _pickGstCertificate(_documentService.pickFromGallery),
+                  icon: const Icon(LucideIcons.image, size: 14),
+                  label: Text(s.gallery, style: const TextStyle(fontSize: 11)),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('btn_gst_cert_file'),
+                  onPressed: _isExtractingGst ? null : () => _pickGstCertificate(_documentService.pickDocumentFile),
+                  icon: const Icon(LucideIcons.fileText, size: 14),
+                  label: Text(s.pdfOrFile, style: const TextStyle(fontSize: 11)),
+                ),
+              ],
+            ),
+            if (doc != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                key: const Key('gst_certificate_preview'),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: SizedBox(
+                        width: 48,
+                        height: 64,
+                        child: isPdf
+                            ? const Icon(LucideIcons.fileText, color: AppColors.primary)
+                            : Image.file(
+                                File(doc.localPath),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const Icon(LucideIcons.image, color: AppColors.primary),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        doc.fileName,
+                        key: const Key('gst_certificate_file_name'),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                    ),
+                    TextButton(
+                      key: const Key('btn_gst_cert_replace'),
+                      onPressed: _isExtractingGst ? null : () => _pickGstCertificate(_documentService.pickFromGallery),
+                      child: Text(s.replaceDocument, style: const TextStyle(fontSize: 11)),
+                    ),
+                    TextButton(
+                      key: const Key('btn_gst_cert_remove'),
+                      onPressed: _isExtractingGst ? null : _removeGstCertificate,
+                      child: Text(s.removeDocument, style: const TextStyle(fontSize: 11, color: AppColors.error)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (_isExtractingGst) ...[
+              const SizedBox(height: 10),
+              Row(children: [
+                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: 8),
+                Text(s.readingCertificate, style: const TextStyle(fontSize: 12)),
+              ]),
+            ],
+            if (_gstNotice != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _gstNotice!,
+                key: const Key('gst_certificate_notice'),
+                style: TextStyle(fontSize: 11, color: _gstNoticeIsError ? AppColors.error : AppColors.warning),
+              ),
+            ],
+            if (d != null) ...[
+              const SizedBox(height: 10),
+              Text(s.gstExtractedTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+              const SizedBox(height: 4),
+              valueRow(s.legalNameLabel, d.legalName, key: 'gst_value_legal_name'),
+              valueRow(s.tradeNameLabel, d.tradeName, key: 'gst_value_trade_name'),
+              valueRow(s.gstinLabel, d.gstin, key: 'gst_value_gstin'),
+              valueRow(s.principalPlaceLabel, d.principalAddress, key: 'gst_value_address'),
+              valueRow(s.jurisdictionalOfficeLabel, d.jurisdictionalOffice, key: 'gst_value_jurisdiction'),
+              valueRow(s.certificateIssueDateLabel, d.issueDate, key: 'gst_value_issue_date'),
+              Material(
+                type: MaterialType.transparency,
+                child: CheckboxListTile(
+                  key: const Key('chk_gst_address_is_godown'),
+                  value: _gstAddressIsGodown,
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  title: Text(s.gstAddressIsGodown, style: const TextStyle(fontSize: 12)),
+                  onChanged: (v) => setState(() => _gstAddressIsGodown = v ?? false),
+                ),
+              ),
+              ElevatedButton.icon(
+                key: const Key('btn_apply_gst_certificate'),
+                onPressed: _applyGstCertificate,
+                icon: const Icon(LucideIcons.sparkles, size: 15),
+                label: Text(s.applyGstToProfile),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 36),
+                ),
+              ),
+            ],
+          ],
+        ],
       ),
     );
   }
