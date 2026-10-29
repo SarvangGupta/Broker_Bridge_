@@ -197,6 +197,13 @@
       "when": 1791780000000,
       "tag": "0034_enforce_negotiation_immutability",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1793262994603,
+      "tag": "0035_add_gst_verification_fields",
+      "breakpoints": true
     }
   ]
 }

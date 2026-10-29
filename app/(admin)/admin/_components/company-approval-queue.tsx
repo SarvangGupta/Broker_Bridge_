@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Loader2, CheckCircle2, XCircle } from "lucide-react"
+import { VerifyGstButton } from "@/src/components/admin/verify-gst-button"
 
 import {
   getPendingCompaniesAction,
@@ -116,7 +117,19 @@ export function CompanyApprovalQueue() {
                 return (
                   <TableRow key={item.company.id} className="border-b border-slate-100 hover:bg-slate-50/50">
                     <TableCell className="font-medium text-[#334155]">{item.company.name}</TableCell>
-                    <TableCell className="text-slate-600">{item.company.gst || 'N/A'}</TableCell>
+                    <TableCell className="text-slate-600">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span className="font-mono text-xs">{item.company.gst || 'N/A'}</span>
+                        {item.company.gst && (
+                          <VerifyGstButton
+                            companyId={item.company.id}
+                            gstNumber={item.company.gst}
+                            isVerified={Boolean(item.company.gstVerified)}
+                            onSuccess={() => loadCompanies()}
+                          />
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-slate-600">
                       {item.districtName ? `${item.districtName}, ` : ''}{item.stateName || 'N/A'}
                     </TableCell>

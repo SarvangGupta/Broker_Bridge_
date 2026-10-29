@@ -10,6 +10,9 @@ export const companies = pgTable('companies', {
   status: boolean('status').default(true).notNull(),
   isVerified: boolean('is_verified').default(false).notNull(),
   trustScore: integer('trust_score').default(100).notNull(),
+  gstVerified: boolean('gst_verified').default(false).notNull(),
+  gstVerifiedAt: timestamp('gst_verified_at'),
+  gstLiveData: jsonb('gst_live_data'),
 });
 
 export const users = pgTable('users', {

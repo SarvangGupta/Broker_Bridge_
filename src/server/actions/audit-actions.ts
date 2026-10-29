@@ -6,13 +6,17 @@ export type AuditActionType =
   | "BOOKING_CREATED"
   | "AI_MATCH_REVIEWED"
   | "AUTONOMOUS_BYPASS_ATTEMPT_BLOCKED"
-  | "SELLER_PROPOSAL_ACTION";
+  | "SELLER_PROPOSAL_ACTION"
+  | "GST_VERIFIED_ONLINE"
+  | "GST verified online"
+  | "GST manually verified by Admin"
+  | (string & {});
 
 export interface DecisionGateAuditEvent {
   action: AuditActionType;
   actorId: string;
   actorRole?: string;
-  entity: "broker_requests" | "deals" | "quotations" | "ai_match" | "system" | "bookings";
+  entity: "broker_requests" | "deals" | "quotations" | "ai_match" | "system" | "bookings" | "companies" | (string & {});
   entityId?: string;
   metadata?: {
     matchScore?: number;
