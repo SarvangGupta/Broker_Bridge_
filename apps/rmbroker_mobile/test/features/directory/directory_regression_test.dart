@@ -399,10 +399,12 @@ void main() {
       'a failed submit shows its error, and a later valid submit clears it',
       () async {
         form().initForCreate(ContactRole.seller);
+        form().setRegistrationMode(CounterpartyRegistrationMode.manual);
         form()
           ..updateName('Ramesh')
           ..updateCompanyName('Malwa Agro')
-          ..updateMobile('9876543210');
+          ..updateMobile('9876543210')
+          ..updateGstin('27AABCU9603R1ZN');
         repo.insertError = Exception('down');
         expect(await form().submit(), isFalse);
         expect(read().generalError, contains('Could not save the contact'));
@@ -416,10 +418,12 @@ void main() {
 
     test('rapid repeated submit creates one contact', () async {
       form().initForCreate();
+      form().setRegistrationMode(CounterpartyRegistrationMode.manual);
       form()
         ..updateName('Ramesh')
         ..updateCompanyName('Malwa Agro')
-        ..updateMobile('9876543210');
+        ..updateMobile('9876543210')
+        ..updateGstin('27AABCU9603R1ZN');
       repo.insertGate = Completer<void>();
       final first = form().submit();
       final second = await form().submit();

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../utils/phone_utils.dart';
+import 'cheque_leaf_data.dart';
+import 'gst_certificate_data.dart';
 
 /// Role of the directory counterparty in commodity trade.
 enum ContactRole {
@@ -34,6 +36,7 @@ class DirectoryContact {
   final bool status; // true = Active, false = Inactive / Archived
   final bool isVerified;
   final int trustScore;
+
   /// Stored values (`companies.district_id` / `state_id`): a master-table UUID
   /// or legacy free text. Kept unchanged so edits never overwrite them.
   final String? city;
@@ -46,6 +49,28 @@ class DirectoryContact {
   final int openRequirementsCount;
   final int availableOffersCount;
   final int activeDealsCount;
+
+  // --- GST Verification Fields ---
+  final String? gstin;
+  final String? legalName;
+  final String? tradeName;
+  final String? constitution;
+  final String? address;
+  final String gstVerificationStatus; // 'unverified', 'gst_pending', 'broker_verified', 'gst_verified', 'rejected'
+  final String? gstCertificateUrl;
+  final String? gstVerifiedBy;
+  final DateTime? gstVerifiedAt;
+
+  // --- Bank Details Fields ---
+  final String? bankHolderName;
+  final String? bankName;
+  final String? bankAccountNumber;
+  final String? bankIfsc;
+  final String? bankBranch;
+  final String? bankChequeUrl;
+  final String bankVerificationStatus; // 'unverified', 'cheque_leaf_provided', 'verified'
+  final String? bankRecordedBy;
+  final DateTime? bankRecordedAt;
 
   static final _uuid = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -86,6 +111,24 @@ class DirectoryContact {
     this.openRequirementsCount = 0,
     this.availableOffersCount = 0,
     this.activeDealsCount = 0,
+    this.gstin,
+    this.legalName,
+    this.tradeName,
+    this.constitution,
+    this.address,
+    this.gstVerificationStatus = CounterpartyGstStatus.unverified,
+    this.gstCertificateUrl,
+    this.gstVerifiedBy,
+    this.gstVerifiedAt,
+    this.bankHolderName,
+    this.bankName,
+    this.bankAccountNumber,
+    this.bankIfsc,
+    this.bankBranch,
+    this.bankChequeUrl,
+    this.bankVerificationStatus = CounterpartyBankStatus.unverified,
+    this.bankRecordedBy,
+    this.bankRecordedAt,
   });
 
   String get formattedMobile {
@@ -105,9 +148,31 @@ class DirectoryContact {
   int get totalMandatesCount =>
       openRequirementsCount + availableOffersCount + activeDealsCount;
 
+  bool get isBrokerVerified =>
+      gstVerificationStatus == CounterpartyGstStatus.brokerVerified;
+  bool get isGstPending =>
+      gstVerificationStatus == CounterpartyGstStatus.gstPending;
+  bool get isGstVerified =>
+      gstVerificationStatus == CounterpartyGstStatus.gstVerified;
+  String get gstStatusLabel =>
+      CounterpartyGstStatus.displayLabel(gstVerificationStatus);
+  String get bankStatusLabel =>
+      CounterpartyBankStatus.displayLabel(bankVerificationStatus);
+  bool get hasChequeLeaf =>
+      bankChequeUrl != null && bankChequeUrl!.trim().isNotEmpty;
+  bool get hasBankDetails =>
+      bankAccountNumber != null && bankAccountNumber!.trim().isNotEmpty;
+
+  /// Masked bank account number, protecting sensitive financial data
+  String get maskedBankAccount {
+    final num = bankAccountNumber?.replaceAll(RegExp(r'\D'), '') ?? '';
+    if (num.length < 4) return '••••';
+    final last4 = num.substring(num.length - 4);
+    return '•••• •••• $last4';
+  }
+
   /// The directory's role tab / status / search rules. Shared by the screen
-  /// and the paged repository scan so both always agree on what matches
-  /// (the server's SQL filters mirror these rules too).
+  /// and the paged repository scan so both always agree on what matches.
   bool matchesFilters({String? role, String? status, String? search}) {
     if (role == 'buyer' && this.role != ContactRole.buyer) return false;
     if (role == 'seller' && this.role != ContactRole.seller) return false;
@@ -117,9 +182,12 @@ class DirectoryContact {
     final q = search?.toLowerCase().trim() ?? '';
     if (q.isEmpty) return true;
     final digits = q.replaceAll(RegExp(r'\D'), '');
-    // Location matches the displayed (resolved) names, never stored UUIDs.
+
     return name.toLowerCase().contains(q) ||
         companyName.toLowerCase().contains(q) ||
+        (legalName?.toLowerCase().contains(q) ?? false) ||
+        (tradeName?.toLowerCase().contains(q) ?? false) ||
+        (gstin?.toLowerCase().contains(q) ?? false) ||
         (email?.toLowerCase().contains(q) ?? false) ||
         (cityLabel?.toLowerCase().contains(q) ?? false) ||
         (stateLabel?.toLowerCase().contains(q) ?? false) ||
@@ -143,6 +211,8 @@ class DirectoryContact {
       trustScore: (json['trustScore'] as num? ?? json['trust_score'] as num? ?? 100).toInt(),
       city: json['city']?.toString() ?? json['districtId']?.toString() ?? json['district_id']?.toString(),
       state: json['state']?.toString() ?? json['stateId']?.toString() ?? json['state_id']?.toString(),
+      cityName: json['cityName']?.toString(),
+      stateName: json['stateName']?.toString(),
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : (json['created_at'] != null
@@ -151,6 +221,32 @@ class DirectoryContact {
       openRequirementsCount: (json['openRequirementsCount'] as num? ?? json['open_requirements_count'] as num? ?? 0).toInt(),
       availableOffersCount: (json['availableOffersCount'] as num? ?? json['available_offers_count'] as num? ?? 0).toInt(),
       activeDealsCount: (json['activeDealsCount'] as num? ?? json['active_deals_count'] as num? ?? 0).toInt(),
+      gstin: json['gstin']?.toString() ?? json['gst']?.toString(),
+      legalName: json['legalName']?.toString() ?? json['legal_name']?.toString(),
+      tradeName: json['tradeName']?.toString() ?? json['trade_name']?.toString(),
+      constitution: json['constitution']?.toString(),
+      address: json['address']?.toString() ?? json['principal_address']?.toString(),
+      gstVerificationStatus: json['gstVerificationStatus']?.toString() ??
+          json['gst_verification_status']?.toString() ??
+          CounterpartyGstStatus.unverified,
+      gstCertificateUrl: json['gstCertificateUrl']?.toString() ?? json['gst_certificate_url']?.toString(),
+      gstVerifiedBy: json['gstVerifiedBy']?.toString() ?? json['gst_verified_by']?.toString(),
+      gstVerifiedAt: json['gstVerifiedAt'] != null
+          ? DateTime.tryParse(json['gstVerifiedAt'].toString())
+          : (json['gst_verified_at'] != null ? DateTime.tryParse(json['gst_verified_at'].toString()) : null),
+      bankHolderName: json['bankHolderName']?.toString() ?? json['bank_holder_name']?.toString(),
+      bankName: json['bankName']?.toString() ?? json['bank_name']?.toString(),
+      bankAccountNumber: json['bankAccountNumber']?.toString() ?? json['bank_account_number']?.toString(),
+      bankIfsc: json['bankIfsc']?.toString() ?? json['bank_ifsc']?.toString(),
+      bankBranch: json['bankBranch']?.toString() ?? json['bank_branch']?.toString(),
+      bankChequeUrl: json['bankChequeUrl']?.toString() ?? json['bank_cheque_url']?.toString(),
+      bankVerificationStatus: json['bankVerificationStatus']?.toString() ??
+          json['bank_verification_status']?.toString() ??
+          CounterpartyBankStatus.unverified,
+      bankRecordedBy: json['bankRecordedBy']?.toString() ?? json['bank_recorded_by']?.toString(),
+      bankRecordedAt: json['bankRecordedAt'] != null
+          ? DateTime.tryParse(json['bankRecordedAt'].toString())
+          : (json['bank_recorded_at'] != null ? DateTime.tryParse(json['bank_recorded_at'].toString()) : null),
     );
   }
 
@@ -174,6 +270,20 @@ class DirectoryContact {
       'openRequirementsCount': openRequirementsCount,
       'availableOffersCount': availableOffersCount,
       'activeDealsCount': activeDealsCount,
+      'gstin': gstin,
+      'legalName': legalName,
+      'tradeName': tradeName,
+      'constitution': constitution,
+      'address': address,
+      'gstVerificationStatus': gstVerificationStatus,
+      'gstCertificateUrl': gstCertificateUrl,
+      'bankHolderName': bankHolderName,
+      'bankName': bankName,
+      'bankAccountNumber': bankAccountNumber,
+      'bankIfsc': bankIfsc,
+      'bankBranch': bankBranch,
+      'bankChequeUrl': bankChequeUrl,
+      'bankVerificationStatus': bankVerificationStatus,
     };
   }
 
@@ -198,6 +308,24 @@ class DirectoryContact {
     int? openRequirementsCount,
     int? availableOffersCount,
     int? activeDealsCount,
+    String? gstin,
+    String? legalName,
+    String? tradeName,
+    String? constitution,
+    String? address,
+    String? gstVerificationStatus,
+    String? gstCertificateUrl,
+    String? gstVerifiedBy,
+    DateTime? gstVerifiedAt,
+    String? bankHolderName,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankIfsc,
+    String? bankBranch,
+    String? bankChequeUrl,
+    String? bankVerificationStatus,
+    String? bankRecordedBy,
+    DateTime? bankRecordedAt,
   }) {
     return DirectoryContact(
       id: id ?? this.id,
@@ -220,6 +348,24 @@ class DirectoryContact {
       openRequirementsCount: openRequirementsCount ?? this.openRequirementsCount,
       availableOffersCount: availableOffersCount ?? this.availableOffersCount,
       activeDealsCount: activeDealsCount ?? this.activeDealsCount,
+      gstin: gstin ?? this.gstin,
+      legalName: legalName ?? this.legalName,
+      tradeName: tradeName ?? this.tradeName,
+      constitution: constitution ?? this.constitution,
+      address: address ?? this.address,
+      gstVerificationStatus: gstVerificationStatus ?? this.gstVerificationStatus,
+      gstCertificateUrl: gstCertificateUrl ?? this.gstCertificateUrl,
+      gstVerifiedBy: gstVerifiedBy ?? this.gstVerifiedBy,
+      gstVerifiedAt: gstVerifiedAt ?? this.gstVerifiedAt,
+      bankHolderName: bankHolderName ?? this.bankHolderName,
+      bankName: bankName ?? this.bankName,
+      bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
+      bankIfsc: bankIfsc ?? this.bankIfsc,
+      bankBranch: bankBranch ?? this.bankBranch,
+      bankChequeUrl: bankChequeUrl ?? this.bankChequeUrl,
+      bankVerificationStatus: bankVerificationStatus ?? this.bankVerificationStatus,
+      bankRecordedBy: bankRecordedBy ?? this.bankRecordedBy,
+      bankRecordedAt: bankRecordedAt ?? this.bankRecordedAt,
     );
   }
 }
@@ -276,6 +422,27 @@ class CreateContactInput {
   final String? state;
   final String? notes;
 
+  // --- GST Verification Fields ---
+  final String? gstin;
+  final String? legalName;
+  final String? tradeName;
+  final String? constitution;
+  final String? address;
+  final String? gstRegistrationDate;
+  final String gstVerificationStatus; // 'broker_verified' | 'gst_pending' | 'unverified'
+  final String? gstCertificateUrl;
+  final bool isBrokerVerified;
+
+  // --- Bank Details Fields ---
+  final String? bankHolderName;
+  final String? bankName;
+  final String? bankAccountNumber;
+  final String? bankIfsc;
+  final String? bankBranch;
+  final String? bankChequeUrl;
+  final String bankVerificationStatus; // 'cheque_leaf_provided' | 'unverified'
+  final bool hasChequeLeaf;
+
   const CreateContactInput({
     required this.name,
     required this.companyName,
@@ -286,6 +453,23 @@ class CreateContactInput {
     this.city,
     this.state,
     this.notes,
+    this.gstin,
+    this.legalName,
+    this.tradeName,
+    this.constitution,
+    this.address,
+    this.gstRegistrationDate,
+    this.gstVerificationStatus = CounterpartyGstStatus.unverified,
+    this.gstCertificateUrl,
+    this.isBrokerVerified = false,
+    this.bankHolderName,
+    this.bankName,
+    this.bankAccountNumber,
+    this.bankIfsc,
+    this.bankBranch,
+    this.bankChequeUrl,
+    this.bankVerificationStatus = CounterpartyBankStatus.unverified,
+    this.hasChequeLeaf = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -299,6 +483,21 @@ class CreateContactInput {
       if (city != null && city!.trim().isNotEmpty) 'city': city!.trim(),
       if (state != null && state!.trim().isNotEmpty) 'state': state!.trim(),
       if (notes != null && notes!.trim().isNotEmpty) 'notes': notes!.trim(),
+      if (gstin != null && gstin!.trim().isNotEmpty) 'gstin': gstin!.trim(),
+      if (legalName != null && legalName!.trim().isNotEmpty) 'legalName': legalName!.trim(),
+      if (tradeName != null && tradeName!.trim().isNotEmpty) 'tradeName': tradeName!.trim(),
+      if (constitution != null && constitution!.trim().isNotEmpty) 'constitution': constitution!.trim(),
+      if (address != null && address!.trim().isNotEmpty) 'address': address!.trim(),
+      if (gstRegistrationDate != null) 'registration_date': gstRegistrationDate,
+      'gst_verification_status': gstVerificationStatus,
+      if (gstCertificateUrl != null) 'gst_certificate_url': gstCertificateUrl,
+      if (bankHolderName != null && bankHolderName!.trim().isNotEmpty) 'bank_holder_name': bankHolderName!.trim(),
+      if (bankName != null && bankName!.trim().isNotEmpty) 'bank_name': bankName!.trim(),
+      if (bankAccountNumber != null && bankAccountNumber!.trim().isNotEmpty) 'bank_account_number': bankAccountNumber!.trim(),
+      if (bankIfsc != null && bankIfsc!.trim().isNotEmpty) 'bank_ifsc': bankIfsc!.trim(),
+      if (bankBranch != null && bankBranch!.trim().isNotEmpty) 'bank_branch': bankBranch!.trim(),
+      if (bankChequeUrl != null) 'bank_cheque_url': bankChequeUrl,
+      'bank_verification_status': bankVerificationStatus,
     };
   }
 }
@@ -317,6 +516,22 @@ class UpdateContactInput {
   final String? notes;
   final bool? status;
 
+  // --- GST and Bank fields ---
+  final String? gstin;
+  final String? legalName;
+  final String? tradeName;
+  final String? constitution;
+  final String? address;
+  final String? gstVerificationStatus;
+  final String? gstCertificateUrl;
+  final String? bankHolderName;
+  final String? bankName;
+  final String? bankAccountNumber;
+  final String? bankIfsc;
+  final String? bankBranch;
+  final String? bankChequeUrl;
+  final String? bankVerificationStatus;
+
   const UpdateContactInput({
     required this.name,
     required this.companyName,
@@ -328,6 +543,20 @@ class UpdateContactInput {
     this.state,
     this.notes,
     this.status,
+    this.gstin,
+    this.legalName,
+    this.tradeName,
+    this.constitution,
+    this.address,
+    this.gstVerificationStatus,
+    this.gstCertificateUrl,
+    this.bankHolderName,
+    this.bankName,
+    this.bankAccountNumber,
+    this.bankIfsc,
+    this.bankBranch,
+    this.bankChequeUrl,
+    this.bankVerificationStatus,
   });
 
   Map<String, dynamic> toJson() {
@@ -342,6 +571,20 @@ class UpdateContactInput {
       if (state != null && state!.trim().isNotEmpty) 'state': state!.trim(),
       if (notes != null && notes!.trim().isNotEmpty) 'notes': notes!.trim(),
       if (status != null) 'status': status,
+      if (gstin != null && gstin!.trim().isNotEmpty) 'gstin': gstin!.trim(),
+      if (legalName != null) 'legalName': legalName!.trim(),
+      if (tradeName != null) 'tradeName': tradeName!.trim(),
+      if (constitution != null) 'constitution': constitution!.trim(),
+      if (address != null) 'address': address!.trim(),
+      if (gstVerificationStatus != null) 'gst_verification_status': gstVerificationStatus,
+      if (gstCertificateUrl != null) 'gst_certificate_url': gstCertificateUrl,
+      if (bankHolderName != null) 'bank_holder_name': bankHolderName!.trim(),
+      if (bankName != null) 'bank_name': bankName!.trim(),
+      if (bankAccountNumber != null) 'bank_account_number': bankAccountNumber!.trim(),
+      if (bankIfsc != null) 'bank_ifsc': bankIfsc!.trim(),
+      if (bankBranch != null) 'bank_branch': bankBranch!.trim(),
+      if (bankChequeUrl != null) 'bank_cheque_url': bankChequeUrl,
+      if (bankVerificationStatus != null) 'bank_verification_status': bankVerificationStatus,
     };
   }
 }
@@ -350,10 +593,11 @@ class UpdateContactInput {
 @immutable
 class DuplicateCheckResult {
   final bool isDuplicate;
-  final String? matchType; // 'exact_mobile' | 'company_name'
+  final String? matchType; // 'exact_mobile' | 'company_name' | 'gstin'
   final String? existingContactName;
   final String? existingCompanyName;
   final String? existingMobile;
+  final String? existingGstin;
   final String? existingRole;
 
   const DuplicateCheckResult({
@@ -362,6 +606,7 @@ class DuplicateCheckResult {
     this.existingContactName,
     this.existingCompanyName,
     this.existingMobile,
+    this.existingGstin,
     this.existingRole,
   });
 
@@ -375,6 +620,7 @@ class DuplicateCheckResult {
       existingContactName: existing?['name']?.toString(),
       existingCompanyName: existing?['companyName']?.toString(),
       existingMobile: existing?['mobile']?.toString(),
+      existingGstin: existing?['gstin']?.toString() ?? existing?['gst']?.toString(),
       existingRole: existing?['role']?.toString(),
     );
   }

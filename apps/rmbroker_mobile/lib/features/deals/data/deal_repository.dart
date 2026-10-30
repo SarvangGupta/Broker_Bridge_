@@ -1,3 +1,5 @@
+import '../../directory/domain/cheque_leaf_data.dart';
+import '../domain/deal_share_model.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1666,5 +1668,52 @@ class DealRepository {
     return const DealContractPending(
       contractNotice: 'Deal finalization service is currently synchronizing.',
     );
+  }
+  /// Fetches registered bank details for a seller company to assist with deal document sharing.
+  Future<ChequeLeafData?> getSellerBankDetails(String sellerCompanyId) async {
+    try {
+      if (_supabase != null) {
+        final res = await _supabase!
+            .from('companies')
+            .select('bank_holder_name, bank_name, bank_account_number, bank_ifsc, bank_branch, bank_cheque_url, bank_verification_status')
+            .eq('id', sellerCompanyId)
+            .maybeSingle();
+
+        if (res != null && res is Map<String, dynamic>) {
+          return ChequeLeafData.fromJson(res);
+        }
+      }
+    } catch (e) {
+      debugPrint('Seller bank details fetch notice: $e');
+    }
+    return null;
+  }
+
+  /// Records an audit log entry when deal summary and seller cheque leaf are shared.
+  Future<bool> logDealDocumentShare({
+    required String dealId,
+    required String recipientCompanyId,
+    required String documentType,
+    required Map<String, dynamic> sharedPayload,
+    String? documentRef,
+  }) async {
+    try {
+      final brokerId = await _storage.getUserId();
+      if (_supabase != null && brokerId != null) {
+        await _supabase!.from('deal_document_shares').insert({
+          'deal_id': dealId,
+          'broker_id': brokerId,
+          'recipient_company_id': recipientCompanyId,
+          'document_type': documentType,
+          'document_ref': documentRef,
+          'shared_payload': sharedPayload,
+          'shared_at': DateTime.now().toUtc().toIso8601String(),
+        });
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Deal document share log notice: $e');
+    }
+    return false;
   }
 }

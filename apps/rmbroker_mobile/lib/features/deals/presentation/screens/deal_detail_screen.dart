@@ -1,3 +1,4 @@
+import '../widgets/deal_share_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -405,6 +406,25 @@ class DealDetailScreen extends ConsumerWidget {
                             currencyFormat.format(deal.totalValuation), AppColors.primaryDark),
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('share_deal_summary_button'),
+                    icon: const Icon(LucideIcons.share2, size: 16, color: AppColors.primary),
+                    label: const Text(
+                      'Share Deal Summary & Banking Details',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    onPressed: () => DealShareDialog.show(context, detail: detail),
                   ),
                 ),
               ],

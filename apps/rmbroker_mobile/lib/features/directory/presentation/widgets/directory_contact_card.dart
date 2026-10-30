@@ -95,6 +95,48 @@ class DirectoryContactCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                        if (contact.isBrokerVerified)
+                          Container(
+                            key: const Key('contact_broker_verified_badge'),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFF86EFAC)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(LucideIcons.fileCheck2, size: 12, color: Color(0xFF15803D)),
+                                SizedBox(width: 3),
+                                Text(
+                                  'Certificate Reviewed',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF15803D)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (contact.isGstPending)
+                          Container(
+                            key: const Key('contact_gst_pending_badge'),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFFDE68A)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(LucideIcons.clock, size: 12, color: Color(0xFFB45309)),
+                                SizedBox(width: 3),
+                                Text(
+                                  'GST Pending',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                                ),
+                              ],
+                            ),
+                          ),
                         if (!contact.status)
                           const Text(
                             'ARCHIVED',

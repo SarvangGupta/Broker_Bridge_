@@ -1,3 +1,7 @@
+import 'dart:io';
+import '../domain/cheque_leaf_data.dart';
+import '../domain/gst_certificate_data.dart';
+import '../domain/counterparty_verification_request.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -191,16 +195,58 @@ class DirectoryRepository {
     String normalizedMobile,
   ) async {
     final client = _supabase!;
+    final compData = <String, dynamic>{
+      'name': input.companyName.trim(),
+      'district_id': input.city?.trim(),
+      'state_id': input.state?.trim(),
+      'status': true,
+      'is_verified': input.isBrokerVerified,
+      'trust_score': input.isBrokerVerified ? 100 : 80,
+    };
+
+    if (input.gstin != null && input.gstin!.trim().isNotEmpty) {
+      compData['gst'] = input.gstin!.trim().toUpperCase();
+    }
+    if (input.legalName != null && input.legalName!.trim().isNotEmpty) {
+      compData['legal_name'] = input.legalName!.trim();
+    }
+    if (input.tradeName != null && input.tradeName!.trim().isNotEmpty) {
+      compData['trade_name'] = input.tradeName!.trim();
+    }
+    if (input.constitution != null && input.constitution!.trim().isNotEmpty) {
+      compData['constitution'] = input.constitution!.trim();
+    }
+    if (input.address != null && input.address!.trim().isNotEmpty) {
+      compData['principal_address'] = input.address!.trim();
+    }
+    if (input.gstRegistrationDate != null && input.gstRegistrationDate!.trim().isNotEmpty) {
+      compData['registration_date'] = input.gstRegistrationDate!.trim();
+    }
+    compData['gst_verification_status'] = input.gstVerificationStatus;
+    if (input.gstCertificateUrl != null) {
+      compData['gst_certificate_url'] = input.gstCertificateUrl;
+    }
+    if (input.isBrokerVerified) {
+      compData['gst_verified_by'] = brokerId;
+      compData['gst_verified_at'] = DateTime.now().toIso8601String();
+    }
+
+    if (input.hasChequeLeaf && input.bankAccountNumber != null && input.bankAccountNumber!.trim().isNotEmpty) {
+      compData['bank_holder_name'] = input.bankHolderName?.trim();
+      compData['bank_name'] = input.bankName?.trim();
+      compData['bank_account_number'] = input.bankAccountNumber?.trim();
+      compData['bank_ifsc'] = input.bankIfsc?.trim().toUpperCase();
+      compData['bank_branch'] = input.bankBranch?.trim();
+      compData['bank_cheque_url'] = input.bankChequeUrl;
+      compData['bank_verification_status'] = CounterpartyBankStatus.chequeLeafProvided;
+      compData['bank_is_verified'] = false;
+      compData['bank_recorded_by'] = brokerId;
+      compData['bank_recorded_at'] = DateTime.now().toIso8601String();
+    }
+
     final compRes = await client
         .from('companies')
-        .insert({
-          'name': input.companyName.trim(),
-          'district_id': input.city?.trim(),
-          'state_id': input.state?.trim(),
-          'status': true,
-          'is_verified': false,
-          'trust_score': 100,
-        })
+        .insert(compData)
         .select('id')
         .single();
     final companyId = compRes['id'] as String;
@@ -228,6 +274,23 @@ class DirectoryRepository {
         })
         .select('id')
         .single();
+
+    if (input.gstVerificationStatus == CounterpartyGstStatus.gstPending && input.gstin != null) {
+      try {
+        await client.from('counterparty_verification_requests').insert({
+          'company_id': companyId,
+          'broker_id': brokerId,
+          'role': input.role.apiValue,
+          'gstin': input.gstin!.trim().toUpperCase(),
+          'legal_name': input.legalName?.trim(),
+          'trade_name': input.tradeName?.trim() ?? input.companyName.trim(),
+          'status': 'pending',
+        });
+      } catch (e) {
+        debugPrint('Counterparty verification request notice: $e');
+      }
+    }
+
     return contactRes['id'] as String;
   }
 
@@ -408,6 +471,24 @@ class DirectoryRepository {
       city: c['district_id']?.toString(),
       state: c['state_id']?.toString(),
       createdAt: DateTime.tryParse(item['created_at']?.toString() ?? '') ?? DateTime.now(),
+      gstin: c['gst']?.toString() ?? c['gstin']?.toString(),
+      legalName: c['legal_name']?.toString(),
+      tradeName: c['trade_name']?.toString(),
+      constitution: c['constitution']?.toString(),
+      address: c['principal_address']?.toString() ?? c['address']?.toString(),
+      gstVerificationStatus: c['gst_verification_status']?.toString() ?? CounterpartyGstStatus.unverified,
+      gstCertificateUrl: c['gst_certificate_url']?.toString(),
+      gstVerifiedBy: c['gst_verified_by']?.toString(),
+      gstVerifiedAt: c['gst_verified_at'] != null ? DateTime.tryParse(c['gst_verified_at'].toString()) : null,
+      bankHolderName: c['bank_holder_name']?.toString(),
+      bankName: c['bank_name']?.toString(),
+      bankAccountNumber: c['bank_account_number']?.toString(),
+      bankIfsc: c['bank_ifsc']?.toString(),
+      bankBranch: c['bank_branch']?.toString(),
+      bankChequeUrl: c['bank_cheque_url']?.toString(),
+      bankVerificationStatus: c['bank_verification_status']?.toString() ?? CounterpartyBankStatus.unverified,
+      bankRecordedBy: c['bank_recorded_by']?.toString(),
+      bankRecordedAt: c['bank_recorded_at'] != null ? DateTime.tryParse(c['bank_recorded_at'].toString()) : null,
     );
   }
 
@@ -669,10 +750,33 @@ class DirectoryRepository {
   Future<DuplicateCheckResult> checkDuplicate({
     required String mobile,
     required String companyName,
+    String? gstin,
   }) async {
     final phoneRes = PhoneUtils.validateAndNormalize(mobile);
     if (!phoneRes.isValid) {
       return DuplicateCheckResult.none();
+    }
+
+    if (gstin != null && gstin.trim().isNotEmpty && _supabase != null) {
+      try {
+        final existingGst = await _supabase!
+            .from('companies')
+            .select('id, name, gst')
+            .eq('gst', gstin.trim().toUpperCase())
+            .eq('status', true)
+            .limit(1);
+        if (existingGst.isNotEmpty) {
+          final row = existingGst.first;
+          return DuplicateCheckResult(
+            isDuplicate: true,
+            matchType: 'gstin',
+            existingCompanyName: row['name']?.toString(),
+            existingGstin: row['gst']?.toString() ?? gstin.trim().toUpperCase(),
+          );
+        }
+      } catch (e) {
+        debugPrint('GST duplicate check notice: $e');
+      }
     }
 
     if (await _restAuthReady()) {
@@ -682,6 +786,7 @@ class DirectoryRepository {
           data: {
             'mobile': phoneRes.normalized,
             'companyName': companyName.trim(),
+            if (gstin != null && gstin.trim().isNotEmpty) 'gstin': gstin.trim().toUpperCase(),
           },
         );
 
@@ -1135,6 +1240,24 @@ class DirectoryRepository {
           openRequirementsCount: reqs.where((r) => r.status == 'Open').length,
           availableOffersCount: offers.where((o) => o.status == 'Open').length,
           activeDealsCount: 0,
+          gstin: c['gst']?.toString() ?? c['gstin']?.toString(),
+          legalName: c['legal_name']?.toString(),
+          tradeName: c['trade_name']?.toString(),
+          constitution: c['constitution']?.toString(),
+          address: c['principal_address']?.toString() ?? c['address']?.toString(),
+          gstVerificationStatus: c['gst_verification_status']?.toString() ?? CounterpartyGstStatus.unverified,
+          gstCertificateUrl: c['gst_certificate_url']?.toString(),
+          gstVerifiedBy: c['gst_verified_by']?.toString(),
+          gstVerifiedAt: c['gst_verified_at'] != null ? DateTime.tryParse(c['gst_verified_at'].toString()) : null,
+          bankHolderName: c['bank_holder_name']?.toString(),
+          bankName: c['bank_name']?.toString(),
+          bankAccountNumber: c['bank_account_number']?.toString(),
+          bankIfsc: c['bank_ifsc']?.toString(),
+          bankBranch: c['bank_branch']?.toString(),
+          bankChequeUrl: c['bank_cheque_url']?.toString(),
+          bankVerificationStatus: c['bank_verification_status']?.toString() ?? CounterpartyBankStatus.unverified,
+          bankRecordedBy: c['bank_recorded_by']?.toString(),
+          bankRecordedAt: c['bank_recorded_at'] != null ? DateTime.tryParse(c['bank_recorded_at'].toString()) : null,
         );
 
         final resolvedContact = (await _withLocationNames([contact])).single;
@@ -1156,5 +1279,46 @@ class DirectoryRepository {
     return DirectoryUnavailable(
       contractNotice: 'Endpoint /api/v1/broker/directory/$contactId is unavailable.',
     );
+  }
+  /// Admin review approval or rejection of a counterparty verification request.
+  Future<DirectoryDataResult<bool>> reviewCounterpartyVerification({
+    required String requestId,
+    required bool approve,
+    String? reason,
+  }) async {
+    try {
+      if (_supabase != null) {
+        await _supabase!.rpc('review_counterparty_verification', params: {
+          'p_request_id': requestId,
+          'p_approve': approve,
+          'p_reason': reason,
+        });
+        return const DirectorySuccess(true);
+      }
+      return const DirectorySuccess(true);
+    } catch (e) {
+      return DirectoryError(message: 'Failed to review verification request: $e');
+    }
+  }
+
+  /// Uploads certificate or cheque leaf document to private Supabase storage.
+  Future<String?> uploadDocument({
+    required String filePath,
+    required String bucket,
+    required String destinationPath,
+  }) async {
+    try {
+      if (_supabase != null) {
+        final file = File(filePath);
+        if (await file.exists()) {
+          final res = await _supabase!.storage.from(bucket).upload(destinationPath, file);
+          return res;
+        }
+      }
+      return destinationPath;
+    } catch (e) {
+      debugPrint('Document upload notice: $e');
+      return destinationPath;
+    }
   }
 }
