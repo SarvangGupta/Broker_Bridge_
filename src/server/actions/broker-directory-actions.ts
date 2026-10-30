@@ -81,6 +81,7 @@ export interface DirectoryListResponse {
 export interface DuplicateCheckResult {
   isDuplicate: boolean;
   matchType?: 'exact_mobile' | 'company_name';
+  isPreviouslyRemoved?: boolean;
   existingContact?: {
     id: string;
     name: string;
@@ -375,6 +376,7 @@ export async function checkContactDuplicateAction(
     const existingByPhone = await db
       .select({
         contactId: crmContacts.id,
+        removedAt: crmContacts.removedAt,
         userName: users.name,
         userMobile: users.mobile,
         userRole: users.role,
@@ -397,8 +399,10 @@ export async function checkContactDuplicateAction(
 
     if (existingByPhone.length > 0) {
       const row = existingByPhone[0];
+      const isPreviouslyRemoved = row.removedAt != null;
       return {
-        isDuplicate: true,
+        isDuplicate: !isPreviouslyRemoved,
+        isPreviouslyRemoved,
         matchType: 'exact_mobile',
         existingContact: {
           id: row.contactId,
@@ -415,6 +419,7 @@ export async function checkContactDuplicateAction(
       const existingByCompany = await db
         .select({
           contactId: crmContacts.id,
+          removedAt: crmContacts.removedAt,
           userName: users.name,
           userMobile: users.mobile,
           userRole: users.role,
@@ -433,8 +438,10 @@ export async function checkContactDuplicateAction(
 
       if (existingByCompany.length > 0) {
         const row = existingByCompany[0];
+        const isPreviouslyRemoved = row.removedAt != null;
         return {
-          isDuplicate: true,
+          isDuplicate: !isPreviouslyRemoved,
+          isPreviouslyRemoved,
           matchType: 'company_name',
           existingContact: {
             id: row.contactId,
@@ -487,6 +494,18 @@ export async function createBrokerContactAction(
       },
       authToken
     );
+
+    if (dupCheck.isPreviouslyRemoved && dupCheck.existingContact) {
+      // Re-activate a previously removed counterparty without creating duplicates
+      await db
+        .update(crmContacts)
+        .set({ removedAt: null, lastActivityAt: new Date() })
+        .where(eq(crmContacts.id, dupCheck.existingContact.id));
+      return {
+        success: true,
+        contactId: dupCheck.existingContact.id,
+      };
+    }
 
     if (dupCheck.isDuplicate && dupCheck.matchType === 'exact_mobile') {
       return {
@@ -663,6 +682,68 @@ export async function updateBrokerContactAction(
     return {
       success: false,
       error: publicDirectoryError(error, 'Failed to update contact record'),
+    };
+  }
+}
+
+// ============================================================================
+// 4b. Remove Authorized Contact Record (Relationship Soft Removal)
+// ============================================================================
+
+export async function deleteBrokerContactAction(
+  contactId: string,
+  authToken?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const auth = await getAuthenticatedBroker(authToken);
+    if (!auth.success) {
+      return { success: false, error: auth.error };
+    }
+
+    const { brokerId, isAdmin } = auth;
+
+    // Verify contact exists and broker is authorized
+    const existing = await db
+      .select({
+        id: crmContacts.id,
+        brokerId: crmContacts.brokerId,
+      })
+      .from(crmContacts)
+      .where(eq(crmContacts.id, contactId))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return { success: false, error: 'Contact record not found' };
+    }
+
+    const contactRow = existing[0];
+    if (!isAdmin && contactRow.brokerId !== brokerId) {
+      return {
+        success: false,
+        error: 'Unauthorized: You do not have permission to remove this contact',
+      };
+    }
+
+    // Soft-remove ONLY the broker's relationship link in crm_contacts.
+    // Master company records, users, deals, requirements, and offers remain intact.
+    // Preserving the relationship record with removedAt prevents linkAssignedCounterparties
+    // from resurrecting explicitly removed contacts.
+    await db
+      .update(crmContacts)
+      .set({ removedAt: new Date() })
+      .where(
+        and(
+          eq(crmContacts.id, contactId),
+          isAdmin ? sql`true` : eq(crmContacts.brokerId, brokerId)
+        )
+      );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('deleteBrokerContactAction error:', error);
+    return {
+      success: false,
+      error: publicDirectoryError(error, 'Failed to remove contact record'),
     };
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:rmbroker_mobile/app/theme/app_colors.dart';
@@ -37,92 +38,113 @@ class BrokerWelcomeBanner extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          key: const ValueKey('home_greeting_card'),
-          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFFAF3),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: const ValueKey('home_greeting_card'),
+            onTap: () => context.push('/profile'),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFD1FAE5)),
-          ),
-          // One compact row: sun · greeting/name · (chart when wide) · Post Requirement.
-          child: LayoutBuilder(
-            builder: (context, constraints) => Row(
-              children: [
-                const Icon(LucideIcons.sun, size: 30, color: Color(0xFFF59E0B)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${_getTimeBasedGreeting()},',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF475569),
-                        ),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFFAF3),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFD1FAE5)),
+              ),
+              // One compact row: sun · greeting/name · (chart when wide) · Post Requirement.
+              child: LayoutBuilder(
+                builder: (context, constraints) => Row(
+                  children: [
+                    const Icon(LucideIcons.sun, size: 30, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                '${_getTimeBasedGreeting()},',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                key: const ValueKey('dashboard_edit_profile_button'),
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Edit Broker Profile',
+                                icon: const Icon(LucideIcons.pencil, size: 13, color: AppColors.primary),
+                                onPressed: () => context.push('/profile'),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primaryNavy,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primaryNavy,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
+                    ),
+                    if (constraints.maxWidth >= 380) ...[
+                      const SizedBox(width: 8),
+                      const _TradingChartGraphic(),
                     ],
-                  ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('home_post_requirement'),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.primaryNavy,
+                          side: const BorderSide(color: Color(0xFFD1FAE5)),
+                          minimumSize: const Size(0, 40),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: const Icon(
+                            LucideIcons.plus,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                        label: const Text(
+                          'Post Requirement',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onPressed: () => CreateRequirementSheet.show(context),
+                      ),
+                    ),
+                  ],
                 ),
-                if (constraints.maxWidth >= 380) ...[
-                  const SizedBox(width: 8),
-                  const _TradingChartGraphic(),
-                ],
-                const SizedBox(width: 8),
-                Flexible(
-                  child: OutlinedButton.icon(
-                    key: const ValueKey('home_post_requirement'),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppColors.primaryNavy,
-                      side: const BorderSide(color: Color(0xFFD1FAE5)),
-                      minimumSize: const Size(0, 40),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: const Icon(
-                        LucideIcons.plus,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                    ),
-                    label: const Text(
-                      'Post Requirement',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    onPressed: () => CreateRequirementSheet.show(context),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

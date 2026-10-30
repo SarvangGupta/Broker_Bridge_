@@ -10,10 +10,12 @@ import '../../../work/domain/offer_model.dart';
 import '../../../work/domain/requirement_model.dart';
 import '../../../work/presentation/controllers/offers_controller.dart';
 import '../../../work/presentation/controllers/requirements_controller.dart';
+import '../../domain/market_filter_criteria.dart';
+import '../controllers/home_market_filter_controller.dart';
+import 'market_filter_sheet.dart';
 
-/// Home: Buyer Requirements / Seller Offers switch with compact rows from the
-/// same providers as the Work Desk. Rows open the existing detail routes; the
-/// full lists (search, filters) stay in Work Desk.
+/// Home: Buyer Requirements / Seller Offers switch with compact rows and
+/// tab-independent filter & sort capabilities.
 class HomeMarketSection extends ConsumerStatefulWidget {
   /// Rows shown before "View all in Work Desk".
   static const int maxRows = 10;
@@ -58,10 +60,43 @@ class _HomeMarketSectionState extends ConsumerState<HomeMarketSection> {
     return n.isEmpty || _placeholderNames.contains(n) ? null : n;
   }
 
+  void _openFilterSheet(MarketFilterCriteria current) {
+    MarketFilterSheet.show(
+      context,
+      initialCriteria: current,
+      isOffersTab: _showOffers,
+      onApply: (newCriteria) {
+        final notifier = ref.read(homeMarketFilterProvider.notifier);
+        if (_showOffers) {
+          notifier.setOffersFilter(newCriteria);
+        } else {
+          notifier.setRequirementsFilter(newCriteria);
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final reqState = ref.watch(requirementsProvider);
     final offerState = ref.watch(offersProvider);
+    final filterState = ref.watch(homeMarketFilterProvider);
+    final filterNotifier = ref.read(homeMarketFilterProvider.notifier);
+
+    // Apply independent tab filters & sorting
+    final filteredReqs = filterState.requirementsFilter.applyToRequirements(reqState.requirements);
+    final filteredOffers = filterState.offersFilter.applyToOffers(offerState.offers);
+
+    final currentFilter = _showOffers ? filterState.offersFilter : filterState.requirementsFilter;
+    final currentActiveCount = currentFilter.activeFilterCount;
+    final hasActiveFilters = currentFilter.hasActiveFilters;
+
+    final reqDisplayCount = filterState.requirementsFilter.hasActiveFilters
+        ? filteredReqs.length
+        : reqState.totalCount;
+    final offerDisplayCount = filterState.offersFilter.hasActiveFilters
+        ? filteredOffers.length
+        : offerState.totalCount;
 
     final Widget body;
     if (!_showOffers) {
@@ -69,10 +104,12 @@ class _HomeMarketSectionState extends ConsumerState<HomeMarketSection> {
         loading: reqState.isLoading && reqState.requirements.isEmpty,
         error: reqState.errorMessage ?? reqState.contractNotice,
         emptyText: 'No buyer requirements assigned to you yet.',
+        hasFilters: hasActiveFilters,
+        onClearFilters: () => filterNotifier.resetRequirementsFilter(),
         rows: [
-          for (final r in reqState.requirements.take(HomeMarketSection.maxRows)) _requirementRow(r),
+          for (final r in filteredReqs.take(HomeMarketSection.maxRows)) _requirementRow(r),
         ],
-        total: reqState.totalCount,
+        total: filteredReqs.length,
         viewAllRoute: '/work?tab=0',
       );
     } else {
@@ -80,8 +117,12 @@ class _HomeMarketSectionState extends ConsumerState<HomeMarketSection> {
         loading: offerState.isLoading && offerState.offers.isEmpty,
         error: offerState.errorMessage ?? offerState.contractNotice,
         emptyText: 'No seller offers available to you yet.',
-        rows: [for (final o in offerState.offers.take(HomeMarketSection.maxRows)) _offerRow(o)],
-        total: offerState.totalCount,
+        hasFilters: hasActiveFilters,
+        onClearFilters: () => filterNotifier.resetOffersFilter(),
+        rows: [
+          for (final o in filteredOffers.take(HomeMarketSection.maxRows)) _offerRow(o),
+        ],
+        total: filteredOffers.length,
         viewAllRoute: '/work?tab=1',
       );
     }
@@ -89,42 +130,294 @@ class _HomeMarketSectionState extends ConsumerState<HomeMarketSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceLight,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.borderLight),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: _segment(
-                  key: 'home_tab_requirements',
-                  icon: LucideIcons.fileText,
-                  label: 'Buyer Requirements',
-                  count: reqState.totalCount,
-                  selected: !_showOffers,
-                  onTap: () => setState(() => _showOffers = false),
+        // Tabs + Filter Button Header
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _segment(
+                        key: 'home_tab_requirements',
+                        icon: LucideIcons.fileText,
+                        label: 'Buyer Requirements',
+                        count: reqDisplayCount,
+                        selected: !_showOffers,
+                        onTap: () {
+                          setState(() => _showOffers = false);
+                          filterNotifier.setTab(false);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: _segment(
+                        key: 'home_tab_offers',
+                        icon: LucideIcons.tag,
+                        label: 'Seller Offers',
+                        count: offerDisplayCount,
+                        selected: _showOffers,
+                        onTap: () {
+                          setState(() => _showOffers = true);
+                          filterNotifier.setTab(true);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: _segment(
-                  key: 'home_tab_offers',
-                  icon: LucideIcons.tag,
-                  label: 'Seller Offers',
-                  count: offerState.totalCount,
-                  selected: _showOffers,
-                  onTap: () => setState(() => _showOffers = true),
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            _filterButton(
+              activeCount: currentActiveCount,
+              onTap: () => _openFilterSheet(currentFilter),
+            ),
+          ],
         ),
+
+        // Active Filter Chips Bar (visible when filters are applied)
+        if (hasActiveFilters) ...[
+          const SizedBox(height: 8),
+          _activeFilterChips(
+            criteria: currentFilter,
+            onClearAll: () {
+              if (_showOffers) {
+                filterNotifier.resetOffersFilter();
+              } else {
+                filterNotifier.resetRequirementsFilter();
+              }
+            },
+            onUpdate: (updated) {
+              if (_showOffers) {
+                filterNotifier.setOffersFilter(updated);
+              } else {
+                filterNotifier.setRequirementsFilter(updated);
+              }
+            },
+          ),
+        ],
+
         const SizedBox(height: 10),
         body,
       ],
+    );
+  }
+
+  Widget _filterButton({
+    required int activeCount,
+    required VoidCallback onTap,
+  }) {
+    final hasFilters = activeCount > 0;
+    return Material(
+      color: hasFilters ? AppColors.primary : AppColors.surfaceLight,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        key: const Key('home_market_filter_button'),
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: hasFilters ? AppColors.primary : AppColors.borderLight,
+            ),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(
+                LucideIcons.slidersHorizontal,
+                size: 19,
+                color: hasFilters ? Colors.white : AppColors.primaryNavy,
+              ),
+              if (hasFilters)
+                Positioned(
+                  top: 5,
+                  right: 5,
+                  child: Container(
+                    padding: const EdgeInsets.all(3.5),
+                    decoration: const BoxDecoration(
+                      color: AppColors.error,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$activeCount',
+                        key: const Key('home_market_filter_badge_count'),
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _activeFilterChips({
+    required MarketFilterCriteria criteria,
+    required VoidCallback onClearAll,
+    required ValueChanged<MarketFilterCriteria> onUpdate,
+  }) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          // Clear All link
+          GestureDetector(
+            key: const Key('home_market_clear_all_chips'),
+            onTap: onClearAll,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              margin: const EdgeInsets.only(right: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.rotateCcw, size: 12, color: Color(0xFFDC2626)),
+                  SizedBox(width: 4),
+                  Text(
+                    'Clear All',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFDC2626),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Raw Material Chip
+          if (criteria.commodityId != null)
+            _filterChip(
+              label: 'Raw Material: ${criteria.commodityName ?? "Selected"}',
+              onDelete: () => onUpdate(
+                criteria.copyWith(
+                  commodityId: () => null,
+                  commodityName: () => null,
+                ),
+              ),
+            ),
+
+          // Date Chip
+          if (criteria.datePreset != DateFilterPreset.all)
+            _filterChip(
+              label: criteria.datePreset == DateFilterPreset.custom
+                  ? 'Custom Date'
+                  : criteria.datePreset.label,
+              onDelete: () => onUpdate(
+                criteria.copyWith(
+                  datePreset: DateFilterPreset.all,
+                  customStartDate: () => null,
+                  customEndDate: () => null,
+                ),
+              ),
+            ),
+
+          // Price Chip
+          if (criteria.minPrice != null || criteria.maxPrice != null)
+            _filterChip(
+              label: _formatRangeLabel('₹', criteria.minPrice, criteria.maxPrice),
+              onDelete: () => onUpdate(
+                criteria.copyWith(
+                  minPrice: () => null,
+                  maxPrice: () => null,
+                ),
+              ),
+            ),
+
+          // Quantity Chip
+          if (criteria.minQuantity != null || criteria.maxQuantity != null)
+            _filterChip(
+              label: '${_formatRangeLabel("", criteria.minQuantity, criteria.maxQuantity)} MT',
+              onDelete: () => onUpdate(
+                criteria.copyWith(
+                  minQuantity: () => null,
+                  maxQuantity: () => null,
+                ),
+              ),
+            ),
+
+          // Sort Chip
+          if (criteria.sortBy != MarketSortOption.newestFirst)
+            _filterChip(
+              label: 'Sort: ${criteria.sortBy.label}',
+              onDelete: () => onUpdate(
+                criteria.copyWith(sortBy: MarketSortOption.newestFirst),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatRangeLabel(String prefix, double? min, double? max) {
+    if (min != null && max != null) {
+      return '$prefix${min.toStringAsFixed(0)} - $prefix${max.toStringAsFixed(0)}';
+    } else if (min != null) {
+      return '≥ $prefix${min.toStringAsFixed(0)}';
+    } else if (max != null) {
+      return '≤ $prefix${max.toStringAsFixed(0)}';
+    }
+    return '';
+  }
+
+  Widget _filterChip({
+    required String label,
+    required VoidCallback onDelete,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primaryNavy,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onDelete,
+            child: const Icon(LucideIcons.x, size: 13, color: AppColors.primaryNavy),
+          ),
+        ],
+      ),
     );
   }
 
@@ -190,6 +483,8 @@ class _HomeMarketSectionState extends ConsumerState<HomeMarketSection> {
     required bool loading,
     required String? error,
     required String emptyText,
+    required bool hasFilters,
+    required VoidCallback onClearFilters,
     required List<Widget> rows,
     required int total,
     required String viewAllRoute,
@@ -200,7 +495,57 @@ class _HomeMarketSectionState extends ConsumerState<HomeMarketSection> {
         child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
       );
     }
+
     if (rows.isEmpty) {
+      if (hasFilters) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: AppColors.backgroundLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(LucideIcons.filterX, size: 22, color: AppColors.textSecondaryLight),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'No ${_showOffers ? "seller offers" : "buyer requirements"} match your active filters.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryNavy,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Try adjusting or resetting your filter criteria to see more records.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                key: const Key('home_market_clear_filters_button'),
+                icon: const Icon(LucideIcons.rotateCcw, size: 14),
+                label: const Text('Clear Filters', style: TextStyle(fontWeight: FontWeight.w700)),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: onClearFilters,
+              ),
+            ],
+          ),
+        );
+      }
+
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Text(
@@ -210,6 +555,7 @@ class _HomeMarketSectionState extends ConsumerState<HomeMarketSection> {
         ),
       );
     }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

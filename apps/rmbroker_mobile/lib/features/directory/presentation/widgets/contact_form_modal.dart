@@ -9,6 +9,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../domain/directory_contact.dart';
 import '../../domain/gst_certificate_data.dart';
 import '../controllers/contact_form_controller.dart';
+import 'gst_filing_history_sheet.dart';
 
 /// Modal bottom sheet for adding or editing an authorized counterparty contact.
 /// Supports both GST Certificate OCR extraction (Broker Verified) and Manual entry (GST Verification Pending).
@@ -292,34 +293,92 @@ class _ContactFormModalState extends ConsumerState<ContactFormModal> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0xFFFCA5A5)),
                       ),
-                      child: Row(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(LucideIcons.alertTriangle, size: 18, color: Color(0xFFDC2626)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Duplicate Counterparty Detected',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFFDC2626),
-                                  ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(LucideIcons.alertTriangle, size: 18, color: Color(0xFFDC2626)),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Duplicate Counterparty Detected',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFDC2626),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      formState.duplicateWarning!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF7F1D1D),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  formState.duplicateWarning!,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF7F1D1D),
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
+                          if (formState.duplicateInfo?.isCaseB == true &&
+                              formState.duplicateInfo?.existingContactId != null) ...[
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                key: const Key('restore_counterparty_button'),
+                                icon: const Icon(LucideIcons.rotateCcw, size: 15),
+                                label: const Text('Add Them Back (Restore Relationship)'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0D9488),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                ),
+                                onPressed: () async {
+                                  final ok = await formNotifier.restoreCounterparty(
+                                    formState.duplicateInfo!.existingContactId!,
+                                  );
+                                  if (ok && context.mounted) {
+                                    Navigator.of(context).pop(true);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                          if (formState.duplicateInfo?.isCaseC == true &&
+                              formState.duplicateInfo?.existingCompanyId != null) ...[
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                key: const Key('link_shared_counterparty_button'),
+                                icon: const Icon(LucideIcons.link2, size: 15),
+                                label: const Text('Link to My Directory'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryNavy,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                ),
+                                onPressed: () async {
+                                  final ok = await formNotifier.linkSharedCounterparty(
+                                    companyId: formState.duplicateInfo!.existingCompanyId!,
+                                    userId: formState.duplicateInfo?.existingUserId,
+                                  );
+                                  if (ok && context.mounted) {
+                                    Navigator.of(context).pop(true);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -390,45 +449,43 @@ class _ContactFormModalState extends ConsumerState<ContactFormModal> {
                   const SizedBox(height: 18),
 
                   // 2. Registration Mode (GST Certificate vs Manual)
-                  if (!widget.isEditing) ...[
-                    const Text(
-                      'Registration Method',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
+                  const Text(
+                    'Registration Method',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildSegmentButton(
-                              label: 'GST Certificate (OCR)',
-                              icon: LucideIcons.fileCheck2,
-                              isSelected: formState.registrationMode == CounterpartyRegistrationMode.gstCertificate,
-                              onTap: () => formNotifier.setRegistrationMode(CounterpartyRegistrationMode.gstCertificate),
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildSegmentButton(
-                              label: 'Enter Manually',
-                              icon: LucideIcons.pencilLine,
-                              isSelected: formState.registrationMode == CounterpartyRegistrationMode.manual,
-                              onTap: () => formNotifier.setRegistrationMode(CounterpartyRegistrationMode.manual),
-                            ),
-                          ),
-                        ],
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(height: 16),
-                  ],
+                    padding: const EdgeInsets.all(4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildSegmentButton(
+                            label: 'GST Certificate (OCR)',
+                            icon: LucideIcons.fileCheck2,
+                            isSelected: formState.registrationMode == CounterpartyRegistrationMode.gstCertificate,
+                            onTap: () => formNotifier.setRegistrationMode(CounterpartyRegistrationMode.gstCertificate),
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildSegmentButton(
+                            label: 'Enter Manually',
+                            icon: LucideIcons.pencilLine,
+                            isSelected: formState.registrationMode == CounterpartyRegistrationMode.manual,
+                            onTap: () => formNotifier.setRegistrationMode(CounterpartyRegistrationMode.manual),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // 3. GST Certificate Capture & Review (when in certificate mode)
                   if (formState.registrationMode == CounterpartyRegistrationMode.gstCertificate) ...[
@@ -436,7 +493,7 @@ class _ContactFormModalState extends ConsumerState<ContactFormModal> {
                     const SizedBox(height: 16),
                   ] else ...[
                     // Manual mode notice
-                    _buildManualGstNotice(),
+                    _buildManualGstNotice(formState),
                     const SizedBox(height: 16),
                   ],
 
@@ -720,6 +777,7 @@ class _ContactFormModalState extends ConsumerState<ContactFormModal> {
     ContactFormController formNotifier,
   ) {
     final hasFile = formState.gstCertificatePath != null;
+    final isGstinValid = GstinRules.hasValidFormat(formState.gstin);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -763,6 +821,38 @@ class _ContactFormModalState extends ConsumerState<ContactFormModal> {
             ],
           ),
           const SizedBox(height: 10),
+
+          // Check GST Filing History button beside GST Certificate section
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const Key('check_gst_filing_history_button'),
+              icon: const Icon(LucideIcons.fileSpreadsheet, size: 15),
+              label: Text(
+                isGstinValid
+                    ? 'Check GST Filing History'
+                    : 'Check GST Filing History (Valid GSTIN Required)',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: isGstinValid ? const Color(0xFF1E3A8A) : Colors.grey.shade400,
+                side: BorderSide(color: isGstinValid ? const Color(0xFF1E3A8A) : Colors.grey.shade300),
+                backgroundColor: isGstinValid ? Colors.white : Colors.grey.shade50,
+                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+              ),
+              onPressed: isGstinValid
+                  ? () {
+                      GstFilingHistorySheet.show(
+                        context,
+                        gstin: formState.gstin,
+                        companyId: widget.existingContact?.companyId,
+                        counterpartyName: formState.companyName,
+                      );
+                    }
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 12),
           if (!hasFile) ...[
             const Text(
               'Photograph or upload the GST certificate. Fields will be automatically read for your review.',
@@ -889,7 +979,9 @@ class _ContactFormModalState extends ConsumerState<ContactFormModal> {
     );
   }
 
-  Widget _buildManualGstNotice() {
+  Widget _buildManualGstNotice(ContactFormState formState) {
+    final isGstinValid = GstinRules.hasValidFormat(formState.gstin);
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -897,29 +989,64 @@ class _ContactFormModalState extends ConsumerState<ContactFormModal> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFF86EFAC)),
       ),
-      child: const Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(LucideIcons.info, size: 16, color: Color(0xFF15803D)),
-          SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Manual Entry: GST Verification Pending',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF15803D),
-                  ),
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(LucideIcons.info, size: 16, color: Color(0xFF15803D)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Manual Entry: GST Verification Pending',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF15803D),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Counterparty will be saved as Unverified and an Admin verification request will be created automatically. You will be notified once reviewed.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF166534), height: 1.3),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 2),
-                Text(
-                  'Counterparty will be saved as Unverified and an Admin verification request will be created automatically. You will be notified once reviewed.',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF166534), height: 1.3),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const Key('manual_check_gst_filing_history_button'),
+              icon: const Icon(LucideIcons.fileSpreadsheet, size: 15),
+              label: Text(
+                isGstinValid
+                    ? 'Check GST Filing History'
+                    : 'Check GST Filing History (Valid GSTIN Required)',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: isGstinValid ? const Color(0xFF15803D) : Colors.grey.shade400,
+                side: BorderSide(color: isGstinValid ? const Color(0xFF86EFAC) : Colors.grey.shade300),
+                backgroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              ),
+              onPressed: isGstinValid
+                  ? () {
+                      GstFilingHistorySheet.show(
+                        context,
+                        gstin: formState.gstin,
+                        companyId: widget.existingContact?.companyId,
+                        counterpartyName: formState.companyName,
+                      );
+                    }
+                  : null,
             ),
           ),
         ],

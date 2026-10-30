@@ -21,6 +21,7 @@ export const users = pgTable('users', {
   status: boolean('status').default(true).notNull(),
   companyId: uuid('company_id').references(() => companies.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  removedAt: timestamp('removed_at', { withTimezone: true }),
 });
 
 export const profilesBuyer = pgTable('profiles_buyer', {

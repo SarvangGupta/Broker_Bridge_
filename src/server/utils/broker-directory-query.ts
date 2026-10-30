@@ -115,7 +115,8 @@ export interface DirectoryRow {
 type Db = PostgresJsDatabase<Record<string, unknown>>;
 
 function scopeSql(scope: DirectoryScope): SQL {
-  return scope.isAdmin ? sql`true` : sql`c.broker_id = ${scope.brokerId}::uuid`;
+  const brokerPart = scope.isAdmin ? sql`true` : sql`c.broker_id = ${scope.brokerId}::uuid`;
+  return sql`${brokerPart} and c.removed_at is null`;
 }
 
 /** Filters matching the app's `DirectoryContact.matchesFilters` exactly. */

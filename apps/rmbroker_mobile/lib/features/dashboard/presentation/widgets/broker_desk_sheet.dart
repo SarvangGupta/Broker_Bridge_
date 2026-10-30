@@ -60,6 +60,8 @@ class BrokerDeskSheet extends StatelessWidget {
       }),
       _DeskAction('Chat', LucideIcons.messageSquare, const Color(0xFF7C3AED),
           () => closeThen(() => _snack(host, 'In-app chat is not available yet. Use Call or WhatsApp.'))),
+      _DeskAction('My Profile', LucideIcons.userCheck, const Color(0xFF0D9488),
+          () => closeThen(() => host.push('/profile'))),
       _DeskAction('Info', LucideIcons.info, const Color(0xFF1E3A5F), () => closeThen(() => _showInfo(host))),
     ];
 

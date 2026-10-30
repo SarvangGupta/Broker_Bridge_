@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/widgets/app_empty_state.dart';
+import '../data/directory_repository.dart';
 import '../domain/directory_contact.dart';
 import '../domain/directory_state.dart';
 import 'controllers/directory_controller.dart';
@@ -94,7 +95,7 @@ class DirectoryScreen extends ConsumerWidget {
 
           // 2. Main Body Content based on status
           Expanded(
-            child: _buildBodyContent(context, state, controller),
+            child: _buildBodyContent(context, ref, state, controller),
           ),
         ],
       ),
@@ -119,6 +120,7 @@ class DirectoryScreen extends ConsumerWidget {
 
   Widget _buildBodyContent(
     BuildContext context,
+    WidgetRef ref,
     DirectoryState state,
     DirectoryController controller,
   ) {
@@ -178,10 +180,71 @@ class DirectoryScreen extends ConsumerWidget {
                 key: Key('contact_card_${contact.id}'),
                 contact: contact,
                 onTap: () => ContactDetailsSheet.show(ctx, contact),
+                onRemove: () => _confirmAndRemoveContact(ctx, ref, contact),
               );
             },
           ),
         );
+    }
+  }
+
+  Future<void> _confirmAndRemoveContact(
+    BuildContext context,
+    WidgetRef ref,
+    DirectoryContact contact,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Remove ${contact.role.label}?'),
+        content: Text(
+          'Are you sure you want to remove ${contact.companyName} from your directory? '
+          'They will no longer appear in your active dashboard. Master company records, GST details, and transaction history remain safe.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            key: const Key('confirm_remove_contact_button'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      final controller = ref.read(directoryControllerProvider.notifier);
+      final result = await controller.removeContactDetailed(contact.id);
+      if (!context.mounted) return;
+
+      if (result is DirectorySuccess<bool>) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('${contact.companyName} removed from your directory.'),
+            backgroundColor: const Color(0xFF0D9488),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        final errorMsg = (result is DirectoryError ? (result as DirectoryError).message : null) ??
+            controller.lastActionError ??
+            'Could not remove contact. Please try again.';
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 

@@ -75,6 +75,7 @@ class ContactFormState {
   final String? ifscError;
   final String? generalError;
   final String? duplicateWarning;
+  final DuplicateCheckResult? duplicateInfo;
   final bool isSuccess;
   final String? createdContactId;
 
@@ -125,6 +126,7 @@ class ContactFormState {
     this.ifscError,
     this.generalError,
     this.duplicateWarning,
+    this.duplicateInfo,
     this.isSuccess = false,
     this.createdContactId,
   });
@@ -191,6 +193,7 @@ class ContactFormState {
     Object? ifscError = _keep,
     Object? generalError = _keep,
     Object? duplicateWarning = _keep,
+    Object? duplicateInfo = _keep,
     bool? isSuccess,
     String? createdContactId,
     bool clearErrors = false,
@@ -245,6 +248,7 @@ class ContactFormState {
       ifscError: pick(ifscError, this.ifscError),
       generalError: pick(generalError, this.generalError),
       duplicateWarning: pick(duplicateWarning, this.duplicateWarning),
+      duplicateInfo: pick(duplicateInfo, this.duplicateInfo),
       isSuccess: isSuccess ?? this.isSuccess,
       createdContactId: createdContactId ?? this.createdContactId,
     );
@@ -638,6 +642,11 @@ class ContactFormController extends Notifier<ContactFormState> {
     final cleanGstin = GstinRules.normalize(state.gstin);
 
     if (isEditing && contactId != null) {
+      final isCertMode = state.registrationMode == CounterpartyRegistrationMode.gstCertificate;
+      final gstVerificationStatus = isCertMode
+          ? CounterpartyGstStatus.brokerVerified
+          : (cleanGstin.isNotEmpty ? (state.gstData?.gstStatus != null ? CounterpartyGstStatus.portalMatched : CounterpartyGstStatus.gstPending) : CounterpartyGstStatus.missing);
+
       final input = UpdateContactInput(
         name: state.name,
         companyName: state.companyName,
@@ -654,12 +663,15 @@ class ContactFormController extends Notifier<ContactFormState> {
         tradeName: state.tradeName.isNotEmpty ? state.tradeName : null,
         constitution: state.constitution.isNotEmpty ? state.constitution : null,
         address: state.businessAddress.isNotEmpty ? state.businessAddress : null,
+        gstVerificationStatus: gstVerificationStatus,
+        gstCertificateUrl: isCertMode ? state.gstCertificatePath : null,
         bankHolderName: state.hasChequeLeaf && state.bankHolderName.isNotEmpty ? state.bankHolderName : null,
         bankName: state.hasChequeLeaf && state.bankName.isNotEmpty ? state.bankName : null,
         bankAccountNumber: state.hasChequeLeaf && state.bankAccountNumber.isNotEmpty ? state.bankAccountNumber : null,
         bankIfsc: state.hasChequeLeaf && state.bankIfsc.isNotEmpty ? state.bankIfsc : null,
         bankBranch: state.hasChequeLeaf && state.bankBranch.isNotEmpty ? state.bankBranch : null,
         bankChequeUrl: state.hasChequeLeaf ? state.chequeLeafPath : null,
+        bankVerificationStatus: state.hasChequeLeaf ? CounterpartyBankStatus.chequeLeafProvided : null,
       );
 
       final result = await _repository.updateContact(contactId, input);
@@ -668,10 +680,11 @@ class ContactFormController extends Notifier<ContactFormState> {
           state = state.copyWith(isSubmitting: false, isSuccess: true);
           ref.read(directoryControllerProvider.notifier).loadContacts(isRefresh: true);
           return true;
-        case DirectoryError<bool>(:final message, :final isDuplicate):
+        case DirectoryError<bool>(:final message, :final isDuplicate, :final duplicateInfo):
           state = state.copyWith(
             isSubmitting: false,
             duplicateWarning: isDuplicate ? message : null,
+            duplicateInfo: duplicateInfo,
             generalError: isDuplicate ? null : message,
           );
           return false;
@@ -730,10 +743,11 @@ class ContactFormController extends Notifier<ContactFormState> {
           );
           ref.read(directoryControllerProvider.notifier).loadContacts(isRefresh: true);
           return true;
-        case DirectoryError<String>(:final message, :final isDuplicate):
+        case DirectoryError<String>(:final message, :final isDuplicate, :final duplicateInfo):
           state = state.copyWith(
             isSubmitting: false,
             duplicateWarning: isDuplicate ? message : null,
+            duplicateInfo: duplicateInfo,
             generalError: isDuplicate ? null : message,
           );
           return false;
@@ -745,6 +759,28 @@ class ContactFormController extends Notifier<ContactFormState> {
           return false;
       }
     }
+  }
+
+  /// Restore existing previously removed contact (Case B).
+  Future<bool> restoreCounterparty(String contactId) async {
+    final success = await ref.read(directoryControllerProvider.notifier).restoreContact(contactId);
+    if (success) {
+      state = state.copyWith(isSuccess: true);
+    }
+    return success;
+  }
+
+  /// Link existing counterparty from shared database (Case C).
+  Future<bool> linkSharedCounterparty({required String companyId, String? userId}) async {
+    final success = await ref.read(directoryControllerProvider.notifier).linkSharedCounterparty(
+      companyId: companyId,
+      userId: userId,
+      notes: state.notes.isNotEmpty ? state.notes : null,
+    );
+    if (success) {
+      state = state.copyWith(isSuccess: true);
+    }
+    return success;
   }
 }
 

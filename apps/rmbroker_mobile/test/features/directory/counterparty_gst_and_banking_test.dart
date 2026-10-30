@@ -8,7 +8,6 @@ import 'package:rmbroker_mobile/features/directory/data/ocr_extraction_service.d
 import 'package:rmbroker_mobile/features/directory/domain/cheque_leaf_data.dart';
 import 'package:rmbroker_mobile/features/directory/domain/counterparty_verification_request.dart';
 import 'package:rmbroker_mobile/features/directory/domain/directory_contact.dart';
-import 'package:rmbroker_mobile/features/directory/domain/directory_state.dart';
 import 'package:rmbroker_mobile/features/directory/domain/gst_certificate_data.dart';
 import 'package:rmbroker_mobile/features/directory/presentation/controllers/contact_form_controller.dart';
 import 'package:rmbroker_mobile/features/directory/presentation/controllers/directory_controller.dart';

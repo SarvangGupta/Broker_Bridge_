@@ -34,6 +34,38 @@ async function run() {
   `;
   console.log('COLUMNS ON users:', JSON.stringify(userColumns, null, 2));
 
+  const compColumns = await sql`
+    SELECT column_name, data_type, is_nullable, column_default
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'companies';
+  `;
+  console.log('COLUMNS ON companies:', JSON.stringify(compColumns, null, 2));
+
+  const compPolicies = await sql`
+    SELECT policyname, cmd, roles, qual, with_check FROM pg_policies WHERE tablename = 'companies';
+  `;
+  console.log('POLICIES ON companies:', JSON.stringify(compPolicies, null, 2));
+
+  const pbColumns = await sql`
+    SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'profiles_broker';
+  `;
+  console.log('COLUMNS ON profiles_broker:', JSON.stringify(pbColumns, null, 2));
+
+  const storageBuckets = await sql`
+    SELECT id, name, public FROM storage.buckets;
+  `;
+  console.log('STORAGE BUCKETS:', JSON.stringify(storageBuckets, null, 2));
+
+  const brokerUsers = await sql`SELECT id, name, mobile, email, role, company_id FROM users WHERE lower(role) = 'broker' LIMIT 3;`;
+  console.log('SAMPLE BROKERS:', JSON.stringify(brokerUsers, null, 2));
+  if (brokerUsers.length > 0 && brokerUsers[0].company_id) {
+    const comp = await sql`SELECT * FROM companies WHERE id = ${brokerUsers[0].company_id};`;
+    console.log('BROKER COMPANY:', JSON.stringify(comp, null, 2));
+  }
+
+  const func = await sql`SELECT prosrc FROM pg_proc WHERE proname = 'prevent_self_company_change';`;
+  console.log('FUNCTION prevent_self_company_change:', func[0]?.prosrc);
+
   await sql.end();
 }
 

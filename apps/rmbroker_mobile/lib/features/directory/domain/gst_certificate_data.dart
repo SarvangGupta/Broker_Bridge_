@@ -83,22 +83,31 @@ const Map<String, String> gstStateCodes = {
 
 /// Verified states for counterparty GST review.
 class CounterpartyGstStatus {
+  static const String missing = 'missing';
   static const String unverified = 'unverified';
   static const String gstPending = 'gst_pending';
   static const String brokerVerified = 'broker_verified';
+  static const String portalMatched = 'portal_matched';
+  static const String registrationInactive = 'registration_inactive';
   static const String gstVerified = 'gst_verified';
   static const String rejected = 'rejected';
 
   static String displayLabel(String? status) {
     switch (status?.toLowerCase().trim()) {
+      case missing:
+        return 'GST Details Missing';
       case brokerVerified:
         return 'Broker Verified — Certificate Reviewed';
+      case portalMatched:
+        return 'GST Details Matched with Official Portal';
+      case registrationInactive:
+        return 'GST Registration Inactive';
       case gstPending:
-        return 'GST Verification Pending';
+        return 'Pending Verification';
       case gstVerified:
         return 'GST Verified by Government';
       case rejected:
-        return 'GST Verification Rejected';
+        return 'Verification Failed';
       case unverified:
       default:
         return 'Unverified';

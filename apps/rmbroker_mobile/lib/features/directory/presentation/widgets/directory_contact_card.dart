@@ -11,12 +11,14 @@ class DirectoryContactCard extends StatelessWidget {
   final DirectoryContact contact;
   final VoidCallback onTap;
   final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
 
   const DirectoryContactCard({
     super.key,
     required this.contact,
     required this.onTap,
     this.onEdit,
+    this.onRemove,
   });
 
   static const _buyerColor = Color(0xFF1D4ED8);
@@ -164,6 +166,15 @@ class DirectoryContactCard extends StatelessWidget {
                       companyName: contact.companyName,
                       isCompact: true,
                     ),
+                    if (onRemove != null)
+                      IconButton(
+                        key: Key('remove_contact_button_${contact.id}'),
+                        tooltip: 'Remove ${contact.role.label}',
+                        icon: Icon(LucideIcons.trash2, size: 16, color: Colors.red.shade400),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        onPressed: onRemove,
+                      ),
                     const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.textSecondary),
                   ],
                 ),

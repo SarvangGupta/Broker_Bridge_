@@ -38,29 +38,33 @@ class DashboardHeader extends ConsumerWidget implements PreferredSizeWidget {
       backgroundColor: AppColors.surfaceLight,
       title: Row(
         children: [
-          // Dark teal rounded logo container
-          Container(
-            width: logoSize,
-            height: logoSize,
-            decoration: BoxDecoration(
-              color: const Color(0xFF134E4A), // Slate/dark teal
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: const Center(
-              child: Text(
-                'BB',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14,
-                  letterSpacing: 0.5,
+          // Dark teal rounded logo container with tap to view profile
+          InkWell(
+            onTap: () => context.push('/profile'),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: logoSize,
+              height: logoSize,
+              decoration: BoxDecoration(
+                color: const Color(0xFF134E4A), // Slate/dark teal
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Text(
+                  'BB',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ),

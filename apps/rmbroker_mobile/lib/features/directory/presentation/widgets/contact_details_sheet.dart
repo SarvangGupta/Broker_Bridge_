@@ -3,14 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../data/directory_repository.dart';
 import '../../domain/directory_contact.dart';
 import '../../domain/directory_state.dart';
+import '../../domain/gst_certificate_data.dart';
 import '../controllers/contact_details_controller.dart';
+import '../controllers/directory_controller.dart';
 import 'contact_action_buttons.dart';
 import 'contact_form_modal.dart';
+import 'gst_filing_history_sheet.dart';
 
 /// 360-degree bottom sheet view showing contact details, linked business mandates, and archival actions.
-class ContactDetailsSheet extends ConsumerWidget {
+class ContactDetailsSheet extends ConsumerStatefulWidget {
   final DirectoryContact initialContact;
 
   const ContactDetailsSheet({
@@ -28,11 +32,18 @@ class ContactDetailsSheet extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detailsState = ref.watch(contactDetailsControllerProvider(initialContact.id));
-    final controller = ref.read(contactDetailsControllerProvider(initialContact.id).notifier);
+  ConsumerState<ContactDetailsSheet> createState() => _ContactDetailsSheetState();
+}
 
-    final contact = detailsState.payload?.contact ?? initialContact;
+class _ContactDetailsSheetState extends ConsumerState<ContactDetailsSheet> {
+  bool _isRemoving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final detailsState = ref.watch(contactDetailsControllerProvider(widget.initialContact.id));
+    final controller = ref.read(contactDetailsControllerProvider(widget.initialContact.id).notifier);
+
+    final contact = detailsState.payload?.contact ?? widget.initialContact;
     final isBuyer = contact.role == ContactRole.buyer;
     final roleColor = isBuyer ? const Color(0xFF1E3A8A) : const Color(0xFF0D9488);
 
@@ -156,15 +167,100 @@ class ContactDetailsSheet extends ConsumerWidget {
                 IconButton(
                   tooltip: 'Edit Counterparty',
                   icon: const Icon(LucideIcons.edit2, size: 18, color: AppColors.primaryNavy),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    ContactFormModal.show(
-                      context,
-                      isEditing: true,
-                      existingContact: contact,
-                      defaultRole: contact.role,
-                    );
-                  },
+                  onPressed: _isRemoving
+                      ? null
+                      : () {
+                          Navigator.of(context).pop();
+                          ContactFormModal.show(
+                            context,
+                            isEditing: true,
+                            existingContact: contact,
+                            defaultRole: contact.role,
+                          );
+                        },
+                ),
+                // Remove / Delete Counterparty Button
+                IconButton(
+                  key: const Key('remove_contact_button'),
+                  tooltip: 'Remove Counterparty',
+                  icon: _isRemoving
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.red.shade700,
+                          ),
+                        )
+                      : Icon(LucideIcons.trash2, size: 18, color: Colors.red.shade700),
+                  onPressed: _isRemoving
+                      ? null
+                      : () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: Text('Remove ${contact.role.label}?'),
+                              content: Text(
+                                'Are you sure you want to remove ${contact.companyName} from your directory? '
+                                'They will no longer appear in your active dashboard. Master company records, GST details, and transaction history remain safe.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                ElevatedButton(
+                                  key: const Key('confirm_remove_contact_button'),
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red.shade700,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text('Remove'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirmed == true && mounted) {
+                            final messenger = ScaffoldMessenger.of(context);
+                            final nav = Navigator.of(context);
+                            setState(() => _isRemoving = true);
+                            final result = await ref
+                                .read(directoryControllerProvider.notifier)
+                                .removeContactDetailed(contact.id);
+                            if (!mounted) return;
+
+                            if (result is DirectorySuccess<bool>) {
+                              nav.pop();
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${contact.companyName} removed from your directory.',
+                                  ),
+                                  backgroundColor: const Color(0xFF0D9488),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            } else {
+                              setState(() => _isRemoving = false);
+                              final errorMsg = (result is DirectoryError
+                                      ? (result as DirectoryError).message
+                                      : null) ??
+                                  ref
+                                      .read(directoryControllerProvider.notifier)
+                                      .lastActionError ??
+                                  'Could not remove contact. Please try again.';
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(errorMsg),
+                                  backgroundColor: Colors.red.shade700,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                        },
                 ),
                 // Soft Archive Toggle
                 IconButton(
@@ -174,7 +270,9 @@ class ContactDetailsSheet extends ConsumerWidget {
                     size: 18,
                     color: contact.status ? Colors.amber.shade800 : Colors.teal.shade800,
                   ),
-                  onPressed: () async {
+                  onPressed: _isRemoving
+                      ? null
+                      : () async {
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
@@ -246,6 +344,128 @@ class ContactDetailsSheet extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
+
+                  // GST & Business Credibility Section
+                  _buildSectionHeader('GST & Business Credibility', LucideIcons.fileCheck2),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.borderLight),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInfoRow('GSTIN', contact.gstin ?? 'Not Provided', LucideIcons.hash),
+                        if (contact.legalName != null && contact.legalName!.isNotEmpty) ...[
+                          const Divider(height: 16, color: AppColors.borderLight),
+                          _buildInfoRow('Legal Name', contact.legalName!, LucideIcons.building2),
+                        ],
+                        if (contact.tradeName != null && contact.tradeName!.isNotEmpty) ...[
+                          const Divider(height: 16, color: AppColors.borderLight),
+                          _buildInfoRow('Trade Name', contact.tradeName!, LucideIcons.tag),
+                        ],
+                        const Divider(height: 16, color: AppColors.borderLight),
+                        _buildInfoRow('GST Verification', contact.gstStatusLabel, LucideIcons.shieldCheck),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                key: const Key('profile_edit_gst_details_button'),
+                                icon: const Icon(LucideIcons.filePenLine, size: 15),
+                                label: Text(
+                                  contact.hasGstDetails ? 'Update GST Details' : 'Add GST Details',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryNavy,
+                                  side: const BorderSide(color: AppColors.primaryNavy),
+                                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 10),
+                                ),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  ContactFormModal.show(
+                                    context,
+                                    isEditing: true,
+                                    existingContact: contact,
+                                    defaultRole: contact.role,
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            key: const Key('profile_check_gst_filing_history_button'),
+                            icon: const Icon(LucideIcons.fileSpreadsheet, size: 15),
+                            label: Text(
+                              (contact.gstin != null && GstinRules.hasValidFormat(contact.gstin!))
+                                  ? 'Check GST Filing History'
+                                  : 'Check GST Filing History (Valid GSTIN Required)',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: (contact.gstin != null && GstinRules.hasValidFormat(contact.gstin!))
+                                  ? const Color(0xFF1E3A8A)
+                                  : Colors.grey.shade400,
+                              side: BorderSide(
+                                color: (contact.gstin != null && GstinRules.hasValidFormat(contact.gstin!))
+                                    ? const Color(0xFF1E3A8A)
+                                    : Colors.grey.shade300,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                            ),
+                            onPressed: (contact.gstin != null && GstinRules.hasValidFormat(contact.gstin!))
+                                ? () {
+                                    GstFilingHistorySheet.show(
+                                      context,
+                                      gstin: contact.gstin!,
+                                      companyId: contact.companyId,
+                                      counterpartyName: contact.companyName,
+                                    );
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  if (contact.hasBankDetails) ...[
+                    _buildSectionHeader('Banking Information', LucideIcons.landmark),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.borderLight),
+                      ),
+                      child: Column(
+                        children: [
+                          if (contact.bankName != null) ...[
+                            _buildInfoRow('Bank Name', contact.bankName!, LucideIcons.landmark),
+                            const Divider(height: 16, color: AppColors.borderLight),
+                          ],
+                          _buildInfoRow('Account Number', contact.maskedBankAccount, LucideIcons.creditCard),
+                          if (contact.bankIfsc != null) ...[
+                            const Divider(height: 16, color: AppColors.borderLight),
+                            _buildInfoRow('IFSC Code', contact.bankIfsc!, LucideIcons.hash),
+                          ],
+                          const Divider(height: 16, color: AppColors.borderLight),
+                          _buildInfoRow('Bank Status', contact.bankStatusLabel, LucideIcons.shieldAlert),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Linked Business Records (360-Degree Aggregation)
                   _buildSectionHeader(

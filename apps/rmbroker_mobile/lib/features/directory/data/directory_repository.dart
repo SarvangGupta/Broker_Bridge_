@@ -1,7 +1,6 @@
 import 'dart:io';
 import '../domain/cheque_leaf_data.dart';
 import '../domain/gst_certificate_data.dart';
-import '../domain/counterparty_verification_request.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -161,7 +160,7 @@ class DirectoryRepository {
   ) async {
     final rows = await _supabase!
         .from('crm_contacts')
-        .select('id, users!user_id!inner(id, name, mobile, role), companies(name)')
+        .select('id, removed_at, users!user_id!inner(id, name, mobile, role), companies(name)')
         .eq('broker_id', brokerId)
         .inFilter('users.mobile', mobiles)
         .limit(1);
@@ -332,7 +331,8 @@ class DirectoryRepository {
           '$users(id, name, mobile, email, role, status), '
           'companies(id, name, status, is_verified, trust_score, district_id, state_id)',
         )
-        .eq('broker_id', brokerId);
+        .eq('broker_id', brokerId)
+        .filter('removed_at', 'is', 'null');
     // Same rule as ContactRole.fromString: anything but "seller" is a buyer.
     if (role == 'seller') query = query.ilike('users.role', 'seller');
     if (role == 'buyer') {
@@ -414,6 +414,7 @@ class DirectoryRepository {
         .from('crm_contacts')
         .select('id, company_id, users!user_id(role, status), companies(status)')
         .eq('broker_id', brokerId)
+        .filter('removed_at', 'is', 'null')
         .order('id', ascending: true)
         .range(from, to));
     final companyIds = {
@@ -746,45 +747,142 @@ class DirectoryRepository {
     );
   }
 
-  /// Server-side duplicate prevention check against normalized mobile and company name.
+  /// Server-side duplicate prevention check against normalized mobile and GSTIN,
+  /// categorizing into Case A (active), Case B (previously removed), Case C (shared available), or Case D (none).
   Future<DuplicateCheckResult> checkDuplicate({
     required String mobile,
     required String companyName,
     String? gstin,
   }) async {
     final phoneRes = PhoneUtils.validateAndNormalize(mobile);
-    if (!phoneRes.isValid) {
+    if (!phoneRes.isValid && (gstin == null || gstin.trim().isEmpty)) {
       return DuplicateCheckResult.none();
     }
 
-    if (gstin != null && gstin.trim().isNotEmpty && _supabase != null) {
+    final brokerId = activeBrokerId();
+
+    // 1. First, check if this broker already has this counterparty in crm_contacts (Cases A & B)
+    if (brokerId != null && _supabase != null) {
       try {
-        final existingGst = await _supabase!
-            .from('companies')
-            .select('id, name, gst')
-            .eq('gst', gstin.trim().toUpperCase())
-            .eq('status', true)
-            .limit(1);
-        if (existingGst.isNotEmpty) {
-          final row = existingGst.first;
-          return DuplicateCheckResult(
-            isDuplicate: true,
-            matchType: 'gstin',
-            existingCompanyName: row['name']?.toString(),
-            existingGstin: row['gst']?.toString() ?? gstin.trim().toUpperCase(),
-          );
+        final client = _supabase!;
+        // Query by GSTIN under this broker
+        if (gstin != null && gstin.trim().isNotEmpty) {
+          final gstContacts = await client
+              .from('crm_contacts')
+              .select('id, removed_at, user_id, company_id, users!user_id(id, name, mobile, role, status), companies!company_id(id, name, gst, status)')
+              .eq('broker_id', brokerId)
+              .ilike('companies.gst', gstin.trim().toUpperCase())
+              .limit(1);
+
+          if (gstContacts.isNotEmpty) {
+            final row = gstContacts.first;
+            final u = row['users'] as Map<String, dynamic>? ?? {};
+            final c = row['companies'] as Map<String, dynamic>? ?? {};
+            final isRemoved = row['removed_at'] != null;
+            final isActive = !isRemoved && (u['status'] as bool? ?? true) && (c['status'] as bool? ?? true);
+            return DuplicateCheckResult(
+              isDuplicate: true,
+              matchType: 'gstin',
+              duplicateCase: isActive ? DuplicateCase.activeInDirectory : DuplicateCase.previouslyRemoved,
+              existingContactId: row['id']?.toString(),
+              existingUserId: u['id']?.toString() ?? row['user_id']?.toString(),
+              existingCompanyId: c['id']?.toString() ?? row['company_id']?.toString(),
+              existingContactName: u['name']?.toString(),
+              existingCompanyName: c['name']?.toString(),
+              existingMobile: u['mobile']?.toString(),
+              existingGstin: c['gst']?.toString() ?? gstin.trim().toUpperCase(),
+              existingRole: u['role']?.toString(),
+            );
+          }
+        }
+
+        // Query by mobile under this broker
+        if (phoneRes.isValid) {
+          final mobileContacts = await queryContactsByMobile(brokerId, _mobileVariants(phoneRes));
+          if (mobileContacts.isNotEmpty) {
+            final row = mobileContacts.first;
+            final u = row['users'] as Map<String, dynamic>? ?? {};
+            final c = row['companies'] as Map<String, dynamic>? ?? {};
+            final isRemoved = row['removed_at'] != null;
+            final isActive = !isRemoved && (u['status'] as bool? ?? true) && (c['status'] as bool? ?? true);
+            return DuplicateCheckResult(
+              isDuplicate: true,
+              matchType: 'exact_mobile',
+              duplicateCase: isActive ? DuplicateCase.activeInDirectory : DuplicateCase.previouslyRemoved,
+              existingContactId: row['id']?.toString(),
+              existingUserId: u['id']?.toString() ?? row['user_id']?.toString(),
+              existingCompanyId: c['id']?.toString() ?? row['company_id']?.toString(),
+              existingContactName: u['name']?.toString(),
+              existingCompanyName: c['name']?.toString(),
+              existingMobile: u['mobile']?.toString(),
+              existingGstin: c['gst']?.toString(),
+              existingRole: u['role']?.toString(),
+            );
+          }
         }
       } catch (e) {
-        debugPrint('GST duplicate check notice: $e');
+        debugPrint('Broker duplicate check notice: $e');
       }
     }
 
+    // 2. Second, check if counterparty exists in shared database (companies or users) not linked to this broker (Case C)
+    if (_supabase != null) {
+      try {
+        final client = _supabase!;
+        // Check companies by GSTIN
+        if (gstin != null && gstin.trim().isNotEmpty) {
+          final sharedGst = await client
+              .from('companies')
+              .select('id, name, gst, status')
+              .eq('gst', gstin.trim().toUpperCase())
+              .limit(1);
+
+          if (sharedGst.isNotEmpty) {
+            final c = sharedGst.first;
+            return DuplicateCheckResult(
+              isDuplicate: true,
+              matchType: 'gstin',
+              duplicateCase: DuplicateCase.sharedAvailable,
+              existingCompanyId: c['id']?.toString(),
+              existingCompanyName: c['name']?.toString(),
+              existingGstin: c['gst']?.toString() ?? gstin.trim().toUpperCase(),
+            );
+          }
+        }
+
+        // Check users by mobile
+        if (phoneRes.isValid) {
+          final sharedUsers = await client
+              .from('users')
+              .select('id, name, mobile, role, status')
+              .inFilter('mobile', _mobileVariants(phoneRes))
+              .limit(1);
+
+          if (sharedUsers.isNotEmpty) {
+            final u = sharedUsers.first;
+            return DuplicateCheckResult(
+              isDuplicate: true,
+              matchType: 'exact_mobile',
+              duplicateCase: DuplicateCase.sharedAvailable,
+              existingUserId: u['id']?.toString(),
+              existingContactName: u['name']?.toString(),
+              existingMobile: u['mobile']?.toString(),
+              existingRole: u['role']?.toString(),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Shared duplicate check notice: $e');
+      }
+    }
+
+    // 3. Fallback: REST check if online
     if (await _restAuthReady()) {
       try {
         final response = await _apiClient.post(
           '/broker/directory/check-duplicate',
           data: {
-            'mobile': phoneRes.normalized,
+            if (phoneRes.isValid) 'mobile': phoneRes.normalized,
             'companyName': companyName.trim(),
             if (gstin != null && gstin.trim().isNotEmpty) 'gstin': gstin.trim().toUpperCase(),
           },
@@ -796,16 +894,6 @@ class DirectoryRepository {
       } catch (_) {
         // Fallback: check against local/Supabase database
       }
-    }
-
-    try {
-      final brokerId = activeBrokerId();
-      if (brokerId != null) {
-        final list = await queryContactsByMobile(brokerId, _mobileVariants(phoneRes));
-        if (list.isNotEmpty) return _duplicateFromRow(list.first);
-      }
-    } catch (e) {
-      debugPrint('Duplicate check notice: $e');
     }
 
     return DuplicateCheckResult.none();
@@ -858,20 +946,39 @@ class DirectoryRepository {
       return const DirectoryError(message: 'Company name must be at least 2 characters');
     }
 
-    // 2. Pre-check for duplicate mobile
+    // 2. Pre-check for duplicate mobile and GSTIN
     final dupCheck = await checkDuplicate(
       mobile: phoneRes.normalized,
       companyName: input.companyName,
+      gstin: input.gstin,
     );
 
-    if (dupCheck.isDuplicate && dupCheck.matchType == 'exact_mobile') {
-      return DirectoryError(
-        message:
-            'A contact with mobile number ${phoneRes.formatted} already exists (${dupCheck.existingCompanyName}). '
-            'Duplicate creation prevented.',
-        isDuplicate: true,
-        duplicateInfo: dupCheck,
-      );
+    if (dupCheck.isDuplicate) {
+      if (dupCheck.duplicateCase == DuplicateCase.activeInDirectory) {
+        return DirectoryError(
+          message: 'This ${input.role.label} is already in your directory (${dupCheck.existingCompanyName ?? dupCheck.existingContactName ?? 'existing contact'}).',
+          isDuplicate: true,
+          duplicateInfo: dupCheck,
+        );
+      } else if (dupCheck.duplicateCase == DuplicateCase.previouslyRemoved) {
+        return DirectoryError(
+          message: 'This ${input.role.label} already exists in your database. Add them back?',
+          isDuplicate: true,
+          duplicateInfo: dupCheck,
+        );
+      } else if (dupCheck.duplicateCase == DuplicateCase.sharedAvailable) {
+        return DirectoryError(
+          message: 'Found ${dupCheck.existingCompanyName ?? 'counterparty'} in directory. Link to your directory?',
+          isDuplicate: true,
+          duplicateInfo: dupCheck,
+        );
+      } else {
+        return DirectoryError(
+          message: 'A contact with mobile number ${phoneRes.formatted} already exists (${dupCheck.existingCompanyName}). Duplicate creation prevented.',
+          isDuplicate: true,
+          duplicateInfo: dupCheck,
+        );
+      }
     }
 
     // 3. Attempt REST POST
@@ -1033,12 +1140,54 @@ class DirectoryRepository {
         }
 
         if (compId != null) {
-          await client.from('companies').update({
+          final compUpdates = <String, dynamic>{
             'name': input.companyName.trim(),
             'district_id': input.city?.trim(),
             'state_id': input.state?.trim(),
             if (input.status != null) 'status': input.status,
-          }).eq('id', compId);
+          };
+
+          if (input.gstin != null && input.gstin!.trim().isNotEmpty) {
+            compUpdates['gst'] = input.gstin!.trim().toUpperCase();
+          }
+          if (input.legalName != null && input.legalName!.trim().isNotEmpty) {
+            compUpdates['legal_name'] = input.legalName!.trim();
+          }
+          if (input.tradeName != null && input.tradeName!.trim().isNotEmpty) {
+            compUpdates['trade_name'] = input.tradeName!.trim();
+          }
+          if (input.constitution != null && input.constitution!.trim().isNotEmpty) {
+            compUpdates['constitution'] = input.constitution!.trim();
+          }
+          if (input.address != null && input.address!.trim().isNotEmpty) {
+            compUpdates['principal_address'] = input.address!.trim();
+          }
+          if (input.gstVerificationStatus != null) {
+            compUpdates['gst_verification_status'] = input.gstVerificationStatus;
+          }
+          if (input.gstCertificateUrl != null && input.gstCertificateUrl!.trim().isNotEmpty) {
+            compUpdates['gst_certificate_url'] = input.gstCertificateUrl!.trim();
+          }
+          if (input.gstVerificationStatus == CounterpartyGstStatus.brokerVerified) {
+            compUpdates['gst_verified_by'] = session.user.id;
+            compUpdates['gst_verified_at'] = DateTime.now().toIso8601String();
+            compUpdates['is_verified'] = true;
+            compUpdates['trust_score'] = 100;
+          }
+
+          if (input.bankAccountNumber != null && input.bankAccountNumber!.trim().isNotEmpty) {
+            compUpdates['bank_holder_name'] = input.bankHolderName?.trim();
+            compUpdates['bank_name'] = input.bankName?.trim();
+            compUpdates['bank_account_number'] = input.bankAccountNumber?.trim();
+            compUpdates['bank_ifsc'] = input.bankIfsc?.trim().toUpperCase();
+            compUpdates['bank_branch'] = input.bankBranch?.trim();
+            compUpdates['bank_cheque_url'] = input.bankChequeUrl;
+            compUpdates['bank_verification_status'] = input.bankVerificationStatus ?? CounterpartyBankStatus.chequeLeafProvided;
+            compUpdates['bank_recorded_by'] = session.user.id;
+            compUpdates['bank_recorded_at'] = DateTime.now().toIso8601String();
+          }
+
+          await client.from('companies').update(compUpdates).eq('id', compId);
         }
 
         await client.from('crm_contacts').update({
@@ -1053,6 +1202,155 @@ class DirectoryRepository {
 
     return DirectoryUnavailable(
       contractNotice: 'Backend is offline or endpoint /api/v1/broker/directory/$contactId is unavailable.',
+    );
+  }
+
+  /// Safely remove a counterparty from this broker's directory (soft removal).
+  /// Preserves shared company master records, GST details, bank details, and existing deals/transactions.
+  Future<DirectoryDataResult<bool>> removeContact(String contactId) async {
+    // 1. Attempt REST DELETE
+    if (await _restAuthReady()) {
+      try {
+        final response = await _apiClient.delete('/broker/directory/$contactId');
+        if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+          final data = response.data as Map<String, dynamic>;
+          if (data['success'] == true) {
+            return const DirectorySuccess(true);
+          } else {
+            return DirectoryError(
+              message: data['error'] as String? ?? 'Failed to remove contact from directory.',
+            );
+          }
+        }
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 401) {
+          return const DirectoryUnauthorized();
+        }
+        final errMap = dioErr.response?.data;
+        if (errMap is Map && errMap['error'] != null) {
+          return DirectoryError(message: errMap['error'].toString());
+        }
+        debugPrint('REST remove contact DioException: $dioErr');
+      } catch (e) {
+        debugPrint('REST remove contact error: $e');
+      }
+    }
+
+    // 2. Direct Supabase fallback
+    try {
+      final client = _supabase;
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
+        final contact = await client
+            .from('crm_contacts')
+            .select('id, user_id, company_id')
+            .eq('id', contactId)
+            .eq('broker_id', brokerId)
+            .maybeSingle();
+
+        if (contact == null) {
+          return const DirectoryError(message: 'Contact record not found.');
+        }
+
+        // Soft-remove the broker's relationship link in crm_contacts.
+        // Master company records, users, deals, requirements, and offers remain intact.
+        // Preserving the relationship record with removed_at prevents linkAssignedCounterparties
+        // from resurrecting explicitly removed contacts.
+        await client
+            .from('crm_contacts')
+            .update({'removed_at': DateTime.now().toUtc().toIso8601String()})
+            .eq('id', contactId)
+            .eq('broker_id', brokerId);
+
+        return const DirectorySuccess(true);
+      }
+    } catch (e) {
+      debugPrint('Remove contact error: $e');
+      return DirectoryError(message: 'Failed to remove contact: $e');
+    }
+
+    return const DirectoryUnavailable(
+      contractNotice: 'Backend is offline or remove endpoint is unavailable.',
+    );
+  }
+
+  /// Restore a previously removed/inactive counterparty (Case B).
+  Future<DirectoryDataResult<String>> restoreContact(String contactId) async {
+    try {
+      final client = _supabase;
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
+        final contact = await client
+            .from('crm_contacts')
+            .select('id, user_id, company_id')
+            .eq('id', contactId)
+            .eq('broker_id', brokerId)
+            .single();
+
+        final userId = contact['user_id'] as String?;
+        final compId = contact['company_id'] as String?;
+
+        if (userId != null) {
+          await client.from('users').update({'status': true}).eq('id', userId);
+        }
+        if (compId != null) {
+          await client.from('companies').update({'status': true}).eq('id', compId);
+        }
+
+        await client.from('crm_contacts').update({
+          'removed_at': null,
+          'last_activity_at': DateTime.now().toUtc().toIso8601String(),
+        }).eq('id', contactId).eq('broker_id', brokerId);
+
+        return DirectorySuccess(contactId);
+      }
+    } catch (e) {
+      debugPrint('Restore contact error: $e');
+      return DirectoryError(message: 'Failed to restore contact: $e');
+    }
+
+    return const DirectoryUnavailable(
+      contractNotice: 'Backend is offline or restore endpoint is unavailable.',
+    );
+  }
+
+  /// Link an existing shared counterparty to this broker desk (Case C).
+  /// Preserves private notes from other brokers.
+  Future<DirectoryDataResult<String>> linkSharedCounterparty({
+    required String companyId,
+    String? userId,
+    String? notes,
+  }) async {
+    try {
+      final client = _supabase;
+      final brokerId = activeBrokerId();
+      if (client != null && brokerId != null) {
+        final res = await client
+            .from('crm_contacts')
+            .insert({
+              'broker_id': brokerId,
+              'company_id': companyId,
+              if (userId != null) 'user_id': userId,
+              'last_activity_at': DateTime.now().toIso8601String(),
+            })
+            .select('id')
+            .single();
+
+        final newContactId = res['id'] as String;
+
+        if (notes != null && notes.trim().isNotEmpty) {
+          await insertInitialNote(newContactId, notes.trim());
+        }
+
+        return DirectorySuccess(newContactId);
+      }
+    } catch (e) {
+      debugPrint('Link shared counterparty error: $e');
+      return DirectoryError(message: 'Failed to link counterparty: $e');
+    }
+
+    return const DirectoryUnavailable(
+      contractNotice: 'Backend is offline or linking endpoint is unavailable.',
     );
   }
 

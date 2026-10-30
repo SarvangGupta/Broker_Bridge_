@@ -278,55 +278,87 @@ class RequirementCard extends StatelessWidget {
 
     final allocate = view == RequirementAllocationView.notAllocated ? onAllocateSeller : null;
 
-    return Row(
-      children: [
-        Expanded(
-          flex: 3,
-          child: Container(
-            key: const Key('requirement_allocation_status'),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, size: 16, color: color),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isVeryNarrow = constraints.maxWidth < 240;
+
+        final statusWidget = Container(
+          key: const Key('requirement_allocation_status'),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          constraints: const BoxConstraints(minHeight: 38),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                    height: 1.2,
                   ),
                 ),
-              ],
+              ),
+            ],
+          ),
+        );
+
+        final buttonWidget = OutlinedButton.icon(
+          key: Key(allocate != null ? 'requirement_allocate_seller' : 'requirement_view_details'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            minimumSize: const Size(0, 38),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            side: const BorderSide(color: AppColors.primary),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          icon: Icon(
+            allocate != null ? LucideIcons.userPlus : LucideIcons.fileText,
+            size: 15,
+            color: AppColors.primary,
+          ),
+          label: Text(
+            allocate != null ? 'Allocate Seller' : 'View Details',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: OutlinedButton.icon(
-            key: Key(allocate != null ? 'requirement_allocate_seller' : 'requirement_view_details'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              minimumSize: const Size(0, 38),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              side: const BorderSide(color: AppColors.primary),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            icon: Icon(allocate != null ? LucideIcons.userPlus : LucideIcons.fileText, size: 15, color: AppColors.primary),
-            label: Text(
-              allocate != null ? 'Allocate Seller' : 'View Details',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
-            ),
-            onPressed: allocate ?? onTap,
-          ),
-        ),
-      ],
+          onPressed: allocate ?? onTap,
+        );
+
+        if (isVeryNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              statusWidget,
+              const SizedBox(height: 8),
+              buttonWidget,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: statusWidget),
+            const SizedBox(width: 8),
+            buttonWidget,
+          ],
+        );
+      },
     );
   }
 }

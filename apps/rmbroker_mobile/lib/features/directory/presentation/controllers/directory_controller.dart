@@ -177,6 +177,86 @@ class DirectoryController extends Notifier<DirectoryState> {
     loadContacts(isRefresh: state.status == DirectoryStatus.loaded);
   }
 
+  /// Last error from a contact action (removal, status toggle, link, restore).
+  String? lastActionError;
+
+  /// Safely remove a contact from the broker's directory (soft removal) with full result feedback.
+  /// Preserves shared master records, GST details, bank details, and existing deals/transactions.
+  Future<DirectoryDataResult<bool>> removeContactDetailed(String contactId) async {
+    lastActionError = null;
+    final result = await _repository.removeContact(contactId);
+    if (!ref.mounted) return result;
+
+    if (result is DirectorySuccess<bool>) {
+      // Remove from local state immediately
+      DirectoryContact? removed;
+      final updatedList = state.allContacts.where((c) {
+        if (c.id == contactId) {
+          removed = c;
+          return false;
+        }
+        return true;
+      }).toList();
+
+      state = state.copyWith(
+        allContacts: updatedList,
+        stats: _statsAfterToggle(state.stats, removed, false),
+      );
+      // Refresh directory from authoritative source
+      await loadContacts(isRefresh: true);
+      return result;
+    } else if (result is DirectoryError) {
+      lastActionError = (result as DirectoryError).message;
+    } else if (result is DirectoryUnauthorized) {
+      lastActionError = 'Your broker session has expired. Please sign in again.';
+    } else if (result is DirectoryUnavailable) {
+      lastActionError = (result as DirectoryUnavailable).contractNotice;
+    }
+
+    return result;
+  }
+
+  /// Safely remove a contact from the broker's directory (soft removal).
+  /// Preserves shared master records, GST details, bank details, and existing deals/transactions.
+  Future<bool> removeContact(String contactId) async {
+    final result = await removeContactDetailed(contactId);
+    return result is DirectorySuccess<bool>;
+  }
+
+  /// Restore a previously removed counterparty (Case B).
+  Future<bool> restoreContact(String contactId) async {
+    final result = await _repository.restoreContact(contactId);
+    if (!ref.mounted) return result is DirectorySuccess<String>;
+
+    if (result is DirectorySuccess<String>) {
+      loadContacts(isRefresh: true);
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Link an existing shared counterparty to this broker desk (Case C).
+  Future<bool> linkSharedCounterparty({
+    required String companyId,
+    String? userId,
+    String? notes,
+  }) async {
+    final result = await _repository.linkSharedCounterparty(
+      companyId: companyId,
+      userId: userId,
+      notes: notes,
+    );
+    if (!ref.mounted) return result is DirectorySuccess<String>;
+
+    if (result is DirectorySuccess<String>) {
+      loadContacts(isRefresh: true);
+      return true;
+    }
+
+    return false;
+  }
+
   /// Toggle contact status (Active / Inactive soft archival) and update locally.
   Future<bool> toggleContactStatus(String contactId) async {
     final result = await _repository.toggleContactStatus(contactId);

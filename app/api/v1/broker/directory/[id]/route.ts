@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getBrokerContactDetailsAction,
   updateBrokerContactAction,
+  deleteBrokerContactAction,
   type UpdateContactInput,
 } from '@/src/server/actions/broker-directory-actions';
 import { directoryErrorStatus } from '@/src/server/utils/broker-directory-query';
@@ -56,6 +57,30 @@ export async function PUT(
     return NextResponse.json(result, { status: 200 });
   } catch (error: any) {
     console.error('PUT /broker/directory/[id] error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const token = extractAuthToken(req);
+    const { id } = await context.params;
+
+    const result = await deleteBrokerContactAction(id, token);
+
+    if (!result.success) {
+      return NextResponse.json(result, { status: directoryErrorStatus(result.error) });
+    }
+
+    return NextResponse.json(result, { status: 200 });
+  } catch (error: any) {
+    console.error('DELETE /broker/directory/[id] error:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

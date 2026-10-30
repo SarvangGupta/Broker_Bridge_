@@ -148,6 +148,7 @@ class DirectoryContact {
   int get totalMandatesCount =>
       openRequirementsCount + availableOffersCount + activeDealsCount;
 
+  bool get hasGstDetails => gstin != null && gstin!.trim().isNotEmpty;
   bool get isBrokerVerified =>
       gstVerificationStatus == CounterpartyGstStatus.brokerVerified;
   bool get isGstPending =>
@@ -589,6 +590,21 @@ class UpdateContactInput {
   }
 }
 
+/// Duplicate scenario categorization for counterparty directory management.
+enum DuplicateCase {
+  /// Case D: Truly new counterparty.
+  none,
+
+  /// Case A: Counterparty already exists in the broker's active directory.
+  activeInDirectory,
+
+  /// Case B: Counterparty exists in the database but was previously removed/deactivated.
+  previouslyRemoved,
+
+  /// Case C: Counterparty exists in shared database but is not linked to this broker desk.
+  sharedAvailable,
+}
+
 /// Result of duplicate collision check.
 @immutable
 class DuplicateCheckResult {
@@ -599,6 +615,10 @@ class DuplicateCheckResult {
   final String? existingMobile;
   final String? existingGstin;
   final String? existingRole;
+  final DuplicateCase duplicateCase;
+  final String? existingContactId;
+  final String? existingCompanyId;
+  final String? existingUserId;
 
   const DuplicateCheckResult({
     required this.isDuplicate,
@@ -608,20 +628,48 @@ class DuplicateCheckResult {
     this.existingMobile,
     this.existingGstin,
     this.existingRole,
+    this.duplicateCase = DuplicateCase.none,
+    this.existingContactId,
+    this.existingCompanyId,
+    this.existingUserId,
   });
 
-  factory DuplicateCheckResult.none() => const DuplicateCheckResult(isDuplicate: false);
+  bool get isCaseA => duplicateCase == DuplicateCase.activeInDirectory;
+  bool get isCaseB => duplicateCase == DuplicateCase.previouslyRemoved;
+  bool get isCaseC => duplicateCase == DuplicateCase.sharedAvailable;
+
+  factory DuplicateCheckResult.none() => const DuplicateCheckResult(
+        isDuplicate: false,
+        duplicateCase: DuplicateCase.none,
+      );
 
   factory DuplicateCheckResult.fromJson(Map<String, dynamic> json) {
     final existing = json['existingContact'] as Map<String, dynamic>?;
+    final isDup = json['isDuplicate'] as bool? ?? false;
+    DuplicateCase dupCase = DuplicateCase.none;
+    final rawCase = json['duplicateCase']?.toString();
+    if (rawCase == 'activeInDirectory') {
+      dupCase = DuplicateCase.activeInDirectory;
+    } else if (rawCase == 'previouslyRemoved') {
+      dupCase = DuplicateCase.previouslyRemoved;
+    } else if (rawCase == 'sharedAvailable') {
+      dupCase = DuplicateCase.sharedAvailable;
+    } else if (isDup) {
+      dupCase = DuplicateCase.activeInDirectory;
+    }
+
     return DuplicateCheckResult(
-      isDuplicate: json['isDuplicate'] as bool? ?? false,
+      isDuplicate: isDup,
       matchType: json['matchType']?.toString(),
       existingContactName: existing?['name']?.toString(),
       existingCompanyName: existing?['companyName']?.toString(),
       existingMobile: existing?['mobile']?.toString(),
       existingGstin: existing?['gstin']?.toString() ?? existing?['gst']?.toString(),
       existingRole: existing?['role']?.toString(),
+      duplicateCase: dupCase,
+      existingContactId: json['existingContactId']?.toString() ?? existing?['id']?.toString(),
+      existingCompanyId: json['existingCompanyId']?.toString() ?? existing?['companyId']?.toString(),
+      existingUserId: json['existingUserId']?.toString() ?? existing?['userId']?.toString(),
     );
   }
 }
