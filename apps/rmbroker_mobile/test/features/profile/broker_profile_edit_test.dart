@@ -191,7 +191,7 @@ void main() {
 
   group('RMBROKER-PROFILE-EDIT-FIX-01: GST Verification Invalidation on GSTIN Change', () {
     test('Modifying GSTIN invalidates previous verification status', () async {
-      final repo = ProfileRepository(storage: storage);
+      final repo = ProfileRepository(storage: storage, localOnlyForTesting: true);
       final initialResult = await repo.getProfile();
       expect(initialResult, isA<ProfileSuccess<BrokerProfile>>());
 
@@ -230,7 +230,7 @@ void main() {
     });
 
     test('Clearing GSTIN resets status to gst_missing', () async {
-      final repo = ProfileRepository(storage: storage);
+      final repo = ProfileRepository(storage: storage, localOnlyForTesting: true);
       final initialResult = await repo.getProfile();
       final initialProfile = (initialResult as ProfileSuccess<BrokerProfile>).data;
 
@@ -259,7 +259,7 @@ void main() {
         email: 'mukesh@brokerbridge.in',
       );
 
-      final repo = ProfileRepository(storage: storage);
+      final repo = ProfileRepository(storage: storage, localOnlyForTesting: true);
 
       await tester.pumpWidget(
         ProviderScope(
@@ -325,7 +325,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
-      final repo = ProfileRepository(storage: storage);
+      final repo = ProfileRepository(storage: storage, localOnlyForTesting: true);
 
       await tester.pumpWidget(
         ProviderScope(

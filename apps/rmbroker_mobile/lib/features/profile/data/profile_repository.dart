@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/security/secure_storage_service.dart';
+import '../../../core/security/session_guard.dart';
 import '../../directory/domain/gst_certificate_data.dart';
 import '../domain/broker_profile.dart';
 
@@ -38,9 +40,14 @@ class ProfileRepository {
   static const String _keyProfileCache = 'rb_cached_broker_profile';
   static const String _keyProfilePhoto = 'rb_profile_photo_path';
 
+  /// Skips the database entirely. Tests only: production saves must be
+  /// confirmed by the server.
+  final bool localOnlyForTesting;
+
   ProfileRepository({
     SupabaseClient? supabase,
     SecureStorageService? storage,
+    @visibleForTesting this.localOnlyForTesting = false,
   })  : _customSupabase = supabase,
         _storage = storage ?? SecureStorageService();
 
@@ -335,65 +342,11 @@ class ProfileRepository {
       updatedAt: DateTime.now(),
     );
 
-    // 1. Update Supabase if available
-    try {
-      final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
-        await client.from('users').update({
-          'name': safeProfile.fullName.trim(),
-          'mobile': safeProfile.mobile.trim(),
-          'email': safeProfile.email.trim(),
-        }).eq('id', userId);
-
-        // Fetch company_id
-        final userRow = await client
-            .from('users')
-            .select('company_id')
-            .eq('id', userId)
-            .maybeSingle();
-
-        final companyId = userRow?['company_id'] as String?;
-        if (companyId != null && companyId.isNotEmpty) {
-          final gstLiveData = {
-            'designation': safeProfile.designation,
-            'business_type': safeProfile.businessType,
-            'city': safeProfile.city,
-            'state': safeProfile.state,
-            'pincode': safeProfile.pincode,
-            'business_contact_number': safeProfile.businessContactNumber,
-            'legal_name': safeProfile.legalName,
-            'trade_name': safeProfile.tradeName,
-            'constitution': safeProfile.constitution,
-            'registration_date': safeProfile.registrationDate,
-            'gst_status': safeProfile.gstStatus,
-            'principal_place_of_business': safeProfile.principalPlaceOfBusiness,
-            'certificate_url': safeProfile.gstCertificateUrl,
-            'certificate_path': safeProfile.gstCertificatePath,
-            'verification_status': safeProfile.gstVerificationStatus,
-            'verification_source': safeProfile.gstVerificationSource,
-            'operating_locations': safeProfile.operatingLocations,
-            'commodities_handled': safeProfile.commoditiesHandled,
-            'operating_regions': safeProfile.operatingRegions,
-            'updated_at': DateTime.now().toIso8601String(),
-          };
-
-          final isGstVerified = safeProfile.gstVerificationStatus ==
-                  BrokerGstStatus.gstMatched ||
-              safeProfile.gstVerificationStatus ==
-                  BrokerGstStatus.certificateReviewed;
-
-          await client.from('companies').update({
-            'name': safeProfile.brokerageName.trim(),
-            'gst': safeProfile.gstin.trim().isEmpty ? null : safeProfile.gstin.trim(),
-            'gst_verified': isGstVerified,
-            'gst_verified_at': safeProfile.gstVerifiedAt?.toIso8601String(),
-            'gst_live_data': gstLiveData,
-          }).eq('id', companyId);
-        }
-      }
-    } catch (e) {
-      debugPrint('Supabase profile update notice: $e (local cache prioritized)');
+    // 1. The database is the source of truth: nothing below runs, and the local
+    // cache stays untouched, unless it confirms the write.
+    if (!localOnlyForTesting) {
+      final failure = await _writeToDatabase(userId, safeProfile);
+      if (failure != null) return failure;
     }
 
     // 2. Persist to Secure Storage & User Info
@@ -416,6 +369,128 @@ class ProfileRepository {
     return ProfileSuccess(safeProfile);
   }
 
+  static const _saveTimeout = Duration(seconds: 30);
+  static const _networkMessage =
+      'Could not reach the server. Check your internet connection and try again.';
+
+  /// Writes the profile, returning a failure result, or null once the database
+  /// has confirmed every row. `.select()` matters: an update blocked by RLS
+  /// matches zero rows and raises no error.
+  Future<ProfileResult<BrokerProfile>?> _writeToDatabase(
+    String userId,
+    BrokerProfile profile,
+  ) async {
+    final client = _supabase;
+    if (client == null) return const ProfileError(message: _networkMessage);
+
+    final check = await SessionGuard.ensureValidSession(client, storage: _storage);
+    if (check == SessionCheck.signedOut) return const ProfileUnauthorized();
+    if (check == SessionCheck.offline) {
+      return const ProfileError(message: _networkMessage);
+    }
+
+    try {
+      return await _applyWrites(client, userId, profile).timeout(_saveTimeout);
+    } catch (e) {
+      debugPrint('Profile save failed: $e');
+      return ProfileError(message: describeSaveError(e));
+    }
+  }
+
+  Future<ProfileResult<BrokerProfile>?> _applyWrites(
+    SupabaseClient client,
+    String userId,
+    BrokerProfile profile,
+  ) async {
+    const notSaved = ProfileError<BrokerProfile>(
+      message:
+          'Your changes were not saved because your account does not have permission to update this profile. Please contact support.',
+    );
+
+    final userRow = await client
+        .from('users')
+        .select('company_id')
+        .eq('id', userId)
+        .maybeSingle();
+    if (userRow == null) return notSaved;
+
+    // Business, address and mandi details live on the company row, so check
+    // for one before writing anything.
+    final companyId = userRow['company_id'] as String?;
+    if (companyId == null || companyId.isEmpty) {
+      return const ProfileError(
+        message:
+            'Your account is not linked to a business yet, so these details cannot be saved. Please contact support.',
+      );
+    }
+
+    final updatedUsers = await client.from('users').update({
+      'name': profile.fullName.trim(),
+      'mobile': profile.mobile.trim(),
+      'email': profile.email.trim(),
+    }).eq('id', userId).select('id');
+    if (updatedUsers.isEmpty) return notSaved;
+
+    final gstLiveData = {
+      'designation': profile.designation,
+      'business_type': profile.businessType,
+      'city': profile.city,
+      'state': profile.state,
+      'pincode': profile.pincode,
+      'business_contact_number': profile.businessContactNumber,
+      'legal_name': profile.legalName,
+      'trade_name': profile.tradeName,
+      'constitution': profile.constitution,
+      'registration_date': profile.registrationDate,
+      'gst_status': profile.gstStatus,
+      'principal_place_of_business': profile.principalPlaceOfBusiness,
+      'certificate_url': profile.gstCertificateUrl,
+      'certificate_path': profile.gstCertificatePath,
+      'verification_status': profile.gstVerificationStatus,
+      'verification_source': profile.gstVerificationSource,
+      'operating_locations': profile.operatingLocations,
+      'commodities_handled': profile.commoditiesHandled,
+      'operating_regions': profile.operatingRegions,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    final isGstVerified =
+        profile.gstVerificationStatus == BrokerGstStatus.gstMatched ||
+            profile.gstVerificationStatus == BrokerGstStatus.certificateReviewed;
+
+    final updatedCompanies = await client.from('companies').update({
+      'name': profile.brokerageName.trim(),
+      'gst': profile.gstin.trim().isEmpty ? null : profile.gstin.trim(),
+      'gst_verified': isGstVerified,
+      'gst_verified_at': profile.gstVerifiedAt?.toIso8601String(),
+      'gst_live_data': gstLiveData,
+    }).eq('id', companyId).select('id');
+    if (updatedCompanies.isEmpty) return notSaved;
+
+    return null;
+  }
+
+  /// A user-facing, actionable message for a failed save.
+  static String describeSaveError(Object error) {
+    if (error is PostgrestException) {
+      if (error.code == '23505') {
+        return 'That mobile number, email or GSTIN is already used by another account.';
+      }
+      if (error.code == '42501') {
+        return 'Your account does not have permission to update this profile. Please contact support.';
+      }
+      return 'The server could not save your profile. Please try again.';
+    }
+    final text = error.toString();
+    if (error is TimeoutException ||
+        error is SocketException ||
+        text.contains('ClientException') ||
+        text.contains('SocketException')) {
+      return _networkMessage;
+    }
+    return 'Could not save your profile. Please try again.';
+  }
+
   /// Upload GST certificate document to Supabase storage bucket `brokerbridge_documents`.
   /// Returns the remote URL or file path upon completion.
   Future<String?> uploadCertificate({
@@ -427,26 +502,22 @@ class ProfileRepository {
       return null;
     }
 
-    try {
-      final client = _supabase;
-      final session = client?.auth.currentSession;
-      if (client != null && session != null && !session.isExpired) {
-        final ext = filePath.split('.').last.toLowerCase();
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_cert.$ext';
-        final storagePath = 'brokers/$userId/gst_certificates/$fileName';
+    final client = _supabase;
+    final session = client?.auth.currentSession;
+    if (client != null && session != null && !session.isExpired) {
+      final ext = filePath.split('.').last.toLowerCase();
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_cert.$ext';
+      final storagePath = 'brokers/$userId/gst_certificates/$fileName';
 
-        await client.storage.from('brokerbridge_documents').upload(
-              storagePath,
-              file,
-              fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
-            );
+      // Failures propagate: the caller must not save a profile that claims a
+      // certificate the server never received.
+      await client.storage.from('brokerbridge_documents').upload(
+            storagePath,
+            file,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+          );
 
-        final publicUrl =
-            client.storage.from('brokerbridge_documents').getPublicUrl(storagePath);
-        return publicUrl;
-      }
-    } catch (e) {
-      debugPrint('Certificate upload to storage notice: $e');
+      return client.storage.from('brokerbridge_documents').getPublicUrl(storagePath);
     }
 
     // Return original file path as safe offline/local storage fallback

@@ -90,6 +90,7 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
 
   final _formKey = GlobalKey<FormState>();
   BrokerProfile? _currentProfile;
+  String? _savedSnapshot;
   final OcrExtractionService _ocrService = const OcrExtractionService();
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -112,6 +113,19 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     'Maharashtra',
     'Delhi',
   ];
+
+  /// Below this a field can't show its value beside its suffix icon.
+  static const double _minEditColumnWidth = 136;
+
+  /// Dropdown horizontal content padding (10 + 10) plus its arrow icon (24)
+  /// and input border.
+  static const double _dropdownChromeWidth = 46;
+
+  static const TextStyle _editDropdownTextStyle = TextStyle(
+    fontSize: 12.5,
+    color: Color(0xFF0F172A),
+    fontWeight: FontWeight.w600,
+  );
 
   @override
   void initState() {
@@ -221,9 +235,11 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
         profile.gstVerificationStatus == BrokerGstStatus.certificateReviewed;
 
     _selectedPhotoPath = profile.profilePhotoPath;
+    _savedSnapshot = _formSnapshot();
   }
 
   void _cancelEdit() {
+    if (_isSaving) return;
     setState(() {
       _isEditing = false;
       _errorMessage = null;
@@ -428,16 +444,77 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     );
   }
 
-  Future<void> _saveProfile() async {
-    if (_isSaving) return;
-    _errorMessage = null;
-    _successMessage = null;
+  /// Everything the form can change, as it stands right now.
+  String _formSnapshot() => [
+        _nameController.text,
+        _mobileController.text,
+        _emailController.text,
+        _designationController.text,
+        _legalNameController.text,
+        _tradeNameController.text,
+        _gstinController.text,
+        _regDateController.text,
+        _principalPlaceController.text,
+        _cityController.text,
+        _stateController.text,
+        _pincodeController.text,
+        _businessType,
+        _gstStatus,
+        _certificatePath,
+        _selectedPhotoPath,
+        ..._mandisList,
+        '|',
+        ..._commoditiesList,
+      ].map((v) => v?.trim()).join('\u0001');
 
-    if (!_formKey.currentState!.validate()) {
+  void _showSnack(String message, {SnackBarAction? action}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message), action: action));
+  }
+
+  void _showSaveError(String message, {SnackBarAction? action}) {
+    setState(() {
+      _isSaving = false;
+      _errorMessage = message;
+    });
+    // The banner sits at the top of the list, usually scrolled out of view.
+    _showSnack(message, action: action);
+  }
+
+  /// Validates every field; on failure scrolls to the topmost invalid one.
+  bool _validateAndRevealFirstError() {
+    final invalid = _formKey.currentState!.validateGranularly();
+    if (invalid.isEmpty) return true;
+
+    double top(FormFieldState<Object?> field) {
+      final box = field.context.findRenderObject() as RenderBox?;
+      return box?.localToGlobal(Offset.zero).dy ?? double.infinity;
+    }
+
+    final first = invalid.reduce((a, b) => top(a) <= top(b) ? a : b);
+    Scrollable.ensureVisible(
+      first.context,
+      alignment: 0.2,
+      duration: const Duration(milliseconds: 250),
+    );
+    return false;
+  }
+
+  Future<void> _saveProfile() async {
+    if (_isSaving || _currentProfile == null) return;
+
+    if (_formSnapshot() == _savedSnapshot) {
+      _showSnack('No changes to save');
       return;
     }
 
-    if (_currentProfile == null) return;
+    setState(() {
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    if (!_validateAndRevealFirstError()) return;
 
     // Determine verification status
     String finalVerificationStatus = _gstVerificationStatus;
@@ -461,15 +538,27 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
       final repo = ref.read(profileRepositoryProvider);
 
       String? uploadedUrl = _certificateUrl;
+      // Only a newly picked certificate needs uploading.
       if (_certificatePath != null &&
+          _certificatePath != _currentProfile!.gstCertificatePath &&
           !_certificatePath!.startsWith('http') &&
           File(_certificatePath!).existsSync()) {
-        final uploaded = await repo.uploadCertificate(
-          filePath: _certificatePath!,
-          userId: _currentProfile!.id,
-        );
-        if (uploaded != null) {
-          uploadedUrl = uploaded;
+        try {
+          final uploaded = await repo.uploadCertificate(
+            filePath: _certificatePath!,
+            userId: _currentProfile!.id,
+          );
+          if (uploaded != null) {
+            uploadedUrl = uploaded;
+          }
+        } catch (e) {
+          debugPrint('Certificate upload failed: $e');
+          if (mounted) {
+            _showSaveError(
+              'Could not upload the GST certificate, so nothing was saved. Check your connection and try again.',
+            );
+          }
+          return;
         }
       }
 
@@ -504,39 +593,98 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
       );
 
       final result = await repo.updateProfile(updated);
+      if (!mounted) return;
 
-      if (mounted) {
-        if (result is ProfileSuccess<BrokerProfile>) {
+      switch (result) {
+        case ProfileSuccess<BrokerProfile>(:final data):
           setState(() {
             _isSaving = false;
             _isEditing = false;
-            _currentProfile = result.data;
-            _populateFields(result.data);
-            _successMessage =
-                'Broker Profile & GST credentials synchronized successfully';
+            _populateFields(data);
           });
           ref.invalidate(brokerProfileProvider);
-        } else if (result is ProfileError) {
-          setState(() {
-            _isSaving = false;
-            _errorMessage = (result as ProfileError).message;
-          });
-        } else if (result is ProfileUnauthorized) {
-          setState(() {
-            _isSaving = false;
-            _errorMessage = 'Session expired. Please sign in again.';
-          });
-          context.go('/login');
-        }
+          _showSnack('Profile updated successfully');
+        case ProfileError<BrokerProfile>(:final message):
+          _showSaveError(message);
+        case ProfileUnauthorized<BrokerProfile>():
+          // Stay on the form so the entered values aren't lost to a redirect.
+          _showSaveError(
+            'Your session has expired, so your changes were not saved. Sign in again to continue.',
+            action: SnackBarAction(
+              label: 'Sign in',
+              onPressed: () => context.go('/login'),
+            ),
+          );
       }
     } catch (e) {
+      debugPrint('Profile save failed: $e');
       if (mounted) {
-        setState(() {
-          _isSaving = false;
-          _errorMessage = 'Failed to update profile: $e';
-        });
+        _showSaveError(ProfileRepository.describeSaveError(e));
       }
     }
+  }
+
+  Widget _buildSaveChangesBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              key: const ValueKey('edit_profile_save_changes'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
+                disabledForegroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: _isSaving ? null : _saveProfile,
+              child: _isSaving
+                  ? const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Text(
+                          'Saving...',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    )
+                  : const Text(
+                      'Save Changes',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showPhotoOptions() {
@@ -608,6 +756,9 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      bottomNavigationBar: _isEditing && profileAsync.hasValue
+          ? _buildSaveChangesBar()
+          : null,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -1699,9 +1850,13 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
             _buildEditField(
               label: 'Full Name *',
               controller: _nameController,
-              validator: (v) => (v == null || v.trim().isEmpty)
-                  ? 'Full name is required'
-                  : null,
+              validator: (v) {
+                final name = v?.trim() ?? '';
+                if (name.isEmpty) return 'Full name is required';
+                return name.length < 2
+                    ? 'Full name must be at least 2 characters'
+                    : null;
+              },
             ),
             const SizedBox(height: 12),
 
@@ -1723,9 +1878,13 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
               controller: _mobileController,
               keyboardType: TextInputType.phone,
               suffixBadge: 'Verified',
-              validator: (v) => (v == null || v.trim().isEmpty)
-                  ? 'Mobile number is required'
-                  : null,
+              validator: (v) {
+                final digits = (v ?? '').replaceAll(RegExp(r'\D'), '');
+                if (digits.isEmpty) return 'Mobile number is required';
+                return digits.length < 10
+                    ? 'Mobile number must have at least 10 digits'
+                    : null;
+              },
             ),
             const SizedBox(height: 12),
 
@@ -1734,9 +1893,10 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               suffixBadge: 'Verified',
-              validator: (v) => (v == null || !v.contains('@'))
-                  ? 'Enter a valid email'
-                  : null,
+              validator: (v) => RegExp(r'^[\w\.\-]+@([\w\-]+\.)+[\w\-]{2,4}$')
+                      .hasMatch(v?.trim() ?? '')
+                  ? null
+                  : 'Enter a valid email',
             ),
           ],
         ),
@@ -1778,130 +1938,115 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
             _buildEditField(
               label: 'Legal Business Name *',
               controller: _legalNameController,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Legal business name is required'
+                  : null,
+              minLines: 1,
+              maxLines: 5,
             ),
             const SizedBox(height: 12),
 
             _buildEditField(
               label: 'Trade Name',
               controller: _tradeNameController,
+              minLines: 1,
+              maxLines: 5,
             ),
             const SizedBox(height: 12),
 
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Business Type',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        initialValue: _businessTypeOptions.contains(_businessType)
-                            ? _businessType
-                            : _businessTypeOptions.first,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 10),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFCBD5E1)),
-                          ),
-                        ),
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: Color(0xFF0F172A),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        items: _businessTypeOptions
-                            .map((t) => DropdownMenuItem(
-                                  value: t,
-                                  child: Text(t,
-                                      overflow: TextOverflow.ellipsis),
-                                ))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(() => _businessType = v);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildEditField(
-                    label: 'Registration Date',
-                    controller: _regDateController,
-                    suffixIcon: LucideIcons.calendar,
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const spacing = 10.0;
+                final businessTypeField = _buildEditDropdown(
+                  label: 'Business Type',
+                  value: _businessTypeOptions.contains(_businessType)
+                      ? _businessType
+                      : _businessTypeOptions.first,
+                  options: _businessTypeOptions,
+                  onChanged: (v) => setState(() => _businessType = v),
+                );
+                final registrationDateField = _buildEditField(
+                  label: 'Registration Date',
+                  controller: _regDateController,
+                  suffixIcon: LucideIcons.calendar,
+                );
+                final columnWidth = (constraints.maxWidth - spacing) / 2;
+                final fitsSideBySide = columnWidth >= _minEditColumnWidth &&
+                    columnWidth >=
+                        _dropdownRequiredWidth(context, _businessType);
+                return fitsSideBySide
+                    ? _buildEditFieldRow(
+                        spacing: spacing,
+                        children: [businessTypeField, registrationDateField],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          businessTypeField,
+                          const SizedBox(height: 12),
+                          registrationDateField,
+                        ],
+                      );
+              },
             ),
             const SizedBox(height: 12),
 
             // Re-upload / Retake Certificate Button
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                foregroundColor: const Color(0xFF0F766E),
-                side: const BorderSide(color: Color(0xFF0F766E)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: const Color(0xFF0F766E),
+                  side: const BorderSide(color: Color(0xFF0F766E)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              icon: const Icon(LucideIcons.uploadCloud, size: 15),
-              label: Text(
-                _isExtractingOcr
-                    ? 'Scanning Certificate...'
-                    : 'Re-upload / Update GST Certificate',
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-              onPressed: _isExtractingOcr
-                  ? null
-                  : () {
-                      showModalBottomSheet(
-                        context: context,
-                        builder: (ctx) => SafeArea(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                leading: const Icon(LucideIcons.camera,
-                                    color: Color(0xFF0F766E)),
-                                title: const Text('Capture with Camera'),
-                                onTap: () {
-                                  Navigator.pop(ctx);
-                                  _pickCertificate(ImageSource.camera);
-                                },
-                              ),
-                              ListTile(
-                                leading: const Icon(LucideIcons.image,
-                                    color: Color(0xFF0F766E)),
-                                title: const Text('Choose from Gallery'),
-                                onTap: () {
-                                  Navigator.pop(ctx);
-                                  _pickCertificate(ImageSource.gallery);
-                                },
-                              ),
-                            ],
+                icon: const Icon(LucideIcons.uploadCloud, size: 15),
+                label: Text(
+                  _isExtractingOcr
+                      ? 'Scanning Certificate...'
+                      : 'Re-upload / Update GST Certificate',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                onPressed: _isExtractingOcr
+                    ? null
+                    : () {
+                        showModalBottomSheet(
+                          context: context,
+                          builder: (ctx) => SafeArea(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ListTile(
+                                  leading: const Icon(LucideIcons.camera,
+                                      color: Color(0xFF0F766E)),
+                                  title: const Text('Capture with Camera'),
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    _pickCertificate(ImageSource.camera);
+                                  },
+                                ),
+                                ListTile(
+                                  leading: const Icon(LucideIcons.image,
+                                      color: Color(0xFF0F766E)),
+                                  title: const Text('Choose from Gallery'),
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    _pickCertificate(ImageSource.gallery);
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+              ),
             ),
           ],
         ),
@@ -1915,77 +2060,80 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
             _buildEditField(
               label: 'Principal Place of Business *',
               controller: _principalPlaceController,
-              maxLines: 2,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Principal place of business is required'
+                  : null,
+              minLines: 2,
+              maxLines: 5,
             ),
             const SizedBox(height: 12),
 
-            Row(
-              children: [
-                Expanded(
-                  child: _buildEditField(
-                    label: 'City *',
-                    controller: _cityController,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'State *',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        initialValue: _stateOptions.contains(_stateController.text)
-                            ? _stateController.text
-                            : _stateOptions.first,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 10),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFCBD5E1)),
-                          ),
-                        ),
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: Color(0xFF0F172A),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        items: _stateOptions
-                            .map((s) => DropdownMenuItem(
-                                  value: s,
-                                  child: Text(s,
-                                      overflow: TextOverflow.ellipsis),
-                                ))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(() => _stateController.text = v);
-                          }
-                        },
-                      ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const spacing = 8.0;
+                final selectedState =
+                    _stateOptions.contains(_stateController.text)
+                        ? _stateController.text
+                        : _stateOptions.first;
+                final cityField = _buildEditField(
+                  label: 'City *',
+                  controller: _cityController,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'City is required'
+                      : null,
+                );
+                final stateField = _buildEditDropdown(
+                  label: 'State *',
+                  value: selectedState,
+                  options: _stateOptions,
+                  onChanged: (v) => setState(() => _stateController.text = v),
+                );
+                final pinField = _buildEditField(
+                  label: 'PIN Code *',
+                  controller: _pincodeController,
+                  keyboardType: TextInputType.number,
+                  validator: (v) => RegExp(r'^\d{6}$').hasMatch(v?.trim() ?? '')
+                      ? null
+                      : 'Enter a 6-digit PIN code',
+                );
+
+                final minimumWidth = _dropdownRequiredWidth(
+                  context,
+                  selectedState,
+                );
+                bool fits(int columns) {
+                  final columnWidth =
+                      (constraints.maxWidth - spacing * (columns - 1)) /
+                          columns;
+                  return columnWidth >= _minEditColumnWidth &&
+                      columnWidth >= minimumWidth;
+                }
+
+                if (fits(3)) {
+                  return _buildEditFieldRow(
+                    spacing: spacing,
+                    children: [cityField, stateField, pinField],
+                  );
+                }
+                // City names run long, so City keeps the full row on phones.
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    cityField,
+                    const SizedBox(height: 12),
+                    if (fits(2))
+                      _buildEditFieldRow(
+                        spacing: spacing,
+                        children: [stateField, pinField],
+                      )
+                    else ...[
+                      stateField,
+                      const SizedBox(height: 12),
+                      pinField,
                     ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildEditField(
-                    label: 'PIN Code *',
-                    controller: _pincodeController,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -2224,12 +2372,14 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
                 child: Icon(icon, size: 16, color: const Color(0xFF0F766E)),
               ),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0F172A),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
               ),
             ],
@@ -2238,6 +2388,109 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
           ...children,
         ],
       ),
+    );
+  }
+
+  /// Equal-width fields, top aligned so a validation error under one field
+  /// doesn't shift its neighbours.
+  Widget _buildEditFieldRow({
+    required double spacing,
+    required List<Widget> children,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) SizedBox(width: spacing),
+          Expanded(child: children[i]),
+        ],
+      ],
+    );
+  }
+
+  /// Width a dropdown needs to show [value] on one line, as the app renders it.
+  double _dropdownRequiredWidth(BuildContext context, String value) {
+    final painter = TextPainter(
+      text: TextSpan(text: value, style: _editDropdownTextStyle),
+      maxLines: 1,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final width = painter.width + _dropdownChromeWidth;
+    painter.dispose();
+    return width;
+  }
+
+  Widget _buildEditDropdown({
+    required String label,
+    required String value,
+    required List<String> options,
+    required ValueChanged<String> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // The dense button is one line tall; drop it only when the
+            // selection needs a second line, so short values keep their height.
+            final fitsOneLine = constraints.maxWidth >=
+                _dropdownRequiredWidth(context, value);
+            return DropdownButtonFormField<String>(
+              initialValue: value,
+              isExpanded: true,
+              isDense: fitsOneLine,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                ),
+              ),
+              style: _editDropdownTextStyle,
+              selectedItemBuilder: (context) => options
+                  .map(
+                    (o) => Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        o,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              items: options
+                  .map(
+                    (o) => DropdownMenuItem(
+                      value: o,
+                      child: Text(
+                        o,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -2354,6 +2607,7 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     required String label,
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
+    int? minLines,
     int maxLines = 1,
     String? suffixBadge,
     IconData? suffixIcon,
@@ -2374,6 +2628,7 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          minLines: minLines,
           maxLines: maxLines,
           style: const TextStyle(
             fontSize: 13,
