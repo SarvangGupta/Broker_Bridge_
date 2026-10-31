@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/home_add_sheet.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:rmbroker_mobile/app/router/app_router.dart';
@@ -18,6 +19,7 @@ import 'package:rmbroker_mobile/features/dashboard/presentation/dashboard_screen
 import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/dashboard_kpi_grid.dart';
 import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/quick_actions_section.dart';
 import 'package:rmbroker_mobile/features/dashboard/presentation/dashboard_section_screens.dart';
+import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/glass_ball_navigation_bar.dart';
 import 'package:rmbroker_mobile/features/notifications/presentation/screens/notification_center_screen.dart';
 import 'package:rmbroker_mobile/features/work/data/work_repository.dart';
 import 'package:rmbroker_mobile/features/work/domain/offer_model.dart';
@@ -378,7 +380,7 @@ void main() {
       await tester.pump(const Duration(seconds: 3)); // splash timer from the shared router's first build
       await tester.pumpAndSettle();
 
-      int selectedTab() => tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
+      int selectedTab() => tester.widget<GlassBallNavigationBar>(find.byType(GlassBallNavigationBar)).selectedIndex;
 
       // Home shortcuts open their destinations; Summary/Actions stay in Home.
       for (final (key, screen) in [
@@ -420,29 +422,29 @@ void main() {
       await tester.pumpAndSettle();
       expect(selectedTab(), 0);
 
-      // Bottom navigation unchanged: Home | Work Desk | Deals | Directory | More,
+      // Glass-ball bottom navigation: Home | Work Desk | Directory | Deals | More,
       // with the "+" FAB on Home above it.
-      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-      expect(bar.destinations.length, 5);
+      final bar = tester.widget<GlassBallNavigationBar>(find.byType(GlassBallNavigationBar));
+      expect(GlassBallNavigationBar.items.length, 5);
       expect(find.byKey(const ValueKey('home_add_fab')), findsOneWidget);
       expect(
         tester.getBottomLeft(find.byKey(const ValueKey('home_add_fab'))).dy,
-        lessThanOrEqualTo(tester.getTopLeft(find.byType(NavigationBar)).dy),
+        lessThanOrEqualTo(tester.getTopLeft(find.byType(GlassBallNavigationBar)).dy),
         reason: 'FAB sits above the bottom navigation',
       );
-      final labels = ['Home', 'Work Desk', 'Deals', 'Directory', 'More'];
+      final labels = ['Home', 'Work Desk', 'Directory', 'Deals', 'More'];
       for (var i = 1; i < labels.length; i++) {
         expect(
-          tester.getCenter(find.descendant(of: find.byType(NavigationBar), matching: find.text(labels[i - 1]))).dx,
-          lessThan(tester.getCenter(find.descendant(of: find.byType(NavigationBar), matching: find.text(labels[i]))).dx),
+          tester.getCenter(find.descendant(of: find.byType(GlassBallNavigationBar), matching: find.text(labels[i - 1]))).dx,
+          lessThan(tester.getCenter(find.descendant(of: find.byType(GlassBallNavigationBar), matching: find.text(labels[i]))).dx),
           reason: '${labels[i - 1]} before ${labels[i]}',
         );
       }
-      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Directory')));
+      await tester.tap(find.descendant(of: find.byType(GlassBallNavigationBar), matching: find.text('Directory')));
       // The Directory list shows a loading spinner; pump fixed frames.
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(milliseconds: 500));
-      expect(selectedTab(), 3, reason: 'Directory tab works');
+      expect(selectedTab(), 2, reason: 'Directory tab works as centre item');
       await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Home')));
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(milliseconds: 500));
@@ -460,7 +462,7 @@ void main() {
       expect(find.byType(BrokerProfileScreen), findsOneWidget, reason: 'existing profile screen');
     });
 
-    testWidgets('"+" FAB shows exactly Add Requirement and Add Offer; dismissible', (
+    testWidgets('"+" FAB shows exactly Add Buyer Requirement and Add Seller Offer; dismissible', (
       tester,
     ) async {
       final repo = MockDashboardRepository(
@@ -481,29 +483,37 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('home_add_requirement')), findsOneWidget);
       expect(find.byKey(const ValueKey('home_add_offer')), findsOneWidget);
-      expect(find.text('Add Requirement'), findsOneWidget);
-      expect(find.text('Add Offer'), findsWidgets); // also a dashboard quick action
+      expect(find.text('Add Buyer Requirement'), findsOneWidget);
+      expect(find.text('Add Seller Offer'), findsOneWidget);
       expect(
-        find.descendant(of: find.byType(BottomSheet), matching: find.byType(ListTile)),
-        findsNWidgets(2),
-        reason: 'exactly two actions, no combined option',
+        find.descendant(of: find.byType(HomeAddSheet), matching: find.byType(InkWell)),
+        findsNWidgets(3),
+        reason: 'exactly two actions plus close, no combined option',
       );
+      final fab = tester.getRect(find.byKey(const ValueKey('home_add_close')));
+      final screenWidth = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      expect(fab.center.dx, greaterThan(screenWidth / 2), reason: 'bottom-right');
       expect(find.textContaining('Both'), findsNothing);
       final tileHeight = tester.getSize(find.byKey(const ValueKey('home_add_offer'))).height;
       expect(tileHeight, greaterThanOrEqualTo(48));
 
-      // Dismiss by tapping outside, then by Back.
+      // Dismiss with the close control, by tapping outside, then by Back.
+      await tester.tap(find.byKey(const ValueKey('home_add_close')));
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeAddSheet), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('home_add_fab')));
+      await tester.pumpAndSettle();
       await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(HomeAddSheet), findsNothing);
       await tester.tap(find.byKey(const ValueKey('home_add_fab')));
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(HomeAddSheet), findsNothing);
     });
 
-    testWidgets('Add Requirement / Add Offer close the menu and open the existing forms', (
+    testWidgets('Add Buyer Requirement / Add Seller Offer close the menu and open the existing forms', (
       tester,
     ) async {
       final repo = MockDashboardRepository(
@@ -520,9 +530,11 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('home_add_fab')));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(ValueKey(key)));
-        // The forms load master data with a spinner; pump fixed frames.
-        await tester.pump(const Duration(milliseconds: 500));
-        await tester.pump(const Duration(milliseconds: 500));
+        // The menu closes first, then the forms load master data with a spinner;
+        // pump fixed frames.
+        for (var i = 0; i < 4; i++) {
+          await tester.pump(const Duration(milliseconds: 500));
+        }
         expect(find.byKey(ValueKey(key)), findsNothing, reason: 'menu closed first');
         expect(find.byType(sheet), findsOneWidget, reason: key);
         Navigator.of(tester.element(find.byType(sheet))).pop();

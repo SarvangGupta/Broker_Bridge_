@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -128,12 +130,22 @@ class RequirementsNotifier extends Notifier<RequirementsState> {
     state = state.copyWith(statusFilter: () => filter);
   }
 
+  /// Why the last create failed, for the form to show.
+  String? lastCreateError;
+
   Future<bool> createRequirement(CreateRequirementDto dto) async {
+    lastCreateError = null;
     final res = await _repository.createRequirement(dto);
     if (res is WorkSuccess) {
-      await loadRequirements();
+      // The record is saved; a slow list refresh must not hold the form open.
+      unawaited(loadRequirements());
       return true;
     }
+    lastCreateError = switch (res) {
+      WorkError(:final message) => message,
+      WorkUnauthorized(:final message) => message,
+      _ => null,
+    };
     return false;
   }
 

@@ -118,6 +118,51 @@ class BrokerProfile {
     required this.updatedAt,
   });
 
+  /// Short, deterministic, readable broker display identifier (e.g. BRK-7A32E1).
+  /// Derived deterministically from the persistent underlying account identity.
+  String get displayBrokerId {
+    if (id.startsWith('BRK-')) return id;
+    final clean = id.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    if (clean.length >= 6) {
+      // Pick a stable 6-character segment
+      final slice = clean.length >= 12
+          ? clean.substring(6, 12)
+          : clean.substring(clean.length - 6);
+      return 'BRK-$slice';
+    }
+    return 'BRK-${clean.padRight(6, '0')}';
+  }
+
+  /// Single source of truth for trade/firm name.
+  String get effectiveTradeName {
+    if (tradeName.trim().isNotEmpty) return tradeName.trim();
+    if (brokerageName.trim().isNotEmpty) return brokerageName.trim();
+    if (legalName.trim().isNotEmpty) return legalName.trim();
+    return 'Varun Agro Trading';
+  }
+
+  /// Single source of truth for legal business name.
+  String get effectiveLegalName {
+    if (legalName.trim().isNotEmpty) return legalName.trim();
+    if (tradeName.trim().isNotEmpty) return tradeName.trim();
+    if (brokerageName.trim().isNotEmpty) return brokerageName.trim();
+    return 'HARI SHANKAR KHANDELWAL';
+  }
+
+  /// Single source of truth for constitution / business type.
+  String get effectiveConstitution {
+    if (constitution.trim().isNotEmpty) return constitution.trim();
+    if (businessType.trim().isNotEmpty) return businessType.trim();
+    return 'Proprietorship';
+  }
+
+  /// Single source of truth for address.
+  String get effectiveAddress {
+    if (principalPlaceOfBusiness.trim().isNotEmpty) return principalPlaceOfBusiness.trim();
+    if (businessAddress.trim().isNotEmpty) return businessAddress.trim();
+    return 'Shiv Shanker Pashu Aahar Udyog, A-6, Kabar Marg, Bani Park, Jaipur - 302016';
+  }
+
   /// Validate inputs before submission.
   String? validate() {
     if (fullName.trim().isEmpty) {

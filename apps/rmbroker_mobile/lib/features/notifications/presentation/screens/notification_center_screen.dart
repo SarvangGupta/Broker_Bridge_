@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
@@ -46,7 +47,6 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
   final TextEditingController _searchController = TextEditingController();
   bool _isNavigating = false;
   Timer? _debounceTimer;
-  final Set<AlertGroup> _collapsed = {};
 
   @override
   void dispose() {
@@ -136,12 +136,11 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
           ],
         ),
         actions: [
-          // Mark all as read action
           if (state.unreadCount > 0)
-            IconButton(
+            TextButton.icon(
               key: const ValueKey('alerts_mark_all_read'),
-              icon: const Icon(LucideIcons.checkCheck, size: 22),
-              tooltip: 'Mark All Read',
+              icon: const Icon(LucideIcons.check, size: 18),
+              label: const Text('Mark all read', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               onPressed: () async {
                 await controller.markAllAsRead();
                 if (context.mounted) {
@@ -154,11 +153,18 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
                 }
               },
             ),
-          IconButton(
-            key: const ValueKey('alerts_refresh'),
-            icon: const Icon(LucideIcons.refreshCw, size: 20),
-            tooltip: 'Refresh Feed',
-            onPressed: () => controller.refresh(),
+          PopupMenuButton<String>(
+            key: const ValueKey('alerts_overflow'),
+            icon: const Icon(LucideIcons.ellipsisVertical, size: 20),
+            tooltip: 'More',
+            onSelected: (_) => controller.refresh(),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                key: ValueKey('alerts_refresh'),
+                value: 'refresh',
+                child: Text('Refresh'),
+              ),
+            ],
           ),
         ],
       ),
@@ -194,7 +200,7 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
                           },
                         )
                       : null,
-                  hintText: 'Search by commodity, deal, party or location...',
+                  hintText: 'Search alerts...',
                   hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.textDisabled),
                   border: InputBorder.none,
                 ),
@@ -411,49 +417,36 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
     for (final g in AlertGroup.values) {
       final items = groups[g];
       if (items == null || items.isEmpty) continue;
-      final collapsed = _collapsed.contains(g);
-      final unread = items.where((n) => !n.isRead).length;
       children.add(
-        InkWell(
+        Padding(
           key: ValueKey('alerts_group_${g.name}'),
-          onTap: () => setState(() => collapsed ? _collapsed.remove(g) : _collapsed.add(g)),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
-            child: Row(
-              children: [
-                Text(g.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primaryNavy)),
-                const Spacer(),
+          padding: const EdgeInsets.fromLTRB(4, 10, 4, 7),
+          child: Row(
+            children: [
+              Text(g.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryNavy)),
+              const Spacer(),
+              // Earlier spans several days, so a single date would mislead.
+              if (g != AlertGroup.earlier)
                 Text(
-                  unread > 0 ? '$unread new · ${items.length}' : '${items.length}',
-                  key: ValueKey('alerts_group_count_${g.name}'),
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: unread > 0 ? AppColors.primary : AppColors.textSecondaryLight,
-                  ),
+                  DateFormat('dd MMM yyyy').format(items.first.createdAt.toLocal()),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
                 ),
-                const SizedBox(width: 6),
-                Icon(collapsed ? LucideIcons.chevronDown : LucideIcons.chevronUp,
-                    size: 18, color: AppColors.textSecondaryLight),
-              ],
-            ),
+            ],
           ),
         ),
       );
-      if (!collapsed) {
-        for (final item in items) {
-          children.add(Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: NotificationCard(
-              key: ValueKey('notif_card_${item.id}'),
-              notification: item,
-              onTap: (notif) => _handleRecordNavigation(context, notif),
-              onAction: (notif) => _handleRecordNavigation(context, notif),
-              onMarkAsRead: (notif) => controller.markAsRead(notif.id),
-              onShowDetails: (notif) => NotificationDetailDialog.show(context, notification: notif),
-            ),
-          ));
-        }
+      for (final item in items) {
+        children.add(Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: NotificationCard(
+            key: ValueKey('notif_card_${item.id}'),
+            notification: item,
+            onTap: (notif) => _handleRecordNavigation(context, notif),
+            onAction: (notif) => _handleRecordNavigation(context, notif),
+            onMarkAsRead: (notif) => controller.markAsRead(notif.id),
+            onShowDetails: (notif) => NotificationDetailDialog.show(context, notification: notif),
+          ),
+        ));
       }
     }
 

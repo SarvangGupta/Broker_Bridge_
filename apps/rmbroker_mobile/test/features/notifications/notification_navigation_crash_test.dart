@@ -251,10 +251,10 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
 
-    expect(find.text('New High-Score Mandate Match'), findsOneWidget);
+    expect(find.text('Your requirement has a match'), findsOneWidget);
 
     // Tap shell route card
-    await tester.tap(find.text('New High-Score Mandate Match'));
+    await tester.tap(find.text('Your requirement has a match'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(milliseconds: 300));
 

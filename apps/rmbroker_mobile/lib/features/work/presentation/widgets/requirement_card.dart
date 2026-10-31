@@ -280,7 +280,7 @@ class RequirementCard extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isVeryNarrow = constraints.maxWidth < 240;
+        final isVeryNarrow = constraints.maxWidth < 280;
 
         final statusWidget = Container(
           key: const Key('requirement_allocation_status'),

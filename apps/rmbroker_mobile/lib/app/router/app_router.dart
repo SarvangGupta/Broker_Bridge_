@@ -350,6 +350,16 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: directoryNavigatorKey,
+            routes: [
+              GoRoute(
+                path: '/directory',
+                name: 'directory',
+                builder: (context, state) => const DirectoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
             navigatorKey: dealsNavigatorKey,
             routes: [
               GoRoute(
@@ -359,16 +369,6 @@ class AppRouter {
                   final filter = state.uri.queryParameters['filter'];
                   return DealsScreen(initialFilter: filter);
                 },
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: directoryNavigatorKey,
-            routes: [
-              GoRoute(
-                path: '/directory',
-                name: 'directory',
-                builder: (context, state) => const DirectoryScreen(),
               ),
             ],
           ),

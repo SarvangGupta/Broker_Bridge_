@@ -22,18 +22,21 @@ class CreateTaskSheet extends StatefulWidget {
     required TaskCategory category,
     TaskLinkedRecord? linkedRecord,
   }) onSubmit;
+  final BrokerTask? existingTask;
 
   const CreateTaskSheet({
     super.key,
     required this.repository,
     this.preselectedLinkedRecord,
     required this.onSubmit,
+    this.existingTask,
   });
 
   static Future<void> show(
     BuildContext context, {
     required TaskRepository repository,
     TaskLinkedRecord? preselectedLinkedRecord,
+    BrokerTask? existingTask,
     required Function({
       required String title,
       String description,
@@ -51,6 +54,7 @@ class CreateTaskSheet extends StatefulWidget {
         repository: repository,
         preselectedLinkedRecord: preselectedLinkedRecord,
         onSubmit: onSubmit,
+        existingTask: existingTask,
       ),
     );
   }
@@ -81,7 +85,16 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
     _selectedDueDate = DateTime(now.year, now.month, now.day);
     _selectedDueTime = TimeOfDay(hour: (now.hour + 3) % 24, minute: 0);
 
-    if (widget.preselectedLinkedRecord != null) {
+    if (widget.existingTask != null) {
+      final t = widget.existingTask!;
+      _titleController.text = t.title;
+      _descController.text = t.description;
+      _selectedPriority = t.priority;
+      _selectedCategory = t.category;
+      _selectedDueDate = DateTime(t.dueDate.year, t.dueDate.month, t.dueDate.day);
+      _selectedDueTime = TimeOfDay.fromDateTime(t.dueDate.toLocal());
+      _selectedLinkedRecord = t.linkedRecord;
+    } else if (widget.preselectedLinkedRecord != null) {
       _selectedLinkedRecord = widget.preselectedLinkedRecord;
       if (_selectedLinkedRecord!.type == LinkedRecordType.deal) {
         _selectedCategory = TaskCategory.dealFollowUp;
@@ -202,9 +215,9 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Schedule Follow-up Action',
-                      style: TextStyle(
+                    Text(
+                      widget.existingTask != null ? 'Edit Broker Task' : 'Schedule Follow-up Action',
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimaryLight,
@@ -594,7 +607,9 @@ class _CreateTaskSheetState extends State<CreateTaskSheet> {
 
                 // Submit Button
                 AppButton(
-                  label: _isSubmitting ? 'Creating Action Item...' : 'Save Follow-up Task',
+                  label: _isSubmitting
+                      ? (widget.existingTask != null ? 'Saving Changes...' : 'Creating Action Item...')
+                      : (widget.existingTask != null ? 'Save Changes' : 'Save Follow-up Task'),
                   icon: const Icon(LucideIcons.check, size: 18, color: Colors.white),
                   isLoading: _isSubmitting,
                   onPressed: _handleSubmit,

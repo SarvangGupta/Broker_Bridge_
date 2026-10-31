@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/widgets/app_empty_state.dart';
+import '../../../core/widgets/glass_fab_menu.dart';
 import '../data/directory_repository.dart';
 import '../domain/directory_contact.dart';
 import '../domain/directory_state.dart';
@@ -66,17 +67,21 @@ class DirectoryScreen extends ConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('add_contact_fab'),
-        onPressed: () => _addContact(context, defaultRole),
-        backgroundColor: AppColors.primaryNavy,
-        foregroundColor: Colors.white,
-        icon: const Icon(LucideIcons.userPlus, size: 18),
-        label: Text(
-          state.activeTab == 'seller' ? 'Add Seller' : (state.activeTab == 'buyer' ? 'Add Buyer' : 'Add Contact'),
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+      floatingActionButton: Builder(
+        builder: (fabContext) => FloatingActionButton(
+          key: const Key('add_contact_fab'),
+          // Own hero tag: tab branches stay alive alongside other tabs' FABs.
+          heroTag: 'directory_add_fab',
+          onPressed: () => _openAddMenu(context, fabContext),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 4,
+          shape: const CircleBorder(),
+          tooltip: 'Add Buyer or Seller',
+          child: const GlassFabFace(icon: LucideIcons.plus),
         ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Column(
         children: [
           // 1. Search & role tabs
@@ -100,6 +105,38 @@ class DirectoryScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Add Buyer / Add Seller menu; the chosen role opens the existing contact form.
+  Future<void> _openAddMenu(BuildContext context, BuildContext fabContext) {
+    return GlassFabMenu.guarded(fabContext, (navigator, fabRect) async {
+      final role = await GlassFabMenu.present<ContactRole>(
+        navigator,
+        (animation) => GlassFabMenu<ContactRole>(
+          fabRect: fabRect,
+          animation: animation,
+          closeKey: const ValueKey('directory_add_close'),
+          backdropKey: const ValueKey('directory_add_backdrop'),
+          actions: const [
+            GlassFabAction(
+              key: ValueKey('directory_add_buyer'),
+              value: ContactRole.buyer,
+              icon: LucideIcons.userPlus,
+              color: Color(0xFF0F9F7F),
+              label: 'Add Buyer',
+            ),
+            GlassFabAction(
+              key: ValueKey('directory_add_seller'),
+              value: ContactRole.seller,
+              icon: LucideIcons.store,
+              color: Color(0xFF7C3AED),
+              label: 'Add Seller',
+            ),
+          ],
+        ),
+      );
+      if (role != null && context.mounted) await _addContact(context, role);
+    });
   }
 
   Future<void> _addContact(BuildContext context, ContactRole defaultRole) async {

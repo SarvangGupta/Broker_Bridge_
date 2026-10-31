@@ -135,6 +135,11 @@ class TaskController extends Notifier<TaskState> {
     );
   }
 
+  /// Sets active tab (Today, Upcoming, All).
+  void setActiveTab(MyTasksTab tab) {
+    updateFilter(state.filterCriteria.copyWith(activeTab: tab));
+  }
+
   /// Sets text search query.
   void setSearchQuery(String query) {
     updateFilter(state.filterCriteria.copyWith(searchQuery: query));
@@ -272,6 +277,30 @@ class TaskController extends Notifier<TaskState> {
     } catch (e) {
       state = state.copyWith(errorMessage: 'Failed to cancel task: $e');
       return false;
+    }
+  }
+
+  /// Updates existing task fields and refreshes state.
+  Future<BrokerTask?> updateTask(BrokerTask task) async {
+    try {
+      final updated = await _repository.updateTask(task);
+      final index = state.allTasks.indexWhere((t) => t.id == task.id);
+      if (index >= 0) {
+        final updatedAll = List<BrokerTask>.from(state.allTasks);
+        updatedAll[index] = updated;
+        final summary = TaskDashboardSummary.fromTasks(updatedAll);
+        final filtered = updatedAll.where(state.filterCriteria.matches).toList();
+
+        state = state.copyWith(
+          allTasks: updatedAll,
+          filteredTasks: filtered,
+          summary: summary,
+        );
+      }
+      return updated;
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to update task: $e');
+      return null;
     }
   }
 }

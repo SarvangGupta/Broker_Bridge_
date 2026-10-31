@@ -214,6 +214,103 @@ void main() {
       expect(find.textContaining('No contacts match "Nonexistent"'), findsOneWidget);
     });
 
+    group('Add Buyer / Add Seller menu', () {
+      Future<void> pumpScreen(WidgetTester tester, {Size size = const Size(412, 915), bool withContacts = true}) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final repo = MockDirectoryRepository(
+          listResult: DirectorySuccess(DirectoryListPayload(contacts: withContacts ? sampleContacts : const [], stats: sampleStats)),
+        );
+        await tester.pumpWidget(ProviderScope(
+          overrides: [directoryRepositoryProvider.overrideWithValue(repo)],
+          child: const MaterialApp(home: DirectoryScreen()),
+        ));
+        await tester.pumpAndSettle();
+      }
+
+      const fab = Key('add_contact_fab');
+      const buyer = ValueKey('directory_add_buyer');
+      const seller = ValueKey('directory_add_seller');
+      const close = ValueKey('directory_add_close');
+
+      Future<void> open(WidgetTester tester) async {
+        await tester.tap(find.byKey(fab));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('FAB is a bottom-right circle; opens both labelled actions above it', (tester) async {
+        await pumpScreen(tester);
+        final rect = tester.getRect(find.byKey(fab));
+        expect(rect.width, rect.height, reason: 'circular, no text inside');
+        expect(rect.center.dx, greaterThan(412 / 2));
+        expect(find.descendant(of: find.byKey(fab), matching: find.byType(Text)), findsNothing);
+
+        await open(tester);
+        expect(find.text('Add Buyer'), findsOneWidget);
+        expect(find.text('Add Seller'), findsOneWidget);
+        expect(tester.getCenter(find.byKey(close)), rect.center);
+        expect(tester.getBottomLeft(find.byKey(seller)).dy, lessThan(rect.top));
+        expect(tester.getBottomLeft(find.byKey(buyer)).dy, lessThan(tester.getTopLeft(find.byKey(seller)).dy));
+      });
+
+      for (final (key, role) in [(buyer, ContactRole.buyer), (seller, ContactRole.seller)]) {
+        testWidgets('${role.name} action closes the menu and opens the existing form for that role', (tester) async {
+          await pumpScreen(tester, size: const Size(800, 1400));
+          await open(tester);
+          await tester.tap(find.byKey(key));
+          await tester.pumpAndSettle();
+          expect(find.byKey(close), findsNothing);
+          expect(find.byType(ContactFormModal), findsOneWidget);
+          expect(tester.widget<ContactFormModal>(find.byType(ContactFormModal)).defaultRole, role);
+        });
+      }
+
+      testWidgets('close button, outside tap and system back each close the menu', (tester) async {
+        await pumpScreen(tester);
+        await open(tester);
+        await tester.tap(find.byKey(close));
+        await tester.pumpAndSettle();
+        expect(find.byKey(buyer), findsNothing);
+
+        await open(tester);
+        await tester.tapAt(const Offset(5, 300));
+        await tester.pumpAndSettle();
+        expect(find.byKey(buyer), findsNothing);
+
+        await open(tester);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(buyer), findsNothing);
+        expect(find.byType(ContactFormModal), findsNothing);
+      });
+
+      testWidgets('repeated taps open one menu and one form', (tester) async {
+        await pumpScreen(tester, size: const Size(800, 1400));
+        final button = tester.widget<FloatingActionButton>(find.byKey(fab));
+        button.onPressed!();
+        button.onPressed!();
+        await tester.pumpAndSettle();
+        expect(find.byKey(buyer), findsOneWidget);
+
+        await tester.tap(find.byKey(buyer));
+        await tester.pump(const Duration(milliseconds: 20));
+        await tester.tap(find.byKey(buyer), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(find.byType(ContactFormModal), findsOneWidget);
+      });
+
+      testWidgets('fits a small 320x568 screen without overflow', (tester) async {
+        // No contact rows: this checks the menu itself at this width.
+        await pumpScreen(tester, size: const Size(320, 568), withContacts: false);
+        // The existing screen overflows at this width under the test font; not the menu.
+        tester.takeException();
+        await open(tester);
+        expect(tester.takeException(), isNull);
+        expect(tester.getTopLeft(find.byKey(buyer)).dx, greaterThanOrEqualTo(0));
+      });
+    });
+
     testWidgets('tapping FAB opens Add Contact modal with validation fields', (
       tester,
     ) async {
@@ -226,8 +323,10 @@ void main() {
       await tester.pumpWidget(createTestWidget(repository: repo));
       await tester.pumpAndSettle();
 
-      // Tap FAB
+      // Tap FAB, then Add Buyer
       await tester.tap(find.byKey(const Key('add_contact_fab')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('directory_add_buyer')));
       await tester.pumpAndSettle();
 
       expect(find.byType(ContactFormModal), findsOneWidget);

@@ -143,7 +143,7 @@ void main() {
       expect(find.text('Alerts'), findsOneWidget);
       expect(find.text('Stay updated on your business'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget);
-      expect(find.text('Search by commodity, deal, party or location...'), findsOneWidget);
+      expect(find.text('Search alerts...'), findsOneWidget);
 
       // Filter chips with counts from the data
       expect(find.text('All'), findsOneWidget);
@@ -155,11 +155,10 @@ void main() {
       expect(count('requirement').data, '1');
       expect(count('offer').data, '0');
       expect(count('deal').data, '1');
-      expect(count('task').data, '0');
 
       // Check cards
       expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
-      expect(find.text('High-Score Match (96%)'), findsOneWidget);
+      expect(find.text('Your requirement has a match'), findsOneWidget);
       expect(find.text('Commission Payment Recorded'), findsOneWidget);
     });
 
@@ -176,13 +175,13 @@ void main() {
 
       expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
       expect(find.text('Commission Payment Recorded'), findsNothing);
-      expect(find.text('High-Score Match (96%)'), findsNothing);
+      expect(find.text('Your requirement has a match'), findsNothing);
 
       final reqChip = find.byKey(const ValueKey('alerts_filter_requirement'));
       await tester.ensureVisible(reqChip);
       await tester.tap(reqChip);
       await tester.pumpAndSettle();
-      expect(find.text('High-Score Match (96%)'), findsOneWidget);
+      expect(find.text('Your requirement has a match'), findsOneWidget);
       expect(find.text('Deal Awaiting Confirmation'), findsNothing);
     });
 
@@ -196,7 +195,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Deal Awaiting Confirmation'), findsOneWidget);
-      expect(find.text('High-Score Match (96%)'), findsOneWidget);
+      expect(find.text('Your requirement has a match'), findsOneWidget);
       expect(find.text('Commission Payment Recorded'), findsNothing);
     });
 
@@ -239,7 +238,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Find mark all as read icon button
-      final markAllBtn = find.byTooltip('Mark All Read');
+      final markAllBtn = find.byKey(const ValueKey('alerts_mark_all_read'));
       expect(markAllBtn, findsOneWidget);
 
       await tester.tap(markAllBtn);
@@ -247,7 +246,7 @@ void main() {
 
       expect(find.text('All notifications marked as read'), findsOneWidget);
       // Mark All Read icon button should disappear when unread count is 0
-      expect(find.byTooltip('Mark All Read'), findsNothing);
+      expect(find.byKey(const ValueKey('alerts_mark_all_read')), findsNothing);
     });
 
     testWidgets('Mark as read from the card menu marks only that alert read', (
@@ -296,7 +295,7 @@ void main() {
       expect(find.text('Action required'), findsOneWidget); // urgent status
       expect(find.text('10m ago'), findsOneWidget);
       // One compact action; the long message is not repeated on the card
-      expect(find.text('View details'), findsOneWidget);
+      expect(find.text('View Deal'), findsOneWidget);
       expect(find.text('Deal DL-2026-0891 (50 MT Mustard Seed) requires review.'), findsNothing);
 
       // Tap action button

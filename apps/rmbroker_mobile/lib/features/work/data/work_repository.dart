@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -72,6 +74,13 @@ class WorkRepository {
     return session.user.id;
   }
 
+  /// Direct database calls have no client-level deadline, so a dead connection
+  /// would otherwise leave a form on its saving state forever.
+  static const Duration _saveTimeout = Duration(seconds: 20);
+  static const String _saveTimeoutMessage =
+      'The server did not respond. The entry may still have been saved, '
+      'so check the Work Desk before trying again.';
+
   static final RegExp _uuidPattern = RegExp(
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   );
@@ -82,6 +91,7 @@ class WorkRepository {
   static const String _requirementSelect =
       'id, company_id, commodity_id, grade_id, unit_id, broker_id, '
       'quantity, fulfilled_quantity, target_price, delivery_terms_id, '
+      'delivery_location_id, delivery_location_snapshot, notes, '
       'target_date, status, created_at, '
       'companies(id, name, is_verified, trust_score), '
       'master_commodities!inner(id, name, code), '
@@ -241,6 +251,43 @@ class WorkRepository {
     );
   }
 
+  /// Row for a new requirement, including the chosen location's id and address copy.
+  @visibleForTesting
+  static Map<String, dynamic> requirementInsertRow(CreateRequirementDto dto, String brokerId) => {
+        'company_id': dto.companyId,
+        'commodity_id': dto.commodityId,
+        'grade_id': dto.gradeId,
+        'quantity': dto.quantity,
+        'unit_id': dto.unitId,
+        'target_price': dto.targetPrice,
+        'delivery_terms_id': dto.deliveryTerms,
+        'target_date': dto.targetDate.toIso8601String(),
+        'broker_id': brokerId,
+        'status': 'Open',
+        'fulfilled_quantity': 0,
+        'visibility': 'global',
+        'delivery_location_id': dto.locationId,
+        'delivery_location_snapshot': dto.locationSnapshot,
+        'notes': dto.notes,
+      };
+
+  /// Readable text for a failed save. Technical details go to the debug log only.
+  @visibleForTesting
+  static String saveErrorMessage(Object error, String record) {
+    if (error is PostgrestException) {
+      switch (error.code) {
+        case 'PGRST204': // Column missing from the schema cache
+        case '42703': // Undefined column
+          return 'This $record could not be saved because the server needs an update. Nothing was saved. Please contact support.';
+        case '42501':
+          return 'You do not have permission to save this $record. Nothing was saved.';
+        case '23503':
+          return 'A selected item is no longer available. Please check your selections and try again.';
+      }
+    }
+    return 'The $record could not be saved. Please check your connection and try again.';
+  }
+
   /// Creates a new buyer requirement mandate.
   Future<WorkDataResult<String>> createRequirement(CreateRequirementDto dto) async {
     final validationErr = dto.validate();
@@ -272,7 +319,9 @@ class WorkRepository {
       }
     } on DioException catch (dioErr) {
       if (dioErr.response?.statusCode == 401) return const WorkUnauthorized();
-      final errMsg = dioErr.response?.data?['error']?.toString();
+      // An HTML or empty body (route not deployed) must fall through to the direct insert.
+      final body = dioErr.response?.data;
+      final errMsg = body is Map ? body['error']?.toString() : null;
       if (errMsg != null) return WorkError(message: errMsg);
     } catch (e) {
       debugPrint('REST create requirement error: $e');
@@ -284,25 +333,20 @@ class WorkRepository {
       final session = client?.auth.currentSession;
       if (client != null && session != null && !session.isExpired) {
         final brokerId = session.user.id;
-        final res = await client.from('requirements').insert({
-          'company_id': dto.companyId,
-          'commodity_id': dto.commodityId,
-          'grade_id': dto.gradeId,
-          'quantity': dto.quantity,
-          'unit_id': dto.unitId,
-          'target_price': dto.targetPrice,
-          'delivery_terms_id': dto.deliveryTerms,
-          'target_date': dto.targetDate.toIso8601String(),
-          'broker_id': brokerId,
-          'status': 'Open',
-          'fulfilled_quantity': 0,
-          'visibility': 'global',
-        }).select('id').single();
+        final res = await client
+            .from('requirements')
+            .insert(requirementInsertRow(dto, brokerId))
+            .select('id')
+            .single()
+            .timeout(_saveTimeout);
 
         return WorkSuccess(res['id']?.toString() ?? '');
       }
+    } on TimeoutException {
+      return const WorkError(message: _saveTimeoutMessage);
     } catch (e) {
-      return WorkError(message: 'Failed to record mandate in database: $e');
+      debugPrint('Create requirement failed: $e');
+      return WorkError(message: saveErrorMessage(e, 'requirement'));
     }
 
     return const WorkError(
@@ -376,6 +420,7 @@ class WorkRepository {
             .select(
               'id, lot_number, total_quantity, available_quantity, reserved_quantity, '
               'sold_quantity, asking_price, confidential_minimum_price, loading_status, '
+              'loading_remarks, loading_location_id, loading_location_snapshot, '
               'loading_remarks, available_from, valid_until, version, status, created_at, broker_id, '
               'companies!inner(id, name, is_verified, trust_score), '
               'master_commodities!inner(id, name), '
@@ -456,7 +501,8 @@ class WorkRepository {
       }
     } on DioException catch (dioErr) {
       if (dioErr.response?.statusCode == 401) return const WorkUnauthorized();
-      final errMsg = dioErr.response?.data?['error']?.toString();
+      final body = dioErr.response?.data;
+      final errMsg = body is Map ? body['error']?.toString() : null;
       if (errMsg != null) return WorkError(message: errMsg);
     } catch (e) {
       debugPrint('REST create offer error: $e');
@@ -494,12 +540,17 @@ class WorkRepository {
           'status': 'Open',
           'visibility': 'global',
           'version': 1,
-        }).select('id').single();
+          'loading_location_id': dto.locationId,
+          'loading_location_snapshot': dto.locationSnapshot,
+        }).select('id').single().timeout(_saveTimeout);
 
         return WorkSuccess(res['id']?.toString() ?? '');
       }
+    } on TimeoutException {
+      return const WorkError(message: _saveTimeoutMessage);
     } catch (e) {
-      return WorkError(message: 'Failed to record offer in database: $e');
+      debugPrint('Create offer failed: $e');
+      return WorkError(message: saveErrorMessage(e, 'offer'));
     }
 
     return const WorkError(
@@ -552,7 +603,9 @@ class WorkRepository {
   /// Loads dropdown master options for form dialogs.
   Future<WorkDataResult<TradeMasterData>> getMasterData() async {
     try {
-      final response = await _apiClient.get('/broker/master-data');
+      final response = await _apiClient
+          .get('/broker/master-data')
+          .timeout(const Duration(seconds: 3));
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
         if (data is Map<String, dynamic> && data['data'] != null) {
@@ -563,25 +616,45 @@ class WorkRepository {
       }
     } catch (_) {}
 
-    // Supabase fallback
+    // Supabase fallback: execute queries in parallel with a strict timeout
     try {
       final client = _supabase;
       if (client != null) {
-        // Only active (tradable) products, A→Z (postgrest-dart's order() defaults to descending).
-        final commRes = await client
-            .from('master_commodities')
-            .select('id, name, status, category_id')
-            .eq('status', true)
-            .order('name', ascending: true);
-        final gradeRes = await client
-            .from('master_grades')
-            .select('id, grade_name, commodity_id')
-            .order('grade_name', ascending: true);
-        final categoryNames = await _loadCategoryNames(client);
-        final unitRes = await client.from('master_units').select('id, name, symbol');
-        final compRes = await client.from('companies').select('id, name');
-        final stateRes = await client.from('master_states').select('id, name');
-        final distRes = await client.from('master_districts').select('id, name');
+        final results = await Future.wait<dynamic>([
+          // 0: Commodities
+          client
+              .from('master_commodities')
+              .select('id, name, status, category_id')
+              .eq('status', true)
+              .order('name', ascending: true),
+          // 1: Grades
+          client
+              .from('master_grades')
+              .select('id, grade_name, commodity_id')
+              .order('grade_name', ascending: true),
+          // 2: Category names
+          _loadCategoryNames(client),
+          // 3: Units
+          client.from('master_units').select('id, name, symbol'),
+          // 4: The broker's own active counterparties, typed by the contact's role
+          client
+              .from('crm_contacts')
+              .select('company_id, companies(id, name), users!user_id(role)')
+              .eq('broker_id', client.auth.currentUser?.id ?? '')
+              .isFilter('removed_at', null),
+          // 5: States
+          client.from('master_states').select('id, name'),
+          // 6: Districts
+          client.from('master_districts').select('id, name, state_id'),
+        ]).timeout(const Duration(seconds: 5));
+
+        final commRes = results[0] as List;
+        final gradeRes = results[1] as List;
+        final categoryNames = results[2] as Map<String, String>;
+        final unitRes = results[3] as List;
+        final compRes = results[4] as List;
+        final stateRes = results[5] as List;
+        final distRes = results[6] as List;
 
         MasterDropdownItem mapItem(dynamic row, {String nameKey = 'name', String? extraKey}) {
           final m = row as Map<String, dynamic>;
@@ -592,28 +665,44 @@ class WorkRepository {
           );
         }
 
+        final buyers = counterpartiesWithRole(compRes, 'buyer');
+        final sellers = counterpartiesWithRole(compRes, 'seller');
+        final commodities = commRes.map((r) {
+          final m = r as Map<String, dynamic>;
+          return MasterDropdownItem(
+            id: m['id']?.toString() ?? '',
+            name: m['name']?.toString() ?? '',
+            categoryName: categoryNames[m['category_id']?.toString()],
+          );
+        }).toList();
+        final grades = gradeRes.map((r) {
+          final m = r as Map<String, dynamic>;
+          return MasterDropdownItem(
+            id: m['id']?.toString() ?? '',
+            name: m['grade_name']?.toString() ?? '',
+            parentId: m['commodity_id']?.toString(),
+          );
+        }).toList();
+
+        if (commodities.isEmpty) {
+          return WorkSuccess(TradeMasterData.fallback());
+        }
+
         final master = TradeMasterData(
-          buyerCompanies: (compRes as List).map((r) => mapItem(r)).toList(),
-          sellerCompanies: (compRes as List).map((r) => mapItem(r)).toList(),
-          commodities: (commRes as List).map((r) {
+          buyerCompanies: buyers,
+          sellerCompanies: sellers,
+          commodities: commodities,
+          grades: grades,
+          units: unitRes.map((r) => mapItem(r, extraKey: 'symbol')).toList(),
+          states: stateRes.map((r) => mapItem(r)).toList(),
+          districts: distRes.map((r) {
             final m = r as Map<String, dynamic>;
             return MasterDropdownItem(
               id: m['id']?.toString() ?? '',
               name: m['name']?.toString() ?? '',
-              categoryName: categoryNames[m['category_id']?.toString()],
+              parentId: m['state_id']?.toString(),
             );
           }).toList(),
-          grades: (gradeRes as List).map((r) {
-            final m = r as Map<String, dynamic>;
-            return MasterDropdownItem(
-              id: m['id']?.toString() ?? '',
-              name: m['grade_name']?.toString() ?? '',
-              parentId: m['commodity_id']?.toString(),
-            );
-          }).toList(),
-          units: (unitRes as List).map((r) => mapItem(r, extraKey: 'symbol')).toList(),
-          states: (stateRes as List).map((r) => mapItem(r)).toList(),
-          districts: (distRes as List).map((r) => mapItem(r)).toList(),
         );
 
         return WorkSuccess(master);
@@ -622,15 +711,23 @@ class WorkRepository {
       debugPrint('Master data fallback error: $e');
     }
 
-    return const WorkSuccess(TradeMasterData(
-      buyerCompanies: [],
-      sellerCompanies: [],
-      commodities: [],
-      grades: [],
-      units: [],
-      states: [],
-      districts: [],
-    ));
+    return WorkSuccess(TradeMasterData.fallback());
+  }
+
+  /// Companies of the broker's CRM contacts holding [role], once each, A to Z.
+  @visibleForTesting
+  static List<MasterDropdownItem> counterpartiesWithRole(List<dynamic> contacts, String role) {
+    final byId = <String, MasterDropdownItem>{};
+    for (final row in contacts.whereType<Map<String, dynamic>>()) {
+      final user = row['users'];
+      final company = row['companies'];
+      if (user is! Map || company is! Map) continue;
+      if (user['role']?.toString().toLowerCase() != role) continue;
+      final id = company['id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      byId[id] = MasterDropdownItem(id: id, name: company['name']?.toString() ?? '');
+    }
+    return byId.values.toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
   /// Category id → name from `master_categories`. A failure yields an empty map so
@@ -661,7 +758,8 @@ class WorkRepository {
           .eq('id', gradeId)
           .eq('commodity_id', commodityId)
           .eq('master_commodities.status', true)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(_saveTimeout);
       if (grade == null) {
         return 'The selected grade does not belong to the selected product.';
       }

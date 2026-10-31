@@ -1,86 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../../app/theme/app_colors.dart';
+import '../../../../core/widgets/glass_fab_menu.dart';
 import '../../../work/presentation/widgets/create_offer_sheet.dart';
 import '../../../work/presentation/widgets/create_requirement_sheet.dart';
 
-/// Home "+" menu: exactly two actions, each opening the existing Work Desk
+/// Home "+" menu: two labelled actions, each opening the existing Work Desk
 /// creation flow. The menu closes before the chosen flow opens.
 class HomeAddSheet extends StatelessWidget {
-  const HomeAddSheet({super.key});
+  /// The "+" button's rect on screen; the close button sits exactly over it.
+  final Rect fabRect;
+  final Animation<double> animation;
 
-  static Future<void> show(BuildContext context) async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: AppColors.surfaceLight,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const HomeAddSheet(),
-    );
-    if (!context.mounted) return;
-    switch (choice) {
-      case 'requirement':
-        await CreateRequirementSheet.show(context);
-      case 'offer':
-        await CreateOfferSheet.show(context);
-    }
+  const HomeAddSheet({super.key, required this.fabRect, required this.animation});
+
+  /// [context] must be the "+" button's own context, which gives the menu its anchor.
+  static Future<void> show(BuildContext context) {
+    return GlassFabMenu.guarded(context, (navigator, fabRect) async {
+      final choice = await GlassFabMenu.present<String>(
+        navigator,
+        (animation) => HomeAddSheet(fabRect: fabRect, animation: animation),
+      );
+      if (!context.mounted) return;
+      switch (choice) {
+        case 'requirement':
+          await CreateRequirementSheet.show(context);
+        case 'offer':
+          await CreateOfferSheet.show(context);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _item(
-              context,
-              key: 'home_add_requirement',
-              icon: LucideIcons.fileText,
-              color: const Color(0xFF2563EB),
-              label: 'Add Requirement',
-              value: 'requirement',
-            ),
-            _item(
-              context,
-              key: 'home_add_offer',
-              icon: LucideIcons.package,
-              color: const Color(0xFF7C3AED),
-              label: 'Add Offer',
-              value: 'offer',
-            ),
-          ],
+    return GlassFabMenu<String>(
+      fabRect: fabRect,
+      animation: animation,
+      closeKey: const ValueKey('home_add_close'),
+      backdropKey: const ValueKey('home_add_backdrop'),
+      actions: const [
+        GlassFabAction(
+          key: ValueKey('home_add_requirement'),
+          value: 'requirement',
+          icon: LucideIcons.fileText,
+          color: Color(0xFF0F9F7F),
+          label: 'Add Buyer Requirement',
         ),
-      ),
-    );
-  }
-
-  Widget _item(
-    BuildContext context, {
-    required String key,
-    required IconData icon,
-    required Color color,
-    required String label,
-    required String value,
-  }) {
-    return ListTile(
-      key: ValueKey(key),
-      minTileHeight: 56,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      leading: Container(
-        padding: const EdgeInsets.all(9),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-        child: Icon(icon, size: 20, color: color),
-      ),
-      title: Text(
-        label,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primaryNavy),
-      ),
-      onTap: () => Navigator.pop(context, value),
+        GlassFabAction(
+          key: ValueKey('home_add_offer'),
+          value: 'offer',
+          icon: LucideIcons.package,
+          color: Color(0xFF7C3AED),
+          label: 'Add Seller Offer',
+        ),
+      ],
     );
   }
 }

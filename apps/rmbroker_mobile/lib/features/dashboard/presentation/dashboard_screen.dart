@@ -11,6 +11,7 @@ import 'controllers/dashboard_controller.dart';
 import '../../../core/config/app_config.dart';
 import 'widgets/broker_welcome_banner.dart';
 import 'widgets/dashboard_header.dart';
+import '../../../core/widgets/glass_fab_menu.dart';
 import 'widgets/home_add_sheet.dart';
 import 'widgets/home_market_section.dart';
 import 'widgets/home_shortcuts_row.dart';
@@ -145,21 +146,23 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
       ),
-      // "+" opens Add Requirement / Add Offer (Broker Desk moved to the header).
-      floatingActionButton: FloatingActionButton(
-        key: const ValueKey('home_add_fab'),
-        // Own hero tag: tab branches stay alive, and the default tag would
-        // clash with other tabs' FABs when a full-screen route is pushed.
-        heroTag: 'home_add_fab',
-        onPressed: () => HomeAddSheet.show(context),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        shape: const CircleBorder(),
-        tooltip: 'Add Requirement or Offer',
-        child: const Icon(LucideIcons.plus, size: 26),
+      // "+" opens Add Buyer Requirement / Add Seller Offer (Broker Desk moved to the header).
+      floatingActionButton: Builder(
+        builder: (fabContext) => FloatingActionButton(
+          key: const ValueKey('home_add_fab'),
+          // Own hero tag: tab branches stay alive, and the default tag would
+          // clash with other tabs' FABs when a full-screen route is pushed.
+          heroTag: 'home_add_fab',
+          onPressed: () => HomeAddSheet.show(fabContext),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 4,
+          shape: const CircleBorder(),
+          tooltip: 'Add Buyer Requirement or Seller Offer',
+          child: const GlassFabFace(icon: LucideIcons.plus),
+        ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

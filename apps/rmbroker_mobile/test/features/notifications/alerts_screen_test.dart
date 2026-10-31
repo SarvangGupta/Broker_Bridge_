@@ -7,6 +7,7 @@ import 'package:rmbroker_mobile/features/notifications/domain/notification_categ
 import 'package:rmbroker_mobile/features/notifications/domain/notification_model.dart';
 import 'package:rmbroker_mobile/features/notifications/presentation/controllers/notification_controller.dart';
 import 'package:rmbroker_mobile/features/notifications/presentation/screens/notification_center_screen.dart';
+import 'package:rmbroker_mobile/features/notifications/presentation/widgets/notification_card.dart';
 
 // RB-ALERTS-UI-01. Fakes only.
 
@@ -177,7 +178,7 @@ void main() {
     },
   );
 
-  testWidgets('six chips with counts from the data; each filters correctly', (
+  testWidgets('All, Unread, Buyers, Sellers, Deals show data counts and filter correctly', (
     tester,
   ) async {
     await pump(tester);
@@ -186,14 +187,16 @@ void main() {
     expect(count(tester, 'requirement'), '1');
     expect(count(tester, 'offer'), '1');
     expect(count(tester, 'deal'), '1');
-    expect(count(tester, 'task'), '1');
+    expect(find.text('Buyers'), findsOneWidget);
+    expect(find.text('Sellers'), findsOneWidget);
+    expect(find.text('Deals'), findsOneWidget);
+    expect(find.byKey(const ValueKey('alerts_filter_task')), findsNothing);
 
     for (final (key, visible) in [
       ('unread', {'r1', 'o1', 't1'}),
       ('requirement', {'r1'}),
       ('offer', {'o1'}),
       ('deal', {'d1'}),
-      ('task', {'t1'}),
       ('all', {'r1', 'o1', 'd1', 't1', 's1'}),
     ]) {
       await chip(tester, key);
@@ -226,54 +229,25 @@ void main() {
     expect(count(tester, 'all'), '5');
   });
 
-  testWidgets(
-    'grouped Today / Yesterday / Earlier, newest first, collapsible, no duplicates',
-    (tester) async {
-      await pump(tester);
-      expect(find.text('Today'), findsOneWidget);
-      expect(find.text('Yesterday'), findsOneWidget);
-      expect(find.text('Earlier'), findsOneWidget);
-      expect(
-        tester
-            .widget<Text>(
-              find.byKey(const ValueKey('alerts_group_count_today')),
-            )
-            .data,
-        '2 new · 2',
-      );
-      expect(
-        tester
-            .widget<Text>(
-              find.byKey(const ValueKey('alerts_group_count_yesterday')),
-            )
-            .data,
-        '1',
-      );
+  testWidgets('grouped Today / Yesterday / Earlier, newest first, no duplicates', (tester) async {
+    await pump(tester);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Yesterday'), findsOneWidget);
+    expect(find.text('Earlier'), findsOneWidget);
 
-      // Newest first within Today: o1 (09:05) above r1 (09:00).
-      expect(
-        tester.getTopLeft(card('o1')).dy,
-        lessThan(tester.getTopLeft(card('r1')).dy),
-      );
-
-      await tester.tap(find.byKey(const ValueKey('alerts_group_today')));
-      await tester.pumpAndSettle();
-      expect(card('r1'), findsNothing);
-      expect(card('d1'), findsOneWidget, reason: 'other groups unaffected');
-      await tester.tap(find.byKey(const ValueKey('alerts_group_today')));
-      await tester.pumpAndSettle();
-      expect(card('r1'), findsOneWidget);
-
-      for (final id in ['r1', 'o1', 'd1', 't1', 's1']) {
-        expect(card(id), findsOneWidget, reason: 'each alert appears once');
-      }
-    },
-  );
+    // Newest first within Today: o1 (09:05) above r1 (09:00).
+    expect(tester.getTopLeft(card('o1')).dy, lessThan(tester.getTopLeft(card('r1')).dy));
+    for (final id in ['r1', 'o1', 'd1', 't1', 's1']) {
+      expect(card(id), findsOneWidget, reason: 'each alert appears once');
+    }
+  });
 
   testWidgets(
     'refresh reloads without duplicates; mark-all-read clears unread',
     (tester) async {
       final repo = await pump(tester);
+      await tester.tap(find.byKey(const ValueKey('alerts_overflow')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('alerts_refresh')));
       await tester.pumpAndSettle();
       expect(repo.fetches, 2);
@@ -292,15 +266,14 @@ void main() {
     (tester) async {
       final repo = await pump(tester);
       final r1 = card('r1');
-      // Row 1 type, Row 2 commodity, Row 3 ref/qty/price, Row 4 location + action.
       for (final t in [
+        'BUY',
         'New requirement',
+        'A buyer wants to buy',
         'DORB',
-        '#REQ-REQ-43',
         '100 MT',
-        '₹21,000/MT',
         'Kota Mandi',
-        'View details',
+        'View in Work Desk',
       ]) {
         expect(
           find.descendant(of: r1, matching: find.text(t)),
@@ -308,6 +281,9 @@ void main() {
           reason: t,
         );
       }
+      // Long ids and prices are left to the record screen.
+      expect(find.descendant(of: r1, matching: find.textContaining('REQ-')), findsNothing);
+      expect(find.descendant(of: r1, matching: find.textContaining('₹')), findsNothing);
       // The long message duplicating commodity/quantity is not shown.
       expect(find.textContaining('Buyer posted requirement'), findsNothing);
       expect(
@@ -329,6 +305,8 @@ void main() {
       );
 
       repo.fail = true;
+      await tester.tap(find.byKey(const ValueKey('alerts_overflow')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('alerts_refresh')));
       await tester.pumpAndSettle();
       expect(
@@ -357,6 +335,36 @@ void main() {
     await tester.tap(find.text('Retry Synchronization'));
     await tester.pumpAndSettle();
     expect(card('r1'), findsOneWidget);
+  });
+
+  testWidgets('long name and commodity fit a 320dp card with its action visible', (tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final n = alert(
+      'x',
+      'REQUIREMENT_CREATED',
+      today,
+      payload: {
+        'requirementId': 'r',
+        'commodity': 'Extremely Long Commodity Name That Cannot Possibly Fit On One Line',
+        'quantity': 100000,
+        'unit': 'MT',
+        'deliveryLocation': 'A Very Long Delivery Location Name In Some Far Away District',
+      },
+    ).copyWith(counterpartyName: 'A Very Long Counterparty Company Name Private Limited Of Rajasthan');
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: SingleChildScrollView(child: NotificationCard(notification: n, onTap: (_) {}))),
+    ));
+    expect(tester.takeException(), isNull);
+    expect(find.text('View in Work Desk'), findsOneWidget);
+  });
+
+  testWidgets('empty feed shows the empty state and no Mark all read', (tester) async {
+    final repo = await pump(tester, items: []);
+    expect(find.text('All Caught Up!'), findsOneWidget);
+    expect(find.byKey(const ValueKey('alerts_mark_all_read')), findsNothing);
+    expect(repo.fetches, 1);
   });
 
   testWidgets('small 320dp screen with long text: no overflow', (tester) async {

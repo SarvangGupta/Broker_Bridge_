@@ -8,12 +8,12 @@ import 'notification_model.dart';
 /// record they concern; it does not change [NotificationCategory] or routing.
 enum AlertKind {
   requirement(
-    'Requirements',
+    'Buyers',
     'Requirement',
     LucideIcons.layers,
     Color(0xFF0F766E),
   ),
-  offer('Offers', 'Offer', LucideIcons.tag, Color(0xFF7C3AED)),
+  offer('Sellers', 'Offer', LucideIcons.tag, Color(0xFF7C3AED)),
   deal('Deals', 'Deal', Icons.handshake_outlined, Color(0xFFEA580C)),
   task('Tasks', 'Task', LucideIcons.squareCheck, Color(0xFF2563EB)),
   other('Other', 'Update', LucideIcons.info, Color(0xFF64748B));
@@ -25,8 +25,8 @@ enum AlertKind {
 
   const AlertKind(this.filterLabel, this.label, this.icon, this.color);
 
-  /// Chips shown in the filter row (Other is counted under All only).
-  static const filterable = [requirement, offer, deal, task];
+  /// Chips shown in the filter row (tasks and other updates appear under All).
+  static const filterable = [requirement, offer, deal];
 
   static AlertKind of(BrokerNotification n) {
     final type = n.eventType.toUpperCase();
@@ -46,7 +46,9 @@ enum AlertKind {
         type.contains('AVAILABILITY')) {
       return offer;
     }
-    if (n.requirementId != null ||
+    // Chat is buyer-to-broker only (migration 0043), so it counts under Buyers.
+    if (type == 'CHAT_MESSAGE' ||
+        n.requirementId != null ||
         type.contains('REQUIREMENT') ||
         type.contains('BROKER_REQUEST') ||
         type.contains('MATCH') ||

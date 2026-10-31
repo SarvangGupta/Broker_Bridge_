@@ -266,8 +266,8 @@ void main() {
     expect(find.text('New requirement'), findsOneWidget);
     expect(find.text('Maize DDGS'), findsOneWidget);
     expect(find.text('Buyer posted requirement for 35 MT of Maize DDGS.'), findsNothing);
-    // Record metadata, each part with its own icon (Alerts card).
-    for (final part in ['#REQ-107DF7', '35 MT', '₹28,000/MT', 'Kota Mandi', 'FOR Mill Delivery']) {
+    // Compact metadata and one action; ids and prices stay on the record screen.
+    for (final part in ['35 MT', 'Kota Mandi', 'View in Work Desk']) {
       expect(find.text(part), findsOneWidget, reason: part);
     }
 

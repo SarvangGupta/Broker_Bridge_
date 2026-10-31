@@ -125,6 +125,78 @@ class NotificationRepository {
     return _filterAndSort(category: category, unreadOnly: unreadOnly);
   }
 
+  /// Fills in names and record facts from each notification's related record.
+  /// Reads run under the broker's own RLS: anything not visible stays unresolved
+  /// and the card falls back to neutral wording. Never fails the feed.
+  Future<List<BrokerNotification>> resolveRelated(List<BrokerNotification> items) async {
+    final client = _supabase;
+    if (client == null || items.isEmpty) return items;
+
+    Future<Map<String, Map<String, dynamic>>> rows(String table, String columns, Set<String> ids) async {
+      if (ids.isEmpty) return const {};
+      try {
+        final res = await client
+            .from(table)
+            .select(columns)
+            .inFilter('id', ids.toList())
+            .timeout(const Duration(seconds: 8));
+        return {
+          for (final row in (res as List).whereType<Map<String, dynamic>>()) row['id'].toString(): row,
+        };
+      } catch (e) {
+        debugPrint('Alert details unavailable from $table: $e');
+        return const {};
+      }
+    }
+
+    final results = await Future.wait([
+      rows(
+        'requirements',
+        'id, quantity, delivery_terms_id, companies(name), master_commodities(name), master_units(symbol)',
+        {for (final n in items) ?n.requirementId},
+      ),
+      rows(
+        'availabilities',
+        'id, quantity, companies(name), master_commodities(name), master_units(symbol), master_districts(name)',
+        {for (final n in items) ?n.offerId},
+      ),
+      rows('deals', 'id, buyer:companies!buyer_id(name)', {for (final n in items) ?n.dealId}),
+      rows('companies', 'id, name', {
+        for (final n in items)
+          if (n.isWarehouseEvent && n.payload?['companyId'] != null) n.payload!['companyId'].toString(),
+      }),
+    ]);
+
+    String? nested(Map<String, dynamic>? row, String key, String field) {
+      final value = row?[key];
+      return value is Map ? value[field]?.toString() : null;
+    }
+
+    String? quantityOf(Map<String, dynamic>? row) {
+      final qty = row?['quantity'];
+      if (qty is! num) return null;
+      final text = qty % 1 == 0 ? qty.toInt().toString() : qty.toString();
+      final unit = nested(row, 'master_units', 'symbol');
+      return unit == null ? text : '$text $unit';
+    }
+
+    return items.map((n) {
+      final requirement = results[0][n.requirementId];
+      final offer = results[1][n.offerId];
+      final deal = results[2][n.dealId];
+      final company = n.isWarehouseEvent ? results[3][n.payload?['companyId']?.toString()] : null;
+      final record = requirement ?? offer;
+      return n.copyWith(
+        counterpartyName: nested(deal, 'buyer', 'name') ??
+            nested(record, 'companies', 'name') ??
+            company?['name']?.toString(),
+        resolvedCommodity: nested(record, 'master_commodities', 'name'),
+        resolvedQuantity: quantityOf(record),
+        resolvedLocation: requirement?['delivery_terms_id']?.toString() ?? nested(offer, 'master_districts', 'name'),
+      );
+    }).toList();
+  }
+
   /// Merges newly fetched notifications into in-memory cache with deduplication.
   void _mergeNotifications(List<BrokerNotification> newItems) {
     for (final item in newItems) {

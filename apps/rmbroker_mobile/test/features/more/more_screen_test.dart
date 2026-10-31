@@ -7,6 +7,7 @@ import 'package:rmbroker_mobile/app/router/app_router.dart';
 import 'package:rmbroker_mobile/core/preferences/app_settings_provider.dart';
 import 'package:rmbroker_mobile/features/authentication/data/auth_repository.dart';
 import 'package:rmbroker_mobile/features/authentication/domain/broker_user.dart';
+import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/glass_ball_navigation_bar.dart';
 import 'package:rmbroker_mobile/features/more/presentation/more_screen.dart';
 import 'package:rmbroker_mobile/features/more/presentation/more_section_screens.dart';
 import 'package:rmbroker_mobile/features/more/presentation/widgets/app_settings_section.dart';
@@ -95,7 +96,7 @@ void main() {
   testWidgets('More shows exactly the four sections; no settings controls or submenu items', (tester) async {
     await pump(tester, []);
     expect(find.text('More'), findsOneWidget);
-    expect(find.text('Tools & account settings'), findsOneWidget);
+    expect(find.text('Your workspace & account'), findsOneWidget);
     for (final k in ['more_profile', 'more_tools', 'more_finance', 'more_settings']) {
       expect(find.byKey(Key(k)), findsOneWidget, reason: k);
     }
@@ -195,7 +196,7 @@ void main() {
       router.go(path);
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
-      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+      final bar = tester.widget<GlassBallNavigationBar>(find.byType(GlassBallNavigationBar));
       expect(bar.selectedIndex, 4, reason: path);
     }
     expect(tester.takeException(), isNull);

@@ -5,7 +5,6 @@ import 'package:rmbroker_mobile/core/security/secure_storage_service.dart';
 import 'package:rmbroker_mobile/features/authentication/domain/broker_user.dart';
 import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/broker_welcome_banner.dart';
 import 'package:rmbroker_mobile/features/dashboard/presentation/widgets/dashboard_header.dart';
-import 'package:rmbroker_mobile/features/directory/domain/gst_certificate_data.dart';
 import 'package:rmbroker_mobile/features/profile/data/profile_repository.dart';
 import 'package:rmbroker_mobile/features/profile/domain/broker_profile.dart';
 import 'package:rmbroker_mobile/features/profile/presentation/broker_profile_screen.dart';
@@ -260,10 +259,17 @@ void main() {
         email: 'mukesh@brokerbridge.in',
       );
 
+      final repo = ProfileRepository(storage: storage);
+
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: BrokerWelcomeBanner(broker: broker),
+        ProviderScope(
+          overrides: [
+            profileRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: BrokerWelcomeBanner(broker: broker),
+            ),
           ),
         ),
       );
@@ -272,7 +278,7 @@ void main() {
 
       // Home greeting card exists
       expect(find.byKey(const ValueKey('home_greeting_card')), findsOneWidget);
-      expect(find.text('Mukesh Mandi Broker'), findsOneWidget);
+      expect(find.text('Mukesh Sharma'), findsOneWidget);
 
       // Dedicated edit profile icon button exists
       expect(
@@ -319,9 +325,14 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
+      final repo = ProfileRepository(storage: storage);
+
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        ProviderScope(
+          overrides: [
+            profileRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: const MaterialApp(
             home: BrokerProfileScreen(),
           ),
         ),
@@ -331,27 +342,28 @@ void main() {
 
       // Section titles
       expect(find.text('Broker Profile'), findsOneWidget);
-      expect(find.text('Protected Desk Identifiers'), findsOneWidget);
-      expect(find.text('Personal Information'), findsOneWidget);
-      expect(find.text('Business & Brokerage Details'), findsOneWidget);
+      expect(find.text('Contact Information'), findsOneWidget);
+      expect(find.text('Business Details'), findsOneWidget);
+      expect(find.text('GST Registration'), findsOneWidget);
+      expect(find.text('Address & Locations'), findsOneWidget);
 
-      // Bottom bar edit button exists
-      expect(find.text('Edit Profile Information'), findsOneWidget);
+      // Edit action exists in appbar
+      expect(find.byTooltip('Edit Profile'), findsOneWidget);
 
-      // Tap Edit Profile Information
-      await tester.tap(find.text('Edit Profile Information'));
+      // Tap Edit Profile
+      await tester.tap(find.byTooltip('Edit Profile'));
       await tester.pumpAndSettle();
 
-      // Save Profile and Cancel buttons now appear
-      expect(find.text('Save Profile'), findsOneWidget);
-      expect(find.text('Cancel'), findsOneWidget);
+      // In edit mode: Title changes to Edit Profile and Save button appears
+      expect(find.text('Edit Profile'), findsOneWidget);
+      expect(find.text('Save'), findsOneWidget);
 
-      // Tap Cancel
-      await tester.tap(find.text('Cancel'));
+      // Tap Back to cancel edit
+      await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
 
-      // Restores Edit Profile Information button
-      expect(find.text('Edit Profile Information'), findsOneWidget);
+      // Restores view mode title
+      expect(find.text('Broker Profile'), findsOneWidget);
     });
   });
 }

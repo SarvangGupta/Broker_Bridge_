@@ -1,3 +1,5 @@
+import '../../../core/widgets/glass_fab_menu.dart';
+import '../../dashboard/presentation/widgets/home_add_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,8 +15,6 @@ import 'controllers/requirements_controller.dart';
 import '../domain/match_model.dart';
 import '../domain/offer_model.dart';
 import '../domain/requirement_model.dart';
-import 'widgets/create_offer_sheet.dart';
-import 'widgets/create_requirement_sheet.dart';
 import 'widgets/match_card.dart';
 import 'widgets/offer_card.dart';
 import 'widgets/offer_detail_sheet.dart';
@@ -110,32 +110,6 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
       }
     }
   }
-
-  Future<void> _openCreateRequirement() async {
-    if (_isOpeningSheet) return;
-    _isOpeningSheet = true;
-    try {
-      await CreateRequirementSheet.show(context);
-    } finally {
-      if (mounted) {
-        _isOpeningSheet = false;
-      }
-    }
-  }
-
-  Future<void> _openCreateOffer() async {
-    if (_isOpeningSheet) return;
-    _isOpeningSheet = true;
-    try {
-      await CreateOfferSheet.show(context);
-    } finally {
-      if (mounted) {
-        _isOpeningSheet = false;
-      }
-    }
-  }
-
-
 
   @override
   void initState() {
@@ -419,7 +393,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
               : RefreshIndicator(
                   onRefresh: () => ref.read(requirementsProvider.notifier).loadRequirements(),
                   child: ListView.builder(
-                    // Bottom padding keeps the last card clear of the New Mandate button.
+                    // Bottom padding keeps the last card clear of the add button.
                     padding: const EdgeInsets.only(top: 8, bottom: 88),
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
@@ -926,29 +900,23 @@ class _WorkScreenState extends ConsumerState<WorkScreen>
       floatingActionButton: AnimatedBuilder(
         animation: _tabController,
         builder: (context, _) {
-          final tab = _tabController.index;
-          if (tab == 0) {
-            return FloatingActionButton.extended(
-              heroTag: 'work_desk_mandate_fab',
+          if (_tabController.index == 2) return const SizedBox.shrink();
+          return Builder(
+            builder: (fabContext) => FloatingActionButton(
+              key: const ValueKey('work_add_fab'),
+              heroTag: 'work_add_fab',
+              onPressed: () => HomeAddSheet.show(fabContext),
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              icon: const Icon(LucideIcons.plus, size: 18),
-              label: const Text('New Mandate', style: TextStyle(fontWeight: FontWeight.w700)),
-              onPressed: _openCreateRequirement,
-            );
-          } else if (tab == 1) {
-            return FloatingActionButton.extended(
-              heroTag: 'work_desk_offer_fab',
-              backgroundColor: AppColors.success,
-              foregroundColor: Colors.white,
-              icon: const Icon(LucideIcons.plus, size: 18),
-              label: const Text('Post Offer', style: TextStyle(fontWeight: FontWeight.w700)),
-              onPressed: _openCreateOffer,
-            );
-          }
-          return const SizedBox.shrink();
+              elevation: 4,
+              shape: const CircleBorder(),
+              tooltip: 'Add Buyer Requirement or Seller Offer',
+              child: const GlassFabFace(icon: LucideIcons.plus),
+            ),
+          );
         },
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

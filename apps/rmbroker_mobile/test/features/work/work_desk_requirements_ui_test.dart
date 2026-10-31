@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rmbroker_mobile/features/work/presentation/widgets/create_offer_sheet.dart';
 import 'package:rmbroker_mobile/app/router/app_router.dart';
 import 'package:rmbroker_mobile/features/deals/data/deal_repository.dart';
 import 'package:rmbroker_mobile/features/deals/domain/allocation_model.dart';
@@ -284,14 +285,33 @@ void main() {
     expect(find.text('Partly Allocated (2)'), findsOneWidget);
   });
 
-  testWidgets('small screen: no overflow; New Mandate opens; other tabs still switch', (tester) async {
+  testWidgets('small screen: no overflow; + menu opens the form; other tabs still switch', (tester) async {
     await pump(tester, size: const Size(640, 1136), dpr: 2.0, withLots: false);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('New Mandate'));
-    // The mandate sheet keeps a loading spinner while master data loads.
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('New Mandate'), findsNothing);
+    expect(find.text('Post Offer'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('work_add_fab')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add Buyer Requirement'), findsOneWidget);
+    expect(find.text('Add Seller Offer'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('home_add_close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('home_add_requirement')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('work_add_fab')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home_add_offer')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CreateOfferSheet), findsOneWidget);
+    Navigator.of(tester.element(find.byType(CreateOfferSheet))).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('work_add_fab')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home_add_requirement')));
+    // The menu closes first; the form then keeps a spinner while master data loads.
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
     expect(find.byType(CreateRequirementSheet), findsOneWidget);
     Navigator.of(tester.element(find.byType(CreateRequirementSheet))).pop();
     await tester.pump(const Duration(milliseconds: 500));
@@ -301,7 +321,8 @@ void main() {
     await tester.ensureVisible(find.byType(Tab).at(1));
     await tester.tap(find.byType(Tab).at(1));
     await tester.pumpAndSettle();
-    expect(find.text('Post Offer'), findsOneWidget);
+    expect(find.text('Post Offer'), findsNothing);
+    expect(find.byKey(const ValueKey('work_add_fab')), findsOneWidget);
     await tester.ensureVisible(find.byType(Tab).at(2));
     await tester.tap(find.byType(Tab).at(2));
     await tester.pumpAndSettle();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rmbroker_mobile/features/notifications/domain/alert_presentation.dart';
 import 'package:rmbroker_mobile/features/notifications/data/notification_repository.dart';
 import 'package:rmbroker_mobile/features/notifications/domain/notification_category.dart';
 import 'package:rmbroker_mobile/features/notifications/domain/notification_model.dart';
@@ -73,7 +74,7 @@ void main() {
       expect(notif.eventType, 'WAREHOUSE_UPDATED');
       expect(notif.category, NotificationCategory.dispatchAndDelivery);
       expect(NotificationCard.typeLabel(notif), 'Warehouse update');
-      expect(NotificationCard.headline(notif), 'Apex Commodities Ltd');
+      expect(AlertPresentation.counterparty(notif), 'Apex Commodities Ltd');
       expect(notif.actionUrl, '/directory');
       expect(notif.payload?['warehouseName'], 'Kota Terminal Godown');
       expect(notif.payload?['changeType'], 'CREATED');
@@ -133,7 +134,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Warehouse update'), findsOneWidget);
-      expect(find.text('Apex Commodities Ltd'), findsOneWidget);
+      expect(find.text('Apex Commodities Ltd updated warehouse'), findsOneWidget);
 
       await tester.tap(find.byType(NotificationCard));
       await tester.pumpAndSettle();
@@ -176,7 +177,7 @@ void main() {
 
       // In notification list, warehouse update and company name are rendered
       expect(find.text('Warehouse update'), findsOneWidget);
-      expect(find.text('Apex Commodities Ltd'), findsOneWidget);
+      expect(find.text('Apex Commodities Ltd updated warehouse'), findsOneWidget);
 
       // Search by company name
       await tester.enterText(find.byType(TextField), 'Apex Commodities');

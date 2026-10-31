@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../domain/trade_master_data.dart';
+import 'trade_form_widgets.dart';
 
 /// Product field for broker forms: shows the selected product with its authoritative
 /// category label and opens a searchable picker over the shared catalogue.
@@ -36,15 +37,12 @@ class CommodityPickerField extends StatelessWidget {
       onTap: () => _open(context),
       borderRadius: BorderRadius.circular(4),
       child: InputDecorator(
-        decoration: const InputDecoration(
-          labelText: 'Commodity *',
-          border: OutlineInputBorder(),
-          isDense: true,
-          suffixIcon: Icon(LucideIcons.search, size: 18),
+        decoration: tradeInputDecoration().copyWith(
+          suffixIcon: const Icon(LucideIcons.search, size: 18),
         ),
         child: sel == null
             ? const Text(
-                'Tap to search products',
+                'Search products',
                 style: TextStyle(fontSize: 14, color: AppColors.textMutedLight),
               )
             : Column(

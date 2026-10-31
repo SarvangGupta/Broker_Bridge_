@@ -111,7 +111,7 @@ void main() {
 
     testWidgets('nothing is preselected; label updates when the product changes', (tester) async {
       await pumpSheet(tester, const CreateRequirementSheet());
-      expect(find.text('Tap to search products'), findsOneWidget);
+      expect(find.text('Search products'), findsOneWidget);
 
       await searchAndPick(tester, 'bran', wheatBran);
       expect(find.text('Category: Bran, Polish & Milling By-products'), findsOneWidget);
@@ -132,8 +132,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Test Buyer').last);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Record Buyer Mandate'));
-      await tester.tap(find.text('Record Buyer Mandate'));
+      final saveBtn = find.text('Save Requirement');
+      await tester.ensureVisible(saveBtn);
+      await tester.tap(saveBtn);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('No grade is defined for Soybean DOC'), findsWidgets);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -124,12 +126,22 @@ class OffersNotifier extends Notifier<OffersState> {
     state = state.copyWith(statusFilter: () => filter);
   }
 
+  /// Why the last create failed, for the form to show.
+  String? lastCreateError;
+
   Future<bool> createOffer(CreateOfferDto dto) async {
+    lastCreateError = null;
     final res = await _repository.createOffer(dto);
     if (res is WorkSuccess) {
-      await loadOffers();
+      // The record is saved; a slow list refresh must not hold the form open.
+      unawaited(loadOffers());
       return true;
     }
+    lastCreateError = switch (res) {
+      WorkError(:final message) => message,
+      WorkUnauthorized(:final message) => message,
+      _ => null,
+    };
     return false;
   }
 }

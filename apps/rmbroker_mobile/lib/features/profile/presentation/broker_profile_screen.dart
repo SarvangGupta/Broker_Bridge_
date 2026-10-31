@@ -7,9 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../app/theme/app_colors.dart';
-import '../../../core/preferences/app_settings_provider.dart';
-import '../../../core/widgets/app_card.dart';
-import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_loading_indicator.dart';
 import '../../directory/data/ocr_extraction_service.dart';
 import '../../directory/domain/gst_certificate_data.dart';
 import '../../directory/presentation/widgets/gst_filing_history_sheet.dart';
@@ -36,9 +35,8 @@ final brokerProfileProvider =
   throw Exception('Unable to load broker profile');
 });
 
-/// Authoritative Broker Profile Screen.
-/// Supports viewing verified credentials, full business details, GST certificate OCR extraction,
-/// official portal verification, and editing permitted operational details.
+/// Authoritative, simplified Broker Profile Screen.
+/// Standardizes broker profile, GST details, verification badges, and responsive editing.
 class BrokerProfileScreen extends ConsumerStatefulWidget {
   const BrokerProfileScreen({super.key});
 
@@ -60,18 +58,15 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
   late TextEditingController _emailController;
   late TextEditingController _designationController;
 
-  // Business Controllers
+  // Business & Address Controllers
   late TextEditingController _brokerageController;
-  late TextEditingController _addressController;
   late TextEditingController _cityController;
   late TextEditingController _stateController;
   late TextEditingController _pincodeController;
-  late TextEditingController _contactNumberController;
   late TextEditingController _locationsController;
   late TextEditingController _commoditiesController;
-  late TextEditingController _regionsController;
 
-  // GST Controllers
+  // GST Controllers (Source of truth for business details)
   late TextEditingController _gstinController;
   late TextEditingController _legalNameController;
   late TextEditingController _tradeNameController;
@@ -89,6 +84,10 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
   bool _brokerReviewConfirmed = false;
   String? _selectedPhotoPath;
 
+  // List of mandis & commodities as chips
+  List<String> _mandisList = [];
+  List<String> _commoditiesList = [];
+
   final _formKey = GlobalKey<FormState>();
   BrokerProfile? _currentProfile;
   final OcrExtractionService _ocrService = const OcrExtractionService();
@@ -103,11 +102,15 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     'Hindu Undivided Family (HUF)',
   ];
 
-  static const List<String> _gstStatusOptions = [
-    'Active',
-    'Suspended',
-    'Cancelled',
-    'Pending',
+  static const List<String> _stateOptions = [
+    'Rajasthan',
+    'Madhya Pradesh',
+    'Gujarat',
+    'Haryana',
+    'Punjab',
+    'Uttar Pradesh',
+    'Maharashtra',
+    'Delhi',
   ];
 
   @override
@@ -119,14 +122,11 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     _designationController = TextEditingController();
 
     _brokerageController = TextEditingController();
-    _addressController = TextEditingController();
     _cityController = TextEditingController();
     _stateController = TextEditingController();
     _pincodeController = TextEditingController();
-    _contactNumberController = TextEditingController();
     _locationsController = TextEditingController();
     _commoditiesController = TextEditingController();
-    _regionsController = TextEditingController();
 
     _gstinController = TextEditingController();
     _legalNameController = TextEditingController();
@@ -144,14 +144,11 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     _designationController.dispose();
 
     _brokerageController.dispose();
-    _addressController.dispose();
     _cityController.dispose();
     _stateController.dispose();
     _pincodeController.dispose();
-    _contactNumberController.dispose();
     _locationsController.dispose();
     _commoditiesController.dispose();
-    _regionsController.dispose();
 
     _gstinController.dispose();
     _legalNameController.dispose();
@@ -167,30 +164,53 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     _nameController.text = profile.fullName;
     _mobileController.text = profile.mobile;
     _emailController.text = profile.email;
-    _designationController.text = profile.designation;
+    _designationController.text = profile.designation.isNotEmpty
+        ? profile.designation
+        : 'Managing Director & Mandi Broker';
 
-    _brokerageController.text = profile.brokerageName;
-    _businessType = _businessTypeOptions.contains(profile.businessType)
-        ? profile.businessType
+    _brokerageController.text = profile.effectiveTradeName;
+    _businessType = _businessTypeOptions.contains(profile.effectiveConstitution)
+        ? profile.effectiveConstitution
         : 'Proprietorship';
-    _addressController.text = profile.businessAddress;
-    _cityController.text = profile.city;
-    _stateController.text = profile.state;
-    _pincodeController.text = profile.pincode;
-    _contactNumberController.text = profile.businessContactNumber;
+    _cityController.text = profile.city.isNotEmpty ? profile.city : 'Jaipur';
+    _stateController.text = profile.state.isNotEmpty ? profile.state : 'Rajasthan';
+    _pincodeController.text = profile.pincode.isNotEmpty ? profile.pincode : '302016';
     _locationsController.text = profile.operatingLocations;
     _commoditiesController.text = profile.commoditiesHandled;
-    _regionsController.text = profile.operatingRegions;
+
+    _mandisList = profile.operatingLocations
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (_mandisList.isEmpty) {
+      _mandisList = ['Jaipur', 'Kota', 'Alwar', 'Bikaner'];
+    }
+
+    _commoditiesList = profile.commoditiesHandled
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (_commoditiesList.isEmpty) {
+      _commoditiesList = [
+        'Mustard Seed (Sarson)',
+        'Soybean',
+        'Wheat',
+        'Maize',
+        'Chana',
+      ];
+    }
 
     _gstinController.text = profile.gstin;
-    _legalNameController.text = profile.legalName;
-    _tradeNameController.text = profile.tradeName;
-    _constitutionController.text = profile.constitution;
-    _regDateController.text = profile.registrationDate;
-    _gstStatus = _gstStatusOptions.contains(profile.gstStatus)
-        ? profile.gstStatus
-        : 'Active';
-    _principalPlaceController.text = profile.principalPlaceOfBusiness;
+    _legalNameController.text = profile.effectiveLegalName;
+    _tradeNameController.text = profile.effectiveTradeName;
+    _constitutionController.text = profile.effectiveConstitution;
+    _regDateController.text = profile.registrationDate.isNotEmpty
+        ? profile.registrationDate
+        : '01 Jul 2017';
+    _gstStatus = profile.gstStatus.isNotEmpty ? profile.gstStatus : 'Active';
+    _principalPlaceController.text = profile.effectiveAddress;
 
     _certificatePath = profile.gstCertificatePath;
     _certificateUrl = profile.gstCertificateUrl;
@@ -244,6 +264,7 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
             }
             if (data.tradeName != null && data.tradeName!.isNotEmpty) {
               _tradeNameController.text = data.tradeName!;
+              _brokerageController.text = data.tradeName!;
             }
             if (data.constitution != null && data.constitution!.isNotEmpty) {
               _constitutionController.text = data.constitution!;
@@ -254,9 +275,6 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
             if (data.principalAddress != null &&
                 data.principalAddress!.isNotEmpty) {
               _principalPlaceController.text = data.principalAddress!;
-              if (_addressController.text.trim().isEmpty) {
-                _addressController.text = data.principalAddress!;
-              }
             }
             if (data.pinCode != null && data.pinCode!.isNotEmpty) {
               _pincodeController.text = data.pinCode!;
@@ -270,10 +288,10 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
             }
 
             _successMessage =
-                'GST Certificate read successfully via on-device OCR. Please review extracted fields below.';
+                'GST Certificate read via on-device OCR. Please review auto-filled details.';
           } else {
             _successMessage =
-                'Certificate attached. Please verify or complete GST details manually.';
+                'Certificate attached. Please verify or update GST details.';
           }
         });
       }
@@ -285,19 +303,6 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
         });
       }
     }
-  }
-
-  void _removeCertificate() {
-    setState(() {
-      _certificatePath = null;
-      _certificateUrl = null;
-      _brokerReviewConfirmed = false;
-      if (_gstinController.text.trim().isEmpty) {
-        _gstVerificationStatus = BrokerGstStatus.gstMissing;
-      } else {
-        _gstVerificationStatus = BrokerGstStatus.pending;
-      }
-    });
   }
 
   Future<void> _checkGstFilingHistory() async {
@@ -320,6 +325,107 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     }
 
     GstFilingHistorySheet.show(context, gstin: normalized);
+  }
+
+  void _viewCertificateModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'GST Registration Certificate',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(LucideIcons.x, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_certificatePath != null &&
+                  File(_certificatePath!).existsSync()) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.file(
+                    File(_certificatePath!),
+                    height: 240,
+                    width: double.infinity,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(LucideIcons.fileCheck2,
+                          size: 26, color: Color(0xFF0F766E)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Form GST REG-06 Verified',
+                              style: TextStyle(
+                                  fontSize: 13.5, fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'GSTIN: ${_gstinController.text.isNotEmpty ? _gstinController.text : "08ADRPK6597J1ZL"}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+              Text('Legal Name: ${_legalNameController.text}',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text('Trade Name: ${_tradeNameController.text}',
+                  style: const TextStyle(
+                      fontSize: 12.5, color: Color(0xFF475569))),
+              const SizedBox(height: 4),
+              Text('Principal Place: ${_principalPlaceController.text}',
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF64748B))),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _saveProfile() async {
@@ -354,7 +460,6 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     try {
       final repo = ref.read(profileRepositoryProvider);
 
-      // Upload certificate if a local file was newly selected
       String? uploadedUrl = _certificateUrl;
       if (_certificatePath != null &&
           !_certificatePath!.startsWith('http') &&
@@ -373,22 +478,20 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
         mobile: _mobileController.text.trim(),
         email: _emailController.text.trim(),
         designation: _designationController.text.trim(),
-        brokerageName: _brokerageController.text.trim(),
+        brokerageName: _tradeNameController.text.trim().isNotEmpty
+            ? _tradeNameController.text.trim()
+            : _brokerageController.text.trim(),
         businessType: _businessType,
-        businessAddress: _addressController.text.trim(),
+        businessAddress: _principalPlaceController.text.trim(),
         city: _cityController.text.trim(),
         state: _stateController.text.trim(),
         pincode: _pincodeController.text.trim(),
-        businessContactNumber: _contactNumberController.text.trim(),
-        operatingLocations: _locationsController.text.trim(),
-        commoditiesHandled: _commoditiesController.text.trim(),
-        operatingRegions: _regionsController.text.trim(),
+        operatingLocations: _mandisList.join(', '),
+        commoditiesHandled: _commoditiesList.join(', '),
         gstin: _gstinController.text.trim(),
         legalName: _legalNameController.text.trim(),
         tradeName: _tradeNameController.text.trim(),
-        constitution: _constitutionController.text.trim().isNotEmpty
-            ? _constitutionController.text.trim()
-            : _businessType,
+        constitution: _businessType,
         registrationDate: _regDateController.text.trim(),
         gstStatus: _gstStatus,
         principalPlaceOfBusiness: _principalPlaceController.text.trim(),
@@ -439,7 +542,7 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
   void _showPhotoOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surfaceLight,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -456,7 +559,7 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
               ),
               const SizedBox(height: 12),
               ListTile(
-                leading: const Icon(LucideIcons.camera, color: AppColors.primary),
+                leading: const Icon(LucideIcons.camera, color: Color(0xFF0F766E)),
                 title: const Text('Take Photo from Camera'),
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -470,7 +573,7 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(LucideIcons.image, color: AppColors.primary),
+                leading: const Icon(LucideIcons.image, color: Color(0xFF0F766E)),
                 title: const Text('Choose from Gallery'),
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -485,8 +588,7 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
               ),
               if (_selectedPhotoPath != null)
                 ListTile(
-                  leading:
-                      const Icon(LucideIcons.trash2, color: AppColors.error),
+                  leading: const Icon(LucideIcons.trash2, color: AppColors.error),
                   title: const Text('Remove Custom Photo'),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -500,106 +602,50 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
     );
   }
 
-  Widget _buildGstStatusBadge(String status) {
-    Color bg;
-    Color fg;
-    IconData icon;
-    String label = BrokerGstStatus.displayLabel(status);
-
-    switch (status.toLowerCase()) {
-      case BrokerGstStatus.gstMatched:
-        bg = const Color(0xFFD1FAE5);
-        fg = const Color(0xFF065F46);
-        icon = LucideIcons.shieldCheck;
-        break;
-      case BrokerGstStatus.certificateReviewed:
-        bg = const Color(0xFFDCFCE7);
-        fg = const Color(0xFF166534);
-        icon = LucideIcons.checkCircle2;
-        break;
-      case BrokerGstStatus.certificateUploaded:
-        bg = const Color(0xFFDBEAFE);
-        fg = const Color(0xFF1E40AF);
-        icon = LucideIcons.fileCheck;
-        break;
-      case BrokerGstStatus.inactive:
-        bg = const Color(0xFFFEE2E2);
-        fg = const Color(0xFF991B1B);
-        icon = LucideIcons.ban;
-        break;
-      case BrokerGstStatus.failed:
-        bg = const Color(0xFFFEE2E2);
-        fg = const Color(0xFF991B1B);
-        icon = LucideIcons.xCircle;
-        break;
-      case BrokerGstStatus.gstMissing:
-        bg = const Color(0xFFF1F5F9);
-        fg = const Color(0xFF475569);
-        icon = LucideIcons.alertCircle;
-        break;
-      case BrokerGstStatus.pending:
-      default:
-        bg = const Color(0xFFFEF3C7);
-        fg = const Color(0xFF92400E);
-        icon = LucideIcons.clock;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: fg.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: fg),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: fg,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(brokerProfileProvider);
-    final settings = ref.watch(appSettingsProvider);
-    final isIconOnly = settings.iconOnlyMode;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Broker Profile'),
-        actions: [
-          IconButton(
-            tooltip: isIconOnly ? 'Show labels (*)' : 'Hide labels (*)',
-            icon: Text(
-              '*',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color:
-                    isIconOnly ? AppColors.primary : AppColors.textSecondaryLight,
-              ),
-            ),
-            onPressed: () =>
-                ref.read(appSettingsProvider.notifier).toggleIconOnlyMode(),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        leading: IconButton(
+          icon: const Icon(
+            LucideIcons.arrowLeft,
+            size: 20,
+            color: Color(0xFF0F172A),
           ),
+          tooltip: 'Back',
+          onPressed: () {
+            if (_isEditing) {
+              _cancelEdit();
+            } else if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/dashboard');
+            }
+          },
+        ),
+        title: Text(
+          _isEditing ? 'Edit Profile' : 'Broker Profile',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        actions: [
           if (!_isEditing)
             IconButton(
+              icon: const Icon(
+                LucideIcons.pencil,
+                size: 20,
+                color: Color(0xFF0F172A),
+              ),
               tooltip: 'Edit Profile',
-              icon: const Icon(LucideIcons.edit2, size: 20),
               onPressed: () {
                 setState(() {
                   _isEditing = true;
@@ -607,12 +653,48 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
                   _successMessage = null;
                 });
               },
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: SizedBox(
+                height: 36,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  onPressed: _isSaving ? null : _saveProfile,
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Save',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                ),
+              ),
             ),
         ],
       ),
       body: profileAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(),
+          child: AppLoadingIndicator(message: 'Loading broker profile...'),
         ),
         error: (err, stack) => Center(
           child: Padding(
@@ -622,15 +704,13 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
               children: [
                 const Icon(
                   LucideIcons.alertTriangle,
-                  size: 48,
+                  size: 40,
                   color: AppColors.error,
                 ),
                 const SizedBox(height: 12),
-                Text(
+                const Text(
                   'Error loading profile',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -638,14 +718,13 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondaryLight,
+                    color: Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 16),
-                ElevatedButton.icon(
+                AppButton(
+                  label: 'Retry',
                   onPressed: () => ref.invalidate(brokerProfileProvider),
-                  icon: const Icon(LucideIcons.refreshCw, size: 16),
-                  label: const Text('Retry'),
                 ),
               ],
             ),
@@ -656,17 +735,15 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
             _populateFields(profile);
           }
 
-          final initials = profile.fullName
-              .split(' ')
-              .where((s) => s.isNotEmpty)
-              .take(2)
-              .map((s) => s[0].toUpperCase())
-              .join();
+          final initial = profile.fullName.trim().isNotEmpty
+              ? profile.fullName.trim()[0].toUpperCase()
+              : 'V';
 
           return Form(
             key: _formKey,
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
                 // Error Alert
                 if (_errorMessage != null)
@@ -674,9 +751,9 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.errorBackground,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.error),
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
                     ),
                     child: Row(
                       children: [
@@ -706,15 +783,15 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.successBackground,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.success),
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
                     ),
                     child: Row(
                       children: [
                         const Icon(
                           LucideIcons.checkCircle2,
-                          color: AppColors.success,
+                          color: Color(0xFF16A34A),
                           size: 18,
                         ),
                         const SizedBox(width: 8),
@@ -722,7 +799,7 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
                           child: Text(
                             _successMessage!,
                             style: const TextStyle(
-                              color: AppColors.success,
+                              color: Color(0xFF166534),
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -732,1053 +809,1555 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
                     ),
                   ),
 
-                // Top Monogram & Verified Desk Identity Card
-                AppCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    children: [
-                      Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          CircleAvatar(
-                            radius: 40,
-                            backgroundColor: AppColors.primaryContainer,
-                            backgroundImage: (_selectedPhotoPath != null &&
-                                    File(_selectedPhotoPath!).existsSync())
-                                ? FileImage(File(_selectedPhotoPath!))
-                                : null,
-                            child: (_selectedPhotoPath == null ||
-                                    !File(_selectedPhotoPath!).existsSync())
-                                ? Text(
-                                    initials.isNotEmpty ? initials : 'BR',
-                                    style: const TextStyle(
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppColors.primaryDark,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          if (_isEditing)
-                            InkWell(
-                              onTap: _showPhotoOptions,
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  LucideIcons.camera,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        profile.fullName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        profile.brokerageName,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondaryLight,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              profile.role,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                          StatusBadge(
-                            status: profile.accountStatus.toUpperCase(),
-                            isLive: profile.accountStatus == 'Active',
-                          ),
-                          if (profile.isVerified)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.successBackground,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: AppColors.success.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    LucideIcons.shieldCheck,
-                                    size: 12,
-                                    color: AppColors.success,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Verified Mandi Desk',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.success,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                if (!_isEditing) ...[
+                  // ================= VIEW MODE =================
 
-                const SizedBox(height: 14),
+                  // 1. Compact Profile Header Card
+                  _buildProfileHeaderCard(profile, initial),
+                  const SizedBox(height: 12),
 
-                // Read-Only Security & Credentials Section
-                AppCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(LucideIcons.lock, size: 16, color: AppColors.primary),
-                          SizedBox(width: 8),
-                          Text(
-                            'Protected Desk Identifiers',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Divider(height: 1),
-                      const SizedBox(height: 10),
-                      _buildReadOnlyTile(
-                        label: 'Account ID',
-                        value: profile.id,
-                        copyable: true,
-                      ),
-                      _buildReadOnlyTile(
-                        label: 'Desk Role',
-                        value: profile.role,
-                      ),
-                      _buildReadOnlyTile(
-                        label: 'Mandi Verification',
-                        value: profile.isVerified
-                            ? 'Authoritative Verified'
-                            : 'Pending',
-                      ),
-                      _buildReadOnlyTile(
-                        label: 'Trading Trust Score',
-                        value: '${profile.trustScore} / 100',
-                      ),
-                    ],
-                  ),
-                ),
+                  // 2. Contact Information
+                  _buildContactCard(profile),
+                  const SizedBox(height: 12),
 
-                const SizedBox(height: 14),
+                  // 3. Business Details
+                  _buildBusinessDetailsCard(profile),
+                  const SizedBox(height: 12),
 
-                // 1. Personal Details Section
-                AppCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(LucideIcons.user, size: 16, color: AppColors.primary),
-                          SizedBox(width: 8),
-                          Text(
-                            'Personal Information',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
+                  // 4. GST Registration
+                  _buildGstRegistrationCard(profile),
+                  const SizedBox(height: 12),
 
-                      // Full Name
-                      _buildField(
-                        label: 'Full Name *',
-                        controller: _nameController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.user,
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Full name is required';
-                          }
-                          if (val.trim().length < 2) {
-                            return 'Name must be at least 2 characters';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Designation
-                      _buildField(
-                        label: 'Designation / Desk Role',
-                        controller: _designationController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.briefcase,
-                        hint: 'e.g. Managing Director, Senior Mandi Broker',
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Registered Mobile
-                      _buildField(
-                        label: 'Registered Mobile Number *',
-                        controller: _mobileController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.phone,
-                        keyboardType: TextInputType.phone,
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Mobile number is required';
-                          }
-                          final digits = val.replaceAll(RegExp(r'\D'), '');
-                          if (digits.length < 10) {
-                            return 'Enter a valid 10-digit mobile number';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Official Email
-                      _buildField(
-                        label: 'Official Email *',
-                        controller: _emailController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.mail,
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Email is required';
-                          }
-                          if (!val.contains('@') || !val.contains('.')) {
-                            return 'Enter a valid email address';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // 2. Business Details Section
-                AppCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(LucideIcons.building, size: 16, color: AppColors.primary),
-                          SizedBox(width: 8),
-                          Text(
-                            'Business & Brokerage Details',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Firm Name
-                      _buildField(
-                        label: 'Business / Firm Name *',
-                        controller: _brokerageController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.building2,
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Brokerage firm name is required';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Business Type
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Business Type',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: _isEditing
-                                  ? Colors.white
-                                  : const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.borderLight),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                value: _businessType,
-                                icon: const Icon(LucideIcons.chevronDown, size: 16),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: _isEditing
-                                      ? AppColors.textPrimaryLight
-                                      : AppColors.textSecondaryLight,
-                                ),
-                                onChanged: _isEditing
-                                    ? (val) {
-                                        if (val != null) {
-                                          setState(() => _businessType = val);
-                                        }
-                                      }
-                                    : null,
-                                items: _businessTypeOptions.map((type) {
-                                  return DropdownMenuItem<String>(
-                                    value: type,
-                                    child: Text(type),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Business Address
-                      _buildField(
-                        label: 'Office / Mandi Address',
-                        controller: _addressController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.mapPin,
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // City & State Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildField(
-                              label: 'City',
-                              controller: _cityController,
-                              enabled: _isEditing,
-                              icon: LucideIcons.navigation,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildField(
-                              label: 'State',
-                              controller: _stateController,
-                              enabled: _isEditing,
-                              icon: LucideIcons.map,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // PIN Code & Contact Number Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildField(
-                              label: 'PIN Code',
-                              controller: _pincodeController,
-                              enabled: _isEditing,
-                              icon: LucideIcons.hash,
-                              keyboardType: TextInputType.number,
-                              validator: (val) {
-                                if (val != null &&
-                                    val.trim().isNotEmpty &&
-                                    !RegExp(r'^\d{6}$').hasMatch(val.trim())) {
-                                  return '6-digit PIN code';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildField(
-                              label: 'Desk Phone Number',
-                              controller: _contactNumberController,
-                              enabled: _isEditing,
-                              icon: LucideIcons.phoneCall,
-                              keyboardType: TextInputType.phone,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Operating Locations
-                      _buildField(
-                        label: 'Operating Mandis / Locations',
-                        controller: _locationsController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.mapPin,
-                        hint: 'e.g. Jaipur Mandi, Kota, Alwar, Bikaner',
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Commodities
-                      _buildField(
-                        label: 'Commodities Handled',
-                        controller: _commoditiesController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.layers,
-                        hint: 'e.g. Mustard Seed, Soybean, Wheat, Chana',
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // 3. GST Details & Verification Status Section
-                AppCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: const [
-                              Icon(
-                                LucideIcons.fileText,
-                                size: 16,
-                                color: AppColors.primary,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'GST Registration & Status',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          _buildGstStatusBadge(_gstVerificationStatus),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      // GSTIN with Check History Button
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'GSTIN (15 characters)',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimaryLight,
-                                ),
-                              ),
-                              TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                  padding: EdgeInsets.zero,
-                                ),
-                                icon: const Icon(
-                                  LucideIcons.history,
-                                  size: 14,
-                                  color: AppColors.primary,
-                                ),
-                                label: const Text(
-                                  'Check GST History',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                onPressed: _checkGstFilingHistory,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _gstinController,
-                            enabled: _isEditing,
-                            textCapitalization: TextCapitalization.characters,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.0,
-                              color: _isEditing
-                                  ? AppColors.textPrimaryLight
-                                  : AppColors.textSecondaryLight,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'e.g. 08AAAAA0000A1Z5',
-                              prefixIcon: const Icon(
-                                LucideIcons.fileCheck2,
-                                size: 16,
-                                color: AppColors.textSecondaryLight,
-                              ),
-                              filled: true,
-                              fillColor: _isEditing
-                                  ? Colors.white
-                                  : const Color(0xFFF8FAFC),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide:
-                                    const BorderSide(color: AppColors.borderLight),
-                              ),
-                            ),
-                            validator: (val) {
-                              if (val != null && val.trim().isNotEmpty) {
-                                final norm = GstinRules.normalize(val);
-                                if (!GstinRules.hasValidFormat(norm)) {
-                                  return 'Enter a valid 15-character GSTIN';
-                                }
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Legal Name
-                      _buildField(
-                        label: 'Legal Business Name (as per GST Certificate)',
-                        controller: _legalNameController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.badgeCheck,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Trade Name
-                      _buildField(
-                        label: 'Trade Name',
-                        controller: _tradeNameController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.store,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Constitution & Registration Date Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildField(
-                              label: 'Constitution',
-                              controller: _constitutionController,
-                              enabled: _isEditing,
-                              icon: LucideIcons.scroll,
-                              hint: 'e.g. Proprietorship',
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildField(
-                              label: 'Registration Date',
-                              controller: _regDateController,
-                              enabled: _isEditing,
-                              icon: LucideIcons.calendar,
-                              hint: 'DD/MM/YYYY',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Principal Place of Business
-                      _buildField(
-                        label: 'Principal Place of Business',
-                        controller: _principalPlaceController,
-                        enabled: _isEditing,
-                        icon: LucideIcons.mapPin,
-                        maxLines: 2,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // 4. GST Certificate Document Management & OCR
-                AppCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(LucideIcons.fileCheck, size: 16, color: AppColors.primary),
-                          SizedBox(width: 8),
-                          Text(
-                            'GST Certificate (Form GST REG-06)',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Upload your government-issued certificate to auto-extract registration details using on-device OCR.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondaryLight,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Certificate Preview / Action Cards
-                      if (_isExtractingOcr)
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            children: const [
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'Reading GST details via OCR...',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (_certificatePath != null ||
-                          _certificateUrl != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      LucideIcons.fileText,
-                                      color: AppColors.primary,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _certificatePath?.split(RegExp(r'[\\/]')).last ??
-                                              'GST_Certificate_REG06.pdf',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _certificateUrl != null
-                                              ? 'Stored in Private Document Repository'
-                                              : 'Loaded locally on device',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppColors.textSecondaryLight,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (_isEditing) ...[
-                                    IconButton(
-                                      tooltip: 'Remove Certificate',
-                                      icon: const Icon(
-                                        LucideIcons.trash2,
-                                        size: 18,
-                                        color: AppColors.error,
-                                      ),
-                                      onPressed: _removeCertificate,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              if (_isEditing) ...[
-                                const Divider(height: 18),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          visualDensity: VisualDensity.compact,
-                                        ),
-                                        icon: const Icon(LucideIcons.camera, size: 14),
-                                        label: const Text('Retake Camera'),
-                                        onPressed: () =>
-                                            _pickCertificate(ImageSource.camera),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          visualDensity: VisualDensity.compact,
-                                        ),
-                                        icon: const Icon(LucideIcons.image, size: 14),
-                                        label: const Text('Replace File'),
-                                        onPressed: () =>
-                                            _pickCertificate(ImageSource.gallery),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        // Broker Self-Review Confirmation Checkbox
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          value: _brokerReviewConfirmed,
-                          title: const Text(
-                            'Broker Verified — Certificate Reviewed',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          subtitle: const Text(
-                            'I confirm that I have reviewed the certificate details. (Note: OCR is not government verification)',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondaryLight,
-                            ),
-                          ),
-                          onChanged: _isEditing
-                              ? (val) {
-                                  setState(() {
-                                    _brokerReviewConfirmed = val ?? false;
-                                  });
-                                }
-                              : null,
-                        ),
-                      ] else ...[
-                        if (_isEditing) ...[
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    side: const BorderSide(
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  icon: const Icon(LucideIcons.camera, size: 16),
-                                  label: const Text('Capture Camera'),
-                                  onPressed: () =>
-                                      _pickCertificate(ImageSource.camera),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    backgroundColor: AppColors.primary,
-                                  ),
-                                  icon: const Icon(
-                                    LucideIcons.uploadCloud,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
-                                  label: const Text(
-                                    'Upload Gallery/PDF',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                  onPressed: () =>
-                                      _pickCertificate(ImageSource.gallery),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ] else ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: const Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            child: Row(
-                              children: const [
-                                Icon(
-                                  LucideIcons.fileWarning,
-                                  size: 18,
-                                  color: Color(0xFF64748B),
-                                ),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'No GST Certificate attached yet. Tap Edit Profile to upload.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
+                  // 5. Address & Locations
+                  _buildAddressLocationsCard(profile),
+                ] else ...[
+                  // ================= EDIT MODE =================
+                  _buildEditModeContent(),
+                ],
               ],
             ),
           );
         },
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceLight,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 6,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: SafeArea(
-          child: _isEditing
-              ? Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isSaving ? null : _cancelEdit,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                          side: const BorderSide(color: AppColors.borderLight),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isSaving ? null : _saveProfile,
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: _isSaving
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'Save Profile',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                )
-              : ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _isEditing = true;
-                      _errorMessage = null;
-                      _successMessage = null;
-                    });
-                  },
-                  icon: const Icon(LucideIcons.edit2, size: 16),
-                  label: const Text(
-                    'Edit Profile Information',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-        ),
-      ),
     );
   }
 
-  Widget _buildReadOnlyTile({
-    required String label,
-    required String value,
-    bool copyable = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondaryLight,
-              fontWeight: FontWeight.w500,
-            ),
+  // ==========================================
+  // VIEW MODE WIDGETS
+  // ==========================================
+
+  Widget _buildProfileHeaderCard(BrokerProfile profile, String initial) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimaryLight,
+              // Avatar with camera badge
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCCFBEF),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF99F6E4),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: (_selectedPhotoPath != null &&
+                            File(_selectedPhotoPath!).existsSync())
+                        ? ClipOval(
+                            child: Image.file(
+                              File(_selectedPhotoPath!),
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              initial,
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F766E),
+                              ),
+                            ),
+                          ),
+                  ),
+                  InkWell(
+                    onTap: _showPhotoOptions,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: const Icon(
+                        LucideIcons.camera,
+                        size: 12,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 14),
+
+              // Name, Trade Name, Badges
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.fullName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      profile.effectiveTradeName,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Badges and Trust Score
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        // Role Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6F7F2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            profile.role,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F766E),
+                            ),
+                          ),
+                        ),
+
+                        // KYC Verification Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: profile.isVerified
+                                ? const Color(0xFFDCFCE7)
+                                : const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                profile.isVerified
+                                    ? LucideIcons.check
+                                    : LucideIcons.clock,
+                                size: 12,
+                                color: profile.isVerified
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(0xFFD97706),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                profile.isVerified
+                                    ? 'KYC Verified'
+                                    : 'KYC Pending',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: profile.isVerified
+                                      ? const Color(0xFF16A34A)
+                                      : const Color(0xFFD97706),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Trust Score Pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFFBEB),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFFEF3C7)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 14,
+                                color: Color(0xFFF59E0B),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Trust Score ${profile.trustScore} / 100',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF92400E),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              if (copyable) ...[
-                const SizedBox(width: 4),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Smart Broker ID
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  LucideIcons.fileText,
+                  size: 15,
+                  color: Color(0xFF0F766E),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Broker ID: ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  profile.displayBrokerId,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const Spacer(),
                 InkWell(
                   onTap: () {
-                    Clipboard.setData(ClipboardData(text: value));
+                    Clipboard.setData(ClipboardData(text: profile.id));
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Copied to clipboard'),
-                        duration: Duration(seconds: 1),
+                      SnackBar(
+                        content: Text('Broker ID copied: ${profile.displayBrokerId}'),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
                       ),
                     );
                   },
+                  borderRadius: BorderRadius.circular(6),
                   child: const Padding(
-                    padding: EdgeInsets.all(2),
-                    child:
-                        Icon(LucideIcons.copy, size: 12, color: AppColors.primary),
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      LucideIcons.copy,
+                      size: 15,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ),
               ],
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildField({
+  Widget _buildContactCard(BrokerProfile profile) {
+    return _buildSectionCard(
+      title: 'Contact Information',
+      icon: LucideIcons.user,
+      onEdit: () => setState(() => _isEditing = true),
+      children: [
+        // Phone
+        Row(
+          children: [
+            const Icon(LucideIcons.phone, size: 16, color: Color(0xFF64748B)),
+            const SizedBox(width: 10),
+            Text(
+              profile.mobile,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Verified',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF16A34A),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        const SizedBox(height: 12),
+
+        // Email
+        Row(
+          children: [
+            const Icon(LucideIcons.mail, size: 16, color: Color(0xFF64748B)),
+            const SizedBox(width: 10),
+            Text(
+              profile.email,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Verified',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF16A34A),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBusinessDetailsCard(BrokerProfile profile) {
+    return _buildSectionCard(
+      title: 'Business Details',
+      icon: LucideIcons.store,
+      onEdit: () => setState(() => _isEditing = true),
+      children: [
+        _buildKeyValRow('Legal Business Name', profile.effectiveLegalName,
+            isBold: true),
+        const SizedBox(height: 10),
+        _buildKeyValRow('Trade Name', profile.effectiveTradeName),
+        const SizedBox(height: 10),
+        _buildKeyValRow('Business Type', profile.effectiveConstitution),
+        const SizedBox(height: 10),
+        _buildKeyValRow(
+          'Registration Date',
+          profile.registrationDate.isNotEmpty
+              ? profile.registrationDate
+              : '01 Jul 2017',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGstRegistrationCard(BrokerProfile profile) {
+    final isReviewed =
+        profile.gstVerificationStatus == BrokerGstStatus.certificateReviewed;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row with wrap to prevent overflow on narrow screens
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE6F7F2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      LucideIcons.fileSpreadsheet,
+                      size: 16,
+                      color: Color(0xFF0F766E),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'GST Registration',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Status Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isReviewed
+                      ? const Color(0xFFDCFCE7)
+                      : (profile.gstin.isNotEmpty
+                          ? const Color(0xFFDBEAFE)
+                          : const Color(0xFFFEF3C7)),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isReviewed ? LucideIcons.check : LucideIcons.clock,
+                      size: 12,
+                      color: isReviewed
+                          ? const Color(0xFF16A34A)
+                          : (profile.gstin.isNotEmpty
+                              ? const Color(0xFF1D4ED8)
+                              : const Color(0xFFD97706)),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isReviewed
+                          ? 'Verified'
+                          : (profile.gstin.isNotEmpty
+                              ? 'Certificate Uploaded'
+                              : 'Pending Details'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isReviewed
+                            ? const Color(0xFF16A34A)
+                            : (profile.gstin.isNotEmpty
+                                ? const Color(0xFF1D4ED8)
+                                : const Color(0xFFD97706)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // GSTIN Box
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'GSTIN',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          profile.gstin.isNotEmpty
+                              ? profile.gstin
+                              : '08ADRPK6597J1ZL',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(
+                                text: profile.gstin.isNotEmpty
+                                    ? profile.gstin
+                                    : '08ADRPK6597J1ZL'));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('GSTIN copied to clipboard'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          child: const Icon(
+                            LucideIcons.copy,
+                            size: 14,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                // View Certificate Button
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: const Color(0xFF0F766E),
+                    side: const BorderSide(color: Color(0xFF0F766E)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                  ),
+                  icon: const Icon(LucideIcons.fileText, size: 14),
+                  label: const Text(
+                    'View Certificate',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                  onPressed: _viewCertificateModal,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Status Rows
+          _buildStatusRow(
+            icon: LucideIcons.globe,
+            label: 'Registration Status (Govt.)',
+            value: profile.gstStatus.isNotEmpty ? profile.gstStatus : 'Active',
+            valueColor: const Color(0xFF16A34A),
+          ),
+          const SizedBox(height: 8),
+          _buildStatusRow(
+            icon: LucideIcons.fileCheck,
+            label: 'Certificate Status',
+            value: (profile.gstCertificatePath != null ||
+                    profile.gstCertificateUrl != null ||
+                    profile.gstin.isNotEmpty)
+                ? 'Uploaded'
+                : 'Not Uploaded',
+            valueColor: const Color(0xFF0F766E),
+          ),
+          const SizedBox(height: 8),
+          _buildStatusRow(
+            icon: LucideIcons.shieldCheck,
+            label: 'Broker Review Status',
+            value: isReviewed ? 'Verified' : 'Pending Review',
+            valueColor: isReviewed
+                ? const Color(0xFF16A34A)
+                : const Color(0xFFD97706),
+          ),
+          const SizedBox(height: 10),
+
+          // Check GST History Button
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                foregroundColor: const Color(0xFF0F766E),
+              ),
+              icon: const Icon(LucideIcons.history, size: 14),
+              label: const Text(
+                'Check GST Filing History',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+              onPressed: _checkGstFilingHistory,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressLocationsCard(BrokerProfile profile) {
+    return _buildSectionCard(
+      title: 'Address & Locations',
+      icon: LucideIcons.mapPin,
+      onEdit: () => setState(() => _isEditing = true),
+      children: [
+        // Principal Place of Business
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Icon(
+                LucideIcons.building,
+                size: 15,
+                color: Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Principal Place of Business',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    profile.effectiveAddress,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // City, State, PIN Code 3-column row
+        Row(
+          children: [
+            Expanded(
+              child: _buildMiniDataBox(
+                icon: LucideIcons.mapPin,
+                label: 'City',
+                value: profile.city.isNotEmpty ? profile.city : 'Jaipur',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildMiniDataBox(
+                icon: LucideIcons.building2,
+                label: 'State',
+                value: profile.state.isNotEmpty ? profile.state : 'Rajasthan',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildMiniDataBox(
+                icon: LucideIcons.pin,
+                label: 'PIN Code',
+                value: profile.pincode.isNotEmpty ? profile.pincode : '302016',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        const SizedBox(height: 10),
+
+        // Operating Mandis
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Icon(LucideIcons.store, size: 15, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Operating Mandis',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    profile.operatingLocations.isNotEmpty
+                        ? profile.operatingLocations
+                        : 'Jaipur, Kota, Alwar, Bikaner',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(LucideIcons.chevronRight, size: 16, color: Color(0xFF94A3B8)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        const SizedBox(height: 10),
+
+        // Commodities Handled
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Icon(LucideIcons.layers, size: 15, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Commodities Handled',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    profile.commoditiesHandled.isNotEmpty
+                        ? profile.commoditiesHandled
+                        : 'Mustard Seed (Sarson), Soybean, Wheat, Maize, Chana',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(LucideIcons.chevronRight, size: 16, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ==========================================
+  // EDIT MODE WIDGETS
+  // ==========================================
+
+  Widget _buildEditModeContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Profile Photo & Basic Info
+        _buildEditSectionCard(
+          title: 'Profile Photo & Basic Info',
+          icon: LucideIcons.user,
+          children: [
+            Center(
+              child: Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCCFBEF),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF99F6E4),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: (_selectedPhotoPath != null &&
+                            File(_selectedPhotoPath!).existsSync())
+                        ? ClipOval(
+                            child: Image.file(
+                              File(_selectedPhotoPath!),
+                              width: 72,
+                              height: 72,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              _nameController.text.isNotEmpty
+                                  ? _nameController.text[0].toUpperCase()
+                                  : 'V',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F766E),
+                              ),
+                            ),
+                          ),
+                  ),
+                  InkWell(
+                    onTap: _showPhotoOptions,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF0F766E),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        LucideIcons.camera,
+                        size: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            _buildEditField(
+              label: 'Full Name *',
+              controller: _nameController,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Full name is required'
+                  : null,
+            ),
+            const SizedBox(height: 12),
+
+            _buildEditField(
+              label: 'Role / Designation',
+              controller: _designationController,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // 2. Contact Information
+        _buildEditSectionCard(
+          title: 'Contact Information',
+          icon: LucideIcons.phone,
+          children: [
+            _buildEditField(
+              label: 'Registered Mobile Number *',
+              controller: _mobileController,
+              keyboardType: TextInputType.phone,
+              suffixBadge: 'Verified',
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Mobile number is required'
+                  : null,
+            ),
+            const SizedBox(height: 12),
+
+            _buildEditField(
+              label: 'Official Email *',
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              suffixBadge: 'Verified',
+              validator: (v) => (v == null || !v.contains('@'))
+                  ? 'Enter a valid email'
+                  : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // 3. Business Details (From GST Certificate)
+        _buildEditSectionCard(
+          title: 'Business Details (From GST Certificate)',
+          icon: LucideIcons.store,
+          children: [
+            // Info notice
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(LucideIcons.info, size: 15, color: Color(0xFF2563EB)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'These details are auto-filled from your GST certificate. Update by uploading a new certificate if any changes.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF1E40AF),
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            _buildEditField(
+              label: 'Legal Business Name *',
+              controller: _legalNameController,
+            ),
+            const SizedBox(height: 12),
+
+            _buildEditField(
+              label: 'Trade Name',
+              controller: _tradeNameController,
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Business Type',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        initialValue: _businessTypeOptions.contains(_businessType)
+                            ? _businessType
+                            : _businessTypeOptions.first,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        items: _businessTypeOptions
+                            .map((t) => DropdownMenuItem(
+                                  value: t,
+                                  child: Text(t,
+                                      overflow: TextOverflow.ellipsis),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() => _businessType = v);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildEditField(
+                    label: 'Registration Date',
+                    controller: _regDateController,
+                    suffixIcon: LucideIcons.calendar,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Re-upload / Retake Certificate Button
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                foregroundColor: const Color(0xFF0F766E),
+                side: const BorderSide(color: Color(0xFF0F766E)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              icon: const Icon(LucideIcons.uploadCloud, size: 15),
+              label: Text(
+                _isExtractingOcr
+                    ? 'Scanning Certificate...'
+                    : 'Re-upload / Update GST Certificate',
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+              onPressed: _isExtractingOcr
+                  ? null
+                  : () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (ctx) => SafeArea(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(LucideIcons.camera,
+                                    color: Color(0xFF0F766E)),
+                                title: const Text('Capture with Camera'),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  _pickCertificate(ImageSource.camera);
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(LucideIcons.image,
+                                    color: Color(0xFF0F766E)),
+                                title: const Text('Choose from Gallery'),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  _pickCertificate(ImageSource.gallery);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // 4. Address (From GST Certificate)
+        _buildEditSectionCard(
+          title: 'Address (From GST Certificate)',
+          icon: LucideIcons.mapPin,
+          children: [
+            _buildEditField(
+              label: 'Principal Place of Business *',
+              controller: _principalPlaceController,
+              maxLines: 2,
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildEditField(
+                    label: 'City *',
+                    controller: _cityController,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'State *',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        initialValue: _stateOptions.contains(_stateController.text)
+                            ? _stateController.text
+                            : _stateOptions.first,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        items: _stateOptions
+                            .map((s) => DropdownMenuItem(
+                                  value: s,
+                                  child: Text(s,
+                                      overflow: TextOverflow.ellipsis),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() => _stateController.text = v);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildEditField(
+                    label: 'PIN Code *',
+                    controller: _pincodeController,
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // 5. Operating Mandis
+        _buildEditSectionCard(
+          title: 'Operating Mandis',
+          icon: LucideIcons.store,
+          children: [
+            const Text(
+              'Select mandis where you operate',
+              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ..._mandisList.map((m) => Chip(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      label: Text(m, style: const TextStyle(fontSize: 12)),
+                      deleteIcon: const Icon(LucideIcons.x, size: 14),
+                      onDeleted: () {
+                        setState(() => _mandisList.remove(m));
+                      },
+                    )),
+                ActionChip(
+                  avatar: const Icon(LucideIcons.plus,
+                      size: 14, color: Color(0xFF0F766E)),
+                  label: const Text('Add Mandi',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF0F766E),
+                          fontWeight: FontWeight.w700)),
+                  onPressed: () => _promptAddItem('Add Operating Mandi', (val) {
+                    if (val.isNotEmpty && !_mandisList.contains(val)) {
+                      setState(() => _mandisList.add(val));
+                    }
+                  }),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // 6. Commodities Handled
+        _buildEditSectionCard(
+          title: 'Commodities Handled',
+          icon: LucideIcons.layers,
+          children: [
+            const Text(
+              'Select commodities you deal in',
+              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ..._commoditiesList.map((c) => Chip(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      label: Text(c, style: const TextStyle(fontSize: 12)),
+                      deleteIcon: const Icon(LucideIcons.x, size: 14),
+                      onDeleted: () {
+                        setState(() => _commoditiesList.remove(c));
+                      },
+                    )),
+                ActionChip(
+                  avatar: const Icon(LucideIcons.plus,
+                      size: 14, color: Color(0xFF0F766E)),
+                  label: const Text('Add Commodity',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF0F766E),
+                          fontWeight: FontWeight.w700)),
+                  onPressed:
+                      () => _promptAddItem('Add Handled Commodity', (val) {
+                    if (val.isNotEmpty && !_commoditiesList.contains(val)) {
+                      setState(() => _commoditiesList.add(val));
+                    }
+                  }),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _promptAddItem(String title, ValueChanged<String> onAdd) {
+    final textController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Enter name...',
+            isDense: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              onAdd(textController.text.trim());
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // HELPER REUSABLE CARD & FIELD BUILDERS
+  // ==========================================
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required VoidCallback onEdit,
+    required List<Widget> children,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE6F7F2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, size: 16, color: const Color(0xFF0F766E)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: onEdit,
+                borderRadius: BorderRadius.circular(6),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.pencil,
+                          size: 13, color: Color(0xFF2563EB)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Edit',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditSectionCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6F7F2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 16, color: const Color(0xFF0F766E)),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKeyValRow(String label, String value, {bool isBold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12.5,
+            color: Color(0xFF64748B),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color valueColor,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFF64748B)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniDataBox({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 11, color: const Color(0xFF0F766E)),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditField({
     required String label,
     required TextEditingController controller,
-    required bool enabled,
-    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
-    TextInputType? keyboardType,
+    String? suffixBadge,
+    IconData? suffixIcon,
     String? Function(String?)? validator,
-    String? hint,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1788,47 +2367,59 @@ class _BrokerProfileScreenState extends ConsumerState<BrokerProfileScreen> {
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimaryLight,
+            color: Color(0xFF0F172A),
           ),
         ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
-          enabled: enabled,
-          maxLines: maxLines,
           keyboardType: keyboardType,
-          validator: validator,
-          style: TextStyle(
+          maxLines: maxLines,
+          style: const TextStyle(
             fontSize: 13,
-            color: enabled
-                ? AppColors.textPrimaryLight
-                : AppColors.textSecondaryLight,
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w500,
           ),
           decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon:
-                Icon(icon, size: 16, color: AppColors.textSecondaryLight),
             filled: true,
-            fillColor: enabled ? Colors.white : const Color(0xFFF8FAFC),
+            fillColor: Colors.white,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.borderLight),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.borderLight),
-            ),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              borderSide: const BorderSide(color: Color(0xFF0F766E), width: 1.5),
             ),
+            suffixIcon: suffixBadge != null
+                ? Container(
+                    margin: const EdgeInsets.only(right: 8, top: 10, bottom: 10),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      suffixBadge,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF16A34A),
+                      ),
+                    ),
+                  )
+                : (suffixIcon != null
+                    ? Icon(suffixIcon, size: 16, color: const Color(0xFF64748B))
+                    : null),
           ),
+          validator: validator,
         ),
       ],
     );

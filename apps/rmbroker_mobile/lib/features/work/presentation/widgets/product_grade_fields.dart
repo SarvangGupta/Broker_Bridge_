@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../domain/trade_master_data.dart';
 import 'commodity_picker_field.dart';
+import 'trade_form_widgets.dart';
 
 String noGradeMessage(String productName) =>
     'No grade is defined for $productName in the Product Master yet. '
@@ -17,6 +18,7 @@ class ProductGradeFields extends StatelessWidget {
   final ValueChanged<MasterDropdownItem> onCommodityChanged;
   final ValueChanged<String?> onGradeChanged;
   final VoidCallback onRetry;
+  final bool isLoading;
 
   const ProductGradeFields({
     super.key,
@@ -26,6 +28,7 @@ class ProductGradeFields extends StatelessWidget {
     required this.onCommodityChanged,
     required this.onGradeChanged,
     required this.onRetry,
+    this.isLoading = false,
   });
 
   @override
@@ -61,12 +64,41 @@ class ProductGradeFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CommodityPickerField(
-          commodities: master.commodities,
-          selected: selected,
-          onSelected: onCommodityChanged,
+        if (master.isFallback && !isLoading) ...[
+          Container(
+            key: const Key('live-master-unavailable'),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.errorBackground,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(LucideIcons.alertCircle, size: 16, color: AppColors.error),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Live company and product lists could not be loaded. Sample data is shown and cannot be saved.',
+                    style: TextStyle(fontSize: 12, color: AppColors.error),
+                  ),
+                ),
+                TextButton(onPressed: onRetry, child: const Text('Retry')),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        TradeFormRow(
+          icon: LucideIcons.wheat,
+          child: TradeField(
+            label: 'Commodity',
+            child: CommodityPickerField(
+              commodities: master.commodities,
+              selected: selected,
+              onSelected: onCommodityChanged,
+            ),
+          ),
         ),
-        const SizedBox(height: 12),
         if (selected != null && grades.isEmpty)
           Container(
             key: const Key('no-grade-notice'),
@@ -81,21 +113,23 @@ class ProductGradeFields extends StatelessWidget {
             ),
           )
         else
-          DropdownButtonFormField<String>(
-            // Rebuild per product so a grade from another product can never stay selected.
-            key: ValueKey('grade-dropdown-${selected?.id}'),
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Quality Grade *',
-              border: OutlineInputBorder(),
-              isDense: true,
+          TradeFormRow(
+            icon: LucideIcons.award,
+            child: TradeField(
+              label: 'Grade',
+              child: DropdownButtonFormField<String>(
+                // Rebuild per product so a grade from another product can never stay selected.
+                key: ValueKey('grade-dropdown-${selected?.id}'),
+                isExpanded: true,
+                decoration: tradeInputDecoration(),
+                initialValue: validGrade,
+                hint: const Text('Select grade', overflow: TextOverflow.ellipsis),
+                items: grades
+                    .map((g) => DropdownMenuItem<String>(value: g.id, child: Text(g.name, overflow: TextOverflow.ellipsis)))
+                    .toList(),
+                onChanged: selected == null ? null : onGradeChanged,
+              ),
             ),
-            initialValue: validGrade,
-            hint: Text(selected == null ? 'Select a product first' : 'Select grade'),
-            items: grades
-                .map((g) => DropdownMenuItem<String>(value: g.id, child: Text(g.name)))
-                .toList(),
-            onChanged: selected == null ? null : onGradeChanged,
           ),
       ],
     );

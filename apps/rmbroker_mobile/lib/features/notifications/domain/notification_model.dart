@@ -22,6 +22,12 @@ class BrokerNotification {
   final DateTime createdAt;
   final Map<String, dynamic>? payload;
 
+  /// Read from the related record; never stored on the notification itself.
+  final String? counterpartyName;
+  final String? resolvedCommodity;
+  final String? resolvedQuantity;
+  final String? resolvedLocation;
+
   const BrokerNotification({
     required this.id,
     required this.userId,
@@ -40,6 +46,10 @@ class BrokerNotification {
     this.readAt,
     required this.createdAt,
     this.payload,
+    this.counterpartyName,
+    this.resolvedCommodity,
+    this.resolvedQuantity,
+    this.resolvedLocation,
   });
 
   /// Factory constructor to parse from backend Supabase or REST API JSON.
@@ -126,6 +136,10 @@ class BrokerNotification {
     DateTime? readAt,
     DateTime? createdAt,
     Map<String, dynamic>? payload,
+    String? counterpartyName,
+    String? resolvedCommodity,
+    String? resolvedQuantity,
+    String? resolvedLocation,
   }) {
     return BrokerNotification(
       id: id ?? this.id,
@@ -145,7 +159,27 @@ class BrokerNotification {
       readAt: readAt ?? this.readAt,
       createdAt: createdAt ?? this.createdAt,
       payload: payload ?? this.payload,
+      counterpartyName: counterpartyName ?? this.counterpartyName,
+      resolvedCommodity: resolvedCommodity ?? this.resolvedCommodity,
+      resolvedQuantity: resolvedQuantity ?? this.resolvedQuantity,
+      resolvedLocation: resolvedLocation ?? this.resolvedLocation,
     );
+  }
+
+  /// Commodity named by the payload or the related record.
+  String? get commodityLabel {
+    for (final key in const ['commodity', 'commodityName', 'commodity_name']) {
+      final v = payload?[key]?.toString().trim();
+      if (v != null && v.isNotEmpty) return v;
+    }
+    if (resolvedCommodity != null) return resolvedCommodity;
+    // Older rows name the commodity only in the title ("New Requirement: Maize").
+    final type = eventType.toUpperCase();
+    final colon = title.indexOf(': ');
+    if ((type.contains('REQUIREMENT') || type.contains('OFFER')) && colon > 0) {
+      return title.substring(colon + 2).trim();
+    }
+    return null;
   }
 
   /// Whether this notification can be clicked to navigate to an existing app screen or record.

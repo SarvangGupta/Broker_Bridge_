@@ -23,7 +23,7 @@ class ToolsMenuScreen extends StatelessWidget {
             'Send verified prices to buyers', (c) => c.push('/broadcast/market-price')),
         MoreSectionItem('broadcast_history', LucideIcons.history, 'Broadcast Price History',
             'Review sent prices, recipients & audit trail', (c) => c.push('/broadcast/history')),
-        MoreSectionItem('tasks', LucideIcons.squareCheck, 'Broker Tasks & Follow-ups',
+        MoreSectionItem('tasks', LucideIcons.squareCheck, 'My Tasks',
             'Track action items, priorities & business follow-ups', (c) => c.push('/tasks')),
         MoreSectionItem('notifications', LucideIcons.bell, 'Notifications & Activity Center',
             'Operational alerts, mandates, deals & invoices', (c) => c.push('/notifications')),

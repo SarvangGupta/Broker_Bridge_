@@ -454,7 +454,8 @@ class DealDetailScreen extends ConsumerWidget {
             child: Column(
               children: [
                 _buildTermRow('Price Basis', deal.priceBasis),
-                _buildTermRow('Delivery Location', deal.deliveryLocation ?? 'FOR Mandi Warehouse'),
+                _buildTermRow('Unloading Location', deal.deliveryLocation ?? 'Not recorded'),
+                _buildTermRow('Loading Location', detail.loadingLocation ?? 'Not recorded'),
                 _buildTermRow('Delivery Terms', detail.deliveryTerms),
                 _buildTermRow('Payment Terms', detail.paymentTerms),
                 _buildTermRow('Packaging Type', detail.packagingType),

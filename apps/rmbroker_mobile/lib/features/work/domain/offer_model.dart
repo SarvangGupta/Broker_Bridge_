@@ -115,6 +115,9 @@ class OfferItem {
   final String labReportDisclaimer;
 
   final String? notes;
+  final String? locationId;
+  final String? locationSnapshot;
+  final String? priceVisibility;
   final DateTime createdAt;
 
   /// Managing broker desk; only that broker can reserve the lot's stock.
@@ -156,6 +159,9 @@ class OfferItem {
     this.labReportUrl,
     this.labReportDisclaimer = 'Seller Declared / Pending Verification',
     this.notes,
+    this.locationId,
+    this.locationSnapshot,
+    this.priceVisibility,
     required this.createdAt,
     this.brokerId,
   });
@@ -271,6 +277,15 @@ class OfferItem {
       labReportUrl: json['lab_report_url']?.toString() ?? json['file_url']?.toString(),
       labReportDisclaimer: 'Seller Declared / Pending Verification',
       notes: json['notes']?.toString(),
+      locationId: json['loading_location_id']?.toString() ?? json['location_id']?.toString() ?? json['locationId']?.toString(),
+      locationSnapshot: json['loading_location_snapshot']?.toString() ??
+          json['location_snapshot']?.toString() ??
+          json['locationSnapshot']?.toString() ??
+          json['loading_remarks']?.toString() ??
+          json['loadingRemarks']?.toString(),
+      priceVisibility: json['price_visibility']?.toString() ??
+          json['priceVisibility']?.toString() ??
+          'Confidential',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -303,6 +318,9 @@ class CreateOfferDto {
   final DateTime validUntil;
   final LoadingReadiness loadingStatus;
   final String? loadingRemarks;
+  final String? locationId;
+  final String? locationSnapshot;
+  final String? priceVisibility;
 
   const CreateOfferDto({
     required this.companyId,
@@ -318,6 +336,9 @@ class CreateOfferDto {
     required this.validUntil,
     this.loadingStatus = LoadingReadiness.notReady,
     this.loadingRemarks,
+    this.locationId,
+    this.locationSnapshot,
+    this.priceVisibility,
   });
 
   /// Validates input fields and returns error message or null if valid.
@@ -359,5 +380,8 @@ class CreateOfferDto {
         'loadingStatus': loadingStatus.label,
         if (loadingRemarks != null && loadingRemarks!.trim().isNotEmpty)
           'loadingRemarks': loadingRemarks!.trim(),
+        if (locationId != null) 'locationId': locationId,
+        if (locationSnapshot != null) 'locationSnapshot': locationSnapshot,
+        if (priceVisibility != null) 'priceVisibility': priceVisibility,
       };
 }

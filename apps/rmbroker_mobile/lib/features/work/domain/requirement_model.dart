@@ -96,6 +96,8 @@ class RequirementItem {
   final String? rawStatus;
   final String? brokerId;
   final String? notes;
+  final String? locationId;
+  final String? locationSnapshot;
   final DateTime createdAt;
 
   const RequirementItem({
@@ -133,6 +135,8 @@ class RequirementItem {
     this.rawStatus,
     this.brokerId,
     this.notes,
+    this.locationId,
+    this.locationSnapshot,
     required this.createdAt,
   });
 
@@ -272,6 +276,12 @@ class RequirementItem {
       rawStatus: rawStatus,
       brokerId: json['broker_id']?.toString() ?? json['brokerId']?.toString(),
       notes: json['notes']?.toString(),
+      locationId: json['delivery_location_id']?.toString() ?? json['location_id']?.toString() ?? json['locationId']?.toString(),
+      locationSnapshot: json['delivery_location_snapshot']?.toString() ??
+          json['location_snapshot']?.toString() ??
+          json['locationSnapshot']?.toString() ??
+          json['delivery_terms_id']?.toString() ??
+          json['deliveryTerms']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -299,6 +309,8 @@ class CreateRequirementDto {
   final String deliveryTerms;
   final DateTime targetDate;
   final String? notes;
+  final String? locationId;
+  final String? locationSnapshot;
 
   const CreateRequirementDto({
     required this.companyId,
@@ -310,6 +322,8 @@ class CreateRequirementDto {
     required this.deliveryTerms,
     required this.targetDate,
     this.notes,
+    this.locationId,
+    this.locationSnapshot,
   });
 
   /// Validates input fields and returns error message or null if valid.
@@ -337,8 +351,10 @@ class CreateRequirementDto {
         'quantity': quantity,
         'unitId': unitId,
         'targetPrice': targetPrice,
-        'deliveryTermsId': deliveryTerms,
+        'deliveryTermsId': locationSnapshot ?? deliveryTerms,
         'targetDate': targetDate.toIso8601String(),
         if (notes != null && notes!.trim().isNotEmpty) 'notes': notes!.trim(),
+        if (locationId != null) 'locationId': locationId,
+        if (locationSnapshot != null) 'locationSnapshot': locationSnapshot,
       };
 }

@@ -281,6 +281,7 @@ void main() {
         'id': reqId,
         'company_id': buyerCo,
         'status': 'Open',
+        'delivery_location_id': 'wh-unload',
         'master_commodities': {'name': 'Maize DDGS'},
         'master_units': {'symbol': 'MT'},
         'companies': {'name': 'Rohan Feeds'},
@@ -289,6 +290,8 @@ void main() {
         'id': lotId,
         'company_id': sellerCo,
         'status': 'Open',
+        'loading_location_id': 'wh-load',
+        'loading_location_snapshot': 'Kota Godown, Road - 324005, Kota, Rajasthan',
         'companies': {'name': 'Seller Co'},
       },
     };
@@ -317,7 +320,7 @@ void main() {
       expect(deal.buyerCompanyName, 'Rohan Feeds');
       final select = fake.requests.first.query['select']!;
       expect(select, isNot(contains('seller_id')));
-      expect(select, contains('availabilities(id,company_id')); // postgrest-dart strips spaces
+      expect(select, contains('availabilities(*')); // seller company comes from the lot row
 
       final dealInsert = fake.writesTo('deals').single.body as Map;
       expect(dealInsert['buyer_id'], buyerCo);
@@ -329,6 +332,10 @@ void main() {
       expect(snapshot['requirementId'], reqId);
       expect(snapshot['allocationId'], allocId);
       expect(snapshot['buyerConfirmed'], isFalse);
+      expect(snapshot['deliveryLocation'], 'FOR Mill Delivery, Kota Mandi');
+      expect(snapshot['unloadingLocationId'], 'wh-unload');
+      expect(snapshot['loadingLocationId'], 'wh-load');
+      expect(snapshot['loadingLocationSnapshot'], contains('Kota Godown'));
 
       final commit = fake.writesTo('requirement_allocations').single;
       expect((commit.body as Map)['status'], 'COMMITTED_TO_DEAL');

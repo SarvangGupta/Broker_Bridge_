@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../data/saved_locations_repository.dart';
 import '../../domain/requirement_model.dart';
+import '../../domain/saved_location_model.dart';
 import '../../domain/trade_master_data.dart';
 import '../controllers/master_data_controller.dart';
 import '../controllers/requirements_controller.dart';
+import 'change_location_sheet.dart';
 import 'product_grade_fields.dart';
+import 'trade_form_widgets.dart';
 
 class CreateRequirementSheet extends ConsumerStatefulWidget {
   const CreateRequirementSheet({super.key});
@@ -15,12 +19,9 @@ class CreateRequirementSheet extends ConsumerStatefulWidget {
   static Future<bool?> show(BuildContext context) {
     return showModalBottomSheet<bool>(
       context: context,
-      useRootNavigator: false,
+      useRootNavigator: true,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceLight,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (_) => const CreateRequirementSheet(),
     );
   }
@@ -34,13 +35,15 @@ class _CreateRequirementSheetState extends ConsumerState<CreateRequirementSheet>
   String? _selectedCommodityId;
   String? _selectedGradeId;
   String _selectedUnitSymbol = 'MT';
+  String? _locationError;
+  SavedLocation? _selectedLocation;
+  bool _isLoadingLocation = false;
 
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
-  final _termsController = TextEditingController(text: 'FOR Destination (Jaipur)');
   final _notesController = TextEditingController();
 
-  DateTime _targetDate = DateTime.now().add(const Duration(days: 7));
+  DateTime? _targetDate;
   bool _isSubmitting = false;
   String? _errorMessage;
 
@@ -48,21 +51,76 @@ class _CreateRequirementSheetState extends ConsumerState<CreateRequirementSheet>
   void dispose() {
     _quantityController.dispose();
     _priceController.dispose();
-    _termsController.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  List<MasterDropdownItem> _getBuyerList(TradeMasterData master) {
+    return master.buyerCompanies;
+  }
+
+  Future<void> _loadLocationForBuyer(String buyerId) async {
+    setState(() {
+      _isLoadingLocation = true;
+      _locationError = null;
+    });
+    try {
+      final loc = await ref.read(savedLocationsRepositoryProvider).getDefaultLocation(buyerId);
+      // A newer buyer selection owns the result.
+      if (mounted && _selectedBuyerId == buyerId) {
+        setState(() {
+          _selectedLocation = loc;
+          _isLoadingLocation = false;
+        });
+      }
+    } on SavedLocationsUnavailable catch (e) {
+      if (mounted && _selectedBuyerId == buyerId) {
+        setState(() {
+          _locationError = e.message;
+          _isLoadingLocation = false;
+        });
+      }
+    }
   }
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _targetDate.isBefore(now) ? now : _targetDate,
+      initialDate: _targetDate ?? now.add(const Duration(days: 7)),
       firstDate: now,
       lastDate: now.add(const Duration(days: 180)),
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() => _targetDate = picked);
+    }
+  }
+
+  Future<void> _onBuyerChanged(String buyerId, List<MasterDropdownItem> buyers) async {
+    setState(() {
+      _selectedBuyerId = buyerId;
+      _selectedLocation = null;
+    });
+    await _loadLocationForBuyer(buyerId);
+  }
+
+  Future<void> _openChangeLocation(List<MasterDropdownItem> buyers) async {
+    if (_selectedBuyerId == null) {
+      setState(() => _errorMessage = 'Please select a buyer first');
+      return;
+    }
+
+    final buyer = buyers.where((b) => b.id == _selectedBuyerId).firstOrNull;
+    final picked = await ChangeLocationSheet.show(
+      context: context,
+      companyId: _selectedBuyerId!,
+      companyName: buyer?.name ?? 'Buyer Counterparty',
+      currentLocationId: _selectedLocation?.id,
+      role: LocationRole.delivery,
+    );
+
+    if (picked != null && mounted) {
+      setState(() => _selectedLocation = picked);
     }
   }
 
@@ -70,7 +128,7 @@ class _CreateRequirementSheetState extends ConsumerState<CreateRequirementSheet>
     setState(() => _errorMessage = null);
 
     if (_selectedBuyerId == null || _selectedBuyerId!.isEmpty) {
-      setState(() => _errorMessage = 'Please select a buyer counterparty');
+      setState(() => _errorMessage = 'Please select a buyer');
       return;
     }
     if (_selectedCommodityId == null || _selectedCommodityId!.isEmpty) {
@@ -78,8 +136,12 @@ class _CreateRequirementSheetState extends ConsumerState<CreateRequirementSheet>
       return;
     }
     final master = ref.read(masterDataProvider).value;
-    final commodity = master?.commodityById(_selectedCommodityId);
-    if (master == null || commodity == null) {
+    if (master == null || master.isFallback) {
+      setState(() => _errorMessage = 'Live company and product lists are not loaded. Tap Retry, then save.');
+      return;
+    }
+    final commodity = master.commodityById(_selectedCommodityId);
+    if (commodity == null) {
       setState(() => _errorMessage = 'Please select a product from the catalogue');
       return;
     }
@@ -104,25 +166,47 @@ class _CreateRequirementSheetState extends ConsumerState<CreateRequirementSheet>
 
     final price = double.tryParse(_priceController.text.trim()) ?? 0;
     if (price <= 0) {
-      setState(() => _errorMessage = 'Target price must be a positive number');
+      setState(() => _errorMessage = 'Price must be a positive number');
       return;
     }
 
-    if (_termsController.text.trim().isEmpty) {
-      setState(() => _errorMessage = 'Delivery terms are required');
+    final unitId = master.unitIdFor(_selectedUnitSymbol);
+    if (unitId == null) {
+      setState(() => _errorMessage = 'Unit $_selectedUnitSymbol is not available in the master list');
       return;
     }
 
+    final targetDate = _targetDate;
+    if (targetDate == null) {
+      setState(() => _errorMessage = 'Please select the required-by date');
+      return;
+    }
+
+    final location = _selectedLocation;
+    if (location == null) {
+      setState(() => _errorMessage = 'Please select an unload location');
+      return;
+    }
+    final deliverySnapshot = master.locationSnapshot(
+      name: location.name,
+      address: location.address,
+      city: location.city,
+      state: location.state,
+    );
+
+    final notes = _notesController.text.trim();
     final dto = CreateRequirementDto(
       companyId: _selectedBuyerId!,
       commodityId: _selectedCommodityId!,
       gradeId: _selectedGradeId!,
       quantity: qty,
-      unitId: '00000000-0000-0000-0000-000000000001',
+      unitId: unitId,
       targetPrice: price,
-      deliveryTerms: _termsController.text.trim(),
-      targetDate: _targetDate,
-      notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+      deliveryTerms: deliverySnapshot,
+      targetDate: targetDate,
+      notes: notes.isNotEmpty ? notes : null,
+      locationId: location.id,
+      locationSnapshot: deliverySnapshot,
     );
 
     final validationErr = dto.validate();
@@ -134,21 +218,21 @@ class _CreateRequirementSheetState extends ConsumerState<CreateRequirementSheet>
     setState(() => _isSubmitting = true);
 
     try {
-      final success =
-          await ref.read(requirementsProvider.notifier).createRequirement(dto);
+      final success = await ref.read(requirementsProvider.notifier).createRequirement(dto);
       if (mounted) {
         if (success) {
           Navigator.pop(context, true);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Buyer mandate created successfully on broker desk'),
+              content: Text('Buyer requirement saved successfully on broker desk'),
               backgroundColor: AppColors.success,
             ),
           );
         } else {
           setState(() {
             _isSubmitting = false;
-            _errorMessage = 'Failed to record mandate. Please verify inputs.';
+            _errorMessage = ref.read(requirementsProvider.notifier).lastCreateError ??
+                'Failed to record mandate. Please verify inputs.';
           });
         }
       }
@@ -167,271 +251,233 @@ class _CreateRequirementSheetState extends ConsumerState<CreateRequirementSheet>
     final masterAsync = ref.watch(masterDataProvider);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: bottomInset + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryContainer.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(LucideIcons.filePlus, size: 20, color: AppColors.primary),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
+    ref.listen<AsyncValue<TradeMasterData>>(masterDataProvider, (prev, next) {
+      next.whenData((master) {
+        // Retry succeeded: selections made from the sample lists no longer exist.
+        if (mounted && prev?.value?.isFallback == true && !master.isFallback) {
+          setState(() {
+            _selectedBuyerId = null;
+            _selectedCommodityId = null;
+            _selectedGradeId = null;
+            _selectedLocation = null;
+          });
+        }
+      });
+    });
+
+    final master = masterAsync.value ?? TradeMasterData.fallback();
+    final buyers = _getBuyerList(master);
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
+      child: Material(
+        color: AppColors.surfaceLight,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(14, 14, 14, bottomInset + 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const TradeFormHeader(
+                title: 'New Buyer Requirement',
+                subtitle: 'Add what the buyer needs',
+                icon: LucideIcons.filePlus,
+              ),
+              const SizedBox(height: 12),
+              if (_errorMessage != null) TradeErrorBanner(message: _errorMessage!),
+              if (masterAsync.isLoading && masterAsync.value == null)
+                const TradeLoadingRow(message: 'Loading product catalogue...'),
+              Expanded(
+                child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'New Buyer Purchase Mandate',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimaryLight,
-                        ),
+                      TradeFormSection(
+                        number: '1',
+                        title: 'Buyer & Product',
+                        children: [
+                          TradeFormRow(
+                            icon: LucideIcons.user,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: TradeField(
+                              label: 'Buyer',
+                              child: DropdownButtonFormField<String>(
+                                key: ValueKey('buyer_counterparty_dropdown_$_selectedBuyerId'),
+                                isExpanded: true,
+                                decoration: tradeInputDecoration(),
+                                hint: const Text('Select buyer', overflow: TextOverflow.ellipsis),
+                                initialValue: _selectedBuyerId,
+                                items: buyers
+                                    .map((b) => DropdownMenuItem<String>(
+                                          value: b.id,
+                                          child: Text(b.name, overflow: TextOverflow.ellipsis),
+                                        ))
+                                    .toList(),
+                                onChanged: (val) {
+                                  if (val != null) _onBuyerChanged(val, buyers);
+                                },
+                              ),
+                                  ),
+                                ),
+                                TradeViewButton(
+                                  onPressed: () => showTradeCounterpartySummary(
+                                    context,
+                                    buyers.where((b) => b.id == _selectedBuyerId).firstOrNull?.name ?? 'No buyer selected',
+                                    _selectedLocation,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ProductGradeFields(
+                            master: master,
+                            commodityId: _selectedCommodityId,
+                            gradeId: _selectedGradeId,
+                            isLoading: masterAsync.isLoading,
+                            onRetry: () => ref.invalidate(masterDataProvider),
+                            onCommodityChanged: (c) => setState(() {
+                              _selectedCommodityId = c.id;
+                              final own = master.gradesFor(c.id);
+                              _selectedGradeId = own.isNotEmpty ? own.first.id : null;
+                            }),
+                            onGradeChanged: (g) => setState(() => _selectedGradeId = g),
+                          ),
+                        ],
                       ),
-                      Text(
-                        'Record buyer commodity requirement on broker desk',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                      TradeFormSection(
+                        number: '2',
+                        title: 'Quantity & Price',
+                        children: [
+                          TradeFormRow(
+                            icon: LucideIcons.package,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: TradeField(
+                                    label: 'Quantity',
+                                    child: TextFormField(
+                                      key: const Key('requirement_quantity_field'),
+                                      controller: _quantityController,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      decoration: tradeInputDecoration(hint: 'Enter quantity'),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  flex: 2,
+                                  child: TradeField(
+                                    label: 'Unit',
+                                    child: DropdownButtonFormField<String>(
+                                      key: const Key('requirement_unit_dropdown'),
+                                      isExpanded: true,
+                                      decoration: tradeInputDecoration(),
+                                      initialValue: _selectedUnitSymbol,
+                                      items: const [
+                                        DropdownMenuItem<String>(value: 'MT', child: Text('MT')),
+                                        DropdownMenuItem<String>(value: 'Qtl', child: Text('Quintal')),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) setState(() => _selectedUnitSymbol = val);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TradeFormRow(
+                            icon: LucideIcons.indianRupee,
+                            child: TradeField(
+                              label: 'Price (₹/$_selectedUnitSymbol)',
+                              child: TextFormField(
+                                key: const Key('requirement_price_field'),
+                                controller: _priceController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: tradeInputDecoration(hint: 'Enter price'),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      TradeFormSection(
+                        number: '3',
+                        title: 'Delivery (Unloading)',
+                        children: [
+                          TradeFormRow(
+                            icon: LucideIcons.mapPin,
+                            topInset: 0,
+                            child: _buildUnloadAt(buyers),
+                          ),
+                          TradeFormRow(
+                            icon: LucideIcons.calendar,
+                            child: TradeField(
+                              label: 'Required by',
+                              child: TradeDateField(
+                                key: const Key('requirement_date_field'),
+                                date: _targetDate,
+                                onTap: _pickDate,
+                              ),
+                            ),
+                          ),
+                          TradeNotesTile(
+                            controller: _notesController,
+                            hint: 'Special packing, delivery timing',
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(LucideIcons.x, size: 20),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            if (_errorMessage != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.error.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.alertCircle, size: 16, color: AppColors.error),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(fontSize: 12, color: AppColors.error),
-                      ),
-                    ),
-                  ],
-                ),
               ),
-
-            // Dropdown Options
-            masterAsync.when(
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(),
-                ),
+              const SizedBox(height: 8),
+              TradeSaveButton(
+                buttonKey: const Key('save_requirement_button'),
+                label: 'Save Requirement',
+                savingLabel: 'Saving Requirement...',
+                isSaving: _isSubmitting,
+                onPressed: _submit,
               ),
-              error: (err, _) => const Text(
-                'Notice: Master data loading fallback active.',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
-              ),
-              data: (master) {
-                // Pre-populate dropdown defaults if empty
-                final buyers = master.buyerCompanies.isNotEmpty
-                    ? master.buyerCompanies
-                    : [
-                        const MasterDropdownItem(
-                            id: '00000000-0000-0000-0000-000000000001',
-                            name: 'AgrInnovate Flour Mills'),
-                        const MasterDropdownItem(
-                            id: '00000000-0000-0000-0000-000000000002',
-                            name: 'North Dairy Feed Corp'),
-                      ];
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Buyer Selector
-                    DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(
-                        labelText: 'Buyer Counterparty *',
-                        prefixIcon: Icon(LucideIcons.building, size: 18),
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      initialValue: _selectedBuyerId,
-                      items: buyers.map((b) {
-                        return DropdownMenuItem<String>(value: b.id, child: Text(b.name));
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedBuyerId = val),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Product (searchable, with category label) & product-specific Grade
-                    ProductGradeFields(
-                      master: master,
-                      commodityId: _selectedCommodityId,
-                      gradeId: _selectedGradeId,
-                      onRetry: () => ref.invalidate(masterDataProvider),
-                      onCommodityChanged: (c) => setState(() {
-                        _selectedCommodityId = c.id;
-                        final own = master.gradesFor(c.id);
-                        _selectedGradeId = own.isNotEmpty ? own.first.id : null;
-                      }),
-                      onGradeChanged: (g) => setState(() => _selectedGradeId = g),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // Quantity & Unit
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: TextFormField(
-                    controller: _quantityController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Requested Quantity *',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Unit *',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    initialValue: _selectedUnitSymbol,
-                    items: const [
-                      DropdownMenuItem<String>(value: 'MT', child: Text('MT')),
-                      DropdownMenuItem<String>(value: 'Qtl', child: Text('Quintal')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) setState(() => _selectedUnitSymbol = val);
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Target Price & Delivery Date
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _priceController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: 'Target Price (₹/$_selectedUnitSymbol) *',
-                      prefixText: '₹ ',
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                        side: const BorderSide(color: AppColors.borderLight),
-                      ),
-                    ),
-                    icon: const Icon(LucideIcons.calendar, size: 16),
-                    label: Text(
-                      '${_targetDate.day}/${_targetDate.month}/${_targetDate.year}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                    onPressed: _pickDate,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Delivery Terms
-            TextFormField(
-              controller: _termsController,
-              decoration: const InputDecoration(
-                labelText: 'Delivery Terms & Destination Mandi *',
-                prefixIcon: Icon(LucideIcons.mapPin, size: 18),
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Notes
-            TextFormField(
-              controller: _notesController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Special Specs or Notes (Optional)',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                icon: _isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Icon(LucideIcons.check, size: 18),
-                label: Text(
-                  _isSubmitting ? 'Recording Mandate...' : 'Record Buyer Mandate',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-                onPressed: _isSubmitting ? null : _submit,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildUnloadAt(List<MasterDropdownItem> buyers) {
+    final buyerId = _selectedBuyerId;
+    final location = _selectedLocation;
+    final Widget body;
+    if (buyerId == null) {
+      body = const TradeNoLocationCard(message: 'Select a buyer to load their saved locations.');
+    } else if (_isLoadingLocation) {
+      body = const TradeLoadingRow(message: 'Fetching buyer\'s saved location...');
+    } else if (_locationError != null) {
+      body = TradeNoLocationCard(message: _locationError!, onRetry: () => _loadLocationForBuyer(buyerId));
+    } else if (location == null) {
+      body = TradeNoLocationCard(message: 'This buyer has no saved location.', onAdd: () => _openChangeLocation(buyers));
+    } else {
+      body = TradeSavedLocationCard(
+        location: location,
+        selectedText: 'Selected from buyer\'s saved locations',
+        changeKey: const Key('change_delivery_location_btn'),
+        onChange: () => _openChangeLocation(buyers),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const TradeLocationLabel(label: 'Unload at', badge: 'From buyer\'s saved locations'),
+        const SizedBox(height: 6),
+        body,
+      ],
     );
   }
 }

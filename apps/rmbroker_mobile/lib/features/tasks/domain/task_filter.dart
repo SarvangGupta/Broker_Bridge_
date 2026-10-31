@@ -14,6 +14,16 @@ enum TaskDateFilter {
   const TaskDateFilter(this.label);
 }
 
+/// Simple navigation tabs for My Tasks
+enum MyTasksTab {
+  today('Today'),
+  upcoming('Upcoming'),
+  all('All');
+
+  final String label;
+  const MyTasksTab(this.label);
+}
+
 /// Filter criteria applied to the broker task list.
 class TaskFilterCriteria {
   final String searchQuery;
@@ -21,6 +31,7 @@ class TaskFilterCriteria {
   final TaskPriority? priorityFilter;
   final TaskCategory? categoryFilter;
   final TaskDateFilter dateFilter;
+  final MyTasksTab activeTab;
 
   const TaskFilterCriteria({
     this.searchQuery = '',
@@ -28,6 +39,7 @@ class TaskFilterCriteria {
     this.priorityFilter,
     this.categoryFilter,
     this.dateFilter = TaskDateFilter.all,
+    this.activeTab = MyTasksTab.today,
   });
 
   bool get isDefault =>
@@ -35,7 +47,8 @@ class TaskFilterCriteria {
       statusFilter == null &&
       priorityFilter == null &&
       (categoryFilter == null || categoryFilter == TaskCategory.all) &&
-      dateFilter == TaskDateFilter.all;
+      dateFilter == TaskDateFilter.all &&
+      activeTab == MyTasksTab.today;
 
   TaskFilterCriteria copyWith({
     String? searchQuery,
@@ -43,6 +56,7 @@ class TaskFilterCriteria {
     TaskPriority? Function()? priorityFilter,
     TaskCategory? Function()? categoryFilter,
     TaskDateFilter? dateFilter,
+    MyTasksTab? activeTab,
   }) {
     return TaskFilterCriteria(
       searchQuery: searchQuery ?? this.searchQuery,
@@ -52,6 +66,7 @@ class TaskFilterCriteria {
       categoryFilter:
           categoryFilter != null ? categoryFilter() : this.categoryFilter,
       dateFilter: dateFilter ?? this.dateFilter,
+      activeTab: activeTab ?? this.activeTab,
     );
   }
 
@@ -77,24 +92,41 @@ class TaskFilterCriteria {
       }
     }
 
-    // 2. Status filter
+    // 2. Active Tab filter
+    switch (activeTab) {
+      case MyTasksTab.today:
+        // Incomplete tasks due today or overdue. Overdue tasks remain visible in Today until completed.
+        if (task.status.isClosed) return false;
+        if (!task.isOverdue && !task.isDueToday) return false;
+        break;
+      case MyTasksTab.upcoming:
+        // Incomplete tasks due after today.
+        if (task.status.isClosed) return false;
+        if (!task.isUpcoming) return false;
+        break;
+      case MyTasksTab.all:
+        // All tasks (both complete and incomplete).
+        break;
+    }
+
+    // 3. Status filter
     if (statusFilter != null && task.status != statusFilter) {
       return false;
     }
 
-    // 3. Priority filter
+    // 4. Priority filter
     if (priorityFilter != null && task.priority != priorityFilter) {
       return false;
     }
 
-    // 4. Category filter
+    // 5. Category filter
     if (categoryFilter != null &&
         categoryFilter != TaskCategory.all &&
         task.category != categoryFilter) {
       return false;
     }
 
-    // 5. Date filter
+    // 6. Date filter
     switch (dateFilter) {
       case TaskDateFilter.all:
         break;

@@ -105,7 +105,7 @@ class NotificationController extends Notifier<NotificationState> {
   Future<void> loadNotifications() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final items = await _repository.fetchNotifications();
+      final items = await _repository.resolveRelated(await _repository.fetchNotifications());
       final unread = items.where((n) => !n.isRead).length;
 
       final catCounts = <NotificationCategory, int>{};
@@ -134,7 +134,7 @@ class NotificationController extends Notifier<NotificationState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Failed to synchronize notifications: ${e.toString()}',
+        errorMessage: 'Alerts could not be loaded. Please check your connection and try again.',
       );
     }
   }
@@ -299,13 +299,17 @@ class NotificationController extends Notifier<NotificationState> {
     final q = searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
       result = result.where((n) {
-        final commodity = (n.payload?['commodity'] ?? n.payload?['commodityName'])?.toString() ?? '';
+        final commodity = n.commodityLabel ?? '';
+        final party = n.counterpartyName ?? '';
+        final place = n.resolvedLocation ?? '';
         return n.title.toLowerCase().contains(q) ||
             n.message.toLowerCase().contains(q) ||
             n.contextReason.toLowerCase().contains(q) ||
             (n.actionLabel?.toLowerCase().contains(q) ?? false) ||
             (n.detailLine?.toLowerCase().contains(q) ?? false) ||
-            commodity.toLowerCase().contains(q);
+            commodity.toLowerCase().contains(q) ||
+            party.toLowerCase().contains(q) ||
+            place.toLowerCase().contains(q);
       }).toList();
     }
 

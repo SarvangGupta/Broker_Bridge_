@@ -255,14 +255,14 @@ class BrokerTask {
     }
 
     if (isDueToday) {
-      return 'Due today, ${DateFormat('hh:mm a').format(localDue)}';
+      return 'Today, ${DateFormat('hh:mm a').format(localDue)}';
     }
 
     final tomorrow = now.add(const Duration(days: 1));
     if (localDue.year == tomorrow.year &&
         localDue.month == tomorrow.month &&
         localDue.day == tomorrow.day) {
-      return 'Due tomorrow, ${DateFormat('hh:mm a').format(localDue)}';
+      return 'Tomorrow, ${DateFormat('hh:mm a').format(localDue)}';
     }
 
     return 'Due ${DateFormat('dd MMM, hh:mm a').format(localDue)}';

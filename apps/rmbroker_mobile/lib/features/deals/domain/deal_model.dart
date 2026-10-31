@@ -302,6 +302,9 @@ class DealDetailItem {
   final String commissionBasis;
   final String? notes;
 
+  /// Seller's loading address kept with the deal version; null if none was recorded.
+  final String? loadingLocation;
+
   const DealDetailItem({
     required this.deal,
     required this.confirmations,
@@ -311,6 +314,7 @@ class DealDetailItem {
     required this.brokerCommissionRate,
     this.commissionBasis = '₹/MT',
     this.notes,
+    this.loadingLocation,
   });
 
   factory DealDetailItem.fromJson(Map<String, dynamic> json) {
@@ -333,6 +337,7 @@ class DealDetailItem {
       brokerCommissionRate: (json['brokerCommissionRate'] as num?)?.toDouble() ?? 50.0,
       commissionBasis: json['commissionBasis']?.toString() ?? '₹/MT',
       notes: json['notes']?.toString(),
+      loadingLocation: json['loadingLocationSnapshot']?.toString(),
     );
   }
 }

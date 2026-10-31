@@ -451,7 +451,7 @@ class DealRepository {
                 versionStatus: latest['status']?.toString(),
                 snapshot: snapshot,
               );
-              for (final key in const ['deliveryLocation', 'deliveryDate', 'paymentTerms', 'packagingType', 'priceBasis', 'notes']) {
+              for (final key in const ['deliveryLocation', 'loadingLocationSnapshot', 'deliveryDate', 'paymentTerms', 'packagingType', 'priceBasis', 'notes']) {
                 if (snapshot[key] != null) flat[key] = snapshot[key];
               }
               final terms = snapshot['deliveryTerms'] ?? snapshot['deliveryLocation'];
@@ -613,7 +613,8 @@ class DealRepository {
       if (dioErr.response?.statusCode == 401) {
         return const DealUnauthorized();
       }
-      final msg = dioErr.response?.data?['error']?.toString() ?? dioErr.message;
+      final body = dioErr.response?.data;
+      final msg = (body is Map ? body['error']?.toString() : null) ?? dioErr.message;
       debugPrint('REST propose allocation error: $msg');
     } catch (e) {
       debugPrint('REST propose allocation error: $e');
@@ -848,6 +849,19 @@ class DealRepository {
   // ============================================================================
 
   /// Authoritatively converts a confirmed allocation into an initial immutable Version 1 deal record.
+  /// Location terms a new deal keeps in its immutable version snapshot, copied from the
+  /// requirement and offer so later edits to a saved location never rewrite history.
+  /// Rows saved before location columns existed fall back to their stored text.
+  @visibleForTesting
+  static Map<String, dynamic> createdLocationTerms(Map<String, dynamic> requirement, Map<String, dynamic> offer) {
+    final legacyLoading = offer['loading_remarks']?.toString().split(' | Notes:').first;
+    return {
+      'unloadingLocationId': requirement['delivery_location_id'],
+      'loadingLocationId': offer['loading_location_id'],
+      'loadingLocationSnapshot': offer['loading_location_snapshot'] ?? legacyLoading,
+    };
+  }
+
   Future<DealDataResult<DealItem>> createDealFromAllocation(CreateDealDto dto) async {
     final validationError = dto.validate();
     if (validationError != null) {
@@ -892,7 +906,8 @@ class DealRepository {
       if (dioErr.response?.statusCode == 401) {
         return const DealUnauthorized();
       }
-      final msg = dioErr.response?.data?['error']?.toString() ?? dioErr.message;
+      final body = dioErr.response?.data;
+      final msg = (body is Map ? body['error']?.toString() : null) ?? dioErr.message;
       debugPrint('REST create deal error: $msg');
     } catch (e) {
       debugPrint('REST create deal error: $e');
@@ -910,9 +925,10 @@ class DealRepository {
             .select(
               'id, status, deal_id, broker_id, allocation_reference, requirement_id, availability_id, '
               'allocated_quantity, allocated_price, '
-              'requirements(id, company_id, commodity_id, status, master_commodities(name), '
+              // Whole rows: the location columns are read when present (see createdLocationTerms).
+              'requirements(*, master_commodities(name), '
               'master_units(symbol), companies(name)), '
-              'availabilities(id, company_id, status, companies(name))',
+              'availabilities(*, companies(name))',
             )
             .eq('id', dto.allocationId)
             .maybeSingle();
@@ -1014,6 +1030,7 @@ class DealRepository {
             'agreedQuantity': dto.agreedQuantity,
             'priceBasis': dto.priceBasis,
             'deliveryLocation': dto.deliveryLocation,
+            ...createdLocationTerms(req, avail),
             'deliveryDate': dto.deliveryDate.toIso8601String(),
             'deliveryTerms': dto.deliveryTerms,
             'paymentTerms': dto.paymentTerms,
@@ -1270,7 +1287,8 @@ class DealRepository {
       if (dioErr.response?.statusCode == 401) {
         return const DealUnauthorized();
       }
-      final msg = dioErr.response?.data?['error']?.toString() ?? dioErr.message;
+      final body = dioErr.response?.data;
+      final msg = (body is Map ? body['error']?.toString() : null) ?? dioErr.message;
       debugPrint('REST update deal terms error: $msg');
     } catch (e) {
       debugPrint('REST update deal terms error: $e');
@@ -1333,6 +1351,7 @@ class DealRepository {
         for (final key in const [
           'dealId', 'quotationId', 'allocationId', 'allocationReference', 'requirementId',
           'availabilityId', 'commodityName', 'unitSymbol', 'buyerCompanyId', 'sellerCompanyId',
+          'unloadingLocationId', 'loadingLocationId', 'loadingLocationSnapshot',
         ]) {
           if (oldSnapshot?[key] != null) newSnapshot.putIfAbsent(key, () => oldSnapshot![key]);
         }
@@ -1409,7 +1428,8 @@ class DealRepository {
       if (dioErr.response?.statusCode == 401) {
         return const DealUnauthorized();
       }
-      final msg = dioErr.response?.data?['error']?.toString() ?? dioErr.message;
+      final body = dioErr.response?.data;
+      final msg = (body is Map ? body['error']?.toString() : null) ?? dioErr.message;
       debugPrint('REST party confirmation error: $msg');
     } catch (e) {
       debugPrint('REST party confirmation error: $e');
@@ -1531,7 +1551,8 @@ class DealRepository {
       if (dioErr.response?.statusCode == 401) {
         return const DealUnauthorized();
       }
-      final msg = dioErr.response?.data?['error']?.toString() ?? dioErr.message;
+      final body = dioErr.response?.data;
+      final msg = (body is Map ? body['error']?.toString() : null) ?? dioErr.message;
       debugPrint('REST finalize deal error: $msg');
     } catch (e) {
       debugPrint('REST finalize deal error: $e');
