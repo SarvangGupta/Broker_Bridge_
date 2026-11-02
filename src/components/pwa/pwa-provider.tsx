@@ -63,8 +63,22 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
       setIsInstalled(true)
     }
 
-    // 3. Register Service Worker
+    // 3. Register Service Worker (Production Only)
     if ('serviceWorker' in navigator) {
+      if (process.env.NODE_ENV === 'development') {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
+        if ('caches' in window) {
+          caches.keys().then((keys) => {
+            for (const key of keys) {
+              caches.delete(key);
+            }
+          });
+        }
+      } else {
       setIsSupported(true)
       window.addEventListener('load', () => {
         navigator.serviceWorker
@@ -89,6 +103,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
             console.warn('[PWA] Service Worker registration failed:', err)
           })
       })
+      }
     }
 
     // 4. Capture native beforeinstallprompt event (Chromium, Android, Edge)

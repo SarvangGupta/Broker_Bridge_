@@ -1,5 +1,5 @@
 // BrokerBridge Enterprise Service Worker
-const CACHE_NAME = 'brokerbridge-v1';
+const CACHE_NAME = 'brokerbridge-v2';
 
 const STATIC_ASSETS = [
   '/',
@@ -49,6 +49,17 @@ self.addEventListener('fetch', (event) => {
 
   // Ignore non-GET requests and browser extensions
   if (request.method !== 'GET' || !url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // Bypass service worker entirely for localhost/development or Turbopack/HMR requests
+  if (
+    url.hostname === 'localhost' ||
+    url.hostname === '127.0.0.1' ||
+    url.hostname.endsWith('.local') ||
+    url.pathname.includes('__turbopack') ||
+    url.pathname.includes('_next/webpack-hmr')
+  ) {
     return;
   }
 

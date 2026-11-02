@@ -66,6 +66,7 @@ import { AdminDisputeQueue } from "./admin-dispute-queue"
 import { AdminHelpDeskQueue } from "./admin-help-desk-queue"
 import { AdminBrokersVault } from "./admin-brokers-vault"
 import { QualityParameterDialog } from "./quality-parameter-dialog"
+import { AddClientDialog } from "@/src/components/admin/add-client-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -419,6 +420,7 @@ export function MasterDataTabs() {
         <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 z-10 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-500 tracking-wide uppercase">Tier 0 / System Console</h2>
           <div className="flex items-center gap-3">
+            <AddClientDialog />
             <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="ghost" className="relative h-10 w-10 rounded-full border border-slate-200 hover:bg-slate-100 p-0" />}>

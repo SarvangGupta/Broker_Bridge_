@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Loader2, CheckCircle2, XCircle } from "lucide-react"
 import { VerifyGstButton } from "@/src/components/admin/verify-gst-button"
+import { AddClientDialog } from "@/src/components/admin/add-client-dialog"
 
 import {
   getPendingCompaniesAction,
@@ -83,14 +84,17 @@ export function CompanyApprovalQueue() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-[#334155]">Company Approvals</h2>
           <p className="text-sm text-slate-500 mt-1">Review and approve new company registrations.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadCompanies} disabled={loading}>
-          Refresh Queue
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={loadCompanies} disabled={loading} className="h-10">
+            Refresh Queue
+          </Button>
+          <AddClientDialog onSuccess={loadCompanies} />
+        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
