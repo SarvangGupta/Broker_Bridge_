@@ -94,7 +94,12 @@ class BrokerDeskSheet extends StatelessWidget {
                 children: [
                   Expanded(child: _DeskCard(action: actions[row])),
                   const SizedBox(width: 10),
-                  Expanded(child: _DeskCard(action: actions[row + 1])),
+                  // An odd last card keeps its half width beside an empty cell.
+                  Expanded(
+                    child: row + 1 < actions.length
+                        ? _DeskCard(action: actions[row + 1])
+                        : const SizedBox.shrink(),
+                  ),
                 ],
               ),
               if (row + 2 < actions.length) const SizedBox(height: 10),

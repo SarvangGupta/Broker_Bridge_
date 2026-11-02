@@ -24,6 +24,7 @@ class TestableDirectoryRepository extends DirectoryRepository {
     String? role,
     String? search,
     String? status,
+    String? categoryId,
     int? limit,
     String? cursor,
   }) async {

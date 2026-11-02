@@ -9,6 +9,7 @@ import '../data/directory_repository.dart';
 import '../domain/directory_contact.dart';
 import '../domain/directory_state.dart';
 import 'controllers/directory_controller.dart';
+import 'widgets/buyer_discovery_sheet.dart';
 import 'widgets/contact_details_sheet.dart';
 import 'widgets/contact_form_modal.dart';
 import 'widgets/directory_contact_card.dart';
@@ -59,6 +60,12 @@ class DirectoryScreen extends ConsumerWidget {
             onPressed: () => controller.loadContacts(isRefresh: true),
           ),
           IconButton(
+            key: const Key('directory_find_buyer_button'),
+            icon: const Icon(LucideIcons.userSearch, size: 20, color: Colors.white),
+            tooltip: 'Find Existing Buyer',
+            onPressed: () => BuyerDiscoverySheet.show(context),
+          ),
+          IconButton(
             key: const Key('directory_add_contact_button'),
             icon: const Icon(LucideIcons.userPlus, size: 20, color: Colors.white),
             tooltip: 'Add Contact',
@@ -94,6 +101,9 @@ class DirectoryScreen extends ConsumerWidget {
             onSearchChanged: controller.setSearchQuery,
             onClearSearch: controller.clearSearch,
             onStatusFilterChanged: controller.setStatusFilter,
+            categories: state.categories,
+            categoryFilter: state.categoryFilter,
+            onCategoryChanged: controller.setCategoryFilter,
           ),
 
           const Divider(height: 1, color: AppColors.borderLight),

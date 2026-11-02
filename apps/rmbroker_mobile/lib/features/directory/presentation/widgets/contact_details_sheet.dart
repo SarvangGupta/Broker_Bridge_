@@ -335,6 +335,14 @@ class _ContactDetailsSheetState extends ConsumerState<ContactDetailsSheet> {
                         const Divider(height: 16, color: AppColors.borderLight),
                         _buildInfoRow('Mandi Location', contact.locationLabel, LucideIcons.mapPin),
                         const Divider(height: 16, color: AppColors.borderLight),
+                        if (isBuyer) ...[
+                          _buildInfoRow(
+                            'Commodity Interest',
+                            contact.interestedInLabel,
+                            LucideIcons.tag,
+                          ),
+                          const Divider(height: 16, color: AppColors.borderLight),
+                        ],
                         _buildInfoRow(
                           'Trust & Integrity',
                           '${contact.trustScore}% Score (${contact.isVerified ? "Platform Verified" : "Self-Reported"})',

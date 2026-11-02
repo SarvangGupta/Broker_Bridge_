@@ -10,6 +10,8 @@ import {
   parseDirectoryLimit,
 } from '@/src/server/utils/broker-directory-query';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function extractAuthToken(req: NextRequest): string | undefined {
   const authHeader = req.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -38,8 +40,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid page cursor' }, { status: 400 });
     }
 
+    const categoryParam = searchParams.get('categoryId');
+    const categoryId = categoryParam && UUID_RE.test(categoryParam) ? categoryParam : undefined;
+
     const result = await getBrokerDirectoryContactsAction(
-      { role, status, search, limit, cursor },
+      { role, status, search, categoryId, limit, cursor },
       token
     );
 

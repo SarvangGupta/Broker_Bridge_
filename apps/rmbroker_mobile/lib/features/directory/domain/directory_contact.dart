@@ -21,6 +21,72 @@ enum ContactRole {
   }
 }
 
+/// A commodity category (`master_categories`) a buyer has chosen.
+@immutable
+class InterestedCategory {
+  final String id;
+  final String name;
+
+  const InterestedCategory({required this.id, required this.name});
+
+  static List<InterestedCategory> listFromJson(Object? raw) => [
+        if (raw is List)
+          for (final item in raw.whereType<Map<String, dynamic>>())
+            InterestedCategory(
+              id: item['id']?.toString() ?? '',
+              name: item['name']?.toString() ?? '',
+            ),
+      ];
+}
+
+/// An existing buyer found by search. Identifies the canonical user and
+/// company; carries no mobile, email or bank data until the buyer is linked.
+@immutable
+class DiscoverableBuyer {
+  final String userId;
+  final String name;
+  final String companyName;
+  final String? location;
+  final String? maskedGstin;
+  final String gstVerificationStatus;
+  final List<InterestedCategory> interestedCategories;
+
+  /// The broker's live `crm_contacts.id` for this buyer, when already linked.
+  final String? contactId;
+
+  const DiscoverableBuyer({
+    required this.userId,
+    required this.name,
+    required this.companyName,
+    this.location,
+    this.maskedGstin,
+    this.gstVerificationStatus = CounterpartyGstStatus.unverified,
+    this.interestedCategories = const [],
+    this.contactId,
+  });
+
+  bool get isAlreadyAdded => contactId != null;
+  bool get isVerificationPending =>
+      gstVerificationStatus == CounterpartyGstStatus.gstPending;
+  String get categoriesLabel => interestedCategories.isEmpty
+      ? 'All Categories'
+      : interestedCategories.map((c) => c.name).join(', ');
+
+  factory DiscoverableBuyer.fromJson(Map<String, dynamic> json) {
+    return DiscoverableBuyer(
+      userId: json['userId']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      companyName: json['companyName']?.toString() ?? '',
+      location: json['location']?.toString(),
+      maskedGstin: json['gstin']?.toString(),
+      gstVerificationStatus: json['gstVerificationStatus']?.toString() ??
+          CounterpartyGstStatus.unverified,
+      interestedCategories: InterestedCategory.listFromJson(json['interestedCategories']),
+      contactId: json['contactId']?.toString(),
+    );
+  }
+}
+
 /// Authorized counterparty contact item in the broker's directory.
 @immutable
 class DirectoryContact {
@@ -49,6 +115,9 @@ class DirectoryContact {
   final int openRequirementsCount;
   final int availableOffersCount;
   final int activeDealsCount;
+
+  /// The buyer's chosen categories; empty means All Categories.
+  final List<InterestedCategory> interestedCategories;
 
   // --- GST Verification Fields ---
   final String? gstin;
@@ -111,6 +180,7 @@ class DirectoryContact {
     this.openRequirementsCount = 0,
     this.availableOffersCount = 0,
     this.activeDealsCount = 0,
+    this.interestedCategories = const [],
     this.gstin,
     this.legalName,
     this.tradeName,
@@ -172,9 +242,24 @@ class DirectoryContact {
     return '•••• •••• $last4';
   }
 
+  /// Directory visibility only; this does not create requirements or matches.
+  /// A buyer with no saved categories is visible under every category. Only
+  /// buyers have this preference, so sellers are not narrowed by it.
+  bool matchesCategory(String? categoryId) {
+    if (categoryId == null || role != ContactRole.buyer) return true;
+    return interestedCategories.isEmpty ||
+        interestedCategories.any((c) => c.id == categoryId);
+  }
+
+  String get interestedInLabel {
+    if (interestedCategories.isEmpty) return 'Interested in: All Categories';
+    return 'Interested in: ${interestedCategories.map((c) => c.name).join(', ')}';
+  }
+
   /// The directory's role tab / status / search rules. Shared by the screen
   /// and the paged repository scan so both always agree on what matches.
-  bool matchesFilters({String? role, String? status, String? search}) {
+  bool matchesFilters({String? role, String? status, String? search, String? categoryId}) {
+    if (!matchesCategory(categoryId)) return false;
     if (role == 'buyer' && this.role != ContactRole.buyer) return false;
     if (role == 'seller' && this.role != ContactRole.seller) return false;
     if (status == 'active' && !this.status) return false;
@@ -222,6 +307,7 @@ class DirectoryContact {
       openRequirementsCount: (json['openRequirementsCount'] as num? ?? json['open_requirements_count'] as num? ?? 0).toInt(),
       availableOffersCount: (json['availableOffersCount'] as num? ?? json['available_offers_count'] as num? ?? 0).toInt(),
       activeDealsCount: (json['activeDealsCount'] as num? ?? json['active_deals_count'] as num? ?? 0).toInt(),
+      interestedCategories: InterestedCategory.listFromJson(json['interestedCategories']),
       gstin: json['gstin']?.toString() ?? json['gst']?.toString(),
       legalName: json['legalName']?.toString() ?? json['legal_name']?.toString(),
       tradeName: json['tradeName']?.toString() ?? json['trade_name']?.toString(),
@@ -309,6 +395,7 @@ class DirectoryContact {
     int? openRequirementsCount,
     int? availableOffersCount,
     int? activeDealsCount,
+    List<InterestedCategory>? interestedCategories,
     String? gstin,
     String? legalName,
     String? tradeName,
@@ -349,6 +436,7 @@ class DirectoryContact {
       openRequirementsCount: openRequirementsCount ?? this.openRequirementsCount,
       availableOffersCount: availableOffersCount ?? this.availableOffersCount,
       activeDealsCount: activeDealsCount ?? this.activeDealsCount,
+      interestedCategories: interestedCategories ?? this.interestedCategories,
       gstin: gstin ?? this.gstin,
       legalName: legalName ?? this.legalName,
       tradeName: tradeName ?? this.tradeName,

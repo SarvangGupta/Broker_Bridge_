@@ -108,6 +108,7 @@ class _FakeDirectoryRepository extends DirectoryRepository {
     String? role,
     String? search,
     String? status,
+    String? categoryId,
     int? limit,
     String? cursor,
   }) async => const DirectorySuccess(

@@ -70,6 +70,10 @@ class DirectoryContactCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       _iconLine(LucideIcons.mapPin, contact.locationLabel, muted),
                     ],
+                    if (isBuyer) ...[
+                      const SizedBox(height: 2),
+                      _iconLine(LucideIcons.tag, contact.interestedInLabel, muted),
+                    ],
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 10,
@@ -133,7 +137,7 @@ class DirectoryContactCard extends StatelessWidget {
                                 Icon(LucideIcons.clock, size: 12, color: Color(0xFFB45309)),
                                 SizedBox(width: 3),
                                 Text(
-                                  'GST Pending',
+                                  'Verification Pending',
                                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
                                 ),
                               ],

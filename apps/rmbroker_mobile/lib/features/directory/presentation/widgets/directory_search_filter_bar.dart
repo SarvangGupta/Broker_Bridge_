@@ -14,6 +14,9 @@ class DirectorySearchFilterBar extends StatefulWidget {
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClearSearch;
   final ValueChanged<String> onStatusFilterChanged;
+  final List<InterestedCategory> categories;
+  final String? categoryFilter;
+  final ValueChanged<String?>? onCategoryChanged;
 
   const DirectorySearchFilterBar({
     super.key,
@@ -25,6 +28,9 @@ class DirectorySearchFilterBar extends StatefulWidget {
     required this.onSearchChanged,
     required this.onClearSearch,
     required this.onStatusFilterChanged,
+    this.categories = const [],
+    this.categoryFilter,
+    this.onCategoryChanged,
   });
 
   @override
@@ -127,6 +133,27 @@ class _DirectorySearchFilterBarState extends State<DirectorySearchFilterBar> {
               ],
             ),
           ),
+
+          // 3. Category filter
+          if (widget.categories.isNotEmpty && widget.onCategoryChanged != null) ...[
+            const SizedBox(height: 8),
+            DropdownButton<String?>(
+              key: const Key('directory_category_filter'),
+              isExpanded: true,
+              isDense: true,
+              value: widget.categoryFilter,
+              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              onChanged: widget.onCategoryChanged,
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('All Categories')),
+                for (final c in widget.categories)
+                  DropdownMenuItem<String?>(
+                    value: c.id,
+                    child: Text(c.name, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );

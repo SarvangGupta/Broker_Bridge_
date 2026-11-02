@@ -16,10 +16,16 @@ import { eq, and, or, ilike, desc, sql, notInArray, inArray } from 'drizzle-orm'
 import { z } from 'zod';
 import { validateAndNormalizePhone } from '@/src/lib/phone-utils';
 import {
+  categoryPreferencesAvailable,
+  DISCOVERY_MIN_SEARCH,
+  linkExistingBuyer,
   pgTimestampToIso,
   publicDirectoryError,
+  queryBuyerCategories,
   queryDirectoryPage,
   queryDirectoryStats,
+  queryDiscoverableBuyers,
+  type DiscoverableBuyerRow,
   type DirectoryCursor,
 } from '@/src/server/utils/broker-directory-query';
 
@@ -227,6 +233,7 @@ export async function getBrokerDirectoryContactsAction(
     role?: 'all' | 'buyer' | 'seller';
     search?: string;
     status?: 'all' | 'active' | 'inactive';
+    categoryId?: string;
     /** Page size; omitted returns the full list (web workspace). */
     limit?: number;
     cursor?: DirectoryCursor | null;
@@ -251,10 +258,13 @@ export async function getBrokerDirectoryContactsAction(
     }
 
     // 1. Filtered page (or full list without a limit), filters applied in SQL
-    const page = await queryDirectoryPage(db, scope, filter ?? {}, {
+    const categoryId =
+      filter?.categoryId && (await categoryPreferencesAvailable(db)) ? filter.categoryId : undefined;
+    const page = await queryDirectoryPage(db, scope, { ...filter, categoryId }, {
       limit: filter?.limit,
       after: filter?.cursor,
     });
+    const categories = await queryBuyerCategories(db, page.rows.map((r) => r.userId));
 
     // 2. Mandate counts for this page only: three grouped queries
     const companyIds = [...new Set(page.rows.map((r) => r.companyId))];
@@ -325,6 +335,9 @@ export async function getBrokerDirectoryContactsAction(
       openRequirementsCount: reqMap.get(row.companyId) ?? 0,
       availableOffersCount: availMap.get(row.companyId) ?? 0,
       activeDealsCount: dealsMap.get(row.companyId) ?? 0,
+      gstin: row.gstin,
+      gstVerificationStatus: row.gstVerificationStatus,
+      interestedCategories: categories.get(row.userId) ?? [],
     }));
 
     // 3. Stats cover all of the broker's contacts; computed once per list
@@ -574,6 +587,138 @@ export async function createBrokerContactAction(
       success: false,
       error: publicDirectoryError(error, 'Failed to create contact record'),
     };
+  }
+}
+
+// ============================================================================
+// 3b. Discover and Link Existing Buyers (no new identity is ever created)
+// ============================================================================
+
+export async function discoverBuyersAction(
+  filter: { search: string; categoryId?: string },
+  authToken?: string
+): Promise<{
+  success: boolean;
+  error?: string;
+  data?: Array<DiscoverableBuyerRow & { interestedCategories: Array<{ id: string; name: string }> }>;
+}> {
+  try {
+    const auth = await getAuthenticatedBroker(authToken);
+    if (!auth.success) return { success: false, error: auth.error };
+    if (filter.search.trim().length < DISCOVERY_MIN_SEARCH) return { success: true, data: [] };
+
+    const categoryId =
+      filter.categoryId && (await categoryPreferencesAvailable(db)) ? filter.categoryId : undefined;
+    const rows = await queryDiscoverableBuyers(db, auth.brokerId, { search: filter.search, categoryId });
+    const categories = await queryBuyerCategories(db, rows.map((r) => r.userId));
+    return {
+      success: true,
+      data: rows.map((r) => ({
+        ...r,
+        gstin: r.gstin ? `••••${r.gstin.slice(-4)}` : null,
+        interestedCategories: categories.get(r.userId) ?? [],
+      })),
+    };
+  } catch (error: any) {
+    console.error('discoverBuyersAction error:', error);
+    return { success: false, error: publicDirectoryError(error, 'Failed to search buyers') };
+  }
+}
+
+export async function addExistingBuyerAction(
+  buyerUserId: string,
+  authToken?: string
+): Promise<{ success: boolean; error?: string; contactId?: string; alreadyAdded?: boolean }> {
+  try {
+    const auth = await getAuthenticatedBroker(authToken);
+    if (!auth.success) return { success: false, error: auth.error };
+    if (!z.string().uuid().safeParse(buyerUserId).success) {
+      return { success: false, error: 'This buyer cannot be added.' };
+    }
+    const result = await linkExistingBuyer(db, auth.brokerId, buyerUserId);
+    if (result.outcome === 'not_eligible') {
+      return { success: false, error: 'This buyer cannot be added.' };
+    }
+    return { success: true, contactId: result.contactId, alreadyAdded: result.outcome === 'already' };
+  } catch (error: any) {
+    console.error('addExistingBuyerAction error:', error);
+    return { success: false, error: publicDirectoryError(error, 'Failed to add buyer') };
+  }
+}
+
+const buyerGstSchema = z.object({
+  gstin: z.string().trim().toUpperCase().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/),
+  legalName: z.string().trim().optional().nullable(),
+  tradeName: z.string().trim().optional().nullable(),
+  constitution: z.string().trim().optional().nullable(),
+  address: z.string().trim().optional().nullable(),
+  gstCertificateUrl: z.string().trim().optional().nullable(),
+});
+
+/**
+ * Submits GST details for review. The company stays or becomes `gst_pending`
+ * and `is_verified` is never touched; only the Admin review RPC can verify.
+ * Already verified details go through Admin correction, not this path.
+ */
+export async function submitContactGstAction(
+  contactId: string,
+  rawInput: unknown,
+  authToken?: string
+): Promise<{ success: boolean; error?: string; gstVerificationStatus?: string }> {
+  try {
+    const auth = await getAuthenticatedBroker(authToken);
+    if (!auth.success) return { success: false, error: auth.error };
+    const parsed = buyerGstSchema.safeParse(rawInput);
+    if (!parsed.success) return { success: false, error: 'Enter a valid GSTIN.' };
+    const g = parsed.data;
+
+    return await db.transaction(async (tx) => {
+      const contacts = (await tx.execute(sql`
+        select c.broker_id as "brokerId", c.company_id as "companyId", u.role as "role",
+          co.gst_verification_status as "gstStatus"
+        from crm_contacts c
+        join users u on u.id = c.user_id
+        join companies co on co.id = c.company_id
+        where c.id = ${contactId}::uuid and c.removed_at is null
+        for update of co
+      `)) as unknown as Array<{ brokerId: string; companyId: string; role: string | null; gstStatus: string }>;
+      const contact = contacts[0];
+      if (!contact || (!auth.isAdmin && contact.brokerId !== auth.brokerId)) {
+        return { success: false, error: 'Contact record not found' };
+      }
+      if (contact.gstStatus === 'gst_verified') {
+        return {
+          success: false,
+          error: 'These GST details are verified. Ask Admin to review any correction.',
+        };
+      }
+
+      await tx.execute(sql`
+        update companies set
+          gst = ${g.gstin},
+          legal_name = coalesce(nullif(${g.legalName ?? ''}, ''), legal_name),
+          trade_name = coalesce(nullif(${g.tradeName ?? ''}, ''), trade_name),
+          constitution = coalesce(nullif(${g.constitution ?? ''}, ''), constitution),
+          principal_address = coalesce(nullif(${g.address ?? ''}, ''), principal_address),
+          gst_certificate_url = coalesce(nullif(${g.gstCertificateUrl ?? ''}, ''), gst_certificate_url),
+          gst_verification_status = 'gst_pending'
+        where id = ${contact.companyId}::uuid
+      `);
+      const role = (contact.role ?? '').toLowerCase().trim() === 'seller' ? 'seller' : 'buyer';
+      await tx.execute(sql`
+        insert into counterparty_verification_requests (company_id, broker_id, role, gstin, legal_name, trade_name, status)
+        select ${contact.companyId}::uuid, ${auth.brokerId}::uuid, ${role}, ${g.gstin},
+          ${g.legalName ?? null}, ${g.tradeName ?? null}, 'pending'
+        where not exists (
+          select 1 from counterparty_verification_requests r
+          where r.company_id = ${contact.companyId}::uuid and r.status = 'pending' and r.gstin = ${g.gstin}
+        )
+      `);
+      return { success: true, gstVerificationStatus: 'gst_pending' };
+    });
+  } catch (error: any) {
+    console.error('submitContactGstAction error:', error);
+    return { success: false, error: publicDirectoryError(error, 'Could not submit GST details') };
   }
 }
 

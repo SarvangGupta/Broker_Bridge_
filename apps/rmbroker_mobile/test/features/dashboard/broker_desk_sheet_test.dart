@@ -53,19 +53,29 @@ void main() {
 
   Finder card(String key) => find.byKey(ValueKey('broker_desk_$key'));
 
-  testWidgets('opens with short title, six cards in grid order, no long description; closes', (tester) async {
+  testWidgets('odd card count: opening does not throw RangeError and the last card sits alone', (tester) async {
+    await pump(tester);
+    expect(tester.takeException(), isNull);
+    final info = tester.getCenter(card('info'));
+    final chat = tester.getCenter(card('chat'));
+    expect(info.dy, greaterThan(chat.dy));
+    expect(info.dx, moreOrLessEquals(chat.dx));
+    expect(tester.getSize(card('info')).width, moreOrLessEquals(tester.getSize(card('chat')).width));
+  });
+
+  testWidgets('opens with short title, seven cards in grid order, no long description; closes', (tester) async {
     await pump(tester);
     expect(find.text('Broker Desk'), findsOneWidget);
     expect(find.textContaining('coordination line'), findsNothing);
 
-    final order = ['call', 'whatsapp', 'directory', 'mandi_support', 'chat', 'info'];
+    final order = ['call', 'whatsapp', 'directory', 'mandi_support', 'chat', 'my_profile'];
     final centers = [for (final k in order) tester.getCenter(card(k))];
     for (var i = 0; i < 6; i += 2) {
       expect(centers[i].dy, moreOrLessEquals(centers[i + 1].dy), reason: 'row ${i ~/ 2 + 1} aligned');
       expect(centers[i].dx, lessThan(centers[i + 1].dx), reason: 'left before right');
       if (i > 0) expect(centers[i].dy, greaterThan(centers[i - 2].dy), reason: 'rows top to bottom');
     }
-    for (final l in ['Call', 'WhatsApp', 'Directory', 'Mandi Support', 'Chat', 'Info']) {
+    for (final l in ['Call', 'WhatsApp', 'Directory', 'Mandi Support', 'Chat', 'My Profile', 'Info']) {
       expect(find.bySemanticsLabel(l), findsOneWidget, reason: '$l accessible');
     }
 

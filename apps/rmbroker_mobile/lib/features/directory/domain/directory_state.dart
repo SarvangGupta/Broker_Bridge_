@@ -19,6 +19,8 @@ class DirectoryState {
   final String activeTab; // 'all' | 'buyer' | 'seller'
   final String searchQuery;
   final String statusFilter; // 'all' | 'active' | 'inactive'
+  final String? categoryFilter; // master_categories.id; null = no filter
+  final List<InterestedCategory> categories;
   final String? contractNotice;
   final String? errorMessage;
   final bool isRefreshing;
@@ -39,6 +41,8 @@ class DirectoryState {
     this.activeTab = 'all',
     this.searchQuery = '',
     this.statusFilter = 'all',
+    this.categoryFilter,
+    this.categories = const [],
     this.contractNotice,
     this.errorMessage,
     this.isRefreshing = false,
@@ -58,6 +62,7 @@ class DirectoryState {
             role: activeTab,
             status: statusFilter,
             search: searchQuery,
+            categoryId: categoryFilter,
           ),
         )
         .toList();
@@ -72,6 +77,8 @@ class DirectoryState {
     String? activeTab,
     String? searchQuery,
     String? statusFilter,
+    Object? categoryFilter = _keep,
+    List<InterestedCategory>? categories,
     String? contractNotice,
     String? errorMessage,
     bool? isRefreshing,
@@ -87,6 +94,8 @@ class DirectoryState {
       activeTab: activeTab ?? this.activeTab,
       searchQuery: searchQuery ?? this.searchQuery,
       statusFilter: statusFilter ?? this.statusFilter,
+      categoryFilter: identical(categoryFilter, _keep) ? this.categoryFilter : categoryFilter as String?,
+      categories: categories ?? this.categories,
       contractNotice: contractNotice ?? this.contractNotice,
       errorMessage: errorMessage ?? this.errorMessage,
       isRefreshing: isRefreshing ?? this.isRefreshing,

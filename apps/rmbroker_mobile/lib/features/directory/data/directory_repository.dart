@@ -502,6 +502,7 @@ class DirectoryRepository {
     String? role,
     String? search,
     String? status,
+    String? categoryId,
     int? limit,
     DirectoryCursor? after,
   }) async {
@@ -520,9 +521,13 @@ class DirectoryRepository {
         limit: chunk + 1,
       );
       final scanned = rows.length > chunk ? rows.sublist(0, chunk) : rows;
-      final contacts = await _withLocationNames(scanned.map(_contactFromRow).toList());
+      final contacts = await _withCategories(
+        await _withLocationNames(scanned.map(_contactFromRow).toList()),
+      );
       matches.addAll(
-        contacts.where((c) => c.matchesFilters(role: role, status: status, search: search)),
+        contacts.where(
+          (c) => c.matchesFilters(role: role, status: status, search: search, categoryId: categoryId),
+        ),
       );
       if (rows.length <= chunk) {
         exhausted = true;
@@ -614,6 +619,135 @@ class DirectoryRepository {
     }
   }
 
+  /// Saved categories per buyer user id. Throws, including while migration
+  /// 0064 is not applied.
+  @visibleForTesting
+  Future<Map<String, List<InterestedCategory>>> fetchBuyerCategories(List<String> userIds) async {
+    final rows = await _supabase!
+        .from('buyer_category_preferences')
+        .select('buyer_id, master_categories(id, name)')
+        .inFilter('buyer_id', userIds);
+    final out = <String, List<InterestedCategory>>{};
+    for (final r in (rows as List).whereType<Map<String, dynamic>>()) {
+      final c = r['master_categories'];
+      if (c is! Map) continue;
+      (out[r['buyer_id'].toString()] ??= []).add(
+        InterestedCategory(id: c['id'].toString(), name: c['name']?.toString() ?? ''),
+      );
+    }
+    return out;
+  }
+
+  /// Without readable preferences every buyer is All Categories, never hidden.
+  Future<List<DirectoryContact>> _withCategories(List<DirectoryContact> contacts) async {
+    final ids = [
+      for (final c in contacts)
+        if (c.role == ContactRole.buyer && c.userId.isNotEmpty) c.userId,
+    ];
+    if (ids.isEmpty) return contacts;
+    try {
+      final saved = await fetchBuyerCategories(ids);
+      return [
+        for (final c in contacts) c.copyWith(interestedCategories: saved[c.userId] ?? const []),
+      ];
+    } catch (e) {
+      debugPrint('Buyer category preferences unavailable: $e');
+      return contacts;
+    }
+  }
+
+  /// Active master categories for the filter; empty if they cannot be read.
+  Future<List<InterestedCategory>> getCategories() async {
+    try {
+      final rows = await _supabase!
+          .from('master_categories')
+          .select('id, name')
+          .eq('status', true)
+          .order('name', ascending: true);
+      return InterestedCategory.listFromJson(rows);
+    } catch (e) {
+      debugPrint('Directory categories unavailable: $e');
+      return const [];
+    }
+  }
+
+  /// Finds eligible existing buyers. Server only: RLS correctly hides unlinked
+  /// buyers from a direct query, so there is no Supabase fallback.
+  Future<DirectoryDataResult<List<DiscoverableBuyer>>> discoverBuyers({
+    required String search,
+    String? categoryId,
+  }) async {
+    if (!await _restAuthReady()) return const DirectoryUnauthorized();
+    try {
+      final response = await _apiClient.get(
+        '/broker/directory/discover',
+        queryParameters: {'search': search.trim(), 'categoryId': ?categoryId},
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic> && data['success'] == true) {
+        return DirectorySuccess(
+          (data['data'] as List<dynamic>? ?? [])
+              .whereType<Map<String, dynamic>>()
+              .map(DiscoverableBuyer.fromJson)
+              .toList(),
+        );
+      }
+      return DirectoryError(message: _rejectedOrMalformed(data));
+    } on DioException catch (e) {
+      return _discoveryFailure(e);
+    } catch (e) {
+      debugPrint('Buyer discovery error: $e');
+      return const DirectoryError(message: _discoveryMalformed);
+    }
+  }
+
+  static const _discoveryNetwork = 'Could not reach the RMBroker server. Check your connection and try again.';
+  static const _discoveryMalformed = 'The server sent an unexpected response. Please try again.';
+
+  static String _rejectedOrMalformed(Object? data) =>
+      data is Map ? data['error']?.toString() ?? _discoveryMalformed : _discoveryMalformed;
+
+  /// No response at all is the only case reported as a connection problem.
+  static DirectoryDataResult<T> _discoveryFailure<T>(DioException e) {
+    final status = e.response?.statusCode;
+    debugPrint('Buyer discovery request failed: ${e.type} status=$status');
+    if (status == null) return const DirectoryError(message: _discoveryNetwork, code: 'network');
+    if (status == 401) return const DirectoryUnauthorized();
+    final code = 'http_$status';
+    if (status == 403) {
+      return DirectoryError(message: 'Your account is not permitted to do this.', code: code);
+    }
+    if (status == 404) {
+      return DirectoryError(message: 'Buyer search is not available on this server.', code: code);
+    }
+    if (status >= 500) {
+      return DirectoryError(message: 'The server had a problem. Please try again.', code: code);
+    }
+    return DirectoryError(message: _serverError(e) ?? 'The request was rejected.', code: code);
+  }
+
+  /// Links an existing buyer by id; creates no user or company. Returns the
+  /// broker's contact id, the same one if the buyer was already linked.
+  Future<DirectoryDataResult<String>> addExistingBuyer(String buyerUserId) async {
+    if (!await _restAuthReady()) return const DirectoryUnauthorized();
+    try {
+      final response = await _apiClient.post(
+        '/broker/directory/discover',
+        data: {'buyerUserId': buyerUserId},
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic> && data['success'] == true && data['contactId'] != null) {
+        return DirectorySuccess(data['contactId'].toString());
+      }
+      return DirectoryError(message: _rejectedOrMalformed(data));
+    } on DioException catch (e) {
+      return _discoveryFailure(e);
+    } catch (e) {
+      debugPrint('Add existing buyer error: $e');
+      return const DirectoryError(message: _discoveryMalformed);
+    }
+  }
+
   /// Load counterparty contacts with optional filters.
   ///
   /// With [limit], returns one page (newest first) and a cursor for the next;
@@ -623,6 +757,7 @@ class DirectoryRepository {
     String? role, // 'all' | 'buyer' | 'seller'
     String? search,
     String? status, // 'all' | 'active' | 'inactive'
+    String? categoryId,
     int? limit,
     String? cursor,
   }) async {
@@ -654,6 +789,7 @@ class DirectoryRepository {
             if (role != null && role != 'all') 'role': role,
             if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
             if (status != null && status != 'all') 'status': status,
+            'categoryId': ?categoryId,
             'limit': ?limit,
             'cursor': ?cursor,
           },
@@ -718,6 +854,7 @@ class DirectoryRepository {
             role: role,
             search: search,
             status: status,
+            categoryId: categoryId,
             limit: limit,
             after: after,
           ),
@@ -1102,7 +1239,25 @@ class DirectoryRepository {
         if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
           final data = response.data as Map<String, dynamic>;
           if (data['success'] == true) {
-            return const DirectorySuccess(true);
+            // The PUT route does not take GST fields; they have their own route.
+            final gstin = input.gstin?.trim() ?? '';
+            if (gstin.isEmpty) return const DirectorySuccess(true);
+            final gst = await _apiClient.post(
+              '/broker/directory/$contactId/gst',
+              data: {
+                'gstin': gstin,
+                'legalName': input.legalName,
+                'tradeName': input.tradeName,
+                'constitution': input.constitution,
+                'address': input.address,
+                'gstCertificateUrl': input.gstCertificateUrl,
+              },
+            );
+            final gstData = gst.data;
+            if (gstData is Map && gstData['success'] == true) return const DirectorySuccess(true);
+            return DirectoryError(
+              message: gstData is Map ? gstData['error']?.toString() ?? 'GST update failed' : 'GST update failed',
+            );
           }
           return DirectoryError(message: data['error']?.toString() ?? 'Update failed');
         }
@@ -1168,11 +1323,27 @@ class DirectoryRepository {
           if (input.gstCertificateUrl != null && input.gstCertificateUrl!.trim().isNotEmpty) {
             compUpdates['gst_certificate_url'] = input.gstCertificateUrl!.trim();
           }
-          if (input.gstVerificationStatus == CounterpartyGstStatus.brokerVerified) {
-            compUpdates['gst_verified_by'] = session.user.id;
-            compUpdates['gst_verified_at'] = DateTime.now().toIso8601String();
-            compUpdates['is_verified'] = true;
-            compUpdates['trust_score'] = 100;
+          final hasGstUpdate = input.gstin != null && input.gstin!.trim().isNotEmpty;
+          if (hasGstUpdate) {
+            final current = await client.from('companies').select().eq('id', compId).maybeSingle();
+            if (current?['gst_verification_status'] == CounterpartyGstStatus.gstVerified) {
+              return const DirectoryError(
+                message: 'These GST details are verified. Ask Admin to review any correction.',
+              );
+            }
+            try {
+              await client.from('counterparty_verification_requests').insert({
+                'company_id': compId,
+                'broker_id': session.user.id,
+                'role': input.role.apiValue,
+                'gstin': input.gstin!.trim().toUpperCase(),
+                'legal_name': input.legalName?.trim(),
+                'trade_name': input.tradeName?.trim(),
+                'status': 'pending',
+              });
+            } catch (e) {
+              debugPrint('Counterparty verification request notice: $e');
+            }
           }
 
           if (input.bankAccountNumber != null && input.bankAccountNumber!.trim().isNotEmpty) {

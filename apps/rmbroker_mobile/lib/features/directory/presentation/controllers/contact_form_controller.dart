@@ -643,9 +643,10 @@ class ContactFormController extends Notifier<ContactFormState> {
 
     if (isEditing && contactId != null) {
       final isCertMode = state.registrationMode == CounterpartyRegistrationMode.gstCertificate;
-      final gstVerificationStatus = isCertMode
-          ? CounterpartyGstStatus.brokerVerified
-          : (cleanGstin.isNotEmpty ? (state.gstData?.gstStatus != null ? CounterpartyGstStatus.portalMatched : CounterpartyGstStatus.gstPending) : CounterpartyGstStatus.missing);
+      // A broker's edit or upload never verifies: it stays pending until Admin reviews it.
+      final gstVerificationStatus = cleanGstin.isNotEmpty
+          ? CounterpartyGstStatus.gstPending
+          : CounterpartyGstStatus.missing;
 
       final input = UpdateContactInput(
         name: state.name,

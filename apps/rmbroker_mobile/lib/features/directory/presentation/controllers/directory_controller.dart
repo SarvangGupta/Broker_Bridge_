@@ -26,7 +26,10 @@ class DirectoryController extends Notifier<DirectoryState> {
   DirectoryState build() {
     ref.onDispose(() => _searchTimer?.cancel());
     // Schedule initial load
-    Future.microtask(() => loadContacts());
+    Future.microtask(() {
+      loadContacts();
+      _loadCategories();
+    });
     return const DirectoryState(status: DirectoryStatus.loading);
   }
 
@@ -43,6 +46,7 @@ class DirectoryController extends Notifier<DirectoryState> {
       role: state.activeTab,
       status: state.statusFilter,
       search: state.searchQuery,
+      categoryId: state.categoryFilter,
       limit: DirectoryRepository.directoryPageSize,
     );
     // The directory may have been closed while loading (e.g. refresh after
@@ -107,6 +111,7 @@ class DirectoryController extends Notifier<DirectoryState> {
       role: state.activeTab,
       status: state.statusFilter,
       search: state.searchQuery,
+      categoryId: state.categoryFilter,
       limit: DirectoryRepository.directoryPageSize,
       cursor: cursor,
     );
@@ -167,6 +172,19 @@ class DirectoryController extends Notifier<DirectoryState> {
     if (state.statusFilter == filter) return;
     state = state.copyWith(statusFilter: filter);
     _reloadForFilters();
+  }
+
+  /// Change category filter (`master_categories.id`; null clears it).
+  void setCategoryFilter(String? categoryId) {
+    if (state.categoryFilter == categoryId) return;
+    state = state.copyWith(categoryFilter: categoryId);
+    _reloadForFilters();
+  }
+
+  /// The filter is simply not offered if the categories cannot be read.
+  Future<void> _loadCategories() async {
+    final categories = await _repository.getCategories();
+    if (ref.mounted) state = state.copyWith(categories: categories);
   }
 
   /// Filters are applied by the query, so a changed filter needs a fresh
