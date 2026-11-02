@@ -44,6 +44,7 @@ import {
   createBrokerByAdminAction,
   getAdminBrokersListAction,
 } from "@/src/server/actions/admin-user-actions";
+import { ForceResetPasswordDialog } from "@/src/components/admin/force-reset-password-dialog";
 
 export interface BrokerUserRecord {
   id: string;
@@ -345,6 +346,7 @@ export function AdminBrokersVault() {
                     <TableHead className="font-bold text-xs text-slate-700">Phone / WhatsApp</TableHead>
                     <TableHead className="font-bold text-xs text-slate-700">Status</TableHead>
                     <TableHead className="font-bold text-xs text-slate-700">Provisioned Date</TableHead>
+                    <TableHead className="font-bold text-xs text-slate-700 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
 
@@ -392,6 +394,17 @@ export function AdminBrokersVault() {
                         {broker.createdAt
                           ? format(new Date(broker.createdAt), "MMM d, yyyy")
                           : "N/A"}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        <ForceResetPasswordDialog
+                          user={{
+                            id: broker.id,
+                            name: broker.name,
+                            email: broker.email,
+                            role: "Broker",
+                          }}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

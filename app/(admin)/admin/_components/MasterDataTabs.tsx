@@ -25,7 +25,8 @@ import {
   Handshake, 
   Users, 
   Building2, 
-  Layers 
+  Layers,
+  KeyRound 
 } from "lucide-react"
 import { signOutAction } from "@/src/server/actions/auth-actions"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -67,6 +68,7 @@ import { AdminHelpDeskQueue } from "./admin-help-desk-queue"
 import { AdminBrokersVault } from "./admin-brokers-vault"
 import { QualityParameterDialog } from "./quality-parameter-dialog"
 import { AddClientDialog } from "@/src/components/admin/add-client-dialog"
+import { ForceResetPasswordDialog } from "@/src/components/admin/force-reset-password-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -420,6 +422,18 @@ export function MasterDataTabs() {
         <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 z-10 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-500 tracking-wide uppercase">Tier 0 / System Console</h2>
           <div className="flex items-center gap-3">
+            <ForceResetPasswordDialog
+              trigger={
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 px-3.5 gap-2 text-xs font-semibold text-amber-700 bg-amber-50/80 border-amber-200 hover:bg-amber-100 hover:text-amber-800 transition-colors cursor-pointer"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Reset Password</span>
+                </Button>
+              }
+            />
             <AddClientDialog />
             <NotificationBell />
             <DropdownMenu>

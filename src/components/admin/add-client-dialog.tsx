@@ -463,7 +463,9 @@ export function AddClientDialog({
                       >
                         <FormControl>
                           <SelectTrigger className="h-12 min-h-[48px] text-sm bg-white border-slate-200">
-                            <SelectValue placeholder={loadingIndustries ? "Loading industries..." : "Select Industry"} />
+                            <SelectValue placeholder={loadingIndustries ? "Loading industries..." : "Select Industry"}>
+                              {field.value ? industries.find((i: any) => i.id === field.value)?.name : null}
+                            </SelectValue>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="max-h-60">
@@ -503,7 +505,9 @@ export function AddClientDialog({
                                   ? "No categories in this industry"
                                   : "Select Category"
                               }
-                            />
+                            >
+                              {field.value ? filteredCategories.find((c: any) => c.id === field.value)?.name : null}
+                            </SelectValue>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="max-h-60">
@@ -539,7 +543,9 @@ export function AddClientDialog({
                       >
                         <FormControl>
                           <SelectTrigger className="h-12 min-h-[48px] text-sm bg-white border-slate-200">
-                            <SelectValue placeholder={loadingStates ? "Loading states..." : "Select State"} />
+                            <SelectValue placeholder={loadingStates ? "Loading states..." : "Select State"}>
+                              {field.value ? states.find((s: any) => s.id === field.value)?.name : null}
+                            </SelectValue>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="max-h-60">
@@ -579,7 +585,9 @@ export function AddClientDialog({
                                   ? "No districts found for state"
                                   : "Select District"
                               }
-                            />
+                            >
+                              {field.value ? filteredDistricts.find((d: any) => d.id === field.value)?.name : null}
+                            </SelectValue>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="max-h-60">

@@ -388,3 +388,109 @@ export async function getAdminBrokersListAction(): Promise<AdminActionResult> {
     return { success: false, error: error.message || "Failed to fetch brokers list." };
   }
 }
+
+export interface ForceResetPasswordInput {
+  userId?: string;
+  email?: string;
+  newPassword: string;
+}
+
+/**
+ * Super Admin Force Password Reset Action.
+ * Directly resets the Supabase Auth password for any user (Buyer, Seller, Broker)
+ * using the Supabase Service Role Key without needing email confirmation or current password.
+ */
+export async function forceResetUserPasswordByAdminAction(
+  input: ForceResetPasswordInput
+): Promise<AdminActionResult> {
+  try {
+    // 1. Authenticate caller session strictly ensuring Tier 0 Admin
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Unauthorized: Session required." };
+    }
+
+    const callerDbUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+
+    if (!callerDbUser || callerDbUser.role !== "admin") {
+      return { success: false, error: "Unauthorized: Tier 0 Admin privileges required." };
+    }
+
+    const newPassword = input.newPassword?.trim();
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, error: "New password must be at least 6 characters long." };
+    }
+
+    let targetUserId = input.userId?.trim();
+    let targetUserEmail = input.email?.trim().toLowerCase();
+
+    // If userId not provided, look up by email
+    if (!targetUserId && targetUserEmail) {
+      const foundUser = await db.query.users.findFirst({
+        where: eq(users.email, targetUserEmail),
+      });
+      if (!foundUser) {
+        return { success: false, error: `No user found with email ${targetUserEmail}.` };
+      }
+      targetUserId = foundUser.id;
+    }
+
+    if (!targetUserId) {
+      return { success: false, error: "Target User ID or Email is required." };
+    }
+
+    // Verify user exists in database
+    const targetDbUser = await db.query.users.findFirst({
+      where: eq(users.id, targetUserId),
+    });
+
+    if (!targetDbUser) {
+      return { success: false, error: "User record not found in database." };
+    }
+
+    // 2. Instantiate Supabase admin client using Service Role Key
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+    const supabaseAdmin = createSupabaseAdminClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // 3. Forcefully update password in Supabase Auth
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      targetUserId,
+      { password: newPassword }
+    );
+
+    if (updateError) {
+      console.error("forceResetUserPasswordByAdminAction auth error:", updateError);
+      return {
+        success: false,
+        error: updateError.message || "Failed to update password in Auth service.",
+      };
+    }
+
+    return {
+      success: true,
+      message: `Password forcefully updated for ${targetDbUser.name || targetDbUser.email || targetUserId}.`,
+      data: {
+        userId: targetUserId,
+        email: targetDbUser.email,
+        name: targetDbUser.name,
+      },
+    };
+  } catch (error: any) {
+    console.error("forceResetUserPasswordByAdminAction error:", error);
+    return {
+      success: false,
+      error: error.message || "An unexpected error occurred while resetting the password.",
+    };
+  }
+}

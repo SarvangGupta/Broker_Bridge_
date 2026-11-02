@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Loader2, CheckCircle2, XCircle } from "lucide-react"
 import { VerifyGstButton } from "@/src/components/admin/verify-gst-button"
 import { AddClientDialog } from "@/src/components/admin/add-client-dialog"
+import { ForceResetPasswordDialog } from "@/src/components/admin/force-reset-password-dialog"
 
 import {
   getPendingCompaniesAction,
@@ -165,6 +166,16 @@ export function CompanyApprovalQueue() {
                         {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
                         Reject
                       </Button>
+                      {item.user?.id && (
+                        <ForceResetPasswordDialog
+                          user={{
+                            id: item.user.id,
+                            name: item.user.name,
+                            email: item.user.email,
+                            role: "Client",
+                          }}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 )
