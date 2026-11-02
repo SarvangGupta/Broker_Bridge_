@@ -249,47 +249,40 @@ class _RequirementDetailsScreenState extends State<RequirementDetailsScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildMetricItem('Commodity', req.commodityName),
-                      _buildMetricItem('Quality Grade', req.gradeName),
-                    ],
-                  ),
+                  _buildMetricGrid([
+                    _buildMetricItem('Commodity', _orDash(req.commodityName)),
+                    _buildMetricItem('Quality Grade', _orDash(req.gradeName)),
+                  ]),
                   const SizedBox(height: 12),
                   const Divider(),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildMetricItem('Target Quantity', '${req.quantity} ${req.unit}'),
-                      _buildMetricItem(
-                        'Target Price',
-                        '${currencyFormat.format(req.targetPrice)}/${req.unit}',
-                      ),
-                      _buildMetricItem(
-                        'Est. Mandate Value',
-                        currencyFormat.format(req.totalEstimatedValue),
-                      ),
-                    ],
-                  ),
+                  _buildMetricGrid([
+                    _buildMetricItem('Target Quantity', '${req.quantity} ${req.unit}'),
+                    _buildMetricItem(
+                      'Target Price',
+                      '${currencyFormat.format(req.targetPrice)}/${req.unit}',
+                    ),
+                    _buildMetricItem(
+                      'Est. Mandate Value',
+                      currencyFormat.format(req.totalEstimatedValue),
+                    ),
+                  ]),
                   if (req.fulfilledQuantity > 0) ...[
                     const SizedBox(height: 12),
                     const Divider(),
                     const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildMetricItem(
-                          'Fulfilled Quantity',
-                          '${req.fulfilledQuantity} ${req.unit} (${((req.fulfilledQuantity / req.quantity) * 100).toStringAsFixed(0)}%)',
-                        ),
-                        _buildMetricItem(
-                          'Remaining Balance',
-                          '${req.quantity - req.fulfilledQuantity} ${req.unit}',
-                        ),
-                      ],
-                    ),
+                    _buildMetricGrid([
+                      _buildMetricItem(
+                        'Fulfilled Quantity',
+                        req.quantity > 0
+                            ? '${req.fulfilledQuantity} ${req.unit} (${((req.fulfilledQuantity / req.quantity) * 100).toStringAsFixed(0)}%)'
+                            : '${req.fulfilledQuantity} ${req.unit}',
+                      ),
+                      _buildMetricItem(
+                        'Remaining Balance',
+                        '${req.quantity - req.fulfilledQuantity} ${req.unit}',
+                      ),
+                    ]),
                   ],
                 ],
               ),
@@ -406,19 +399,25 @@ class _RequirementDetailsScreenState extends State<RequirementDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
                       const Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(LucideIcons.badgePercent, size: 18, color: AppColors.primary),
                           SizedBox(width: 8),
-                          Text(
-                            'Broker Commercial Offers',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimaryLight,
+                          Flexible(
+                            child: Text(
+                              'Broker Commercial Offers',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimaryLight,
+                              ),
                             ),
                           ),
                         ],
@@ -456,6 +455,22 @@ class _RequirementDetailsScreenState extends State<RequirementDetailsScreen> {
                       },
                     ),
                   ),
+                  // In-app chat with this requirement's assigned broker,
+                  // linked to the requirement (0067; general thread before it).
+                  if (req.isDirectBrokerMandate) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('requirement_chat_broker_button'),
+                        icon: const Icon(LucideIcons.messagesSquare, size: 16),
+                        label: const Text('Chat with Broker'),
+                        onPressed: () {
+                          context.push('/chats/broker/${req.brokerId}?requirementId=${req.id}');
+                        },
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -505,14 +520,17 @@ class _RequirementDetailsScreenState extends State<RequirementDetailsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Status: ${req.status}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimaryLight,
+              Expanded(
+                child: Text(
+                  'Status: ${req.status}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimaryLight,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               StatusBadge(status: req.status),
             ],
           ),
@@ -536,12 +554,14 @@ class _RequirementDetailsScreenState extends State<RequirementDetailsScreen> {
             children: [
               Icon(LucideIcons.history, size: 18, color: AppColors.primary),
               SizedBox(width: 8),
-              Text(
-                'Activity Timeline & Status History',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimaryLight,
+              Expanded(
+                child: Text(
+                  'Activity Timeline & Status History',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimaryLight,
+                  ),
                 ),
               ),
             ],
@@ -604,8 +624,9 @@ class _RequirementDetailsScreenState extends State<RequirementDetailsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            spacing: 8,
                             children: [
                               Text(
                                 event.title,
@@ -685,6 +706,30 @@ class _RequirementDetailsScreenState extends State<RequirementDetailsScreen> {
           style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
         ),
       ),
+    );
+  }
+
+  String _orDash(String value) => value.trim().isEmpty ? '—' : value;
+
+  /// Lays out metric cells in as many equal columns as fit the available
+  /// width (scaled with the user's text size), stacking on narrow screens so
+  /// long values wrap instead of overflowing.
+  Widget _buildMetricGrid(List<Widget> items) {
+    const spacing = 16.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final minCellWidth = MediaQuery.textScalerOf(context).scale(130);
+        final fit = ((constraints.maxWidth + spacing) / (minCellWidth + spacing)).floor();
+        final columns = fit.clamp(1, items.length);
+        final cellWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: 12,
+          children: [
+            for (final item in items) SizedBox(width: cellWidth, child: item),
+          ],
+        );
+      },
     );
   }
 

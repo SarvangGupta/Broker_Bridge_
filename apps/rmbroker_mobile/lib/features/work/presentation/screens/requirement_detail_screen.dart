@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../chat/data/chat_contacts.dart';
 import '../../../deals/presentation/controllers/allocations_controller.dart';
 import '../../../deals/presentation/controllers/deals_controller.dart';
 import '../../data/work_repository.dart';
@@ -167,8 +168,12 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
     final allocations = allocState.allocations;
     final empty = allocations.isEmpty && deals.isEmpty;
     final unallocated = !allocState.isLoading && empty;
-    final canAllocate = unallocated &&
+    final allocatable =
         SelectSellerLotSheet.canAllocate(requirement, ref.read(workRepositoryProvider).activeBrokerId());
+    final canAllocate = unallocated && allocatable;
+    // Requirements take several seller lots until fulfilled; adding one never
+    // replaces an existing allocation.
+    final canAllocateAnother = !empty && !allocState.isLoading && allocatable;
 
     final String summary;
     if (allocState.isLoading && empty) {
@@ -268,6 +273,18 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
                 ),
               ),
             ),
+          if (canAllocateAnother) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              key: const ValueKey('allocate_another_seller_button'),
+              onPressed: () => _allocateSeller(requirement),
+              icon: const Icon(LucideIcons.plus, size: 16),
+              label: Text(
+                'Allocate Another Seller (${requirement.remainingQuantity.toStringAsFixed(0)} '
+                '${requirement.unitSymbol} open)',
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -954,6 +971,24 @@ class _RequirementDetailScreenState extends ConsumerState<RequirementDetailScree
             _infoRow('Company', requirement.buyerCompanyName),
             _infoRow('Verification', requirement.isBuyerVerified ? 'Verified' : 'Not verified'),
             if (requirement.buyerTrustScore > 0) _infoRow('Trust Score', '${requirement.buyerTrustScore}%'),
+            // Explicit in-app chat with this requirement's buyer (assigned desk only).
+            if (requirement.brokerId != null &&
+                requirement.brokerId == ref.read(workRepositoryProvider).activeBrokerId()) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const ValueKey('chat_with_buyer_button'),
+                  onPressed: () => openChatForContext(
+                    context,
+                    requirementId: requirement.id,
+                    repository: ref.read(chatContactsRepositoryProvider),
+                  ),
+                  icon: const Icon(LucideIcons.messagesSquare, size: 16),
+                  label: const Text('Chat with Buyer'),
+                ),
+              ),
+            ],
           ],
         ),
       ),

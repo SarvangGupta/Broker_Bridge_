@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../theme/app_colors.dart';
 import '../../core/widgets/module_placeholder_screen.dart';
+import '../../features/chat/data/chat_contacts.dart';
 import '../../features/chat/presentation/chat_inbox_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/authentication/presentation/access_denied_screen.dart';
@@ -217,15 +218,33 @@ class AppRouter {
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const NotificationCenterScreen(),
       ),
-      // Buyer <-> Broker chat (BROKERBRIDGE-CHAT-E2E-01). Brokers reply only;
-      // conversations are opened by buyers.
+      // Broker-mediated chat with buyers and sellers (0043 + proposed 0066).
       GoRoute(
         path: '/chats',
         name: 'chat_inbox',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const ChatInboxScreen(
-          emptyText: 'No buyer conversations yet. Buyers can message you from your profile.',
+          emptyText: 'No conversations yet. Buyers and sellers can message you from your profile, '
+              'or use Chat on a requirement or seller lot.',
         ),
+      ),
+      // Broker starts (or reopens) a chat with a buyer or seller on the desk.
+      GoRoute(
+        path: '/chats/user/:userId',
+        name: 'chat_with_user',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final contact = state.extra is ChatContact ? state.extra as ChatContact : null;
+          return ChatScreen(
+            counterpartId: state.pathParameters['userId'],
+            requirementId: state.uri.queryParameters['requirementId'],
+            availabilityId: state.uri.queryParameters['availabilityId'],
+            fallbackName: contact?.name,
+            fallbackCompany: contact?.company,
+            emptyHint: 'Discuss requirements, pricing, lot matching or dispatch. '
+                'Buyer and seller identities stay protected from each other.',
+          );
+        },
       ),
       GoRoute(
         path: '/chats/:id',
@@ -233,8 +252,8 @@ class AppRouter {
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => ChatScreen(
           conversationId: state.pathParameters['id'],
-          emptyHint: 'Reply to the buyer about their requirement, pricing or dispatch. '
-              'Seller identities stay protected.',
+          emptyHint: 'Reply about requirements, lots, pricing or dispatch. '
+              'Buyer and seller identities stay protected from each other.',
         ),
       ),
       GoRoute(

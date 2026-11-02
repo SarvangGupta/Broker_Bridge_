@@ -9,6 +9,8 @@ import '../../features/authentication/presentation/splash_screen.dart';
 import '../../features/brokers/domain/seller_broker_model.dart';
 import '../../features/brokers/presentation/broker_profile_screen.dart';
 import '../../features/brokers/presentation/my_brokers_screen.dart';
+import '../../features/chat/presentation/chat_inbox_screen.dart';
+import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/commodities/domain/commodity_model.dart';
 import '../../features/commodities/presentation/commodity_details_screen.dart';
 import '../../features/commodities/presentation/my_commodities_screen.dart';
@@ -279,6 +281,41 @@ class AppRouter {
                 queryParams['commodityContext'] ?? 'Direct Negotiation Desk',
           );
         },
+      ),
+
+      // Seller <-> Broker chat (shared chat module; 0043 + proposed 0066).
+      GoRoute(
+        path: '/chats',
+        name: 'chat_inbox',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ChatInboxScreen(
+          emptyText: 'No conversations yet. Open a broker and tap Chat with Broker.',
+        ),
+      ),
+      GoRoute(
+        path: '/chats/broker/:brokerId',
+        name: 'chat_with_broker',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final broker = state.extra is SellerBrokerModel ? state.extra as SellerBrokerModel : null;
+          return ChatScreen(
+            brokerId: state.pathParameters['brokerId'],
+            availabilityId: state.uri.queryParameters['availabilityId'],
+            fallbackName: broker?.name,
+            emptyHint: 'Discuss your lots, pricing, buyer interest or dispatch with this broker. '
+                'Buyer identities stay protected.',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/chats/:id',
+        name: 'chat_conversation',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => ChatScreen(
+          conversationId: state.pathParameters['id'],
+          emptyHint: 'Discuss your lots, pricing, buyer interest or dispatch with this broker. '
+              'Buyer identities stay protected.',
+        ),
       ),
 
       // Application Settings Route (Protected)

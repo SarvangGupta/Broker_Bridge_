@@ -63,6 +63,15 @@ class ChatConversationSummary {
   final int unreadCount;
   final DateTime? counterpartLastReadAt;
 
+  /// buyer | seller | broker (0066 inbox); null on a 0043-only backend.
+  final String? counterpartRole;
+
+  /// Requirement / offer this conversation is linked to (0067); null for the
+  /// general thread. [contextLabel] is the server's display text for it.
+  final String? requirementId;
+  final String? availabilityId;
+  final String? contextLabel;
+
   const ChatConversationSummary({
     required this.id,
     required this.buyerId,
@@ -75,7 +84,19 @@ class ChatConversationSummary {
     this.lastSenderId,
     this.unreadCount = 0,
     this.counterpartLastReadAt,
+    this.counterpartRole,
+    this.requirementId,
+    this.availabilityId,
+    this.contextLabel,
   });
+
+  /// 'Buyer' / 'Seller' / 'Broker' tag for lists and headers.
+  String? get roleLabel => switch (counterpartRole) {
+    'buyer' => 'Buyer',
+    'seller' => 'Seller',
+    'broker' => 'Broker',
+    _ => null,
+  };
 
   factory ChatConversationSummary.fromMap(Map<String, dynamic> map) {
     DateTime? ts(Object? v) =>
@@ -97,6 +118,10 @@ class ChatConversationSummary {
       lastSenderId: text(map['last_sender_id']),
       unreadCount: (map['unread_count'] as num?)?.toInt() ?? 0,
       counterpartLastReadAt: ts(map['counterpart_last_read_at']),
+      counterpartRole: text(map['counterpart_role'])?.toLowerCase(),
+      requirementId: text(map['requirement_id']),
+      availabilityId: text(map['availability_id']),
+      contextLabel: text(map['context_label']),
     );
   }
 }

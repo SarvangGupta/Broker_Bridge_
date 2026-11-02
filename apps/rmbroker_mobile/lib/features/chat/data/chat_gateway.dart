@@ -7,33 +7,44 @@ abstract class ChatSubscription {
   Future<void> cancel();
 }
 
-/// Backend contract for Buyer <-> Broker chat (migration 0043).
+/// Backend contract for broker-mediated chat: Buyer/Seller <-> Broker
+/// (migration 0043, extended by proposed 0066). One conversation per
+/// (client user, broker user); buyers and sellers never share one.
 /// All writes go through SECURITY DEFINER RPCs that derive the sender from
 /// the session; the client never supplies its own identity or role.
 abstract class ChatGateway {
   String? get currentUserId;
 
-  /// The caller's conversation with [brokerId], if one exists (Buyer side).
-  Future<String?> findConversationWithBroker(String brokerId);
+  /// The caller's conversation with [userId] (either side), if one exists:
+  /// the general thread, or the one linked to [requirementId] / [availabilityId].
+  Future<String?> findConversationWith(String userId, {String? requirementId, String? availabilityId});
 
   /// Inbox rows; pass [conversationId] for a single conversation's header.
   Future<List<ChatConversationSummary>> inbox({String? conversationId});
 
-  /// Newest-first page of messages strictly older than [before].
+  /// Newest-first page of messages strictly before ([before], [beforeId]) in
+  /// (created_at, id) order, so equal timestamps never skip a message.
   Future<List<ChatMessage>> fetchMessages(
     String conversationId, {
     DateTime? before,
+    String? beforeId,
     int limit = 50,
   });
 
-  /// Persists a message. Exactly one of [brokerId] (first message / buyer by
-  /// broker) or [conversationId] is used. Retrying with the same
-  /// [clientMessageId] returns the original row instead of a duplicate.
+  /// Persists a message. With [conversationId] it replies; otherwise the
+  /// first message creates the conversation, addressed by [brokerId]
+  /// (buyer/seller to a broker, 0043 path) or [counterpartId] (any role to
+  /// a specific user, 0066 path). With [requirementId] / [availabilityId] the
+  /// conversation is the one linked to that requirement / offer (0067).
+  /// Retrying with the same [clientMessageId] returns the original row.
   Future<ChatMessage> send({
     required String body,
     required String clientMessageId,
     String? brokerId,
+    String? counterpartId,
     String? conversationId,
+    String? requirementId,
+    String? availabilityId,
   });
 
   Future<void> markRead(String conversationId);
@@ -63,14 +74,29 @@ class SupabaseChatGateway implements ChatGateway {
   }
 
   @override
-  Future<String?> findConversationWithBroker(String brokerId) async {
+  Future<String?> findConversationWith(String userId, {String? requirementId, String? availabilityId}) async {
     final me = currentUserId;
     if (me == null) throw StateError('Not signed in');
+    try {
+      final id = await _db.rpc(
+        'chat_find_conversation',
+        params: {
+          'p_counterpart_id': userId,
+          'p_requirement_id': requirementId,
+          'p_availability_id': availabilityId,
+        },
+      );
+      return id?.toString();
+    } on PostgrestException catch (e) {
+      // Backend without 0067: only general conversations exist, so a context
+      // chat falls back to the general thread with this person.
+      if (!_isMissingFunction(e)) rethrow;
+    }
+    // RLS returns only the caller's own conversations.
     final row = await _db
         .from('chat_conversations')
         .select('id')
-        .eq('buyer_id', me)
-        .eq('broker_id', brokerId)
+        .or('and(buyer_id.eq.$me,broker_id.eq.$userId),and(broker_id.eq.$me,buyer_id.eq.$userId)')
         .maybeSingle();
     return row?['id']?.toString();
   }
@@ -91,6 +117,7 @@ class SupabaseChatGateway implements ChatGateway {
   Future<List<ChatMessage>> fetchMessages(
     String conversationId, {
     DateTime? before,
+    String? beforeId,
     int limit = 50,
   }) async {
     var query = _db
@@ -100,7 +127,10 @@ class SupabaseChatGateway implements ChatGateway {
         )
         .eq('conversation_id', conversationId);
     if (before != null) {
-      query = query.lt('created_at', before.toUtc().toIso8601String());
+      final ts = before.toUtc().toIso8601String();
+      query = beforeId == null
+          ? query.lt('created_at', ts)
+          : query.or('created_at.lt."$ts",and(created_at.eq."$ts",id.lt.$beforeId)');
     }
     final rows = await query
         .order('created_at', ascending: false)
@@ -114,17 +144,47 @@ class SupabaseChatGateway implements ChatGateway {
     required String body,
     required String clientMessageId,
     String? brokerId,
+    String? counterpartId,
     String? conversationId,
+    String? requirementId,
+    String? availabilityId,
   }) async {
-    final row = await _db.rpc(
-      'chat_send_message',
-      params: {
-        'p_body': body,
-        'p_client_message_id': clientMessageId,
-        'p_broker_id': conversationId == null ? brokerId : null,
-        'p_conversation_id': conversationId,
-      },
-    );
+    if (conversationId == null && (requirementId != null || availabilityId != null)) {
+      try {
+        final row = await _db.rpc(
+          'chat_send_in_context',
+          params: {
+            'p_body': body,
+            'p_client_message_id': clientMessageId,
+            'p_counterpart_id': counterpartId ?? brokerId,
+            'p_requirement_id': requirementId,
+            'p_availability_id': availabilityId,
+          },
+        );
+        return ChatMessage.fromMap(Map<String, dynamic>.from(row as Map));
+      } on PostgrestException catch (e) {
+        // Backend without 0067: send in the general thread (same as before).
+        if (!_isMissingFunction(e)) rethrow;
+      }
+    }
+    final row = conversationId == null && counterpartId != null
+        ? await _db.rpc(
+            'chat_send_message_to',
+            params: {
+              'p_body': body,
+              'p_client_message_id': clientMessageId,
+              'p_counterpart_id': counterpartId,
+            },
+          )
+        : await _db.rpc(
+            'chat_send_message',
+            params: {
+              'p_body': body,
+              'p_client_message_id': clientMessageId,
+              'p_broker_id': conversationId == null ? brokerId : null,
+              'p_conversation_id': conversationId,
+            },
+          );
     return ChatMessage.fromMap(Map<String, dynamic>.from(row as Map));
   }
 
@@ -184,6 +244,10 @@ class SupabaseChatGateway implements ChatGateway {
     return _ChannelSubscription(_db, channel);
   }
 }
+
+/// PostgREST "function not found" (an RPC from a migration not applied yet).
+bool _isMissingFunction(PostgrestException e) =>
+    e.code == 'PGRST202' || e.code == '42883';
 
 class _ChannelSubscription implements ChatSubscription {
   final SupabaseClient _db;

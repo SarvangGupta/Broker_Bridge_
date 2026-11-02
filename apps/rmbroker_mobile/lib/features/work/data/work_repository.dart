@@ -422,7 +422,10 @@ class WorkRepository {
               'sold_quantity, asking_price, confidential_minimum_price, loading_status, '
               'loading_remarks, loading_location_id, loading_location_snapshot, '
               'loading_remarks, available_from, valid_until, version, status, created_at, broker_id, '
-              'companies!inner(id, name, is_verified, trust_score), '
+              'company_id, commodity_id, grade_id, unit_id, '
+              // Left join: companies RLS hides sellers outside the broker's CRM,
+              // and !inner would silently drop their visible lots.
+              'companies(id, name, is_verified, trust_score), '
               'master_commodities!inner(id, name), '
               'master_grades(id, grade_name), '
               'master_units(id, name, symbol), '
@@ -445,8 +448,9 @@ class WorkRepository {
             final d = item['master_districts'] as Map<String, dynamic>? ?? {};
 
             final flat = Map<String, dynamic>.from(item);
-            flat['seller_company_name'] = c['name'];
-            flat['seller_company_verified'] = c['is_verified'];
+            flat['seller_company_name'] = c['name'] ?? 'Seller (details restricted)';
+            // Unknown verification is never treated as verified.
+            flat['seller_company_verified'] = c['is_verified'] ?? false;
             flat['seller_trust_score'] = c['trust_score'];
             flat['commodity_name'] = comm['name'];
             flat['grade_name'] = g['grade_name'];

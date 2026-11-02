@@ -176,9 +176,10 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                             ),
                         ],
                       ),
-                      if (r.counterpartCompany != null)
+                      if (r.counterpartCompany != null || r.roleLabel != null || r.contextLabel != null)
                         Text(
-                          r.counterpartCompany!,
+                          [?r.roleLabel, ?r.counterpartCompany, ?r.contextLabel].join(' · '),
+                          key: Key('chat-inbox-subtitle-${r.id}'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(

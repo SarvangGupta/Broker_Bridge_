@@ -7,24 +7,33 @@ import '../domain/chat_models.dart';
 
 /// State for one conversation screen.
 ///
-/// Opened either by [conversationId] (inbox, notification, broker side) or by
-/// [brokerId] (buyer tapping Chat on a broker profile). In the broker case an
-/// existing conversation is looked up; if none exists the screen shows the
-/// "Start a conversation" state and the first send creates it server-side.
+/// Opened by [conversationId] (inbox, notification), by [brokerId] (buyer or
+/// seller tapping Chat on a broker) or by [counterpartId] (broker tapping Chat
+/// on a requirement buyer or lot seller). Without an id an existing
+/// conversation with that person is looked up; if none exists the screen shows
+/// the "Start a conversation" state and the first send creates it server-side.
 ///
 /// Messages are merged by server id and by (sender, clientMessageId), so a
 /// realtime echo, a history refresh and the send response never duplicate.
 class ChatController extends ChangeNotifier {
   final ChatGateway gateway;
   final String? brokerId;
+  final String? counterpartId;
+
+  /// Requirement / offer the conversation is linked to (0067); null = general.
+  final String? requirementId;
+  final String? availabilityId;
   final int pageSize;
 
   ChatController({
     required this.gateway,
     String? conversationId,
     this.brokerId,
+    this.counterpartId,
+    this.requirementId,
+    this.availabilityId,
     this.pageSize = 50,
-  }) : assert(conversationId != null || brokerId != null),
+  }) : assert(conversationId != null || brokerId != null || counterpartId != null),
        _conversationId = conversationId;
 
   String? _conversationId;
@@ -55,7 +64,11 @@ class ChatController extends ChangeNotifier {
     error = null;
     _notify();
     try {
-      _conversationId ??= await gateway.findConversationWithBroker(brokerId!);
+      _conversationId ??= await gateway.findConversationWith(
+        (brokerId ?? counterpartId)!,
+        requirementId: requirementId,
+        availabilityId: availabilityId,
+      );
       if (_conversationId != null) {
         await _loadSummary();
         await _loadLatest();
@@ -95,6 +108,7 @@ class ChatController extends ChangeNotifier {
       final page = await gateway.fetchMessages(
         _conversationId!,
         before: oldest.first.createdAt,
+        beforeId: oldest.first.id,
         limit: pageSize,
       );
       hasMore = page.length == pageSize;
@@ -156,7 +170,10 @@ class ChatController extends ChangeNotifier {
         body: pending.body,
         clientMessageId: pending.clientMessageId,
         brokerId: brokerId,
+        counterpartId: counterpartId,
         conversationId: _conversationId,
+        requirementId: requirementId,
+        availabilityId: availabilityId,
       );
       if (_disposed) return;
       final created = _conversationId == null;

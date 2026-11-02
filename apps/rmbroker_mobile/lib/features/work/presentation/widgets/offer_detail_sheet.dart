@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../chat/data/chat_contacts.dart';
 import '../../domain/offer_model.dart';
+import '../controllers/requirements_controller.dart';
 
-class OfferDetailSheet extends StatelessWidget {
+class OfferDetailSheet extends ConsumerWidget {
   final OfferItem offer;
 
   const OfferDetailSheet({
@@ -56,7 +59,10 @@ class OfferDetailSheet extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Chat is offered on lots this desk manages (the seller is a desk contact).
+    final brokerId = ref.read(workRepositoryProvider).activeBrokerId();
+    final canChat = brokerId != null && offer.brokerId == brokerId;
     return Padding(
       padding: const EdgeInsets.all(20),
       child: SingleChildScrollView(
@@ -264,6 +270,23 @@ class OfferDetailSheet extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
+            if (canChat) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton.icon(
+                  key: const ValueKey('chat_with_seller_button'),
+                  onPressed: () => openChatForContext(
+                    context,
+                    availabilityId: offer.id,
+                    repository: ref.read(chatContactsRepositoryProvider),
+                  ),
+                  icon: const Icon(LucideIcons.messagesSquare, size: 16),
+                  label: const Text('Chat with Seller'),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             SizedBox(
               width: double.infinity,
               height: 44,

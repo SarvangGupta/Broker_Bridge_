@@ -89,7 +89,9 @@ class DashboardController extends Notifier<DashboardState> {
         );
 
       case DashboardDataUnauthorized(:final message):
-        await _authRepository.signOut();
+        // A REST 401 can come from a stale bearer copy; only end the session
+        // when it cannot be restored or refreshed (checkSession signs out then).
+        await _authRepository.checkSession();
         state = state.copyWith(
           status: DashboardStatus.error,
           errorMessage: message,

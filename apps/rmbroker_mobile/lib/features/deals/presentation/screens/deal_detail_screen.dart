@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../chat/data/chat_contacts.dart';
 import '../../domain/deal_model.dart';
 import '../controllers/deal_detail_controller.dart';
 import '../controllers/deals_controller.dart';
@@ -444,6 +445,19 @@ class DealDetailScreen extends ConsumerWidget {
                 : VersionHistorySheet.show(context, dealId: dealId, dealRef: deal.ref),
           ),
           const SizedBox(height: 10),
+
+          // Explicit in-app chat with the buyer, linked to the deal's requirement.
+          if (deal.requirementId.isNotEmpty) ...[
+            _SectionHeaderCard(
+              key: const ValueKey('section_chat_buyer'),
+              icon: LucideIcons.messagesSquare,
+              title: 'Chat with Buyer',
+              subtitle: 'Two-way chat about this deal\'s requirement',
+              trailing: const Icon(LucideIcons.chevronRight, size: 20, color: AppColors.textSecondaryLight),
+              onTap: () => openChatForContext(context, requirementId: deal.requirementId),
+            ),
+            const SizedBox(height: 10),
+          ],
 
           // 4. Collapsible sections (each collapsed whenever the page opens)
           _AccordionCard(

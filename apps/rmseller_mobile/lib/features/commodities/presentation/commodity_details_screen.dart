@@ -1050,15 +1050,23 @@ class _CommodityDetailsScreenState extends State<CommodityDetailsScreen> {
                           _contactLauncher.launchWhatsApp(effectiveBrokerPhone),
                     ),
                     const SizedBox(width: 8),
+                    // In-app two-way chat with this lot's assigned broker,
+                    // linked to this offer (0067; general thread before it).
                     _buildContactIcon(
                       key: const Key('lot_broker_chat'),
-                      icon: LucideIcons.messageSquare,
-                      tooltip: 'Broker Chat & Commission Desk',
+                      icon: LucideIcons.messagesSquare,
+                      tooltip: 'Chat with Broker',
                       color: AppColors.info,
-                      onPressed: () => context.push(
-                        '/commodities/${lot.id}/negotiate',
-                        extra: lot,
-                      ),
+                      onPressed: () {
+                        final brokerId = lot.assignedBrokerId;
+                        if (brokerId == null || brokerId.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text('Assign a broker to this lot to chat about it.'),
+                          ));
+                          return;
+                        }
+                        context.push('/chats/broker/$brokerId?availabilityId=${lot.id}');
+                      },
                     ),
                     if (lot.isActive) ...[
                       const SizedBox(width: 12),

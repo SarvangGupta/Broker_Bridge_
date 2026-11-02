@@ -221,14 +221,15 @@ void main() {
       );
     });
 
-    test('brokers and sellers cannot start conversations; buyers cannot target sellers', () {
+    test('brokers cannot start via a broker id; sellers can (0066); buyers cannot target sellers', () {
       expect(
         () => s.send(broker, body: 'x', clientId: 'a', brokerId: broker),
         throwsStateError,
       );
+      // 0066: sellers may open a conversation with a broker (as buyers can).
       expect(
-        () => s.send(seller, body: 'x', clientId: 'b', brokerId: broker),
-        throwsStateError,
+        s.send(seller, body: 'x', clientId: 'b', brokerId: broker).senderId,
+        seller,
       );
       expect(
         () => s.send(buyerA, body: 'x', clientId: 'c', brokerId: seller),

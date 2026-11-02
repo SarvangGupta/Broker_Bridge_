@@ -152,15 +152,20 @@ class AuthRepository {
       final check = await SessionGuard.ensureValidSession(client, storage: _storage);
       if (check == SessionCheck.signedOut) {
         final hadSession = client.auth.currentSession != null ||
-            (await _storage.getToken())?.isNotEmpty == true;
+            (await _safeRead(_storage.getToken))?.isNotEmpty == true;
         await signOut();
         return hadSession ? SessionStatus.expired : SessionStatus.unauthenticated;
       }
       final session = client.auth.currentSession;
       if (session != null) {
-
-        // Check role authorization
-        final storedRole = await _storage.getUserRole();
+        // The Supabase session is authoritative. The cached identity can be
+        // missing (Keystore reset, earlier 401 cleanup) or stale; rebuild it
+        // from the profile instead of rejecting a valid session.
+        final cachedId = await _safeRead(_storage.getUserId);
+        var storedRole = await _safeRead(_storage.getUserRole);
+        if (storedRole == null || storedRole.isEmpty || cachedId != session.user.id) {
+          storedRole = await _restoreIdentity(client, session.user);
+        }
         final metaRole = session.user.userMetadata?['role'] as String?;
         final role = (storedRole ?? metaRole ?? '').toLowerCase().trim();
 
@@ -186,6 +191,38 @@ class AuthRepository {
     }
 
     return SessionStatus.unauthenticated;
+  }
+
+  /// Re-resolves the broker's role and name from `public.users` for a restored
+  /// session and re-caches them. Returns the role, or null if unavailable.
+  Future<String?> _restoreIdentity(SupabaseClient client, User user) async {
+    try {
+      final profile = await client
+          .from('users')
+          .select('id, role, full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+      final role = (profile?['role'] as String?)?.toLowerCase().trim();
+      if (role == null || role.isEmpty) return null;
+      await _storage.saveUserInfo(
+        id: user.id,
+        role: role,
+        email: user.email,
+        fullName: (profile?['full_name'] as String?) ??
+            (user.userMetadata?['full_name'] as String?),
+      );
+      return role;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> _safeRead(Future<String?> Function() read) async {
+    try {
+      return await read();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Retrieve the current logged-in broker details from secure storage.

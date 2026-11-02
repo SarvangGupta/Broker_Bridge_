@@ -35,6 +35,14 @@ class SellerMoreScreen extends StatelessWidget {
             onTap: () => context.go('/more/profile?scanInvoice=true'),
           ),
           _MoreMenuTile(
+            key: const Key('more_menu_messages'),
+            icon: LucideIcons.messagesSquare,
+            color: AppColors.primary,
+            title: 'Messages',
+            subtitle: 'Chats with your brokers',
+            onTap: () => context.push('/chats'),
+          ),
+          _MoreMenuTile(
             key: const Key('more_menu_settings'),
             icon: LucideIcons.settings,
             color: AppColors.info,

@@ -45,6 +45,7 @@ void main() {
         ),
       ),
       GoRoute(path: '/directory', builder: (_, _) => const Scaffold(body: Text('DIRECTORY SCREEN'))),
+      GoRoute(path: '/chats', builder: (_, _) => const Scaffold(body: Text('CHAT INBOX'))),
     ]);
     await tester.pumpWidget(ProviderScope(child: MaterialApp.router(routerConfig: router)));
     await tester.tap(find.text('open desk'));
@@ -124,12 +125,15 @@ void main() {
     expect(launched.single, contains('wa.me/919876500999'));
   });
 
-  testWidgets('Chat states it is unavailable; Info opens the minimal dialog', (tester) async {
+  testWidgets('Chat opens the in-app chat inbox; Info opens the minimal dialog', (tester) async {
     await pump(tester);
     await tester.tap(card('chat'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('In-app chat is not available yet'), findsOneWidget);
+    expect(find.text('CHAT INBOX'), findsOneWidget);
+    expect(find.textContaining('In-app chat is not available yet'), findsNothing);
 
+    tester.state<NavigatorState>(find.byType(Navigator).last).pop();
+    await tester.pumpAndSettle();
     await tester.tap(find.text('open desk'));
     await tester.pumpAndSettle();
     await tester.tap(card('info'));

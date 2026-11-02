@@ -51,7 +51,9 @@ class AuthInterceptor extends Interceptor {
         }
 
         if (statusCode == 401) {
-          storage.clearAll();
+          // Do not wipe the cached identity here: the bearer copy may just be
+          // stale while the Supabase session is still refreshable. Explicit
+          // sign-out or a rejected refresh token clears the session.
           onSessionExpired?.call();
           exception = UnauthorizedException(message: errorMessage);
         } else if (statusCode == 403) {

@@ -727,14 +727,26 @@ class _BrokerProfileScreenState extends State<BrokerProfileScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Broker Chat & Commission Desk
+          // In-app chat with this broker (shared two-way chat module).
           AppButton(
-            label: 'Broker Chat & Commission Desk',
-            icon: LucideIcons.messageSquare,
+            key: const ValueKey('chat_with_broker_button'),
+            label: 'Chat with Broker',
+            icon: LucideIcons.messagesSquare,
+            onPressed: () {
+              context.push('/chats/broker/${broker.id}', extra: broker);
+            },
+            variant: ButtonVariant.primary,
+          ),
+          const SizedBox(height: 12),
+
+          // Commission terms and negotiation history
+          AppButton(
+            label: 'Commission & Negotiation Desk',
+            icon: LucideIcons.handshake,
             onPressed: () {
               context.push('/communication/broker/${broker.id}', extra: broker);
             },
-            variant: ButtonVariant.primary,
+            variant: ButtonVariant.outline,
           ),
           const SizedBox(height: 12),
 

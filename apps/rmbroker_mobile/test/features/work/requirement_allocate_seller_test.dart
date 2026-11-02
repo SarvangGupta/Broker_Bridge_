@@ -43,14 +43,19 @@ RequirementItem requirement() => RequirementItem.fromJson({
       'created_at': '2026-10-25T02:31:08.690',
     });
 
-OfferItem lot(String id, {String broker = varun, bool verified = true, String commodityId = 'maize-ddgs'}) =>
+OfferItem lot(String id,
+        {String? broker = varun,
+        bool verified = true,
+        String commodityId = 'maize-ddgs',
+        String? commodityName,
+        String status = 'Open'}) =>
     OfferItem.fromJson({
       'id': id,
       'lot_number': 'LOT-$id',
       'seller_company_name': 'Seller $id',
       'seller_company_verified': verified,
       'commodity_id': commodityId,
-      'commodity_name': commodityId == 'maize-ddgs' ? 'Maize DDGS' : 'Wheat',
+      'commodity_name': commodityName ?? (commodityId == 'maize-ddgs' ? 'Maize DDGS' : 'Wheat'),
       'grade_id': 'grade-good',
       'grade_name': 'Good',
       'unit_id': 'unit-mt',
@@ -62,7 +67,7 @@ OfferItem lot(String id, {String broker = varun, bool verified = true, String co
       'district_name': 'Kota',
       'available_from': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
       'valid_until': DateTime.now().add(const Duration(days: 20)).toIso8601String(),
-      'status': 'Open',
+      'status': status,
       'broker_id': broker,
       'created_at': '2026-10-20T00:00:00.000',
     });
@@ -203,30 +208,97 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('unallocated requirement shows Allocate Seller; picker lists only eligible verified own lots',
-      (tester) async {
+  ListTile tile(WidgetTester tester, String id) =>
+      tester.widget<ListTile>(find.byKey(ValueKey('seller_lot_$id')));
+
+  Future<void> openPicker(WidgetTester tester, {String key = 'allocate_seller_button'}) async {
+    await tester.ensureVisible(find.byKey(ValueKey(key)));
+    await tester.tap(find.byKey(ValueKey(key)));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('picker lists every matching seller; own and unassigned verified lots are selectable', (tester) async {
     await pump(tester,
         work: FakeWork([
           lot('lot-mine'),
           lot('lot-other-desk', broker: otherBroker),
+          lot('lot-unassigned', broker: null),
           lot('lot-unverified', verified: false),
           lot('lot-wheat', commodityId: 'wheat'),
         ]),
         deals: FakeDeals());
 
     expect(find.text('No seller lot has been allocated to this requirement yet.'), findsOneWidget);
-    expect(find.byKey(const ValueKey('allocate_seller_button')), findsOneWidget);
-
-    await tester.ensureVisible(find.byKey(const ValueKey('allocate_seller_button')));
-    await tester.tap(find.byKey(const ValueKey('allocate_seller_button')));
-    await tester.pumpAndSettle();
+    await openPicker(tester);
 
     // Still on the requirement page, with the picker over it.
     expect(find.byType(RequirementDetailScreen), findsOneWidget);
-    expect(find.byKey(const ValueKey('seller_lot_lot-mine')), findsOneWidget);
-    expect(find.byKey(const ValueKey('seller_lot_lot-other-desk')), findsNothing);
-    expect(find.byKey(const ValueKey('seller_lot_lot-unverified')), findsNothing);
+    expect(tile(tester, 'lot-mine').enabled, isTrue);
+    expect(tile(tester, 'lot-other-desk').enabled, isFalse);
+    expect(find.textContaining('Managed by another broker desk'), findsOneWidget);
+    // Unassigned global listings are allocatable via broker_allocate_lot (0068);
+    // the database enforces the rules.
+    expect(tile(tester, 'lot-unassigned').enabled, isTrue);
+    expect(find.textContaining('Unassigned listing'), findsOneWidget);
+    expect(tile(tester, 'lot-unverified').enabled, isFalse);
+    expect(find.textContaining('Seller not verified'), findsOneWidget);
+    // Different commodity: never listed.
     expect(find.byKey(const ValueKey('seller_lot_lot-wheat')), findsNothing);
+  });
+
+  testWidgets('matches on canonical commodity_id, not the display name', (tester) async {
+    await pump(tester,
+        work: FakeWork([
+          lot('lot-renamed', commodityName: 'DDGS (Maize)'),
+          lot('lot-same-name-other-id', commodityId: 'other-ddgs', commodityName: 'Maize DDGS'),
+        ]),
+        deals: FakeDeals());
+    await openPicker(tester);
+    expect(find.byKey(const ValueKey('seller_lot_lot-renamed')), findsOneWidget);
+    expect(find.byKey(const ValueKey('seller_lot_lot-same-name-other-id')), findsNothing);
+  });
+
+  testWidgets('all matching sellers are listed and cancelled/sold-out lots excluded', (tester) async {
+    await pump(tester,
+        work: FakeWork([
+          for (var i = 1; i <= 6; i++) lot('lot-$i'),
+          lot('lot-cancelled', status: 'Cancelled'),
+        ]),
+        deals: FakeDeals());
+    await openPicker(tester);
+    for (var i = 1; i <= 6; i++) {
+      expect(find.byKey(ValueKey('seller_lot_lot-$i')), findsOneWidget);
+    }
+    expect(find.byKey(const ValueKey('seller_lot_lot-cancelled')), findsNothing);
+  });
+
+  testWidgets('no candidates: shows the empty state only after a successful load', (tester) async {
+    await pump(tester, work: FakeWork([lot('lot-wheat', commodityId: 'wheat')]), deals: FakeDeals());
+    await openPicker(tester);
+    expect(find.byKey(const ValueKey('no_matching_sellers')), findsOneWidget);
+  });
+
+  testWidgets('allocated lot cannot be picked again; another seller can be added', (tester) async {
+    final deals = FakeDeals();
+    deals.allocations.add(AllocationItem.fromJson({
+      'id': 'alloc-0',
+      'allocation_reference': 'ALC-000000',
+      'requirement_id': reqId,
+      'availability_id': 'lot-mine',
+      'allocated_quantity': 10,
+      'unit_symbol': 'MT',
+      'seller_company_name': 'Seller lot-mine',
+      'status': 'CONFIRMED',
+    }));
+    await pump(tester, work: FakeWork([lot('lot-mine'), lot('lot-mine-2')]), deals: deals);
+
+    expect(find.byKey(const ValueKey('linked_alloc_alloc-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('allocate_seller_button')), findsNothing);
+    await openPicker(tester, key: 'allocate_another_seller_button');
+
+    expect(tile(tester, 'lot-mine').enabled, isFalse);
+    expect(find.textContaining('Already allocated to this requirement'), findsOneWidget);
+    expect(tile(tester, 'lot-mine-2').enabled, isTrue);
   });
 
   testWidgets('successful allocation persists, creates no deal and updates the section', (tester) async {

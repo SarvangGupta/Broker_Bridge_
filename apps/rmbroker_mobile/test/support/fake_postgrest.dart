@@ -10,7 +10,10 @@ class FakeRequest {
   final Map<String, String> query;
   final Object? body;
 
-  FakeRequest(this.method, this.table, this.query, this.body);
+  FakeRequest(this.method, this.table, this.query, this.body, {this.isRpc = false});
+
+  /// A `POST /rpc/<function>` call; [table] holds the function name.
+  final bool isRpc;
 
   /// Value of a filter parameter such as `id` → `eq.x`.
   String? filter(String column) => query[column];
@@ -55,7 +58,8 @@ class FakePostgrest {
     await _server.close(force: true);
   }
 
-  List<FakeRequest> writes() => requests.where((r) => r.method != 'GET').toList();
+  /// Table writes only; RPC calls (`/rpc/<fn>`) are not table writes.
+  List<FakeRequest> writes() => requests.where((r) => r.method != 'GET' && !r.isRpc).toList();
 
   List<FakeRequest> writesTo(String table) => writes().where((r) => r.table == table).toList();
 
@@ -107,9 +111,10 @@ class FakePostgrest {
 
   Future<void> _handle(HttpRequest req) async {
     final table = req.uri.pathSegments.last;
+    final isRpc = req.uri.pathSegments.contains('rpc');
     final raw = await utf8.decoder.bind(req).join();
     final body = raw.isEmpty ? null : jsonDecode(raw);
-    final request = FakeRequest(req.method, table, req.uri.queryParameters, body);
+    final request = FakeRequest(req.method, table, req.uri.queryParameters, body, isRpc: isRpc);
     requests.add(request);
 
     final wantsObject = (req.headers.value('accept') ?? '').contains('vnd.pgrst.object');
@@ -124,6 +129,10 @@ class FakePostgrest {
 
     final failure = failWith?.call(request);
     if (failure != null) return send(failure.$1, failure.$2);
+    // Like PostgREST for a function that is not deployed.
+    if (isRpc) {
+      return send(404, {'code': 'PGRST202', 'message': 'Could not find the function public.$table'});
+    }
 
     List<Map<String, dynamic>> result;
     switch (req.method) {

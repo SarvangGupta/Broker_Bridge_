@@ -620,11 +620,14 @@ class DealRepository {
       debugPrint('REST propose allocation error: $e');
     }
 
-    // 2. Direct Supabase PostgREST insertion fallback
+    // 2. Direct Supabase: the atomic broker_allocate_lot function (0068) when
+    // deployed; otherwise the multi-step PostgREST path below.
     try {
       final client = _supabase;
       final brokerId = activeBrokerId();
       if (client != null && brokerId != null) {
+        final viaRpc = await _allocateViaRpc(client, dto);
+        if (viaRpc != null) return viaRpc;
         return await _allocateWithReservation(client, brokerId, dto);
       }
     } catch (supabaseErr) {
@@ -635,6 +638,34 @@ class DealRepository {
     return const DealContractPending(
       contractNotice: 'Allocation proposal service is currently unavailable.',
     );
+  }
+
+  /// One-transaction allocation in the database (proposed migration 0068):
+  /// requirement/lot locks, commodity and quantity checks, stock reservation
+  /// and duplicate prevention are all enforced server-side, and unassigned
+  /// global lots can be allocated. Returns null when the function is not
+  /// deployed, so the caller can use the existing multi-step path.
+  Future<DealDataResult<AllocationItem>?> _allocateViaRpc(SupabaseClient client, CreateAllocationDto dto) async {
+    try {
+      final row = await client.rpc('broker_allocate_lot', params: {
+        'p_requirement_id': dto.requirementId,
+        'p_availability_id': dto.availabilityId,
+        'p_quantity': dto.proposedQuantity,
+        'p_price': dto.agreedPrice,
+        'p_price_basis': dto.priceBasis,
+        'p_notes': dto.notes,
+      });
+      // The deployed function always returns the allocation row.
+      if (row is! Map) return null;
+      return DealSuccess(AllocationItem.fromJson({
+        ...Map<String, dynamic>.from(row),
+        'unit_symbol': dto.unitSymbol,
+        'seller_company_name': 'Allocated Seller Lot',
+      }));
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST202' || e.code == '42883') return null;
+      return DealError(message: e.message);
+    }
   }
 
   /// Direct-database allocation following the web desk's propose + confirm rules
@@ -697,8 +728,11 @@ class DealRepository {
     }
     if (lot['broker_id']?.toString() != brokerId) {
       // RLS lets only the managing broker update the lot, so stock cannot be reserved.
-      return const DealError(
-        message: 'This seller lot is managed by another broker desk; only that desk can reserve its stock.',
+      return DealError(
+        message: lot['broker_id'] == null
+            ? 'This seller listing has no broker yet. Allocating unassigned listings needs a server update '
+                'that is pending approval; ask the seller to assign your desk meanwhile.'
+            : 'This seller lot is managed by another broker desk; only that desk can reserve its stock.',
       );
     }
     final lotUnit = (lot['master_units'] as Map<String, dynamic>?)?['symbol']?.toString() ?? reqUnit;

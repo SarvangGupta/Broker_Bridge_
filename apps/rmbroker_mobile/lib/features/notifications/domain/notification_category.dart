@@ -82,6 +82,17 @@ enum NotificationCategory {
       case 'AVAILABILITY_REJECTED':
       case 'AVAILABILITY_EXPIRING':
       case 'AVAILABILITY_EXPIRED':
+      // Seller listing changes (proposed migration 0065)
+      case 'AVAILABILITY_CREATED':
+      case 'AVAILABILITY_ASSIGNED':
+      case 'AVAILABILITY_UPDATED':
+      case 'AVAILABILITY_PRICE_UPDATED':
+      case 'AVAILABILITY_QUANTITY_UPDATED':
+      case 'AVAILABILITY_LOCATION_UPDATED':
+      case 'AVAILABILITY_PAYMENT_TERMS_UPDATED':
+      case 'AVAILABILITY_QUALITY_UPDATED':
+      case 'AVAILABILITY_STATUS_CHANGED':
+      case 'AVAILABILITY_REMOVED':
       case 'MATCH_CREATED':
       case 'MATCH_UPDATED':
       case 'REQUIREMENT_CREATED':

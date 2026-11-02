@@ -203,6 +203,7 @@ class AppRouter {
           final broker = state.extra as BrokerModel?;
           return ChatScreen(
             brokerId: state.pathParameters['brokerId'],
+            requirementId: state.uri.queryParameters['requirementId'],
             fallbackName: broker?.name,
             fallbackCompany: broker == null ? null : brokerFirmName(broker),
           );

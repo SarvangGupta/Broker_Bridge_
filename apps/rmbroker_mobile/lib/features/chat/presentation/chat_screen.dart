@@ -8,12 +8,20 @@ import '../data/chat_gateway.dart';
 import '../domain/chat_models.dart';
 import 'chat_controller.dart';
 
-/// One Buyer <-> Broker conversation. Shows "Start a conversation" until the
+/// One broker-mediated conversation (Buyer or Seller <-> Broker). Shows
+/// "Start a conversation" until the
 /// first message exists. No presence, typing or call features: the backend
 /// has none, so none are shown.
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
   final String? brokerId;
+
+  /// Broker side: the buyer or seller to start a conversation with (0066).
+  final String? counterpartId;
+
+  /// Requirement / offer this chat is about (0067); null = general thread.
+  final String? requirementId;
+  final String? availabilityId;
 
   /// Header identity before the conversation summary loads (e.g. the broker
   /// record the buyer tapped). Replaced by the server's view once available.
@@ -28,11 +36,14 @@ class ChatScreen extends StatefulWidget {
     super.key,
     this.conversationId,
     this.brokerId,
+    this.counterpartId,
+    this.requirementId,
+    this.availabilityId,
     this.fallbackName,
     this.fallbackCompany,
     this.emptyHint = 'Discuss requirements, pricing, lot matching or dispatch. Seller identities stay protected.',
     this.gateway,
-  }) : assert(conversationId != null || brokerId != null);
+  }) : assert(conversationId != null || brokerId != null || counterpartId != null);
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -51,6 +62,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       gateway: widget.gateway ?? SupabaseChatGateway(),
       conversationId: widget.conversationId,
       brokerId: widget.brokerId,
+      counterpartId: widget.counterpartId,
+      requirementId: widget.requirementId,
+      availabilityId: widget.availabilityId,
     )..addListener(_changed);
     _c.init();
     _scroll.addListener(() {
@@ -90,7 +104,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final s = _c.summary;
     final name = s?.counterpartName ?? widget.fallbackName ?? 'Conversation';
-    final company = s?.counterpartCompany ?? widget.fallbackCompany;
+    final company = [
+      ?s?.roleLabel,
+      ?(s?.counterpartCompany ?? widget.fallbackCompany),
+      ?s?.contextLabel,
+    ].join(' · ');
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
@@ -118,7 +136,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       color: AppColors.textPrimaryLight,
                     ),
                   ),
-                  if (company != null)
+                  if (company.isNotEmpty)
                     Text(
                       company,
                       maxLines: 1,
